@@ -18,8 +18,11 @@ export type Database = {
         Row: {
           additional_notes: string | null
           alcohol: string | null
+          authorizes_plan: string | null
           available_days: string | null
           available_equipment: string | null
+          aware_of_trilogy: string | null
+          biggest_obstacle: string | null
           commits_communication: boolean | null
           company_id: string | null
           created_at: string
@@ -30,6 +33,8 @@ export type Database = {
           diseases: string | null
           emergency_contact: string | null
           experience_level: string | null
+          extra_comments: string | null
+          feel_in_3_months: string | null
           food_allergies: string | null
           goals: string | null
           health_conditions: string | null
@@ -67,8 +72,11 @@ export type Database = {
         Insert: {
           additional_notes?: string | null
           alcohol?: string | null
+          authorizes_plan?: string | null
           available_days?: string | null
           available_equipment?: string | null
+          aware_of_trilogy?: string | null
+          biggest_obstacle?: string | null
           commits_communication?: boolean | null
           company_id?: string | null
           created_at?: string
@@ -79,6 +87,8 @@ export type Database = {
           diseases?: string | null
           emergency_contact?: string | null
           experience_level?: string | null
+          extra_comments?: string | null
+          feel_in_3_months?: string | null
           food_allergies?: string | null
           goals?: string | null
           health_conditions?: string | null
@@ -116,8 +126,11 @@ export type Database = {
         Update: {
           additional_notes?: string | null
           alcohol?: string | null
+          authorizes_plan?: string | null
           available_days?: string | null
           available_equipment?: string | null
+          aware_of_trilogy?: string | null
+          biggest_obstacle?: string | null
           commits_communication?: boolean | null
           company_id?: string | null
           created_at?: string
@@ -128,6 +141,8 @@ export type Database = {
           diseases?: string | null
           emergency_contact?: string | null
           experience_level?: string | null
+          extra_comments?: string | null
+          feel_in_3_months?: string | null
           food_allergies?: string | null
           goals?: string | null
           health_conditions?: string | null
@@ -1549,9 +1564,13 @@ export type Database = {
           completed_at: string | null
           created_at: string
           duration_minutes: number | null
+          exercise_index: number | null
           exercises_data: Json | null
           id: string
           notes: string | null
+          reps_done: number | null
+          session_date: string | null
+          set_number: number | null
           student_id: string
           weight: number | null
           workout_id: string
@@ -1560,9 +1579,13 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           duration_minutes?: number | null
+          exercise_index?: number | null
           exercises_data?: Json | null
           id?: string
           notes?: string | null
+          reps_done?: number | null
+          session_date?: string | null
+          set_number?: number | null
           student_id: string
           weight?: number | null
           workout_id: string
@@ -1571,9 +1594,13 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           duration_minutes?: number | null
+          exercise_index?: number | null
           exercises_data?: Json | null
           id?: string
           notes?: string | null
+          reps_done?: number | null
+          session_date?: string | null
+          set_number?: number | null
           student_id?: string
           weight?: number | null
           workout_id?: string

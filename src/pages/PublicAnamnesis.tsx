@@ -153,9 +153,9 @@ export default function PublicAnamnesis() {
         ...payload,
         version: (existing.version || 1) + 1,
         updated_at: new Date().toISOString(),
-      }).eq("id", existing.id));
+      } as any).eq("id", existing.id));
     } else {
-      ({ error } = await supabase.from("anamnesis").insert(payload));
+      ({ error } = await supabase.from("anamnesis").insert(payload as any));
     }
 
     setSaving(false);
