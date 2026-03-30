@@ -298,7 +298,7 @@ export default function StudentDetail() {
     const { data: anamnesisData } = await supabase
       .from("anamnesis").select("*").eq("student_id", studentId)
       .order("version", { ascending: false }).limit(1).maybeSingle();
-    setAnamnesis(anamnesisData as Anamnesis | null);
+    setAnamnesis(anamnesisData as unknown as Anamnesis | null);
 
     const { data: enrollmentData } = await supabase
       .from("enrollments").select("*").eq("student_id", studentId)
