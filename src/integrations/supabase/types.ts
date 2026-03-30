@@ -28,7 +28,9 @@ export type Database = {
           data: Json | null
           diet_type: string | null
           diseases: string | null
+          emergency_contact: string | null
           experience_level: string | null
+          food_allergies: string | null
           goals: string | null
           health_conditions: string | null
           hydration: string | null
@@ -37,11 +39,18 @@ export type Database = {
           medical_release: string | null
           medications: string | null
           modalities: string | null
+          motivation: string | null
+          nutrition: string | null
           nutrition_habits: string | null
+          observation: string | null
           pain_areas: string | null
           physical_activity_level: string | null
+          previous_experience: string | null
+          profession: string | null
+          restorative_sleep: string | null
           restrictions: string | null
           session_duration: string | null
+          sleep_hours: string | null
           sleep_quality: string | null
           smoking: string | null
           stress_level: string | null
@@ -68,7 +77,9 @@ export type Database = {
           data?: Json | null
           diet_type?: string | null
           diseases?: string | null
+          emergency_contact?: string | null
           experience_level?: string | null
+          food_allergies?: string | null
           goals?: string | null
           health_conditions?: string | null
           hydration?: string | null
@@ -77,11 +88,18 @@ export type Database = {
           medical_release?: string | null
           medications?: string | null
           modalities?: string | null
+          motivation?: string | null
+          nutrition?: string | null
           nutrition_habits?: string | null
+          observation?: string | null
           pain_areas?: string | null
           physical_activity_level?: string | null
+          previous_experience?: string | null
+          profession?: string | null
+          restorative_sleep?: string | null
           restrictions?: string | null
           session_duration?: string | null
+          sleep_hours?: string | null
           sleep_quality?: string | null
           smoking?: string | null
           stress_level?: string | null
@@ -108,7 +126,9 @@ export type Database = {
           data?: Json | null
           diet_type?: string | null
           diseases?: string | null
+          emergency_contact?: string | null
           experience_level?: string | null
+          food_allergies?: string | null
           goals?: string | null
           health_conditions?: string | null
           hydration?: string | null
@@ -117,11 +137,18 @@ export type Database = {
           medical_release?: string | null
           medications?: string | null
           modalities?: string | null
+          motivation?: string | null
+          nutrition?: string | null
           nutrition_habits?: string | null
+          observation?: string | null
           pain_areas?: string | null
           physical_activity_level?: string | null
+          previous_experience?: string | null
+          profession?: string | null
+          restorative_sleep?: string | null
           restrictions?: string | null
           session_duration?: string | null
+          sleep_hours?: string | null
           sleep_quality?: string | null
           smoking?: string | null
           stress_level?: string | null
@@ -1030,6 +1057,7 @@ export type Database = {
           notes: string | null
           photos: Json | null
           student_id: string
+          type: string | null
           updated_at: string
           weight: number | null
         }
@@ -1046,6 +1074,7 @@ export type Database = {
           notes?: string | null
           photos?: Json | null
           student_id: string
+          type?: string | null
           updated_at?: string
           weight?: number | null
         }
@@ -1062,6 +1091,7 @@ export type Database = {
           notes?: string | null
           photos?: Json | null
           student_id?: string
+          type?: string | null
           updated_at?: string
           weight?: number | null
         }
@@ -1523,6 +1553,7 @@ export type Database = {
           id: string
           notes: string | null
           student_id: string
+          weight: number | null
           workout_id: string
         }
         Insert: {
@@ -1533,6 +1564,7 @@ export type Database = {
           id?: string
           notes?: string | null
           student_id: string
+          weight?: number | null
           workout_id: string
         }
         Update: {
@@ -1543,6 +1575,7 @@ export type Database = {
           id?: string
           notes?: string | null
           student_id?: string
+          weight?: number | null
           workout_id?: string
         }
         Relationships: [
