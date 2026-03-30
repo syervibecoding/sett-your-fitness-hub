@@ -568,9 +568,9 @@ export default function StudentDetail() {
 
     let error;
     if (anamnesis) {
-      ({ error } = await supabase.from("anamnesis").update(payload).eq("id", anamnesis.id));
+      ({ error } = await supabase.from("anamnesis").update(payload as any).eq("id", anamnesis.id));
     } else {
-      ({ error } = await supabase.from("anamnesis").insert(payload));
+      ({ error } = await supabase.from("anamnesis").insert(payload as any));
     }
     setSaving(false);
     if (error) { toast({ title: "Erro ao salvar anamnese", description: error.message, variant: "destructive" }); return; }
