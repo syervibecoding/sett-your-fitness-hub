@@ -16,28 +16,91 @@ export type Database = {
     Tables: {
       anamnesis: {
         Row: {
+          additional_notes: string | null
+          alcohol: string | null
+          available_days: string | null
           company_id: string | null
           created_at: string
           data: Json | null
+          experience_level: string | null
+          goals: string | null
+          health_conditions: string | null
           id: string
+          injuries: string | null
+          medications: string | null
+          modalities: string | null
+          nutrition_habits: string | null
+          pain_areas: string | null
+          physical_activity_level: string | null
+          restrictions: string | null
+          session_duration: string | null
+          sleep_quality: string | null
+          smoking: string | null
+          stress_level: string | null
           student_id: string
           submitted_at: string | null
+          surgeries: string | null
+          training_days: string | null
+          version: number | null
+          water_intake: string | null
         }
         Insert: {
+          additional_notes?: string | null
+          alcohol?: string | null
+          available_days?: string | null
           company_id?: string | null
           created_at?: string
           data?: Json | null
+          experience_level?: string | null
+          goals?: string | null
+          health_conditions?: string | null
           id?: string
+          injuries?: string | null
+          medications?: string | null
+          modalities?: string | null
+          nutrition_habits?: string | null
+          pain_areas?: string | null
+          physical_activity_level?: string | null
+          restrictions?: string | null
+          session_duration?: string | null
+          sleep_quality?: string | null
+          smoking?: string | null
+          stress_level?: string | null
           student_id: string
           submitted_at?: string | null
+          surgeries?: string | null
+          training_days?: string | null
+          version?: number | null
+          water_intake?: string | null
         }
         Update: {
+          additional_notes?: string | null
+          alcohol?: string | null
+          available_days?: string | null
           company_id?: string | null
           created_at?: string
           data?: Json | null
+          experience_level?: string | null
+          goals?: string | null
+          health_conditions?: string | null
           id?: string
+          injuries?: string | null
+          medications?: string | null
+          modalities?: string | null
+          nutrition_habits?: string | null
+          pain_areas?: string | null
+          physical_activity_level?: string | null
+          restrictions?: string | null
+          session_duration?: string | null
+          sleep_quality?: string | null
+          smoking?: string | null
+          stress_level?: string | null
           student_id?: string
           submitted_at?: string | null
+          surgeries?: string | null
+          training_days?: string | null
+          version?: number | null
+          water_intake?: string | null
         }
         Relationships: [
           {
@@ -218,6 +281,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_active: boolean | null
           max_students: number | null
           name: string
           owner_id: string | null
@@ -231,6 +295,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_active?: boolean | null
           max_students?: number | null
           name: string
           owner_id?: string | null
@@ -244,6 +309,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_active?: boolean | null
           max_students?: number | null
           name?: string
           owner_id?: string | null
@@ -293,6 +359,7 @@ export type Database = {
           end_date: string | null
           id: string
           notes: string | null
+          payment_status: string | null
           plan_id: string | null
           start_date: string | null
           status: string | null
@@ -308,6 +375,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           notes?: string | null
+          payment_status?: string | null
           plan_id?: string | null
           start_date?: string | null
           status?: string | null
@@ -323,6 +391,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           notes?: string | null
+          payment_status?: string | null
           plan_id?: string | null
           start_date?: string | null
           status?: string | null
@@ -359,43 +428,52 @@ export type Database = {
         Row: {
           company_id: string | null
           created_at: string
+          created_by: string | null
           description: string | null
           difficulty: string | null
           equipment: string | null
           id: string
           is_global: boolean | null
+          muscle_group: string | null
           muscle_group_id: string | null
           name: string
           thumbnail_url: string | null
           updated_at: string
+          video_path: string | null
           video_url: string | null
         }
         Insert: {
           company_id?: string | null
           created_at?: string
+          created_by?: string | null
           description?: string | null
           difficulty?: string | null
           equipment?: string | null
           id?: string
           is_global?: boolean | null
+          muscle_group?: string | null
           muscle_group_id?: string | null
           name: string
           thumbnail_url?: string | null
           updated_at?: string
+          video_path?: string | null
           video_url?: string | null
         }
         Update: {
           company_id?: string | null
           created_at?: string
+          created_by?: string | null
           description?: string | null
           difficulty?: string | null
           equipment?: string | null
           id?: string
           is_global?: boolean | null
+          muscle_group?: string | null
           muscle_group_id?: string | null
           name?: string
           thumbnail_url?: string | null
           updated_at?: string
+          video_path?: string | null
           video_url?: string | null
         }
         Relationships: [
@@ -619,17 +697,20 @@ export type Database = {
           asaas_payment_id: string | null
           asaas_pix_payload: string | null
           asaas_pix_qr_code: string | null
+          billing_type: string | null
           company_id: string | null
           created_at: string
           due_date: string | null
           enrollment_id: string | null
           id: string
+          invoice_url: string | null
           notes: string | null
           paid_at: string | null
           payment_method: string | null
           status: string | null
           student_id: string
           updated_at: string
+          value: number | null
         }
         Insert: {
           amount?: number
@@ -638,17 +719,20 @@ export type Database = {
           asaas_payment_id?: string | null
           asaas_pix_payload?: string | null
           asaas_pix_qr_code?: string | null
+          billing_type?: string | null
           company_id?: string | null
           created_at?: string
           due_date?: string | null
           enrollment_id?: string | null
           id?: string
+          invoice_url?: string | null
           notes?: string | null
           paid_at?: string | null
           payment_method?: string | null
           status?: string | null
           student_id: string
           updated_at?: string
+          value?: number | null
         }
         Update: {
           amount?: number
@@ -657,17 +741,20 @@ export type Database = {
           asaas_payment_id?: string | null
           asaas_pix_payload?: string | null
           asaas_pix_qr_code?: string | null
+          billing_type?: string | null
           company_id?: string | null
           created_at?: string
           due_date?: string | null
           enrollment_id?: string | null
           id?: string
+          invoice_url?: string | null
           notes?: string | null
           paid_at?: string | null
           payment_method?: string | null
           status?: string | null
           student_id?: string
           updated_at?: string
+          value?: number | null
         }
         Relationships: [
           {
@@ -700,6 +787,7 @@ export type Database = {
           cycle_duration_days: number | null
           description: string | null
           duration_days: number | null
+          duration_weeks: number | null
           id: string
           is_active: boolean | null
           name: string
@@ -712,6 +800,7 @@ export type Database = {
           cycle_duration_days?: number | null
           description?: string | null
           duration_days?: number | null
+          duration_weeks?: number | null
           id?: string
           is_active?: boolean | null
           name: string
@@ -724,6 +813,7 @@ export type Database = {
           cycle_duration_days?: number | null
           description?: string | null
           duration_days?: number | null
+          duration_weeks?: number | null
           id?: string
           is_active?: boolean | null
           name?: string
@@ -947,10 +1037,12 @@ export type Database = {
       students: {
         Row: {
           address: string | null
+          address_number: string | null
           asaas_customer_id: string | null
           assigned_trainer_id: string | null
           birth_date: string | null
           category_id: string | null
+          cep: string | null
           city: string | null
           company_id: string | null
           cpf: string | null
@@ -961,21 +1053,26 @@ export type Database = {
           full_name: string
           gender: string | null
           id: string
+          neighborhood: string | null
           notes: string | null
           phone: string | null
           photo_url: string | null
+          selected_plan_id: string | null
           state: string | null
           status: string | null
           updated_at: string
           user_id: string | null
+          whatsapp: string | null
           zip_code: string | null
         }
         Insert: {
           address?: string | null
+          address_number?: string | null
           asaas_customer_id?: string | null
           assigned_trainer_id?: string | null
           birth_date?: string | null
           category_id?: string | null
+          cep?: string | null
           city?: string | null
           company_id?: string | null
           cpf?: string | null
@@ -986,21 +1083,26 @@ export type Database = {
           full_name: string
           gender?: string | null
           id?: string
+          neighborhood?: string | null
           notes?: string | null
           phone?: string | null
           photo_url?: string | null
+          selected_plan_id?: string | null
           state?: string | null
           status?: string | null
           updated_at?: string
           user_id?: string | null
+          whatsapp?: string | null
           zip_code?: string | null
         }
         Update: {
           address?: string | null
+          address_number?: string | null
           asaas_customer_id?: string | null
           assigned_trainer_id?: string | null
           birth_date?: string | null
           category_id?: string | null
+          cep?: string | null
           city?: string | null
           company_id?: string | null
           cpf?: string | null
@@ -1011,13 +1113,16 @@ export type Database = {
           full_name?: string
           gender?: string | null
           id?: string
+          neighborhood?: string | null
           notes?: string | null
           phone?: string | null
           photo_url?: string | null
+          selected_plan_id?: string | null
           state?: string | null
           status?: string | null
           updated_at?: string
           user_id?: string | null
+          whatsapp?: string | null
           zip_code?: string | null
         }
         Relationships: [
@@ -1035,10 +1140,18 @@ export type Database = {
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "students_selected_plan_id_fkey"
+            columns: ["selected_plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
         ]
       }
       training_cycles: {
         Row: {
+          company_id: string | null
           created_at: string
           cycle_number: number
           end_date: string
@@ -1048,6 +1161,7 @@ export type Database = {
           status: string | null
         }
         Insert: {
+          company_id?: string | null
           created_at?: string
           cycle_number?: number
           end_date: string
@@ -1057,6 +1171,7 @@ export type Database = {
           status?: string | null
         }
         Update: {
+          company_id?: string | null
           created_at?: string
           cycle_number?: number
           end_date?: string
@@ -1066,6 +1181,13 @@ export type Database = {
           status?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "training_cycles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "training_cycles_enrollment_id_fkey"
             columns: ["enrollment_id"]

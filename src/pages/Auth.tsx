@@ -54,8 +54,8 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md border-border bg-card">
         <CardHeader className="text-center space-y-4">
-          <img src={bnLogo} alt="BN Performance" className="h-20 mx-auto object-contain" />
-          <h1 className="text-3xl tracking-wider text-primary">BN PERFORMANCE</h1>
+          <img src={bnLogo} alt="Set Training" className="h-20 mx-auto object-contain" />
+          <h1 className="text-3xl tracking-wider text-primary">SET TRAINING</h1>
           <p className="text-muted-foreground text-sm font-sans">
             {isLogin ? "Acesse sua conta" : "Crie sua conta"}
           </p>
