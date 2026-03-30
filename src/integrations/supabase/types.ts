@@ -19,14 +19,22 @@ export type Database = {
           additional_notes: string | null
           alcohol: string | null
           available_days: string | null
+          available_equipment: string | null
+          commits_communication: boolean | null
           company_id: string | null
           created_at: string
+          current_pain: string | null
+          daily_meals: string | null
           data: Json | null
+          diet_type: string | null
+          diseases: string | null
           experience_level: string | null
           goals: string | null
           health_conditions: string | null
+          hydration: string | null
           id: string
           injuries: string | null
+          medical_release: string | null
           medications: string | null
           modalities: string | null
           nutrition_habits: string | null
@@ -39,8 +47,11 @@ export type Database = {
           stress_level: string | null
           student_id: string
           submitted_at: string | null
+          supplement_use: string | null
           surgeries: string | null
           training_days: string | null
+          training_location: string | null
+          updated_at: string | null
           version: number | null
           water_intake: string | null
         }
@@ -48,14 +59,22 @@ export type Database = {
           additional_notes?: string | null
           alcohol?: string | null
           available_days?: string | null
+          available_equipment?: string | null
+          commits_communication?: boolean | null
           company_id?: string | null
           created_at?: string
+          current_pain?: string | null
+          daily_meals?: string | null
           data?: Json | null
+          diet_type?: string | null
+          diseases?: string | null
           experience_level?: string | null
           goals?: string | null
           health_conditions?: string | null
+          hydration?: string | null
           id?: string
           injuries?: string | null
+          medical_release?: string | null
           medications?: string | null
           modalities?: string | null
           nutrition_habits?: string | null
@@ -68,8 +87,11 @@ export type Database = {
           stress_level?: string | null
           student_id: string
           submitted_at?: string | null
+          supplement_use?: string | null
           surgeries?: string | null
           training_days?: string | null
+          training_location?: string | null
+          updated_at?: string | null
           version?: number | null
           water_intake?: string | null
         }
@@ -77,14 +99,22 @@ export type Database = {
           additional_notes?: string | null
           alcohol?: string | null
           available_days?: string | null
+          available_equipment?: string | null
+          commits_communication?: boolean | null
           company_id?: string | null
           created_at?: string
+          current_pain?: string | null
+          daily_meals?: string | null
           data?: Json | null
+          diet_type?: string | null
+          diseases?: string | null
           experience_level?: string | null
           goals?: string | null
           health_conditions?: string | null
+          hydration?: string | null
           id?: string
           injuries?: string | null
+          medical_release?: string | null
           medications?: string | null
           modalities?: string | null
           nutrition_habits?: string | null
@@ -97,8 +127,11 @@ export type Database = {
           stress_level?: string | null
           student_id?: string
           submitted_at?: string | null
+          supplement_use?: string | null
           surgeries?: string | null
           training_days?: string | null
+          training_location?: string | null
+          updated_at?: string | null
           version?: number | null
           water_intake?: string | null
         }
@@ -285,6 +318,7 @@ export type Database = {
           max_students: number | null
           name: string
           owner_id: string | null
+          owner_user_id: string | null
           slug: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -299,6 +333,7 @@ export type Database = {
           max_students?: number | null
           name: string
           owner_id?: string | null
+          owner_user_id?: string | null
           slug?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -313,6 +348,7 @@ export type Database = {
           max_students?: number | null
           name?: string
           owner_id?: string | null
+          owner_user_id?: string | null
           slug?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -638,6 +674,8 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          shortcut: string | null
+          title: string | null
           updated_at: string
           variables: Json | null
         }
@@ -648,6 +686,8 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          shortcut?: string | null
+          title?: string | null
           updated_at?: string
           variables?: Json | null
         }
@@ -658,6 +698,8 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          shortcut?: string | null
+          title?: string | null
           updated_at?: string
           variables?: Json | null
         }
@@ -946,6 +988,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          sort_order: number | null
         }
         Insert: {
           color?: string | null
@@ -953,6 +996,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          sort_order?: number | null
         }
         Update: {
           color?: string | null
@@ -960,6 +1004,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          sort_order?: number | null
         }
         Relationships: [
           {
@@ -978,6 +1023,7 @@ export type Database = {
           created_at: string
           evaluation_date: string | null
           evaluator_id: string | null
+          file_url: string | null
           height: number | null
           id: string
           measurements: Json | null
@@ -993,6 +1039,7 @@ export type Database = {
           created_at?: string
           evaluation_date?: string | null
           evaluator_id?: string | null
+          file_url?: string | null
           height?: number | null
           id?: string
           measurements?: Json | null
@@ -1008,6 +1055,7 @@ export type Database = {
           created_at?: string
           evaluation_date?: string | null
           evaluator_id?: string | null
+          file_url?: string | null
           height?: number | null
           id?: string
           measurements?: Json | null
@@ -1250,6 +1298,7 @@ export type Database = {
       }
       whatsapp_chats: {
         Row: {
+          category: string | null
           company_id: string
           contact_name: string | null
           contact_photo: string | null
@@ -1265,6 +1314,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category?: string | null
           company_id: string
           contact_name?: string | null
           contact_photo?: string | null
@@ -1280,6 +1330,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category?: string | null
           company_id?: string
           contact_name?: string | null
           contact_photo?: string | null
@@ -1405,8 +1456,12 @@ export type Database = {
           media_type: string | null
           media_url: string | null
           message_id: string | null
+          message_id_external: string | null
+          sender_id: string | null
+          source: string | null
           status: string | null
           timestamp: string | null
+          type: string | null
         }
         Insert: {
           chat_id: string
@@ -1418,8 +1473,12 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           message_id?: string | null
+          message_id_external?: string | null
+          sender_id?: string | null
+          source?: string | null
           status?: string | null
           timestamp?: string | null
+          type?: string | null
         }
         Update: {
           chat_id?: string
@@ -1431,8 +1490,12 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           message_id?: string | null
+          message_id_external?: string | null
+          sender_id?: string | null
+          source?: string | null
           status?: string | null
           timestamp?: string | null
+          type?: string | null
         }
         Relationships: [
           {
@@ -1501,39 +1564,58 @@ export type Database = {
       }
       workouts: {
         Row: {
+          company_id: string | null
           created_at: string
+          created_by: string | null
           cycle_id: string
           day_of_week: number | null
+          description: string | null
           exercises: Json | null
           id: string
           name: string
           notes: string | null
           sort_order: number | null
+          title: string | null
           updated_at: string
         }
         Insert: {
+          company_id?: string | null
           created_at?: string
+          created_by?: string | null
           cycle_id: string
           day_of_week?: number | null
+          description?: string | null
           exercises?: Json | null
           id?: string
           name?: string
           notes?: string | null
           sort_order?: number | null
+          title?: string | null
           updated_at?: string
         }
         Update: {
+          company_id?: string | null
           created_at?: string
+          created_by?: string | null
           cycle_id?: string
           day_of_week?: number | null
+          description?: string | null
           exercises?: Json | null
           id?: string
           name?: string
           notes?: string | null
           sort_order?: number | null
+          title?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "workouts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "workouts_cycle_id_fkey"
             columns: ["cycle_id"]
