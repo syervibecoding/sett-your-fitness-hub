@@ -405,9 +405,10 @@ export default function WhatsAppChat() {
     }
   };
 
-  useEffect(() => { loadChats(); loadContacts(); loadSenderNames(); loadTemplates(); loadCategories(); loadAvailableLabels(); }, [loadChats, loadContacts, loadSenderNames, loadTemplates, loadCategories, loadAvailableLabels]);
+  useEffect(() => { loadChats(); loadSenderNames(); loadTemplates(); loadCategories(); loadAvailableLabels(); }, [loadChats, loadSenderNames, loadTemplates, loadCategories, loadAvailableLabels]);
+  // Load contacts from Evolution API separately to avoid overwhelming edge function workers
+  useEffect(() => { const t = setTimeout(() => loadContacts(), 2000); return () => clearTimeout(t); }, [loadContacts]);
   useEffect(() => { if (chats.length > 0) { loadStudentData(chats); loadChatLabels(chats.map(c => c.id)); } }, [chats, loadStudentData, loadChatLabels]);
-  useEffect(() => { if (chats.length > 0) loadStudentData(chats); }, [chats, loadStudentData]);
   useEffect(() => { if (selectedChatId) loadMessages(selectedChatId); }, [selectedChatId, loadMessages]);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
