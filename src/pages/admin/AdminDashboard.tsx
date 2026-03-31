@@ -35,7 +35,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({ totalStudents: 0, pendingStudents: 0, inactiveStudents: 0, trainers: 0 });
   const [planChart, setPlanChart] = useState<{ name: string; count: number }[]>([]);
   const [expiringContracts, setExpiringContracts] = useState<any[]>([]);
-  const [missingWorkouts, setMissingWorkouts] = useState<any[]>([]);
+  const [cycleCountdowns, setCycleCountdowns] = useState<any[]>([]);
   const [trainerMap, setTrainerMap] = useState<Record<string, string>>({});
 
   // For admin/coordinator/trainer: use their own companyId. For master impersonating: use viewingCompany.id. Master without impersonating: null (sees all via RLS).
