@@ -185,6 +185,7 @@ async function createCardPayment(body: any) {
     remoteIp,
     installmentCount,
     installmentValue,
+    planId,
   } = body;
 
   if (!studentId || !value || !creditCard || !creditCardHolderInfo) {
@@ -251,7 +252,7 @@ async function createCardPayment(body: any) {
 
   // Ativar aluno automaticamente se pagamento já confirmado
   if (["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"].includes(payment.status)) {
-    await applyPaymentStatusEffects(studentId, payment.status, payment.id);
+    await applyPaymentStatusEffects(studentId, payment.status, payment.id, planId);
   }
 
   return {
