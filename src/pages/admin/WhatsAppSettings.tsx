@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, MessageSquare, Wifi, WifiOff, QrCode, Phone, Bot, ShieldAlert } from "lucide-react";
+import { Loader2, MessageSquare, Wifi, WifiOff, QrCode, Phone, Bot, ShieldAlert, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
@@ -84,7 +84,7 @@ export default function WhatsAppSettings() {
 
   const startPolling = useCallback(() => {
     stopPolling();
-    pollRef.current = setInterval(checkStatus, 5000);
+    pollRef.current = setInterval(checkStatus, 10000);
   }, [checkStatus, stopPolling]);
 
   // Initial load
@@ -134,6 +134,24 @@ export default function WhatsAppSettings() {
       toast.success("WhatsApp desconectado");
     } catch (err: any) {
       toast.error(err.message || "Erro ao desconectar");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRestart = async () => {
+    setBusy(true);
+    try {
+      const data = await invoke("restart-connection");
+      if (!data) return;
+      setState(data.status as ConnectionState);
+      if (data.qrcode) {
+        setQrcode(data.qrcode);
+        startPolling();
+      }
+      toast.success("Instância recriada, escaneie o novo QR Code");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao reconectar");
     } finally {
       setBusy(false);
     }
@@ -247,9 +265,15 @@ export default function WhatsAppSettings() {
                 </Button>
               )}
               {state === "waiting_qr" && (
-                <Button variant="outline" onClick={handleDisconnect} disabled={busy}>
-                  Cancelar
-                </Button>
+                <>
+                  <Button variant="outline" onClick={handleRestart} disabled={busy}>
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                    Reconectar
+                  </Button>
+                  <Button variant="ghost" onClick={handleDisconnect} disabled={busy}>
+                    Cancelar
+                  </Button>
+                </>
               )}
               {state === "connected" && (
                 <Button variant="destructive" onClick={handleDisconnect} disabled={busy}>
