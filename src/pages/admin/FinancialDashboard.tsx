@@ -60,6 +60,7 @@ export default function FinancialDashboard() {
   const [cashMonthTabs, setCashMonthTabs] = useState<string[]>([]);
   const [issuingInvoice, setIssuingInvoice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => { loadData(); }, [effectiveCompanyId]);
 
