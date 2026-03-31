@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { Clock, AlertCircle, Percent, FileText, Loader2, CheckCircle, Wallet, TrendingUp } from "lucide-react";
+import { Clock, AlertCircle, Percent, FileText, Loader2, CheckCircle, Wallet, TrendingUp, RefreshCw } from "lucide-react";
 import { format, subMonths, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AppLayout } from "@/components/AppLayout";
