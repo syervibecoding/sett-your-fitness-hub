@@ -336,39 +336,104 @@ async function createInvoice(body: any) {
   };
 }
 
-async function ensureEnrollmentExists(studentId: string) {
+async function ensureEnrollmentExists(studentId: string, planId?: string) {
   const { data: existing } = await supabaseAdmin
     .from("enrollments")
-    .select("id")
+    .select("id, end_date, plan_id")
     .eq("student_id", studentId)
     .eq("status", "active")
     .maybeSingle();
 
-  if (existing) return existing.id;
-
+  // Get student data
   const { data: student } = await supabaseAdmin
     .from("students")
     .select("selected_plan_id, assigned_trainer_id, company_id")
     .eq("id", studentId)
     .single();
 
-  if (!student?.selected_plan_id) {
-    console.error(`Student ${studentId} has no selected_plan_id`);
+  const effectivePlanId = planId || student?.selected_plan_id;
+
+  if (!effectivePlanId) {
+    console.error(`Student ${studentId} has no plan_id for enrollment`);
     return null;
   }
 
   const { data: plan } = await supabaseAdmin
     .from("plans")
-    .select("duration_weeks, company_id")
-    .eq("id", student.selected_plan_id)
+    .select("duration_weeks, duration_days, company_id, cycle_duration_days")
+    .eq("id", effectivePlanId)
     .single();
 
   if (!plan) return null;
 
-  // Resolve company_id: student → plan fallback
-  const companyId = student.company_id || plan.company_id || null;
+  const planDays = plan.duration_days || (plan.duration_weeks ? plan.duration_weeks * 7 : 90);
+  const companyId = student?.company_id || plan.company_id || null;
 
-  // Resolve created_by: use company owner instead of student UUID
+  // --- RENEWAL: active enrollment exists → extend it ---
+  if (existing) {
+    const currentEnd = existing.end_date ? new Date(existing.end_date) : new Date();
+    const today = new Date();
+    // Start extension from whichever is later: today or current end_date
+    const extensionStart = currentEnd > today ? currentEnd : today;
+    const newEnd = new Date(extensionStart);
+    newEnd.setDate(newEnd.getDate() + planDays);
+
+    const newEndStr = newEnd.toISOString().split("T")[0];
+
+    console.log(`[RENEWAL] Extending enrollment ${existing.id} from ${existing.end_date} to ${newEndStr} (+${planDays} days)`);
+
+    // Update enrollment end_date and plan
+    await supabaseAdmin
+      .from("enrollments")
+      .update({
+        end_date: newEndStr,
+        plan_id: effectivePlanId,
+        payment_status: "paid",
+      })
+      .eq("id", existing.id);
+
+    // Generate new cycles for the extended period
+    // We need to find the last cycle to continue numbering
+    const { data: lastCycle } = await supabaseAdmin
+      .from("training_cycles")
+      .select("cycle_number, end_date")
+      .eq("enrollment_id", existing.id)
+      .order("cycle_number", { ascending: false })
+      .limit(1)
+      .single();
+
+    const cycleDays = plan.cycle_duration_days || 42;
+    let cycleNum = (lastCycle?.cycle_number || 0) + 1;
+    // New cycles start after the last cycle ends (or from extensionStart+1 if no cycles)
+    let cycleStart = lastCycle?.end_date
+      ? new Date(new Date(lastCycle.end_date).getTime() + 86400000)
+      : new Date(extensionStart.getTime() + 86400000);
+
+    while (cycleStart <= newEnd) {
+      let cycleEnd = new Date(cycleStart);
+      cycleEnd.setDate(cycleEnd.getDate() + cycleDays - 1);
+      if (cycleEnd > newEnd) cycleEnd = newEnd;
+
+      await supabaseAdmin.from("training_cycles").insert({
+        enrollment_id: existing.id,
+        cycle_number: cycleNum,
+        start_date: cycleStart.toISOString().split("T")[0],
+        end_date: cycleEnd.toISOString().split("T")[0],
+        status: "pending",
+        company_id: companyId,
+      });
+
+      console.log(`[RENEWAL] Created cycle ${cycleNum}: ${cycleStart.toISOString().split("T")[0]} → ${cycleEnd.toISOString().split("T")[0]}`);
+
+      cycleNum++;
+      cycleStart = new Date(cycleEnd);
+      cycleStart.setDate(cycleStart.getDate() + 1);
+    }
+
+    return existing.id;
+  }
+
+  // --- FIRST ENROLLMENT: create new ---
   let createdBy = studentId;
   if (companyId) {
     const { data: company } = await supabaseAdmin
@@ -383,14 +448,14 @@ async function ensureEnrollmentExists(studentId: string) {
 
   const today = new Date();
   const endDate = new Date(today);
-  endDate.setDate(endDate.getDate() + plan.duration_weeks * 7);
+  endDate.setDate(endDate.getDate() + planDays - 1);
 
   const { data: enrollment, error } = await supabaseAdmin
     .from("enrollments")
     .insert({
       student_id: studentId,
-      plan_id: student.selected_plan_id,
-      trainer_id: student.assigned_trainer_id || null,
+      plan_id: effectivePlanId,
+      trainer_id: student?.assigned_trainer_id || null,
       created_by: createdBy,
       start_date: today.toISOString().split("T")[0],
       end_date: endDate.toISOString().split("T")[0],
@@ -411,8 +476,8 @@ async function ensureEnrollmentExists(studentId: string) {
   return enrollment.id;
 }
 
-async function applyPaymentStatusEffects(studentId: string, paymentStatus: string, asaasPaymentId?: string) {
-  console.log(`[FALLBACK] Aplicando status ${paymentStatus} para aluno ${studentId}`);
+async function applyPaymentStatusEffects(studentId: string, paymentStatus: string, asaasPaymentId?: string, planId?: string) {
+  console.log(`[PAYMENT] Aplicando status ${paymentStatus} para aluno ${studentId} (planId: ${planId || 'none'})`);
 
   if (
     paymentStatus === "RECEIVED" ||
@@ -425,11 +490,11 @@ async function applyPaymentStatusEffects(studentId: string, paymentStatus: strin
       .eq("id", studentId);
 
     if (studentError) {
-      console.error("Erro ao ativar aluno no fallback:", studentError);
+      console.error("Erro ao ativar aluno:", studentError);
     }
 
-    // Ensure enrollment exists (auto-create if missing)
-    await ensureEnrollmentExists(studentId);
+    // Ensure enrollment exists or extend existing one (renewal)
+    await ensureEnrollmentExists(studentId, planId || undefined);
 
     const { error: enrollmentError } = await supabaseAdmin
       .from("enrollments")
@@ -441,14 +506,14 @@ async function applyPaymentStatusEffects(studentId: string, paymentStatus: strin
       .eq("status", "active");
 
     if (enrollmentError) {
-      console.error("Erro ao atualizar matrícula no fallback:", enrollmentError);
+      console.error("Erro ao atualizar matrícula:", enrollmentError);
     }
 
     if (asaasPaymentId) {
       try {
         await createInvoice({ paymentId: asaasPaymentId });
       } catch (error) {
-        console.error("Erro ao emitir NFS-e no fallback de status:", error);
+        console.error("Erro ao emitir NFS-e:", error);
       }
     }
 
@@ -463,7 +528,7 @@ async function applyPaymentStatusEffects(studentId: string, paymentStatus: strin
       .eq("status", "active");
 
     if (error) {
-      console.error("Erro ao marcar matrícula como overdue no fallback:", error);
+      console.error("Erro ao marcar matrícula como overdue:", error);
     }
 
     return;
@@ -480,7 +545,7 @@ async function applyPaymentStatusEffects(studentId: string, paymentStatus: strin
       .eq("id", studentId);
 
     if (studentError) {
-      console.error("Erro ao desativar aluno no fallback:", studentError);
+      console.error("Erro ao desativar aluno:", studentError);
     }
 
     const { error: enrollmentError } = await supabaseAdmin
@@ -490,7 +555,7 @@ async function applyPaymentStatusEffects(studentId: string, paymentStatus: strin
       .eq("status", "active");
 
     if (enrollmentError) {
-      console.error("Erro ao atualizar matrícula para refunded no fallback:", enrollmentError);
+      console.error("Erro ao atualizar matrícula para refunded:", enrollmentError);
     }
   }
 }
