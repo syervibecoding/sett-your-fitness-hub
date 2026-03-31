@@ -22,6 +22,7 @@ import { ptBR } from "date-fns/locale";
 interface TeamMember {
   user_id: string;
   full_name: string | null;
+  email?: string;
   roles: string[];
 }
 
