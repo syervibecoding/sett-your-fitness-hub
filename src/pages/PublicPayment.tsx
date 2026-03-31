@@ -54,6 +54,7 @@ export default function PublicPayment() {
   const [notFound, setNotFound] = useState(false);
   const [step, setStep] = useState<Step>("select_plan");
   const [loading, setLoading] = useState(false);
+  const [isRenewal, setIsRenewal] = useState(false);
 
   // Plans
   const [availablePlans, setAvailablePlans] = useState<PlanOption[]>([]);
