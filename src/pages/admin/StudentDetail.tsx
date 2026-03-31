@@ -97,6 +97,7 @@ interface Plan {
   id: string;
   name: string;
   duration_weeks: number;
+  duration_days: number | null;
 }
 
 interface Trainer {
