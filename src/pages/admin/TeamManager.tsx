@@ -84,6 +84,7 @@ export default function TeamManager() {
 
   const [editUserId, setEditUserId] = useState("");
   const [editUserName, setEditUserName] = useState("");
+  const [editUserEmail, setEditUserEmail] = useState("");
   const [editRoles, setEditRoles] = useState<string[]>([]);
 
   // Performance tab
