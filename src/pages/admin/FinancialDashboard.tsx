@@ -300,8 +300,11 @@ export default function FinancialDashboard() {
     )
   );
 
-  const formatMonthLabel = (key: string) =>
-    format(new Date(key + "-01"), "MMM/yy", { locale: ptBR }).replace(/^./, (c) => c.toUpperCase());
+  const formatMonthLabel = (key: string) => {
+    const [year, month] = key.split("-").map(Number);
+    const date = new Date(year, month - 1, 15); // day 15 avoids timezone edge cases
+    return format(date, "MMM/yy", { locale: ptBR }).replace(/^./, (c) => c.toUpperCase());
+  };
 
   if (loading) {
     return (
