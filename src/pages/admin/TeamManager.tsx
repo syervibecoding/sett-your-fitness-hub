@@ -294,18 +294,33 @@ export default function TeamManager() {
   const handleChangePassword = async () => {
     if (!passwordUserId || !resetPassword) return;
     setLoading(true);
-    const { data, error } = await supabase.functions.invoke("manage-team-member", {
-      body: { action: "update-password", user_id: passwordUserId, new_password: resetPassword },
-    });
-    setLoading(false);
+    try {
+      const { data, error } = await supabase.functions.invoke("manage-team-member", {
+        body: { action: "update-password", user_id: passwordUserId, new_password: resetPassword },
+      });
+      setLoading(false);
 
-    if (error || data?.error) {
-      toast({ title: "Erro", description: data?.error || error?.message, variant: "destructive" });
-      return;
+      if (error) {
+        // Parse error body if available
+        let errorMsg = error.message;
+        try {
+          const parsed = JSON.parse(error.context?.body || "{}");
+          errorMsg = parsed.error || errorMsg;
+        } catch {}
+        toast({ title: "Erro", description: errorMsg, variant: "destructive" });
+        return;
+      }
+      if (data?.error) {
+        toast({ title: "Erro", description: data.error, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Senha alterada com sucesso!" });
+      setPasswordDialogOpen(false);
+      setResetPassword(""); setPasswordUserId("");
+    } catch (e: any) {
+      setLoading(false);
+      toast({ title: "Erro", description: e.message || "Erro desconhecido", variant: "destructive" });
     }
-    toast({ title: "Senha alterada com sucesso!" });
-    setPasswordDialogOpen(false);
-    setResetPassword(""); setPasswordUserId("");
   };
 
   const openPasswordDialog = (uid: string, name: string | null) => {
