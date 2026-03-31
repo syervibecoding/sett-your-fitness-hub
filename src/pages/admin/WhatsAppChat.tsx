@@ -32,7 +32,7 @@ type Chat = {
   last_sender_id: string | null;
   contact_name: string | null;
   category: string | null;
-  student?: { full_name: string; whatsapp: string | null; category: string | null } | null;
+  student?: { full_name: string; whatsapp: string | null; category_id: string | null } | null;
   lastMessage?: string;
 };
 
@@ -149,7 +149,7 @@ export default function WhatsAppChat() {
   const loadChats = useCallback(async () => {
     let query = supabase
       .from("whatsapp_chats")
-      .select("*, student:students(full_name, whatsapp, category)")
+      .select("*, student:students(full_name, whatsapp, category_id)")
       .order("last_message_at", { ascending: false, nullsFirst: false });
 
     if (effectiveCompanyId) query = query.eq("company_id", effectiveCompanyId);
