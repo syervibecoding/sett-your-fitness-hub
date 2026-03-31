@@ -517,7 +517,7 @@ export default function WhatsAppChat() {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-manager`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-        body: JSON.stringify({ action: "send-media", remoteJid: chat.remote_jid, mediaUrl, caption: "📋 Último treino/avaliação", chatId: selectedChatId, fileName: fileUrl.split("/").pop() || "avaliacao.pdf" }),
+        body: JSON.stringify({ action: "send-media", companyId: effectiveCompanyId, remoteJid: chat.remote_jid, mediaUrl, caption: "📋 Último treino/avaliação", chatId: selectedChatId, fileName: fileUrl.split("/").pop() || "avaliacao.pdf" }),
       });
       if (!res.ok) throw new Error("Erro ao enviar arquivo");
       toast.success("Arquivo enviado!");
