@@ -92,6 +92,9 @@ export default function WhatsAppSettings() {
     if (effectiveCompanyId) {
       checkStatus();
       checkBotSettings();
+    } else {
+      setState("disconnected");
+      setBotStatus({ loading: false, enabled: false, source: "none" });
     }
     return () => stopPolling();
   }, [effectiveCompanyId, checkStatus, checkBotSettings, stopPolling]);
