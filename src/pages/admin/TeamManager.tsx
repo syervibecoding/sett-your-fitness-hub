@@ -155,7 +155,7 @@ export default function TeamManager() {
         if (emailData?.emails) {
           const emailMap = new Map(emailData.emails.map((e: any) => [e.user_id, e.email]));
           membersList.forEach((m) => {
-            m.email = emailMap.get(m.user_id) || undefined;
+            m.email = (emailMap.get(m.user_id) as string) || undefined;
           });
         }
       } catch (e) {
