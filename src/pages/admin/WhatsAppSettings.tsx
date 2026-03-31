@@ -162,7 +162,16 @@ export default function WhatsAppSettings() {
           </p>
         </div>
 
+        {role === "master" && !effectiveCompanyId && (
+          <Card className="max-w-lg">
+            <CardContent className="p-6">
+              <p className="text-sm text-muted-foreground">Selecione uma empresa no menu lateral para gerenciar a conexão WhatsApp.</p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Connection Card */}
+        {effectiveCompanyId && (
         <Card className="max-w-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
