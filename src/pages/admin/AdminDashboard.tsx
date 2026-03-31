@@ -255,31 +255,36 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Sem treino no ciclo */}
+        {/* Countdown de troca de treino */}
         <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle className="text-destructive text-xl flex items-center gap-2">
-              <Dumbbell className="h-5 w-5" />SEM TREINO NO CICLO
+            <CardTitle className="text-primary text-xl flex items-center gap-2">
+              <Timer className="h-5 w-5" />TROCA DE TREINO
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {missingWorkouts.length > 0 ? (
-              <div className="space-y-3 max-h-[250px] overflow-auto">
-                {missingWorkouts.map((m: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-destructive/5 border border-destructive/20">
+            {cycleCountdowns.length > 0 ? (
+              <div className="space-y-3 max-h-[300px] overflow-auto">
+                {cycleCountdowns.map((m: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border">
                     <div>
                       <p className="text-foreground font-sans font-medium text-sm">{m.student_name}</p>
-                      <p className="text-muted-foreground text-xs font-sans">{m.reason}</p>
+                      <p className="text-muted-foreground text-xs font-sans">Ciclo {m.cycle_number} · vence {format(new Date(m.end_date), "dd/MM")}</p>
                       {m.trainer_id && trainerMap[m.trainer_id] && (
                         <p className="text-muted-foreground/70 text-[11px] font-sans">Treinador: {trainerMap[m.trainer_id]}</p>
                       )}
                     </div>
-                    <span className="text-xs font-sans font-medium px-2 py-1 rounded bg-destructive/20 text-destructive">Pendente</span>
+                    <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
+                      m.days_left <= 0 ? "bg-destructive/20 text-destructive" :
+                      m.days_left <= 7 ? "bg-warning/20 text-warning" : "bg-primary/20 text-primary"
+                    }`}>
+                      {m.days_left <= 0 ? "Vencido!" : `${m.days_left}d para troca`}
+                    </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground font-sans text-center py-8">Todos os ciclos ativos têm treino prescrito ✓</p>
+              <p className="text-muted-foreground font-sans text-center py-8">Nenhum ciclo ativo no momento</p>
             )}
           </CardContent>
         </Card>
