@@ -1,36 +1,51 @@
 
 
-## Diagnóstico
+# Melhorias no Financeiro: Histórico Completo + Comparativo Mês a Mês
 
-### Problema 1: Parcelas aparecendo como "à vista"
-A API do Asaas, ao listar cobranças (`GET /payments`), retorna cada parcela como um pagamento individual. Cada um tem o campo `installment` (ID do grupo de parcelamento), mas **não** retorna `installmentCount` diretamente. O sync atual usa `ap.installmentCount` que é `undefined`, resultando em `1` (à vista) para todos.
+## O que será feito
 
-### Problema 2: Mês mostrando fevereiro
-O `new Date()` deveria retornar março, mas pode haver dados concentrados em fevereiro. Vou garantir que o mês corrente seja exibido corretamente nos cards e tabs.
+### 1. Sync histórico de 6 meses no Asaas
+A edge function `asaas-integration` (action `sync-payments`) será atualizada para aceitar um parâmetro `syncAll: true` que busca cobranças dos últimos 6 meses usando paginação (offset), não apenas as mais recentes. Um botão "Sync Completo" será adicionado ao lado do botão atual.
+
+**Arquivo:** `supabase/functions/asaas-integration/index.ts`
+- Adicionar parâmetro `dateCreated[ge]` = 6 meses atrás quando `syncAll = true`
+- Paginar com `offset` para buscar além do limit de 100
+
+### 2. Histórico completo de pagamentos com filtros
+Substituir a tabela "Pagamentos Recentes" (top 10) por uma tabela completa com:
+- **Filtros:** período (data início/fim), status (todos/confirmado/pendente/atrasado), método de pagamento, busca por nome do aluno
+- **Paginação:** mostrar 20 por página com navegação
+- **Ordenação:** por data, valor ou status
+
+**Arquivo:** `src/pages/admin/FinancialDashboard.tsx`
+
+### 3. Comparativo mês a mês nos cards
+Nos cards de Faturamento, Caixa e Ticket Médio, adicionar:
+- Variação percentual vs mês anterior (ex: "+12%" ou "-5%")
+- Seta de tendência (verde para cima, vermelho para baixo)
+- Valor do mês anterior em texto menor para referência
+
+**Arquivo:** `src/pages/admin/FinancialDashboard.tsx`
+- Calcular valores do mês anterior a partir dos dados já carregados (sem query extra)
+- Exibir badge com `↑ +12%` ou `↓ -5%` ao lado do valor principal
 
 ---
 
-## Plano
+## Detalhes técnicos
 
-### 1. Corrigir sync de parcelas na edge function `asaas-integration`
+### Edge function — sync histórico
+```
+GET /payments?customer={id}&limit=100&offset={n}&dateCreated[ge]=2025-10-01
+```
+Loop de paginação até `hasMore === false` ou `totalCount` atingido.
 
-Na função `syncPayments`:
-- Ao iterar os pagamentos do Asaas, agrupar por `ap.installment` (ID do parcelamento)
-- Para cada grupo com `installment` preenchido, contar quantos pagamentos pertencem ao mesmo grupo = `installmentCount`
-- Salvar `installment_count` correto em cada pagamento do grupo
-- Pagamentos sem `installment` (à vista) mantêm `installment_count = 1`
+### Frontend — filtros
+Novos estados: `filterStatus`, `filterDateFrom`, `filterDateTo`, `filterSearch`, `currentPage`. Filtro aplicado client-side sobre `recentPayments` (que passa a conter todos os pagamentos já sincronizados).
 
-### 2. Corrigir cálculo do caixa no frontend
-
-Em `FinancialDashboard.tsx`, a lógica de `distributeCash` já está correta — ela distribui parcelas pelos meses futuros usando `installment_count` e `addMonths`. O problema é que os dados no banco estão com `installment_count = 1`. Após corrigir o sync, os dados ficarão corretos.
-
-### 3. Garantir mês correto
-
-- Verificar e forçar que a label "(atual)" nos tabs de caixa use `new Date()` consistentemente
-- No card "Faturamento do Mês" e "Caixa do Mês", adicionar o nome do mês corrente para clareza (ex: "Faturamento — Mar/26")
+### Frontend — comparativo
+Reutilizar `billingMap` e `cashChartMap` já calculados para extrair o valor do mês anterior e calcular a variação percentual.
 
 ### Arquivos alterados
-- `supabase/functions/asaas-integration/index.ts` — corrigir `syncPayments` para agrupar parcelas e calcular `installment_count`
-- `src/pages/admin/FinancialDashboard.tsx` — exibir nome do mês nos cards de faturamento/caixa
-- Deploy da edge function
+1. `supabase/functions/asaas-integration/index.ts` — sync com paginação e filtro de data
+2. `src/pages/admin/FinancialDashboard.tsx` — tabela com filtros, paginação, comparativo nos cards
 
