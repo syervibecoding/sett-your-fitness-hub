@@ -21,6 +21,7 @@ import { format, parseISO, eachDayOfInterval, addWeeks, addDays } from "date-fns
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
+import { WorkoutAnalysis } from "@/components/trainer/WorkoutAnalysis";
 
 interface Student {
   id: string;
