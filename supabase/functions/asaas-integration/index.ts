@@ -612,7 +612,22 @@ async function syncPayments(body: any) {
       const data = await asaasFetch(`/payments?customer=${student.asaas_customer_id}&limit=100`);
       const asaasPayments = data.data || [];
 
+      // Group by installment ID to calculate installment count
+      const installmentGroups: Record<string, number> = {};
       for (const ap of asaasPayments) {
+        if (ap.installment) {
+          installmentGroups[ap.installment] = (installmentGroups[ap.installment] || 0) + 1;
+        }
+      }
+
+      for (const ap of asaasPayments) {
+        // Determine correct installment_count:
+        // If payment belongs to an installment group, count how many in the group
+        // Otherwise it's a single payment (à vista)
+        const installmentCount = ap.installment
+          ? (installmentGroups[ap.installment] || 1)
+          : 1;
+
         // Check if already exists locally
         const { data: existing } = await supabaseAdmin
           .from("payments")
@@ -621,13 +636,13 @@ async function syncPayments(body: any) {
           .maybeSingle();
 
         if (existing) {
-          // Update status
+          // Update status + correct installment_count
           await supabaseAdmin
             .from("payments")
             .update({
               status: ap.status,
               invoice_url: ap.invoiceUrl || null,
-              installment_count: ap.installmentCount || 1,
+              installment_count: installmentCount,
             })
             .eq("id", existing.id);
         } else {
@@ -642,7 +657,7 @@ async function syncPayments(body: any) {
             status: ap.status || "PENDING",
             due_date: ap.dueDate || null,
             invoice_url: ap.invoiceUrl || null,
-            installment_count: ap.installmentCount || 1,
+            installment_count: installmentCount,
           });
         }
         synced++;
