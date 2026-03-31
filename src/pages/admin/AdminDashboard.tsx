@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, ClipboardList, AlertTriangle, TrendingUp, RefreshCw, Dumbbell, Clock, UserX } from "lucide-react";
+import { Users, ClipboardList, AlertTriangle, TrendingUp, RefreshCw, Dumbbell, Clock, UserX, Timer } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { AppLayout } from "@/components/AppLayout";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
@@ -35,7 +35,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({ totalStudents: 0, pendingStudents: 0, inactiveStudents: 0, trainers: 0 });
   const [planChart, setPlanChart] = useState<{ name: string; count: number }[]>([]);
   const [expiringContracts, setExpiringContracts] = useState<any[]>([]);
-  const [missingWorkouts, setMissingWorkouts] = useState<any[]>([]);
+  const [cycleCountdowns, setCycleCountdowns] = useState<any[]>([]);
   const [trainerMap, setTrainerMap] = useState<Record<string, string>>({});
 
   // For admin/coordinator/trainer: use their own companyId. For master impersonating: use viewingCompany.id. Master without impersonating: null (sees all via RLS).
@@ -109,49 +109,40 @@ export default function AdminDashboard() {
     });
     setExpiringContracts(filteredExpiring);
 
-    // Missing workouts: enrollments without training_start_date OR active cycles without workouts
+    // Cycle countdowns: for each active enrollment, find the current active cycle and show days remaining
     let cycleEnrollQuery = supabase.from("enrollments").select("id, training_start_date, trainer_id, students(full_name, assigned_trainer_id)").in("status", ["active", "awaiting_training"]) as any;
     if (effectiveCompanyId) cycleEnrollQuery = cycleEnrollQuery.eq("company_id", effectiveCompanyId);
     const { data: activeEnrolls } = await cycleEnrollQuery;
-    const missing: any[] = [];
+    const countdowns: any[] = [];
     if (activeEnrolls && activeEnrolls.length > 0) {
-      activeEnrolls.forEach((e: any) => {
-        const effectiveTrainer = e.students?.assigned_trainer_id || e.trainer_id;
-        if (!e.training_start_date) {
-          missing.push({ student_name: e.students?.full_name || "—", cycle_number: null, reason: "Sem data de treino", trainer_id: effectiveTrainer });
-        }
-      });
       const enrollsWithDate = activeEnrolls.filter((e: any) => e.training_start_date);
       if (enrollsWithDate.length > 0) {
         const enrollIds = enrollsWithDate.map((e: any) => e.id);
         const enrollInfoMap: Record<string, { name: string; trainer_id: string | null }> = {};
         enrollsWithDate.forEach((e: any) => { enrollInfoMap[e.id] = { name: e.students?.full_name || "—", trainer_id: e.students?.assigned_trainer_id || e.trainer_id }; });
-        const { data: pendingCycles } = await supabase.from("training_cycles").select("*").in("enrollment_id", enrollIds).in("status", ["active", "upcoming"]);
-        if (pendingCycles && pendingCycles.length > 0) {
-          const cycleIds = pendingCycles.map((c: any) => c.id);
-          const { data: workouts } = await supabase.from("workouts").select("cycle_id").in("cycle_id", cycleIds);
-          const withWorkout = new Set((workouts || []).map((w: any) => w.cycle_id));
-          pendingCycles.filter((c: any) => !withWorkout.has(c.id)).forEach((c: any) => {
+        const { data: activeCycles } = await supabase.from("training_cycles").select("*").in("enrollment_id", enrollIds).eq("status", "active");
+        if (activeCycles && activeCycles.length > 0) {
+          activeCycles.forEach((c: any) => {
             const info = enrollInfoMap[c.enrollment_id];
-            missing.push({ student_name: info?.name || "—", cycle_number: c.cycle_number, reason: `Ciclo ${c.cycle_number} sem treino`, trainer_id: info?.trainer_id });
+            const daysLeft = Math.ceil((new Date(c.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+            countdowns.push({
+              student_name: info?.name || "—",
+              cycle_number: c.cycle_number,
+              end_date: c.end_date,
+              days_left: daysLeft,
+              trainer_id: info?.trainer_id,
+            });
           });
         }
       }
     }
-    const firstPerStudent = new Map<string, any>();
-    missing.forEach(m => {
-      const key = m.student_name;
-      const existing = firstPerStudent.get(key);
-      if (!existing || (m.cycle_number !== null && (existing.cycle_number === null || m.cycle_number < existing.cycle_number))) {
-        firstPerStudent.set(key, m);
-      }
-    });
-    setMissingWorkouts(Array.from(firstPerStudent.values()));
+    countdowns.sort((a, b) => a.days_left - b.days_left);
+    setCycleCountdowns(countdowns);
 
     // Fetch trainer names for both sections
     const allTrainerIds = new Set<string>();
     (expiringRes.data || []).forEach((e: any) => { if (e.trainer_id) allTrainerIds.add(e.trainer_id); });
-    Array.from(firstPerStudent.values()).forEach((m: any) => { if (m.trainer_id) allTrainerIds.add(m.trainer_id); });
+    countdowns.forEach((m: any) => { if (m.trainer_id) allTrainerIds.add(m.trainer_id); });
     if (allTrainerIds.size > 0) {
       const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").in("user_id", Array.from(allTrainerIds));
       const tMap: Record<string, string> = {};
@@ -264,31 +255,36 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Sem treino no ciclo */}
+        {/* Countdown de troca de treino */}
         <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle className="text-destructive text-xl flex items-center gap-2">
-              <Dumbbell className="h-5 w-5" />SEM TREINO NO CICLO
+            <CardTitle className="text-primary text-xl flex items-center gap-2">
+              <Timer className="h-5 w-5" />TROCA DE TREINO
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {missingWorkouts.length > 0 ? (
-              <div className="space-y-3 max-h-[250px] overflow-auto">
-                {missingWorkouts.map((m: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-destructive/5 border border-destructive/20">
+            {cycleCountdowns.length > 0 ? (
+              <div className="space-y-3 max-h-[300px] overflow-auto">
+                {cycleCountdowns.map((m: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border">
                     <div>
                       <p className="text-foreground font-sans font-medium text-sm">{m.student_name}</p>
-                      <p className="text-muted-foreground text-xs font-sans">{m.reason}</p>
+                      <p className="text-muted-foreground text-xs font-sans">Ciclo {m.cycle_number} · vence {format(new Date(m.end_date), "dd/MM")}</p>
                       {m.trainer_id && trainerMap[m.trainer_id] && (
                         <p className="text-muted-foreground/70 text-[11px] font-sans">Treinador: {trainerMap[m.trainer_id]}</p>
                       )}
                     </div>
-                    <span className="text-xs font-sans font-medium px-2 py-1 rounded bg-destructive/20 text-destructive">Pendente</span>
+                    <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
+                      m.days_left <= 0 ? "bg-destructive/20 text-destructive" :
+                      m.days_left <= 7 ? "bg-warning/20 text-warning" : "bg-primary/20 text-primary"
+                    }`}>
+                      {m.days_left <= 0 ? "Vencido!" : `${m.days_left}d para troca`}
+                    </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground font-sans text-center py-8">Todos os ciclos ativos têm treino prescrito ✓</p>
+              <p className="text-muted-foreground font-sans text-center py-8">Nenhum ciclo ativo no momento</p>
             )}
           </CardContent>
         </Card>
