@@ -32,7 +32,7 @@ type Chat = {
   last_sender_id: string | null;
   contact_name: string | null;
   category: string | null;
-  student?: { full_name: string; whatsapp: string | null; category: string | null } | null;
+  student?: { full_name: string; whatsapp: string | null; category_id: string | null } | null;
   lastMessage?: string;
 };
 
