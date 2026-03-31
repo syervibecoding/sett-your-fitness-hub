@@ -262,8 +262,8 @@ export default function WhatsAppChat() {
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-manager`;
 
       const [contactsRes, groupsRes] = await Promise.all([
-        fetch(url, { method: "POST", headers, body: JSON.stringify({ action: "fetch-contacts" }) }),
-        fetch(url, { method: "POST", headers, body: JSON.stringify({ action: "fetch-groups" }) }),
+        fetch(url, { method: "POST", headers, body: JSON.stringify({ action: "fetch-contacts", companyId: effectiveCompanyId }) }),
+        fetch(url, { method: "POST", headers, body: JSON.stringify({ action: "fetch-groups", companyId: effectiveCompanyId }) }),
       ]);
 
       const nameMap: Record<string, string> = {};
