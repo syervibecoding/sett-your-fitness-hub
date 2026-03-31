@@ -139,6 +139,24 @@ export default function WhatsAppSettings() {
     }
   };
 
+  const handleRestart = async () => {
+    setBusy(true);
+    try {
+      const data = await invoke("restart-connection");
+      if (!data) return;
+      setState(data.status as ConnectionState);
+      if (data.qrcode) {
+        setQrcode(data.qrcode);
+        startPolling();
+      }
+      toast.success("Instância recriada, escaneie o novo QR Code");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao reconectar");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleDisableBot = async () => {
     setDisablingBot(true);
     try {
