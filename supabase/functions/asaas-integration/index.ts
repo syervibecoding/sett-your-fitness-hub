@@ -108,7 +108,7 @@ async function updateCustomer(body: any) {
 
 
 async function createPayment(body: any) {
-  const { studentId, billingType, value, dueDate, description } = body;
+  const { studentId, billingType, value, dueDate, description, planId } = body;
   if (!studentId || !billingType || !value) {
     throw new Error("studentId, billingType e value são obrigatórios");
   }
@@ -152,7 +152,7 @@ async function createPayment(body: any) {
 
   // Ativar aluno automaticamente se pagamento já confirmado
   if (["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"].includes(payment.status)) {
-    await applyPaymentStatusEffects(studentId, payment.status, payment.id);
+    await applyPaymentStatusEffects(studentId, payment.status, payment.id, planId);
   }
 
   return {
