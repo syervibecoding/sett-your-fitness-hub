@@ -50,7 +50,7 @@ export default function PlansManager() {
     if (editing) {
       const { error } = await supabase
         .from("plans")
-        .update({ name: form.name, duration_weeks: form.duration_weeks, price: form.price, description: form.description || null, cycle_duration_days: form.cycle_duration_days })
+        .update({ name: form.name, duration_weeks: form.duration_weeks, price: form.price, description: form.description || null, cycle_duration_days: form.cycle_duration_days, duration_days: form.duration_weeks * 7 })
         .eq("id", editing.id);
       if (error) {
         toast({ title: "Erro", description: error.message, variant: "destructive" });
