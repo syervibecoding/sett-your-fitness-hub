@@ -1,32 +1,29 @@
 
 
-# Correção: Equipe não aparece para admin
+# Correção: Lista de Treinadores no Seletor
 
 ## Problema
-A tabela `user_roles` não tem política RLS que permita admins lerem as roles de outros membros da mesma empresa. Quando Bruna (admin) carrega a equipe, a query a `user_roles` só retorna a role dela mesma por causa da policy "Users can read own roles".
+O seletor de treinador nas páginas de Alunos e Detalhe do Aluno busca apenas usuários com `role = 'trainer'` na tabela `user_roles`. Isso causa:
+- **Bruna** (admin) e **Matheus** não aparecem porque têm role `admin`/`coordinator`
+- **Syer** aparece porque tem role `trainer` no banco (possivelmente cadastrado incorretamente)
 
 ## Solução
 
-### Migration SQL
-Adicionar uma política RLS em `user_roles` para admins lerem roles dos membros da mesma empresa:
-
-```sql
-CREATE POLICY "Admin reads company member roles"
-ON public.user_roles
-FOR SELECT
-TO authenticated
-USING (
-  (has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'coordinator'::app_role))
-  AND user_id IN (
-    SELECT cm.user_id FROM public.company_members cm
-    WHERE cm.company_id = get_user_company_id(auth.uid())
-  )
-);
+### 1. Corrigir a query de treinadores (2 arquivos)
+Em `StudentsManager.tsx` (linha 95) e `StudentDetail.tsx` (linha 423), trocar:
+```ts
+supabase.from("user_roles").select("user_id").eq("role", "trainer")
 ```
+Por uma query que busca **todos os membros da empresa** com roles `admin`, `coordinator` ou `trainer`:
+```ts
+supabase.from("user_roles").select("user_id, role").in("role", ["admin", "coordinator", "trainer"])
+```
+Isso já vai ser filtrado pela RLS para mostrar apenas membros da mesma empresa.
 
-Isso é suficiente — a policy é permissiva e faz OR com as existentes. Nenhuma mudança no frontend necessária.
+### 2. Verificar/corrigir role do Syer no banco
+Rodar uma query para checar se Syer tem role `trainer` indevidamente. Se sim, remover via migration.
 
 ### Resultado esperado
-- Admin e coordenador vão conseguir ver todos os membros da equipe
-- Novos membros criados aparecerão na lista após criação
+- Bruna, Matheus e qualquer admin/coordinator/trainer da empresa aparecem no seletor
+- Syer (se for aluno) não aparece mais
 
