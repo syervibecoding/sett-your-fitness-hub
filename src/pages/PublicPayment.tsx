@@ -130,13 +130,21 @@ export default function PublicPayment() {
     };
   }, [studentId]);
 
-  const handleSelectPlan = (plan: PlanOption) => {
+  const handleSelectPlan = async (plan: PlanOption) => {
     setSelectedPlanOptionId(plan.id);
     setPlanValue(plan.price);
     setPlanName(plan.name);
     setPlanDurationWeeks(plan.duration_weeks);
     setInstallments(1);
     setStep("choose");
+
+    // Update student's selected_plan_id for renewal logic
+    if (studentId) {
+      await supabase
+        .from("students")
+        .update({ selected_plan_id: plan.id })
+        .eq("id", studentId);
+    }
   };
 
   const maxInstallments = getMaxInstallments(planDurationWeeks);
