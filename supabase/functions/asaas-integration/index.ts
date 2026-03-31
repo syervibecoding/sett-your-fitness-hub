@@ -592,6 +592,69 @@ async function getPaymentStatus(body: any) {
   };
 }
 
+async function syncPayments(body: any) {
+  const { companyId } = body;
+
+  // Get all students with asaas_customer_id for this company
+  let studentsQuery = supabaseAdmin.from("students").select("id, asaas_customer_id, full_name, company_id");
+  if (companyId) studentsQuery = studentsQuery.eq("company_id", companyId);
+  const { data: students } = await studentsQuery.not("asaas_customer_id", "is", null);
+
+  if (!students || students.length === 0) {
+    return { synced: 0, message: "Nenhum aluno com cadastro no Asaas encontrado." };
+  }
+
+  let synced = 0;
+
+  for (const student of students) {
+    try {
+      // Fetch payments from Asaas for this customer
+      const data = await asaasFetch(`/payments?customer=${student.asaas_customer_id}&limit=100`);
+      const asaasPayments = data.data || [];
+
+      for (const ap of asaasPayments) {
+        // Check if already exists locally
+        const { data: existing } = await supabaseAdmin
+          .from("payments")
+          .select("id")
+          .eq("asaas_payment_id", ap.id)
+          .maybeSingle();
+
+        if (existing) {
+          // Update status
+          await supabaseAdmin
+            .from("payments")
+            .update({
+              status: ap.status,
+              invoice_url: ap.invoiceUrl || null,
+              installment_count: ap.installmentCount || 1,
+            })
+            .eq("id", existing.id);
+        } else {
+          // Insert new
+          await supabaseAdmin.from("payments").insert({
+            student_id: student.id,
+            company_id: student.company_id || null,
+            asaas_customer_id: student.asaas_customer_id,
+            asaas_payment_id: ap.id,
+            billing_type: ap.billingType || null,
+            value: Number(ap.value) || 0,
+            status: ap.status || "PENDING",
+            due_date: ap.dueDate || null,
+            invoice_url: ap.invoiceUrl || null,
+            installment_count: ap.installmentCount || 1,
+          });
+        }
+        synced++;
+      }
+    } catch (err) {
+      console.error(`Error syncing payments for student ${student.id}:`, err);
+    }
+  }
+
+  return { synced, message: `${synced} cobranças sincronizadas do Asaas.` };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -622,6 +685,9 @@ Deno.serve(async (req) => {
         break;
       case "update-customer":
         result = await updateCustomer(body);
+        break;
+      case "sync-payments":
+        result = await syncPayments(body);
         break;
       default:
         throw new Error(`Ação desconhecida: ${action}`);
