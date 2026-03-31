@@ -527,31 +527,39 @@ export default function TeamManager() {
                 </DialogContent>
               </Dialog>
 
-              {/* Edit Roles Dialog */}
+              {/* Edit Member Dialog */}
               <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
                 <DialogContent className="bg-card border-border">
                   <DialogHeader>
-                    <DialogTitle className="text-primary">EDITAR PAPÉIS</DialogTitle>
+                    <DialogTitle className="text-primary">EDITAR MEMBRO</DialogTitle>
                   </DialogHeader>
-                  <p className="text-sm text-muted-foreground font-sans">
-                    Editar papéis de: <strong className="text-foreground">{editUserName}</strong>
-                  </p>
                   <div className="space-y-4">
-                    <div className="space-y-3">
-                      {ALL_ROLES.map((role) => (
-                        <div key={role} className="flex items-center space-x-3">
-                          <Checkbox
-                            id={`role-${role}`}
-                            checked={editRoles.includes(role)}
-                            onCheckedChange={() => toggleEditRole(role)}
-                          />
-                          <label htmlFor={`role-${role}`} className="text-sm font-sans font-medium leading-none cursor-pointer">
-                            {roleLabels[role]}
-                          </label>
-                        </div>
-                      ))}
+                    <div className="space-y-2">
+                      <Label className="font-sans">Nome completo</Label>
+                      <Input value={editUserName} onChange={(e) => setEditUserName(e.target.value)} placeholder="Nome do membro" className="bg-secondary border-border" />
                     </div>
-                    <Button onClick={handleSaveRoles} className="w-full" disabled={loading || editRoles.length === 0}>
+                    <div className="space-y-2">
+                      <Label className="font-sans">Email</Label>
+                      <Input type="email" value={editUserEmail} onChange={(e) => setEditUserEmail(e.target.value)} placeholder="email@exemplo.com" className="bg-secondary border-border" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-sans">Papéis</Label>
+                      <div className="space-y-3">
+                        {ALL_ROLES.map((role) => (
+                          <div key={role} className="flex items-center space-x-3">
+                            <Checkbox
+                              id={`role-${role}`}
+                              checked={editRoles.includes(role)}
+                              onCheckedChange={() => toggleEditRole(role)}
+                            />
+                            <label htmlFor={`role-${role}`} className="text-sm font-sans font-medium leading-none cursor-pointer">
+                              {roleLabels[role]}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <Button onClick={handleSaveEdit} className="w-full" disabled={loading || editRoles.length === 0}>
                       {loading ? "Salvando..." : "Salvar Alterações"}
                     </Button>
                   </div>

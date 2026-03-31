@@ -188,6 +188,28 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "update-email") {
+      const { user_id, email } = body;
+      if (!user_id || !email) {
+        return new Response(JSON.stringify({ error: "Missing user_id or email" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { error: updateError } = await adminClient.auth.admin.updateUserById(user_id, { email });
+      if (updateError) {
+        return new Response(JSON.stringify({ error: updateError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (action === "list-emails") {
       const { user_ids } = body;
       if (!user_ids || !Array.isArray(user_ids) || user_ids.length === 0) {
