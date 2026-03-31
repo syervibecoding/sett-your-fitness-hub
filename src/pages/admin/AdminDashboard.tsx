@@ -51,7 +51,7 @@ export default function AdminDashboard() {
     let pendingQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "pending");
     let inactiveQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "inactive");
     let enrollQuery = supabase.from("enrollments").select("plan_id, plans(name)");
-    let expiringQuery = supabase.from("enrollments").select("*, trainer_id, students(full_name), plans(name)")
+    let expiringQuery = supabase.from("enrollments").select("*, trainer_id, students(full_name, status), plans(name)")
       .eq("status", "active").lte("end_date", thirtyDaysFromNow)
       .order("end_date", { ascending: true });
 
