@@ -335,11 +335,14 @@ export default function TeamManager() {
     // Update name via profiles
     await supabase.from("profiles").update({ full_name: editUserName }).eq("user_id", editUserId);
 
-    // Update email via edge function
+    // Update email via edge function (skip if user not found in auth)
     if (editUserEmail) {
-      await supabase.functions.invoke("manage-team-member", {
+      const { data: emailData } = await supabase.functions.invoke("manage-team-member", {
         body: { action: "update-email", user_id: editUserId, email: editUserEmail },
       });
+      if (emailData?.error && !emailData.error.includes("not found")) {
+        toast({ title: "Erro ao atualizar email", description: emailData.error, variant: "destructive" });
+      }
     }
 
     // Update roles
