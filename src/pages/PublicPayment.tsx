@@ -110,6 +110,16 @@ export default function PublicPayment() {
       if (data.selected_plan_id) {
         setSelectedPlanOptionId(data.selected_plan_id);
       }
+
+      // Check if student has active enrollment (renewal)
+      const { data: enrollment } = await supabase
+        .from("enrollments")
+        .select("id")
+        .eq("student_id", studentId)
+        .eq("status", "active")
+        .maybeSingle();
+
+      setIsRenewal(!!enrollment);
     };
 
     const loadPlans = async () => {
