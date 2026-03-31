@@ -4,9 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { Clock, AlertCircle, Percent, FileText, Loader2, CheckCircle, Wallet, TrendingUp, RefreshCw } from "lucide-react";
+import { Clock, AlertCircle, Percent, FileText, Loader2, CheckCircle, Wallet, TrendingUp, RefreshCw, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, Search, Download } from "lucide-react";
 import { format, subMonths, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AppLayout } from "@/components/AppLayout";
@@ -22,6 +24,9 @@ interface FinancialStats {
   overdueCount: number;
   overdueValue: number;
   conversionRate: number;
+  prevMonthBilling: number;
+  prevMonthCash: number;
+  prevTicketMedio: number;
 }
 
 interface RecentPayment {
@@ -30,6 +35,7 @@ interface RecentPayment {
   billing_type: string;
   status: string;
   created_at: string;
+  due_date: string | null;
   asaas_payment_id: string | null;
   invoice_status: string | null;
   installment_count: number;
@@ -42,17 +48,19 @@ interface CashDetail {
   detail: string;
 }
 
+const PAGE_SIZE = 20;
+
 export default function FinancialDashboard() {
   const { toast } = useToast();
   const { companyId, role } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
   const effectiveCompanyId = role === "master" ? (isViewingCompany ? viewingCompany?.id : null) : companyId;
   const [financialStats, setFinancialStats] = useState<FinancialStats>({
-    monthRevenueBilling: 0, monthRevenueCash: 0, pendingCount: 0, pendingValue: 0, overdueCount: 0, overdueValue: 0, conversionRate: 0,
+    monthRevenueBilling: 0, monthRevenueCash: 0, pendingCount: 0, pendingValue: 0, overdueCount: 0, overdueValue: 0, conversionRate: 0, prevMonthBilling: 0, prevMonthCash: 0, prevTicketMedio: 0,
   });
   const [monthlyBilling, setMonthlyBilling] = useState<{ month: string; value: number }[]>([]);
   const [monthlyCash, setMonthlyCash] = useState<{ month: string; value: number }[]>([]);
-  const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([]);
+  const [allPayments, setAllPayments] = useState<RecentPayment[]>([]);
   const [paymentMethodChart, setPaymentMethodChart] = useState<{ name: string; value: number }[]>([]);
   const [revenueByPlan, setRevenueByPlan] = useState<{ name: string; value: number }[]>([]);
   const [ticketMedio, setTicketMedio] = useState(0);
@@ -61,6 +69,15 @@ export default function FinancialDashboard() {
   const [issuingInvoice, setIssuingInvoice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [syncingAll, setSyncingAll] = useState(false);
+
+  // Filters
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterMethod, setFilterMethod] = useState("all");
+  const [filterSearch, setFilterSearch] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => { loadData(); }, [effectiveCompanyId]);
 
@@ -68,8 +85,8 @@ export default function FinancialDashboard() {
     setLoading(true);
     const now = new Date();
     const currentMonthKey = format(now, "yyyy-MM");
+    const prevMonthKey = format(subMonths(now, 1), "yyyy-MM");
 
-    // Single query + parallel independent queries
     let paymentsQuery = supabase.from("payments").select("id, value, installment_count, billing_type, created_at, due_date, status, asaas_payment_id, invoice_status, student_id, students(full_name)");
     let totalQuery = supabase.from("payments").select("*", { count: "exact", head: true });
     let confirmedQuery = supabase.from("payments").select("*", { count: "exact", head: true }).in("status", ["CONFIRMED", "RECEIVED", "RECEIVED_IN_CASH"]);
@@ -93,9 +110,12 @@ export default function FinancialDashboard() {
     const pendingList = all.filter((p) => p.status === "PENDING");
     const overdueList = all.filter((p) => p.status === "OVERDUE");
 
-    // Faturamento do mês
+    // Faturamento do mês atual e anterior
     const monthBilling = billingPayments
       .filter((p) => format(new Date(p.created_at), "yyyy-MM") === currentMonthKey)
+      .reduce((sum, p) => sum + Number(p.value), 0);
+    const prevMonthBilling = billingPayments
+      .filter((p) => format(new Date(p.created_at), "yyyy-MM") === prevMonthKey)
       .reduce((sum, p) => sum + Number(p.value), 0);
 
     // Helper: distribute cash across months
@@ -119,11 +139,11 @@ export default function FinancialDashboard() {
       }
     };
 
-    // Build cash per month + per student (current + 5 future months)
+    // Build cash per month
     let monthCash = 0;
+    let prevMonthCash = 0;
     const cashMonthStudentMap: Record<string, Record<string, { value: number; detail: string }>> = {};
 
-    // Init months: 5 past + current + 12 future
     const allMonthKeys: string[] = [];
     for (let i = 5; i >= -12; i--) {
       const key = format(i > 0 ? subMonths(now, i) : addMonths(now, -i), "yyyy-MM");
@@ -133,6 +153,7 @@ export default function FinancialDashboard() {
     cashPayments.forEach((p) => {
       distributeCash(p, (monthKey, value, studentName, detail) => {
         if (monthKey === currentMonthKey) monthCash += value;
+        if (monthKey === prevMonthKey) prevMonthCash += value;
 
         if (!cashMonthStudentMap[monthKey]) cashMonthStudentMap[monthKey] = {};
         if (!cashMonthStudentMap[monthKey][studentName]) cashMonthStudentMap[monthKey][studentName] = { value: 0, detail: "" };
@@ -141,7 +162,6 @@ export default function FinancialDashboard() {
       });
     });
 
-    // Build student detail tabs (current + next 12 months)
     const futureTabs: string[] = [];
     for (let i = 0; i <= 12; i++) {
       futureTabs.push(format(addMonths(now, i), "yyyy-MM"));
@@ -165,13 +185,20 @@ export default function FinancialDashboard() {
     const conversionRate = totalPayments && totalPayments > 0
       ? Math.round(((confirmedCount || 0) / totalPayments) * 100) : 0;
 
-    // Ticket médio
+    // Ticket médio atual e anterior
     const monthBillingPayments = billingPayments.filter(p => format(new Date(p.created_at), "yyyy-MM") === currentMonthKey);
-    setTicketMedio(monthBillingPayments.length > 0 ? monthBilling / monthBillingPayments.length : 0);
+    const prevMonthBillingPayments = billingPayments.filter(p => format(new Date(p.created_at), "yyyy-MM") === prevMonthKey);
+    const currentTicket = monthBillingPayments.length > 0 ? monthBilling / monthBillingPayments.length : 0;
+    const prevTicket = prevMonthBillingPayments.length > 0 ? prevMonthBilling / prevMonthBillingPayments.length : 0;
+    setTicketMedio(currentTicket);
 
-    setFinancialStats({ monthRevenueBilling: monthBilling, monthRevenueCash: monthCash, pendingCount, pendingValue, overdueCount, overdueValue, conversionRate });
+    setFinancialStats({
+      monthRevenueBilling: monthBilling, monthRevenueCash: monthCash,
+      pendingCount, pendingValue, overdueCount, overdueValue, conversionRate,
+      prevMonthBilling, prevMonthCash, prevTicketMedio: prevTicket,
+    });
 
-    // Charts: 5 past + current for billing, 5 past + current + 12 future for cash
+    // Charts
     const billingMap: Record<string, number> = {};
     for (let i = 5; i >= 0; i--) {
       billingMap[format(subMonths(now, i), "yyyy-MM")] = 0;
@@ -204,7 +231,7 @@ export default function FinancialDashboard() {
     setMonthlyBilling(fmtChart(billingMap));
     setMonthlyCash(fmtChart(cashChartMap));
 
-    // Payment methods by VALUE
+    // Payment methods
     const methodMap: Record<string, number> = {};
     billingPayments.forEach((p) => {
       const label = p.billing_type === "CREDIT_CARD" ? "Cartão" : p.billing_type === "PIX" ? "PIX" : p.billing_type;
@@ -214,11 +241,6 @@ export default function FinancialDashboard() {
 
     // Revenue by Plan
     const planMap: Record<string, number> = {};
-    billingPayments.forEach((p) => {
-      const student = all.find((s: any) => s.id === p.id);
-      // We need students with plan info - fetch separately
-    });
-    // Fetch plans for revenue by plan
     const { data: studentsWithPlans } = await supabase
       .from("students")
       .select("id, selected_plan_id, plans(name)");
@@ -234,9 +256,10 @@ export default function FinancialDashboard() {
     });
     setRevenueByPlan(Object.entries(planMap).map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 })).sort((a, b) => b.value - a.value));
 
-    // Recent payments (already fetched above, just sort/limit)
-    const sorted = [...all].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 10);
-    setRecentPayments(sorted as RecentPayment[]);
+    // All payments sorted
+    const sorted = [...all].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    setAllPayments(sorted as RecentPayment[]);
+    setCurrentPage(1);
     setLoading(false);
   };
 
@@ -248,13 +271,13 @@ export default function FinancialDashboard() {
       });
       if (error) throw error;
       toast({ title: "Nota fiscal emitida!", description: "A NFS-e foi solicitada com sucesso." });
-      setRecentPayments(prev => prev.map(p =>
+      setAllPayments(prev => prev.map(p =>
         p.asaas_payment_id === asaasPaymentId ? { ...p, invoice_status: data?.status || "SCHEDULED" } : p
       ));
     } catch (err: any) {
       const msg = err.message || "";
       if (msg.includes("já existe") || msg.includes("already")) {
-        setRecentPayments(prev => prev.map(p =>
+        setAllPayments(prev => prev.map(p =>
           p.asaas_payment_id === asaasPaymentId ? { ...p, invoice_status: "SCHEDULED" } : p
         ));
         toast({ title: "Nota já emitida", description: "Já existe uma nota fiscal agendada para esta cobrança." });
@@ -266,10 +289,37 @@ export default function FinancialDashboard() {
     }
   };
 
+  // Filtered payments
+  const filteredPayments = allPayments.filter(p => {
+    if (filterStatus !== "all" && p.status !== filterStatus) return false;
+    if (filterMethod !== "all") {
+      const method = p.billing_type === "CREDIT_CARD" ? "CREDIT_CARD" : p.billing_type;
+      if (method !== filterMethod) return false;
+    }
+    if (filterSearch) {
+      const name = p.students?.full_name || "";
+      if (!name.toLowerCase().includes(filterSearch.toLowerCase())) return false;
+    }
+    if (filterDateFrom) {
+      const pDate = (p.due_date || p.created_at).substring(0, 10);
+      if (pDate < filterDateFrom) return false;
+    }
+    if (filterDateTo) {
+      const pDate = (p.due_date || p.created_at).substring(0, 10);
+      if (pDate > filterDateTo) return false;
+    }
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredPayments.length / PAGE_SIZE));
+  const paginatedPayments = filteredPayments.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  // Reset page when filters change
+  useEffect(() => { setCurrentPage(1); }, [filterStatus, filterMethod, filterSearch, filterDateFrom, filterDateTo]);
+
   const chartColors = ["hsl(220, 70%, 25%)", "hsl(220, 60%, 35%)", "hsl(220, 50%, 45%)", "hsl(220, 40%, 55%)"];
   const revenueColor = "hsl(220, 70%, 25%)";
   const cashColor = "hsl(150, 60%, 30%)";
-  const forecastColor = "hsl(150, 40%, 50%)";
 
   const formatCurrency = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -279,13 +329,34 @@ export default function FinancialDashboard() {
       case "CONFIRMED":
       case "RECEIVED":
         return <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/30">Confirmado</Badge>;
+      case "RECEIVED_IN_CASH":
+        return <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/30">Recebido</Badge>;
       case "PENDING":
         return <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30 hover:bg-amber-500/30">Pendente</Badge>;
       case "OVERDUE":
         return <Badge className="bg-red-500/20 text-red-600 border-red-500/30 hover:bg-red-500/30">Atrasado</Badge>;
+      case "REFUNDED":
+        return <Badge className="bg-gray-500/20 text-gray-600 border-gray-500/30">Estornado</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
+  };
+
+  const calcVariation = (current: number, previous: number) => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return Math.round(((current - previous) / previous) * 100);
+  };
+
+  const VariationBadge = ({ current, previous }: { current: number; previous: number }) => {
+    const variation = calcVariation(current, previous);
+    if (variation === 0 && current === 0 && previous === 0) return null;
+    const isPositive = variation >= 0;
+    return (
+      <div className={`flex items-center gap-1 text-xs font-medium ${isPositive ? "text-emerald-500" : "text-red-500"}`}>
+        {isPositive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+        <span>{isPositive ? "+" : ""}{variation}%</span>
+      </div>
+    );
   };
 
   const renderRevenueChart = (data: { month: string; value: number }[], color: string, label: string) => (
@@ -305,8 +376,25 @@ export default function FinancialDashboard() {
 
   const formatMonthLabel = (key: string) => {
     const [year, month] = key.split("-").map(Number);
-    const date = new Date(year, month - 1, 15); // day 15 avoids timezone edge cases
+    const date = new Date(year, month - 1, 15);
     return format(date, "MMM/yy", { locale: ptBR }).replace(/^./, (c) => c.toUpperCase());
+  };
+
+  const handleSync = async (syncAll: boolean) => {
+    if (syncAll) setSyncingAll(true); else setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("asaas-integration", {
+        body: { action: "sync-payments", companyId: effectiveCompanyId, syncAll },
+      });
+      if (error) throw error;
+      toast({ title: "Sincronização concluída", description: data?.message || "Dados atualizados." });
+      await loadData();
+    } catch (err: any) {
+      toast({ title: "Erro ao sincronizar", description: err.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+      setSyncingAll(false);
+    }
   };
 
   if (loading) {
@@ -322,34 +410,31 @@ export default function FinancialDashboard() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-4xl text-primary">FINANCEIRO</h1>
             <p className="text-muted-foreground font-sans">Gestão financeira da consultoria</p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={syncing}
-            onClick={async () => {
-              setSyncing(true);
-              try {
-                const { data, error } = await supabase.functions.invoke("asaas-integration", {
-                  body: { action: "sync-payments", companyId: effectiveCompanyId },
-                });
-                if (error) throw error;
-                toast({ title: "Sincronização concluída", description: data?.message || "Dados atualizados." });
-                await loadData();
-              } catch (err: any) {
-                toast({ title: "Erro ao sincronizar", description: err.message, variant: "destructive" });
-              } finally {
-                setSyncing(false);
-              }
-            }}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Sincronizando..." : "Sincronizar Asaas"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={syncing || syncingAll}
+              onClick={() => handleSync(false)}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Sincronizando..." : "Sincronizar"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={syncing || syncingAll}
+              onClick={() => handleSync(true)}
+            >
+              <Download className={`h-4 w-4 mr-2 ${syncingAll ? "animate-spin" : ""}`} />
+              {syncingAll ? "Importando..." : "Sync 6 meses"}
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -358,32 +443,49 @@ export default function FinancialDashboard() {
               <div className="p-3 rounded-lg bg-emerald-500/10">
                 <TrendingUp className="h-6 w-6 text-emerald-500" />
               </div>
-              <div>
-                <p className="text-xl font-bold text-foreground font-sans">{formatCurrency(financialStats.monthRevenueBilling)}</p>
-                 <p className="text-sm text-muted-foreground font-sans">Faturamento — {format(new Date(), "MMM/yy", { locale: ptBR }).replace(/^./, c => c.toUpperCase())}</p>
-               </div>
-             </CardContent>
-           </Card>
-           <Card className="bg-card border-border">
-             <CardContent className="flex items-center gap-4 pt-6">
-               <div className="p-3 rounded-lg bg-purple-500/10">
-                 <TrendingUp className="h-6 w-6 text-purple-500" />
-               </div>
-               <div>
-                 <p className="text-xl font-bold text-foreground font-sans">{formatCurrency(ticketMedio)}</p>
-                 <p className="text-sm text-muted-foreground font-sans">Ticket Médio</p>
-               </div>
-             </CardContent>
-           </Card>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-xl font-bold text-foreground font-sans">{formatCurrency(financialStats.monthRevenueBilling)}</p>
+                  <VariationBadge current={financialStats.monthRevenueBilling} previous={financialStats.prevMonthBilling} />
+                </div>
+                <p className="text-sm text-muted-foreground font-sans">Faturamento — {format(new Date(), "MMM/yy", { locale: ptBR }).replace(/^./, c => c.toUpperCase())}</p>
+                {financialStats.prevMonthBilling > 0 && (
+                  <p className="text-xs text-muted-foreground/60 font-sans">Mês anterior: {formatCurrency(financialStats.prevMonthBilling)}</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="flex items-center gap-4 pt-6">
+              <div className="p-3 rounded-lg bg-purple-500/10">
+                <TrendingUp className="h-6 w-6 text-purple-500" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-xl font-bold text-foreground font-sans">{formatCurrency(ticketMedio)}</p>
+                  <VariationBadge current={ticketMedio} previous={financialStats.prevTicketMedio} />
+                </div>
+                <p className="text-sm text-muted-foreground font-sans">Ticket Médio</p>
+                {financialStats.prevTicketMedio > 0 && (
+                  <p className="text-xs text-muted-foreground/60 font-sans">Mês anterior: {formatCurrency(financialStats.prevTicketMedio)}</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
           <Card className="bg-card border-border">
             <CardContent className="flex items-center gap-4 pt-6">
               <div className="p-3 rounded-lg bg-blue-500/10">
                 <Wallet className="h-6 w-6 text-blue-500" />
               </div>
-              <div>
-                <p className="text-xl font-bold text-foreground font-sans">{formatCurrency(financialStats.monthRevenueCash)}</p>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-xl font-bold text-foreground font-sans">{formatCurrency(financialStats.monthRevenueCash)}</p>
+                  <VariationBadge current={financialStats.monthRevenueCash} previous={financialStats.prevMonthCash} />
+                </div>
                 <p className="text-sm text-muted-foreground font-sans">Caixa — {format(new Date(), "MMM/yy", { locale: ptBR }).replace(/^./, c => c.toUpperCase())}</p>
-                <p className="text-xs text-muted-foreground font-sans mt-1">Recebido (parcelas distribuídas)</p>
+                {financialStats.prevMonthCash > 0 && (
+                  <p className="text-xs text-muted-foreground/60 font-sans">Mês anterior: {formatCurrency(financialStats.prevMonthCash)}</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -436,7 +538,7 @@ export default function FinancialDashboard() {
           <Card className="bg-card border-border">
             <CardHeader>
               <CardTitle className="text-primary text-xl">CAIXA MENSAL + PREVISÃO</CardTitle>
-              <p className="text-xs text-muted-foreground font-sans">Recebido por mês + previsão dos próximos 3 meses (parcelas futuras)</p>
+              <p className="text-xs text-muted-foreground font-sans">Recebido por mês + previsão dos próximos meses (parcelas futuras)</p>
             </CardHeader>
             <CardContent>
               {renderRevenueChart(monthlyCash, cashColor, "Caixa")}
@@ -537,9 +639,55 @@ export default function FinancialDashboard() {
         </Card>
 
         <Card className="bg-card border-border">
-          <CardHeader><CardTitle className="text-primary text-xl">PAGAMENTOS RECENTES</CardTitle></CardHeader>
-          <CardContent>
-            {recentPayments.length > 0 ? (
+          <CardHeader>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <CardTitle className="text-primary text-xl">HISTÓRICO DE PAGAMENTOS</CardTitle>
+                <p className="text-xs text-muted-foreground font-sans mt-1">{filteredPayments.length} pagamentos encontrados</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Filters */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar aluno..."
+                  value={filterSearch}
+                  onChange={(e) => setFilterSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os status</SelectItem>
+                  <SelectItem value="CONFIRMED">Confirmado</SelectItem>
+                  <SelectItem value="RECEIVED">Recebido</SelectItem>
+                  <SelectItem value="PENDING">Pendente</SelectItem>
+                  <SelectItem value="OVERDUE">Atrasado</SelectItem>
+                  <SelectItem value="REFUNDED">Estornado</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={filterMethod} onValueChange={setFilterMethod}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Método" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os métodos</SelectItem>
+                  <SelectItem value="CREDIT_CARD">Cartão</SelectItem>
+                  <SelectItem value="PIX">PIX</SelectItem>
+                  <SelectItem value="BOLETO">Boleto</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} placeholder="Data início" />
+              <Input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} placeholder="Data fim" />
+            </div>
+
+            {paginatedPayments.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -553,7 +701,7 @@ export default function FinancialDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentPayments.map((p) => (
+                  {paginatedPayments.map((p) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium font-sans">{p.students?.full_name || "—"}</TableCell>
                       <TableCell className="font-sans">{formatCurrency(Number(p.value))}</TableCell>
@@ -596,7 +744,24 @@ export default function FinancialDashboard() {
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground font-sans text-center py-8">Nenhum pagamento registrado</p>
+              <p className="text-muted-foreground font-sans text-center py-8">Nenhum pagamento encontrado</p>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-sm text-muted-foreground font-sans">
+                  Página {currentPage} de {totalPages}
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
