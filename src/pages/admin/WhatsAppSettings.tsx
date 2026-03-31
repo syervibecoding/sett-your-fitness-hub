@@ -92,11 +92,18 @@ export default function WhatsAppSettings() {
     if (effectiveCompanyId) {
       checkStatus();
       checkBotSettings();
+    } else {
+      setState("disconnected");
+      setBotStatus({ loading: false, enabled: false, source: "none" });
     }
     return () => stopPolling();
   }, [effectiveCompanyId, checkStatus, checkBotSettings, stopPolling]);
 
   const handleConnect = async () => {
+    if (!effectiveCompanyId) {
+      toast.error("Selecione uma empresa primeiro");
+      return;
+    }
     setBusy(true);
     try {
       const data = await invoke("init-connection");
@@ -155,7 +162,16 @@ export default function WhatsAppSettings() {
           </p>
         </div>
 
+        {role === "master" && !effectiveCompanyId && (
+          <Card className="max-w-lg">
+            <CardContent className="p-6">
+              <p className="text-sm text-muted-foreground">Selecione uma empresa no menu lateral para gerenciar a conexão WhatsApp.</p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Connection Card */}
+        {effectiveCompanyId && (
         <Card className="max-w-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -244,8 +260,10 @@ export default function WhatsAppSettings() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* External Bot Card */}
+        {effectiveCompanyId && (
         <Card className="max-w-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -303,6 +321,7 @@ export default function WhatsAppSettings() {
             </Button>
           </CardContent>
         </Card>
+        )}
       </div>
     </AppLayout>
   );
