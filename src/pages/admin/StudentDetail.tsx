@@ -318,7 +318,7 @@ export default function StudentDetail() {
     const trainerIds = [...new Set(enrollmentData.map((e) => e.trainer_id))];
 
     const [{ data: plansData }, { data: profiles }] = await Promise.all([
-      supabase.from("plans").select("id, name, duration_weeks").in("id", planIds),
+      supabase.from("plans").select("id, name, duration_weeks, duration_days").in("id", planIds),
       supabase.from("profiles").select("user_id, full_name").in("user_id", trainerIds),
     ]);
 
