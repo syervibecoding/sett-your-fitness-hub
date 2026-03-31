@@ -156,6 +156,7 @@ export default function PublicPayment() {
         studentId,
         billingType: "PIX",
         value: planValue,
+        planId: selectedPlanOptionId,
       });
       setPixPaymentId(paymentId);
 
