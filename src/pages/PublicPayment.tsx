@@ -54,6 +54,7 @@ export default function PublicPayment() {
   const [notFound, setNotFound] = useState(false);
   const [step, setStep] = useState<Step>("select_plan");
   const [loading, setLoading] = useState(false);
+  const [isRenewal, setIsRenewal] = useState(false);
 
   // Plans
   const [availablePlans, setAvailablePlans] = useState<PlanOption[]>([]);
@@ -109,6 +110,16 @@ export default function PublicPayment() {
       if (data.selected_plan_id) {
         setSelectedPlanOptionId(data.selected_plan_id);
       }
+
+      // Check if student has active enrollment (renewal)
+      const { data: enrollment } = await supabase
+        .from("enrollments")
+        .select("id")
+        .eq("student_id", studentId)
+        .eq("status", "active")
+        .maybeSingle();
+
+      setIsRenewal(!!enrollment);
     };
 
     const loadPlans = async () => {
@@ -250,9 +261,13 @@ export default function PublicPayment() {
         <Card className="max-w-md w-full bg-card border-border text-center">
           <CardContent className="pt-8 pb-8 space-y-4">
             <CheckCircle className="h-16 w-16 text-primary mx-auto" />
-            <h2 className="text-3xl text-primary">PAGAMENTO CONFIRMADO!</h2>
+            <h2 className="text-3xl text-primary">
+              {isRenewal ? "RENOVAÇÃO CONFIRMADA!" : "PAGAMENTO CONFIRMADO!"}
+            </h2>
             <p className="text-muted-foreground font-sans">
-              Nossa equipe entrará em contato pelo WhatsApp para os próximos passos.
+              {isRenewal
+                ? "Seu plano foi renovado com sucesso! Seus novos treinos já estão disponíveis."
+                : "Nossa equipe entrará em contato pelo WhatsApp para os próximos passos."}
             </p>
           </CardContent>
         </Card>
@@ -265,10 +280,17 @@ export default function PublicPayment() {
       <div className="max-w-lg mx-auto px-4 py-8 space-y-6">
         <div className="text-center space-y-3">
           <img src={bnLogo} alt="BN Performance Training" className="h-16 mx-auto" />
-          <h1 className="text-4xl text-primary">PAGAMENTO</h1>
+          <h1 className="text-4xl text-primary">
+            {isRenewal ? "RENOVAÇÃO" : "PAGAMENTO"}
+          </h1>
           {student && (
             <p className="text-muted-foreground font-sans">
               Aluno: <strong className="text-foreground">{student.full_name}</strong>
+            </p>
+          )}
+          {isRenewal && (
+            <p className="text-sm text-primary/80 font-sans">
+              ✨ Você já possui uma matrícula ativa. Ao pagar, seu plano será estendido automaticamente.
             </p>
           )}
         </div>
@@ -277,7 +299,9 @@ export default function PublicPayment() {
         {step === "select_plan" && (
           <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-primary text-xl text-center">ESCOLHA SEU PLANO</CardTitle>
+              <CardTitle className="text-primary text-xl text-center">
+                {isRenewal ? "RENOVAR PLANO" : "ESCOLHA SEU PLANO"}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {loadingPlans ? (
