@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Mail, Phone, Cake, CalendarDays, Dumbbell, Plus, CalendarIcon, MapPin, CreditCard, MessageCircle, Pencil, DollarSign, Upload, Image, Mic, FileText, Download, Square, MicOff, RefreshCw, ExternalLink, Copy, Link, Check, Trash2, UserPlus } from "lucide-react";
-import { format, parseISO, eachDayOfInterval, addWeeks } from "date-fns";
+import { format, parseISO, eachDayOfInterval, addWeeks, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
@@ -97,6 +97,7 @@ interface Plan {
   id: string;
   name: string;
   duration_weeks: number;
+  duration_days: number | null;
 }
 
 interface Trainer {
@@ -317,7 +318,7 @@ export default function StudentDetail() {
     const trainerIds = [...new Set(enrollmentData.map((e) => e.trainer_id))];
 
     const [{ data: plansData }, { data: profiles }] = await Promise.all([
-      supabase.from("plans").select("id, name, duration_weeks").in("id", planIds),
+      supabase.from("plans").select("id, name, duration_weeks, duration_days").in("id", planIds),
       supabase.from("profiles").select("user_id, full_name").in("user_id", trainerIds),
     ]);
 
@@ -419,7 +420,7 @@ export default function StudentDetail() {
   // Load plans and trainers for the enrollment dialog
   const loadEnrollmentOptions = async () => {
     const [{ data: plansData }, { data: rolesData }] = await Promise.all([
-      supabase.from("plans").select("id, name, duration_weeks").eq("is_active", true).order("name"),
+      supabase.from("plans").select("id, name, duration_weeks, duration_days").eq("is_active", true).order("name"),
       supabase.from("user_roles").select("user_id, role").in("role", ["admin", "coordinator", "trainer"]),
     ]);
     setPlans(plansData || []);
@@ -441,7 +442,9 @@ export default function StudentDetail() {
   };
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId);
-  const computedEndDate = selectedPlan ? addWeeks(startDate, selectedPlan.duration_weeks) : null;
+  const computedEndDate = selectedPlan
+    ? addDays(startDate, (selectedPlan.duration_days || (selectedPlan.duration_weeks ?? 4) * 7) - 1)
+    : null;
 
   const handleCreateEnrollment = async () => {
     if (!selectedPlanId || !selectedTrainerId || !id || !session?.user?.id || !computedEndDate) return;
