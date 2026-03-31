@@ -142,12 +142,15 @@ Deno.serve(async (req) => {
         .single();
 
       if (callerCompany?.company_id) {
-        await adminClient
+        const { error: memberError } = await adminClient
           .from("company_members")
           .upsert(
             { user_id: userId, company_id: callerCompany.company_id },
             { onConflict: "user_id" }
           );
+        if (memberError) {
+          console.error("company_members upsert error:", memberError.message);
+        }
       }
 
       return new Response(JSON.stringify({ success: true, user_id: userId }), {
