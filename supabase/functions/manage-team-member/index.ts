@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Add to company_members using the caller's company
+      // Add to company_members using the caller's company or the provided company_id
       const { data: callerCompany } = await adminClient
         .from("company_members")
         .select("company_id")
@@ -141,11 +141,13 @@ Deno.serve(async (req) => {
         .limit(1)
         .single();
 
-      if (callerCompany?.company_id) {
+      const targetCompanyId = callerCompany?.company_id || requestCompanyId;
+
+      if (targetCompanyId) {
         const { error: memberError } = await adminClient
           .from("company_members")
           .upsert(
-            { user_id: userId, company_id: callerCompany.company_id },
+            { user_id: userId, company_id: targetCompanyId },
             { onConflict: "user_id" }
           );
         if (memberError) {
