@@ -51,7 +51,7 @@ export default function AdminDashboard() {
     let pendingQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "pending");
     let inactiveQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "inactive");
     let enrollQuery = supabase.from("enrollments").select("plan_id, plans(name)");
-    let expiringQuery = supabase.from("enrollments").select("*, trainer_id, students(full_name), plans(name)")
+    let expiringQuery = supabase.from("enrollments").select("*, trainer_id, students(full_name, status), plans(name)")
       .eq("status", "active").lte("end_date", thirtyDaysFromNow)
       .order("end_date", { ascending: true });
 
@@ -102,7 +102,12 @@ export default function AdminDashboard() {
       setPlanChart(Object.values(planCounts).sort((a, b) => b.count - a.count));
     }
 
-    setExpiringContracts(expiringRes.data || []);
+    // Filter out inactive/cancelled students from expiring contracts
+    const filteredExpiring = (expiringRes.data || []).filter((e: any) => {
+      const studentStatus = e.students?.status;
+      return studentStatus === "active" || studentStatus === "pending";
+    });
+    setExpiringContracts(filteredExpiring);
 
     // Missing workouts: enrollments without training_start_date OR active cycles without workouts
     let cycleEnrollQuery = supabase.from("enrollments").select("id, training_start_date, trainer_id, students(full_name, assigned_trainer_id)").in("status", ["active", "awaiting_training"]) as any;

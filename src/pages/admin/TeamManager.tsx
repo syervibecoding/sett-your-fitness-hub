@@ -22,6 +22,7 @@ import { ptBR } from "date-fns/locale";
 interface TeamMember {
   user_id: string;
   full_name: string | null;
+  email?: string;
   roles: string[];
 }
 
@@ -143,7 +144,26 @@ export default function TeamManager() {
       }
       grouped[r.user_id].roles.push(r.role);
     }
-    setMembers(Object.values(grouped));
+    const membersList = Object.values(grouped);
+
+    // Fetch emails via edge function
+    if (membersList.length > 0) {
+      try {
+        const { data: emailData } = await supabase.functions.invoke("manage-team-member", {
+          body: { action: "list-emails", user_ids: membersList.map((m) => m.user_id) },
+        });
+        if (emailData?.emails) {
+          const emailMap = new Map(emailData.emails.map((e: any) => [e.user_id, e.email]));
+          membersList.forEach((m) => {
+            m.email = (emailMap.get(m.user_id) as string) || undefined;
+          });
+        }
+      } catch (e) {
+        console.error("Failed to fetch emails", e);
+      }
+    }
+
+    setMembers(membersList);
 
     // Available users: only from this company
     const { data: companyProfiles } = await supabase
@@ -531,8 +551,9 @@ export default function TeamManager() {
                       <div className="flex items-center gap-3">
                         <Shield className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="text-foreground font-sans font-medium">{m.full_name}</p>
-                          <p className="text-muted-foreground text-xs font-sans">{m.user_id.slice(0, 8)}...</p>
+                        <p className="text-foreground font-sans font-medium">{m.full_name}</p>
+                          {m.email && <p className="text-muted-foreground text-xs font-sans">{m.email}</p>}
+                          {!m.email && <p className="text-muted-foreground text-xs font-sans">{m.user_id.slice(0, 8)}...</p>}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

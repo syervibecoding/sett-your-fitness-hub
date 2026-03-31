@@ -188,6 +188,28 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "list-emails") {
+      const { user_ids } = body;
+      if (!user_ids || !Array.isArray(user_ids) || user_ids.length === 0) {
+        return new Response(JSON.stringify({ error: "Missing user_ids array" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const results: { user_id: string; email: string }[] = [];
+      for (const uid of user_ids.slice(0, 100)) {
+        const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(uid);
+        if (!userError && userData?.user?.email) {
+          results.push({ user_id: uid, email: userData.user.email });
+        }
+      }
+
+      return new Response(JSON.stringify({ emails: results }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(JSON.stringify({ error: "Invalid action" }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
