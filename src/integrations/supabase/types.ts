@@ -777,6 +777,7 @@ export type Database = {
         Row: {
           amount: number
           asaas_boleto_url: string | null
+          asaas_customer_id: string | null
           asaas_invoice_url: string | null
           asaas_payment_id: string | null
           asaas_pix_payload: string | null
@@ -787,6 +788,8 @@ export type Database = {
           due_date: string | null
           enrollment_id: string | null
           id: string
+          installment_count: number | null
+          invoice_status: string | null
           invoice_url: string | null
           notes: string | null
           paid_at: string | null
@@ -799,6 +802,7 @@ export type Database = {
         Insert: {
           amount?: number
           asaas_boleto_url?: string | null
+          asaas_customer_id?: string | null
           asaas_invoice_url?: string | null
           asaas_payment_id?: string | null
           asaas_pix_payload?: string | null
@@ -809,6 +813,8 @@ export type Database = {
           due_date?: string | null
           enrollment_id?: string | null
           id?: string
+          installment_count?: number | null
+          invoice_status?: string | null
           invoice_url?: string | null
           notes?: string | null
           paid_at?: string | null
@@ -821,6 +827,7 @@ export type Database = {
         Update: {
           amount?: number
           asaas_boleto_url?: string | null
+          asaas_customer_id?: string | null
           asaas_invoice_url?: string | null
           asaas_payment_id?: string | null
           asaas_pix_payload?: string | null
@@ -831,6 +838,8 @@ export type Database = {
           due_date?: string | null
           enrollment_id?: string | null
           id?: string
+          installment_count?: number | null
+          invoice_status?: string | null
           invoice_url?: string | null
           notes?: string | null
           paid_at?: string | null
