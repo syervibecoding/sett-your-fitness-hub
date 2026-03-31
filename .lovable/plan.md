@@ -1,42 +1,36 @@
 
 
-# Correção: Amanda com 2 ciclos em vez de 1
+## Diagnóstico
 
-## Problema
-O plano "BN PRO Iniciante" tem `duration_weeks = 6` e `cycle_duration_days = 42` (6 semanas). Quando a matrícula é criada, o frontend calcula `end_date = addWeeks(startDate, 6)` que dá **14/04** (Mar 3 + 6 semanas). Porém o trigger `generate_training_cycles` calcula internamente `v_end = start + 42 - 1 = 13/04`. Como `NEW.end_date (14/04)` sobrescreve, sobra 1 dia extra, gerando um ciclo 2 de 1 dia só (14/04 a 14/04).
+### Problema 1: Parcelas aparecendo como "à vista"
+A API do Asaas, ao listar cobranças (`GET /payments`), retorna cada parcela como um pagamento individual. Cada um tem o campo `installment` (ID do grupo de parcelamento), mas **não** retorna `installmentCount` diretamente. O sync atual usa `ap.installmentCount` que é `undefined`, resultando em `1` (à vista) para todos.
 
-## Causa raiz
-Na linha 444 do `StudentDetail.tsx`:
-```ts
-const computedEndDate = addWeeks(startDate, selectedPlan.duration_weeks);
-```
-Isso calcula a data **exclusiva** (dia seguinte ao último dia), mas o sistema trata `end_date` como **inclusiva**.
+### Problema 2: Mês mostrando fevereiro
+O `new Date()` deveria retornar março, mas pode haver dados concentrados em fevereiro. Vou garantir que o mês corrente seja exibido corretamente nos cards e tabs.
 
-## Solução
-Trocar o cálculo de `end_date` para usar `duration_days` (que é mais preciso) e subtrair 1 dia para ser inclusivo:
+---
 
-```ts
-const computedEndDate = selectedPlan
-  ? addDays(startDate, (selectedPlan.duration_days || selectedPlan.duration_weeks * 7) - 1)
-  : null;
-```
+## Plano
 
-Isso faz `end_date = 13/04` para Amanda, alinhando com o trigger e gerando apenas 1 ciclo.
+### 1. Corrigir sync de parcelas na edge function `asaas-integration`
 
-## Correção dos dados existentes
-Migration para deletar o ciclo 2 espúrio da Amanda e ajustar o `end_date` da matrícula:
+Na função `syncPayments`:
+- Ao iterar os pagamentos do Asaas, agrupar por `ap.installment` (ID do parcelamento)
+- Para cada grupo com `installment` preenchido, contar quantos pagamentos pertencem ao mesmo grupo = `installmentCount`
+- Salvar `installment_count` correto em cada pagamento do grupo
+- Pagamentos sem `installment` (à vista) mantêm `installment_count = 1`
 
-```sql
--- Remove ciclo 2 de 1 dia
-DELETE FROM training_cycles
-WHERE enrollment_id = '225637a1-2133-44e1-9ac7-5cfb89d8dfd9' AND cycle_number = 2;
+### 2. Corrigir cálculo do caixa no frontend
 
--- Corrige end_date da matrícula
-UPDATE enrollments SET end_date = '2026-04-13'
-WHERE id = '225637a1-2133-44e1-9ac7-5cfb89d8dfd9';
-```
+Em `FinancialDashboard.tsx`, a lógica de `distributeCash` já está correta — ela distribui parcelas pelos meses futuros usando `installment_count` e `addMonths`. O problema é que os dados no banco estão com `installment_count = 1`. Após corrigir o sync, os dados ficarão corretos.
 
-## Arquivos alterados
-- `src/pages/admin/StudentDetail.tsx` — corrigir cálculo de `computedEndDate`
-- Migration SQL — limpar dados da Amanda
+### 3. Garantir mês correto
+
+- Verificar e forçar que a label "(atual)" nos tabs de caixa use `new Date()` consistentemente
+- No card "Faturamento do Mês" e "Caixa do Mês", adicionar o nome do mês corrente para clareza (ex: "Faturamento — Mar/26")
+
+### Arquivos alterados
+- `supabase/functions/asaas-integration/index.ts` — corrigir `syncPayments` para agrupar parcelas e calcular `installment_count`
+- `src/pages/admin/FinancialDashboard.tsx` — exibir nome do mês nos cards de faturamento/caixa
+- Deploy da edge function
 
