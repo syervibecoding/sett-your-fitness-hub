@@ -109,44 +109,35 @@ export default function AdminDashboard() {
     });
     setExpiringContracts(filteredExpiring);
 
-    // Missing workouts: enrollments without training_start_date OR active cycles without workouts
+    // Cycle countdowns: for each active enrollment, find the current active cycle and show days remaining
     let cycleEnrollQuery = supabase.from("enrollments").select("id, training_start_date, trainer_id, students(full_name, assigned_trainer_id)").in("status", ["active", "awaiting_training"]) as any;
     if (effectiveCompanyId) cycleEnrollQuery = cycleEnrollQuery.eq("company_id", effectiveCompanyId);
     const { data: activeEnrolls } = await cycleEnrollQuery;
-    const missing: any[] = [];
+    const countdowns: any[] = [];
     if (activeEnrolls && activeEnrolls.length > 0) {
-      activeEnrolls.forEach((e: any) => {
-        const effectiveTrainer = e.students?.assigned_trainer_id || e.trainer_id;
-        if (!e.training_start_date) {
-          missing.push({ student_name: e.students?.full_name || "—", cycle_number: null, reason: "Sem data de treino", trainer_id: effectiveTrainer });
-        }
-      });
       const enrollsWithDate = activeEnrolls.filter((e: any) => e.training_start_date);
       if (enrollsWithDate.length > 0) {
         const enrollIds = enrollsWithDate.map((e: any) => e.id);
         const enrollInfoMap: Record<string, { name: string; trainer_id: string | null }> = {};
         enrollsWithDate.forEach((e: any) => { enrollInfoMap[e.id] = { name: e.students?.full_name || "—", trainer_id: e.students?.assigned_trainer_id || e.trainer_id }; });
-        const { data: pendingCycles } = await supabase.from("training_cycles").select("*").in("enrollment_id", enrollIds).in("status", ["active", "upcoming"]);
-        if (pendingCycles && pendingCycles.length > 0) {
-          const cycleIds = pendingCycles.map((c: any) => c.id);
-          const { data: workouts } = await supabase.from("workouts").select("cycle_id").in("cycle_id", cycleIds);
-          const withWorkout = new Set((workouts || []).map((w: any) => w.cycle_id));
-          pendingCycles.filter((c: any) => !withWorkout.has(c.id)).forEach((c: any) => {
+        const { data: activeCycles } = await supabase.from("training_cycles").select("*").in("enrollment_id", enrollIds).eq("status", "active");
+        if (activeCycles && activeCycles.length > 0) {
+          activeCycles.forEach((c: any) => {
             const info = enrollInfoMap[c.enrollment_id];
-            missing.push({ student_name: info?.name || "—", cycle_number: c.cycle_number, reason: `Ciclo ${c.cycle_number} sem treino`, trainer_id: info?.trainer_id });
+            const daysLeft = Math.ceil((new Date(c.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+            countdowns.push({
+              student_name: info?.name || "—",
+              cycle_number: c.cycle_number,
+              end_date: c.end_date,
+              days_left: daysLeft,
+              trainer_id: info?.trainer_id,
+            });
           });
         }
       }
     }
-    const firstPerStudent = new Map<string, any>();
-    missing.forEach(m => {
-      const key = m.student_name;
-      const existing = firstPerStudent.get(key);
-      if (!existing || (m.cycle_number !== null && (existing.cycle_number === null || m.cycle_number < existing.cycle_number))) {
-        firstPerStudent.set(key, m);
-      }
-    });
-    setMissingWorkouts(Array.from(firstPerStudent.values()));
+    countdowns.sort((a, b) => a.days_left - b.days_left);
+    setCycleCountdowns(countdowns);
 
     // Fetch trainer names for both sections
     const allTrainerIds = new Set<string>();
