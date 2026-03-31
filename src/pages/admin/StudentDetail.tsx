@@ -441,7 +441,9 @@ export default function StudentDetail() {
   };
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId);
-  const computedEndDate = selectedPlan ? addWeeks(startDate, selectedPlan.duration_weeks) : null;
+  const computedEndDate = selectedPlan
+    ? addDays(startDate, (selectedPlan.duration_days || (selectedPlan.duration_weeks ?? 4) * 7) - 1)
+    : null;
 
   const handleCreateEnrollment = async () => {
     if (!selectedPlanId || !selectedTrainerId || !id || !session?.user?.id || !computedEndDate) return;
