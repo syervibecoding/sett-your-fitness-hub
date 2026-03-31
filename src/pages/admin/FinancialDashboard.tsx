@@ -193,10 +193,13 @@ export default function FinancialDashboard() {
     });
 
     const fmtChart = (map: Record<string, number>) =>
-      Object.entries(map).map(([key, value]) => ({
-        month: format(new Date(key + "-01"), "MMM/yy", { locale: ptBR }),
-        value: Math.round(value * 100) / 100,
-      }));
+      Object.entries(map).map(([key, value]) => {
+        const [y, m] = key.split("-").map(Number);
+        return {
+          month: format(new Date(y, m - 1, 15), "MMM/yy", { locale: ptBR }),
+          value: Math.round(value * 100) / 100,
+        };
+      });
 
     setMonthlyBilling(fmtChart(billingMap));
     setMonthlyCash(fmtChart(cashChartMap));
