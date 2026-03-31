@@ -145,7 +145,7 @@ export default function WhatsAppChat() {
     setEditingName(false);
   };
 
-  // Load chats
+  // Load chats - uses last_message column instead of N+1 queries
   const loadChats = useCallback(async () => {
     let query = supabase
       .from("whatsapp_chats")
@@ -157,21 +157,11 @@ export default function WhatsAppChat() {
     const { data: chatData } = await query;
 
     if (chatData) {
-      const chatsWithPreview = await Promise.all(
-        chatData.map(async (chat: any) => {
-          const { data: msgs } = await supabase
-            .from("whatsapp_messages")
-            .select("content")
-            .eq("chat_id", chat.id)
-            .order("created_at", { ascending: false })
-            .limit(1);
-          return {
-            ...chat,
-            student: Array.isArray(chat.student) ? chat.student[0] : chat.student,
-            lastMessage: msgs?.[0]?.content || "",
-          };
-        })
-      );
+      const chatsWithPreview = chatData.map((chat: any) => ({
+        ...chat,
+        student: Array.isArray(chat.student) ? chat.student[0] : chat.student,
+        lastMessage: chat.last_message || "",
+      }));
       setChats(chatsWithPreview);
     }
   }, [effectiveCompanyId]);
