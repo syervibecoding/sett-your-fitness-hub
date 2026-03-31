@@ -260,8 +260,10 @@ export default function WhatsAppSettings() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* External Bot Card */}
+        {effectiveCompanyId && (
         <Card className="max-w-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
