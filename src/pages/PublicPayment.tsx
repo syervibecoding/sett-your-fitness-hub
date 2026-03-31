@@ -261,9 +261,13 @@ export default function PublicPayment() {
         <Card className="max-w-md w-full bg-card border-border text-center">
           <CardContent className="pt-8 pb-8 space-y-4">
             <CheckCircle className="h-16 w-16 text-primary mx-auto" />
-            <h2 className="text-3xl text-primary">PAGAMENTO CONFIRMADO!</h2>
+            <h2 className="text-3xl text-primary">
+              {isRenewal ? "RENOVAÇÃO CONFIRMADA!" : "PAGAMENTO CONFIRMADO!"}
+            </h2>
             <p className="text-muted-foreground font-sans">
-              Nossa equipe entrará em contato pelo WhatsApp para os próximos passos.
+              {isRenewal
+                ? "Seu plano foi renovado com sucesso! Seus novos treinos já estão disponíveis."
+                : "Nossa equipe entrará em contato pelo WhatsApp para os próximos passos."}
             </p>
           </CardContent>
         </Card>
