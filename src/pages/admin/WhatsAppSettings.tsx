@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, MessageSquare, Wifi, WifiOff, QrCode, Phone, Bot, ShieldAlert } from "lucide-react";
+import { Loader2, MessageSquare, Wifi, WifiOff, QrCode, Phone, Bot, ShieldAlert, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
