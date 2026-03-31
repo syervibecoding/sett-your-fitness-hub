@@ -316,9 +316,34 @@ export default function FinancialDashboard() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-4xl text-primary">FINANCEIRO</h1>
-          <p className="text-muted-foreground font-sans">Gestão financeira da consultoria</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl text-primary">FINANCEIRO</h1>
+            <p className="text-muted-foreground font-sans">Gestão financeira da consultoria</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={syncing}
+            onClick={async () => {
+              setSyncing(true);
+              try {
+                const { data, error } = await supabase.functions.invoke("asaas-integration", {
+                  body: { action: "sync-payments", companyId: effectiveCompanyId },
+                });
+                if (error) throw error;
+                toast({ title: "Sincronização concluída", description: data?.message || "Dados atualizados." });
+                await loadData();
+              } catch (err: any) {
+                toast({ title: "Erro ao sincronizar", description: err.message, variant: "destructive" });
+              } finally {
+                setSyncing(false);
+              }
+            }}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Sincronizando..." : "Sincronizar Asaas"}
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
