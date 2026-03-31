@@ -321,6 +321,7 @@ export default function WhatsAppSettings() {
             </Button>
           </CardContent>
         </Card>
+        )}
       </div>
     </AppLayout>
   );
