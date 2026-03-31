@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, ClipboardList, AlertTriangle, TrendingUp, RefreshCw, Dumbbell, Clock, UserX } from "lucide-react";
+import { Users, ClipboardList, AlertTriangle, TrendingUp, RefreshCw, Dumbbell, Clock, UserX, Timer } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { AppLayout } from "@/components/AppLayout";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
