@@ -191,6 +191,7 @@ export default function PublicPayment() {
       const payload: Record<string, any> = {
         studentId,
         value: planValue,
+        planId: selectedPlanOptionId,
         creditCard: {
           holderName: cardForm.holderName,
           number: cardForm.number,
