@@ -488,7 +488,7 @@ export default function WhatsAppChat() {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-manager`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-        body: JSON.stringify({ action: "delete-message", remoteJid: chat.remote_jid, messageId: msg.message_id_external, chatId: selectedChatId }),
+        body: JSON.stringify({ action: "delete-message", companyId: effectiveCompanyId, remoteJid: chat.remote_jid, messageId: msg.message_id_external, chatId: selectedChatId }),
       });
       if (!res.ok) throw new Error("Erro ao apagar");
       setMessages((prev) => prev.filter((m) => m.id !== msg.id));
