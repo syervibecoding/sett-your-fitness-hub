@@ -144,7 +144,26 @@ export default function TeamManager() {
       }
       grouped[r.user_id].roles.push(r.role);
     }
-    setMembers(Object.values(grouped));
+    const membersList = Object.values(grouped);
+
+    // Fetch emails via edge function
+    if (membersList.length > 0) {
+      try {
+        const { data: emailData } = await supabase.functions.invoke("manage-team-member", {
+          body: { action: "list-emails", user_ids: membersList.map((m) => m.user_id) },
+        });
+        if (emailData?.emails) {
+          const emailMap = new Map(emailData.emails.map((e: any) => [e.user_id, e.email]));
+          membersList.forEach((m) => {
+            m.email = emailMap.get(m.user_id) || undefined;
+          });
+        }
+      } catch (e) {
+        console.error("Failed to fetch emails", e);
+      }
+    }
+
+    setMembers(membersList);
 
     // Available users: only from this company
     const { data: companyProfiles } = await supabase
