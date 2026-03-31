@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
     const { action } = body;
 
     if (action === "create") {
-      const { full_name, email, password, role } = body;
+      const { full_name, email, password, role, company_id: requestCompanyId } = body;
 
       if (!full_name || !email || !password || !role) {
         return new Response(JSON.stringify({ error: "Missing required fields" }), {

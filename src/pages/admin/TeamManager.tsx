@@ -277,7 +277,7 @@ export default function TeamManager() {
     if (!newName || !newEmail || !newPassword || !newMemberRole) return;
     setLoading(true);
     const { data, error } = await supabase.functions.invoke("manage-team-member", {
-      body: { action: "create", full_name: newName, email: newEmail, password: newPassword, role: newMemberRole },
+      body: { action: "create", full_name: newName, email: newEmail, password: newPassword, role: newMemberRole, company_id: effectiveCompanyId },
     });
     setLoading(false);
 
