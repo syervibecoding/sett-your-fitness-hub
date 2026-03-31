@@ -265,9 +265,15 @@ export default function WhatsAppSettings() {
                 </Button>
               )}
               {state === "waiting_qr" && (
-                <Button variant="outline" onClick={handleDisconnect} disabled={busy}>
-                  Cancelar
-                </Button>
+                <>
+                  <Button variant="outline" onClick={handleRestart} disabled={busy}>
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                    Reconectar
+                  </Button>
+                  <Button variant="ghost" onClick={handleDisconnect} disabled={busy}>
+                    Cancelar
+                  </Button>
+                </>
               )}
               {state === "connected" && (
                 <Button variant="destructive" onClick={handleDisconnect} disabled={busy}>
