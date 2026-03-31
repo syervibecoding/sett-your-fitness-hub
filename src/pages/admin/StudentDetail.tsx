@@ -824,7 +824,7 @@ export default function StudentDetail() {
               <p className="text-muted-foreground">Nenhuma anamnese preenchida. Clique em "Adicionar" para preencher.</p>
             ) : (
               <>
-                {anamnesis.modalities.length > 0 && <div><span className="font-medium text-foreground">Modalidades:</span> <span className="text-muted-foreground">{anamnesis.modalities.join(", ")}</span></div>}
+                {anamnesis.modalities && (Array.isArray(anamnesis.modalities) ? anamnesis.modalities.length > 0 : anamnesis.modalities) && <div><span className="font-medium text-foreground">Modalidades:</span> <span className="text-muted-foreground">{Array.isArray(anamnesis.modalities) ? anamnesis.modalities.join(", ") : anamnesis.modalities}</span></div>}
                 {anamnesis.training_days && <div><span className="font-medium text-foreground">Dias de treino:</span> <span className="text-muted-foreground">{anamnesis.training_days}</span></div>}
                 {anamnesis.available_days != null && <div><span className="font-medium text-foreground">Dias disponíveis p/ BN:</span> <span className="text-muted-foreground">{anamnesis.available_days}</span></div>}
                 {anamnesis.session_duration && <div><span className="font-medium text-foreground">Tempo por sessão:</span> <span className="text-muted-foreground">{anamnesis.session_duration}</span></div>}
