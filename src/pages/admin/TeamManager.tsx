@@ -328,9 +328,21 @@ export default function TeamManager() {
     setEditRoles((prev) => prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]);
   };
 
-  const handleSaveRoles = async () => {
+  const handleSaveEdit = async () => {
     if (!editUserId) return;
     setLoading(true);
+
+    // Update name via profiles
+    await supabase.from("profiles").update({ full_name: editUserName }).eq("user_id", editUserId);
+
+    // Update email via edge function
+    if (editUserEmail) {
+      await supabase.functions.invoke("manage-team-member", {
+        body: { action: "update-email", user_id: editUserId, email: editUserEmail },
+      });
+    }
+
+    // Update roles
     const { data: currentRoles } = await supabase.from("user_roles").select("id, role").eq("user_id", editUserId);
     const currentRoleNames = currentRoles?.map((r) => r.role as string) || [];
     const rolesToAdd = editRoles.filter((r) => !currentRoleNames.includes(r));
@@ -343,7 +355,7 @@ export default function TeamManager() {
       await supabase.from("user_roles").insert({ user_id: editUserId, role: roleToAdd as Role });
     }
     setLoading(false);
-    toast({ title: "Papéis atualizados!" });
+    toast({ title: "Membro atualizado!" });
     setEditDialogOpen(false);
     loadTeam();
   };
