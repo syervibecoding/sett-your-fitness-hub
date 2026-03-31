@@ -354,7 +354,7 @@ export default function FinancialDashboard() {
               </div>
               <div>
                 <p className="text-xl font-bold text-foreground font-sans">{formatCurrency(financialStats.monthRevenueBilling)}</p>
-                 <p className="text-sm text-muted-foreground font-sans">Faturamento do Mês</p>
+                 <p className="text-sm text-muted-foreground font-sans">Faturamento — {format(new Date(), "MMM/yy", { locale: ptBR }).replace(/^./, c => c.toUpperCase())}</p>
                </div>
              </CardContent>
            </Card>
