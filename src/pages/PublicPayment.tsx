@@ -280,10 +280,17 @@ export default function PublicPayment() {
       <div className="max-w-lg mx-auto px-4 py-8 space-y-6">
         <div className="text-center space-y-3">
           <img src={bnLogo} alt="BN Performance Training" className="h-16 mx-auto" />
-          <h1 className="text-4xl text-primary">PAGAMENTO</h1>
+          <h1 className="text-4xl text-primary">
+            {isRenewal ? "RENOVAÇÃO" : "PAGAMENTO"}
+          </h1>
           {student && (
             <p className="text-muted-foreground font-sans">
               Aluno: <strong className="text-foreground">{student.full_name}</strong>
+            </p>
+          )}
+          {isRenewal && (
+            <p className="text-sm text-primary/80 font-sans">
+              ✨ Você já possui uma matrícula ativa. Ao pagar, seu plano será estendido automaticamente.
             </p>
           )}
         </div>
