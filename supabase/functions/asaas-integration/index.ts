@@ -593,7 +593,7 @@ async function getPaymentStatus(body: any) {
 }
 
 async function syncPayments(body: any) {
-  const { companyId } = body;
+  const { companyId, syncAll } = body;
 
   // Get all students with asaas_customer_id for this company
   let studentsQuery = supabaseAdmin.from("students").select("id, asaas_customer_id, full_name, company_id");
@@ -606,11 +606,30 @@ async function syncPayments(body: any) {
 
   let synced = 0;
 
+  // Calculate 6 months ago date for syncAll
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const dateFilter = syncAll ? `&dateCreated[ge]=${sixMonthsAgo.toISOString().split("T")[0]}` : "";
+
   for (const student of students) {
     try {
-      // Fetch payments from Asaas for this customer
-      const data = await asaasFetch(`/payments?customer=${student.asaas_customer_id}&limit=100`);
-      const asaasPayments = data.data || [];
+      // Fetch payments from Asaas with pagination
+      let allAsaasPayments: any[] = [];
+      let offset = 0;
+      const limit = 100;
+      let hasMore = true;
+
+      while (hasMore) {
+        const data = await asaasFetch(`/payments?customer=${student.asaas_customer_id}&limit=${limit}&offset=${offset}${dateFilter}`);
+        const page = data.data || [];
+        allAsaasPayments = allAsaasPayments.concat(page);
+        hasMore = data.hasMore === true && page.length === limit;
+        offset += limit;
+        // Safety: stop if not syncAll and we already got first page
+        if (!syncAll) break;
+      }
+
+      const asaasPayments = allAsaasPayments;
 
       // Group by installment ID to calculate installment count
       const installmentGroups: Record<string, number> = {};
