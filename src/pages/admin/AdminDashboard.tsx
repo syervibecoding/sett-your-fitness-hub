@@ -142,7 +142,7 @@ export default function AdminDashboard() {
     // Fetch trainer names for both sections
     const allTrainerIds = new Set<string>();
     (expiringRes.data || []).forEach((e: any) => { if (e.trainer_id) allTrainerIds.add(e.trainer_id); });
-    Array.from(firstPerStudent.values()).forEach((m: any) => { if (m.trainer_id) allTrainerIds.add(m.trainer_id); });
+    countdowns.forEach((m: any) => { if (m.trainer_id) allTrainerIds.add(m.trainer_id); });
     if (allTrainerIds.size > 0) {
       const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").in("user_id", Array.from(allTrainerIds));
       const tMap: Record<string, string> = {};
