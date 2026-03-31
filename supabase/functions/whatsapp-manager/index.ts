@@ -75,58 +75,99 @@ Deno.serve(async (req) => {
 
     const instanceName = instanceRow?.instance_name || `company-${resolvedCompanyId.substring(0, 8)}`;
 
+    // ─── Helper: create fresh instance ───
+    const createFreshInstance = async () => {
+      const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/whatsapp-webhook`;
+      const createRes = await fetch(`${evoUrl}/instance/create`, {
+        method: "POST",
+        headers: evoHeaders,
+        body: JSON.stringify({
+          instanceName,
+          integration: "WHATSAPP-BAILEYS",
+          qrcode: true,
+          webhook: {
+            url: webhookUrl,
+            byEvents: false,
+            base64: false,
+            events: ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
+          },
+        }),
+      });
+
+      if (!createRes.ok) {
+        const errText = await createRes.text();
+        return json({ error: "Evolution API error", details: errText }, 502);
+      }
+
+      const createData = await createRes.json();
+
+      await adminClient.from("whatsapp_instances").upsert(
+        {
+          instance_name: instanceName,
+          company_id: resolvedCompanyId,
+          status: "waiting_qr",
+          qrcode: createData?.qrcode?.base64 || null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "instance_name" }
+      );
+
+      return json({
+        status: "waiting_qr",
+        qrcode: createData?.qrcode?.base64 || null,
+      });
+    };
+
+    // ─── Helper: destroy instance (logout + delete) ───
+    const destroyInstance = async () => {
+      try {
+        await fetch(`${evoUrl}/instance/logout/${instanceName}`, {
+          method: "DELETE",
+          headers: evoHeaders,
+        });
+      } catch { /* ignore */ }
+      try {
+        await fetch(`${evoUrl}/instance/delete/${instanceName}`, {
+          method: "DELETE",
+          headers: evoHeaders,
+        });
+      } catch { /* ignore */ }
+    };
+
     // ─── INIT CONNECTION ───
     if (action === "init-connection") {
       let existsInEvo = false;
+      let evoState = "close";
       try {
         const checkRes = await fetch(`${evoUrl}/instance/connectionState/${instanceName}`, {
           headers: evoHeaders,
         });
-        if (checkRes.ok) existsInEvo = true;
+        if (checkRes.ok) {
+          existsInEvo = true;
+          const checkData = await checkRes.json();
+          evoState = checkData?.instance?.state || "close";
+        }
       } catch { /* doesn't exist */ }
 
       if (!existsInEvo) {
-        const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/whatsapp-webhook`;
-        const createRes = await fetch(`${evoUrl}/instance/create`, {
-          method: "POST",
-          headers: evoHeaders,
-          body: JSON.stringify({
-            instanceName,
-            integration: "WHATSAPP-BAILEYS",
-            qrcode: true,
-            webhook: {
-              url: webhookUrl,
-              byEvents: false,
-              base64: false,
-              events: ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
-            },
-          }),
-        });
+        return await createFreshInstance();
+      }
 
-        if (!createRes.ok) {
-          const errText = await createRes.text();
-          return json({ error: "Evolution API error", details: errText }, 502);
-        }
-
-        const createData = await createRes.json();
-
+      // If already connected, just report
+      if (evoState === "open") {
         await adminClient.from("whatsapp_instances").upsert(
           {
             instance_name: instanceName,
             company_id: resolvedCompanyId,
-            status: "waiting_qr",
-            qrcode: createData?.qrcode?.base64 || null,
+            status: "connected",
             updated_at: new Date().toISOString(),
           },
           { onConflict: "instance_name" }
         );
-
-        return json({
-          status: "waiting_qr",
-          qrcode: createData?.qrcode?.base64 || null,
-        });
+        return json({ status: "connected" });
       }
 
+      // Try to connect existing instance
       const connectRes = await fetch(`${evoUrl}/instance/connect/${instanceName}`, {
         headers: evoHeaders,
       });
@@ -134,6 +175,13 @@ Deno.serve(async (req) => {
 
       const qr = connectData?.base64 || null;
       const state = connectData?.instance?.state || "waiting_qr";
+
+      // If stuck (no QR and not open), destroy and recreate
+      if (state !== "open" && !qr) {
+        console.log("Instance stuck without QR, destroying and recreating...");
+        await destroyInstance();
+        return await createFreshInstance();
+      }
 
       await adminClient.from("whatsapp_instances").upsert(
         {
@@ -150,6 +198,29 @@ Deno.serve(async (req) => {
         status: state === "open" ? "connected" : "waiting_qr",
         qrcode: qr,
       });
+    }
+
+    // ─── RESTART CONNECTION ───
+    if (action === "restart-connection") {
+      console.log("Restarting instance:", instanceName);
+      await destroyInstance();
+
+      await adminClient.from("whatsapp_instances").upsert(
+        {
+          instance_name: instanceName,
+          company_id: resolvedCompanyId,
+          status: "disconnected",
+          qrcode: null,
+          connected_phone: null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "instance_name" }
+      );
+
+      // Small delay to let Evolution clean up
+      await new Promise(r => setTimeout(r, 1500));
+
+      return await createFreshInstance();
     }
 
     // ─── CHECK STATUS ───

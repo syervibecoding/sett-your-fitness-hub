@@ -84,7 +84,7 @@ export default function WhatsAppSettings() {
 
   const startPolling = useCallback(() => {
     stopPolling();
-    pollRef.current = setInterval(checkStatus, 5000);
+    pollRef.current = setInterval(checkStatus, 10000);
   }, [checkStatus, stopPolling]);
 
   // Initial load
