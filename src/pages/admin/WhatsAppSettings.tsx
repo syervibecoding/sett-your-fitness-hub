@@ -100,6 +100,10 @@ export default function WhatsAppSettings() {
   }, [effectiveCompanyId, checkStatus, checkBotSettings, stopPolling]);
 
   const handleConnect = async () => {
+    if (!effectiveCompanyId) {
+      toast.error("Selecione uma empresa primeiro");
+      return;
+    }
     setBusy(true);
     try {
       const data = await invoke("init-connection");
