@@ -262,8 +262,8 @@ export default function WhatsAppChat() {
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-manager`;
 
       const [contactsRes, groupsRes] = await Promise.all([
-        fetch(url, { method: "POST", headers, body: JSON.stringify({ action: "fetch-contacts" }) }),
-        fetch(url, { method: "POST", headers, body: JSON.stringify({ action: "fetch-groups" }) }),
+        fetch(url, { method: "POST", headers, body: JSON.stringify({ action: "fetch-contacts", companyId: effectiveCompanyId }) }),
+        fetch(url, { method: "POST", headers, body: JSON.stringify({ action: "fetch-groups", companyId: effectiveCompanyId }) }),
       ]);
 
       const nameMap: Record<string, string> = {};
@@ -343,6 +343,7 @@ export default function WhatsAppChat() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
         body: JSON.stringify({
           action: "fetch-media",
+          companyId: effectiveCompanyId,
           messageId: msg.message_id_external,
           remoteJid: chat?.remote_jid || undefined,
           fromMe: msg.source === "outgoing",
@@ -459,6 +460,7 @@ export default function WhatsAppChat() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
         body: JSON.stringify({
           action: "send-message",
+          companyId: effectiveCompanyId,
           remoteJid: chat.remote_jid,
           content: newMessage.trim(),
           chatId: selectedChatId,
@@ -486,7 +488,7 @@ export default function WhatsAppChat() {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-manager`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-        body: JSON.stringify({ action: "delete-message", remoteJid: chat.remote_jid, messageId: msg.message_id_external, chatId: selectedChatId }),
+        body: JSON.stringify({ action: "delete-message", companyId: effectiveCompanyId, remoteJid: chat.remote_jid, messageId: msg.message_id_external, chatId: selectedChatId }),
       });
       if (!res.ok) throw new Error("Erro ao apagar");
       setMessages((prev) => prev.filter((m) => m.id !== msg.id));
@@ -515,7 +517,7 @@ export default function WhatsAppChat() {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-manager`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-        body: JSON.stringify({ action: "send-media", remoteJid: chat.remote_jid, mediaUrl, caption: "📋 Último treino/avaliação", chatId: selectedChatId, fileName: fileUrl.split("/").pop() || "avaliacao.pdf" }),
+        body: JSON.stringify({ action: "send-media", companyId: effectiveCompanyId, remoteJid: chat.remote_jid, mediaUrl, caption: "📋 Último treino/avaliação", chatId: selectedChatId, fileName: fileUrl.split("/").pop() || "avaliacao.pdf" }),
       });
       if (!res.ok) throw new Error("Erro ao enviar arquivo");
       toast.success("Arquivo enviado!");
@@ -546,7 +548,7 @@ export default function WhatsAppChat() {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-manager`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-        body: JSON.stringify({ action: "send-media", remoteJid: chat.remote_jid, mediaUrl: urlData.publicUrl, chatId: selectedChatId, mediatype, mimeType: file.type, fileName: file.name, caption: "" }),
+        body: JSON.stringify({ action: "send-media", companyId: effectiveCompanyId, remoteJid: chat.remote_jid, mediaUrl: urlData.publicUrl, chatId: selectedChatId, mediatype, mimeType: file.type, fileName: file.name, caption: "" }),
       });
       if (!res.ok) throw new Error("Erro ao enviar mídia");
       toast.success("Mídia enviada!");
@@ -606,7 +608,7 @@ export default function WhatsAppChat() {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-manager`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-        body: JSON.stringify({ action: "send-media", remoteJid: chat.remote_jid, mediaUrl: urlData.publicUrl, chatId: selectedChatId, mediatype: "audio", mimeType: "audio/webm", fileName: `audio-${Date.now()}.webm`, caption: "" }),
+        body: JSON.stringify({ action: "send-media", companyId: effectiveCompanyId, remoteJid: chat.remote_jid, mediaUrl: urlData.publicUrl, chatId: selectedChatId, mediatype: "audio", mimeType: "audio/webm", fileName: `audio-${Date.now()}.webm`, caption: "" }),
       });
       if (!res.ok) throw new Error("Erro ao enviar áudio");
       toast.success("Áudio enviado!");
