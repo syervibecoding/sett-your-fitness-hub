@@ -299,7 +299,9 @@ export default function PublicPayment() {
         {step === "select_plan" && (
           <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-primary text-xl text-center">ESCOLHA SEU PLANO</CardTitle>
+              <CardTitle className="text-primary text-xl text-center">
+                {isRenewal ? "RENOVAR PLANO" : "ESCOLHA SEU PLANO"}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {loadingPlans ? (
