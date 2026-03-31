@@ -102,7 +102,12 @@ export default function AdminDashboard() {
       setPlanChart(Object.values(planCounts).sort((a, b) => b.count - a.count));
     }
 
-    setExpiringContracts(expiringRes.data || []);
+    // Filter out inactive/cancelled students from expiring contracts
+    const filteredExpiring = (expiringRes.data || []).filter((e: any) => {
+      const studentStatus = e.students?.status;
+      return studentStatus === "active" || studentStatus === "pending";
+    });
+    setExpiringContracts(filteredExpiring);
 
     // Missing workouts: enrollments without training_start_date OR active cycles without workouts
     let cycleEnrollQuery = supabase.from("enrollments").select("id, training_start_date, trainer_id, students(full_name, assigned_trainer_id)").in("status", ["active", "awaiting_training"]) as any;

@@ -551,8 +551,9 @@ export default function TeamManager() {
                       <div className="flex items-center gap-3">
                         <Shield className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="text-foreground font-sans font-medium">{m.full_name}</p>
-                          <p className="text-muted-foreground text-xs font-sans">{m.user_id.slice(0, 8)}...</p>
+                        <p className="text-foreground font-sans font-medium">{m.full_name}</p>
+                          {m.email && <p className="text-muted-foreground text-xs font-sans">{m.email}</p>}
+                          {!m.email && <p className="text-muted-foreground text-xs font-sans">{m.user_id.slice(0, 8)}...</p>}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
