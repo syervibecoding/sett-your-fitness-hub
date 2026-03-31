@@ -92,7 +92,7 @@ export default function StudentsManager() {
     const [{ data: studentsData }, { data: plansData }, { data: rolesData }] = await Promise.all([
       studentsQuery,
       plansQuery,
-      supabase.from("user_roles").select("user_id").eq("role", "trainer"),
+      supabase.from("user_roles").select("user_id, role").in("role", ["admin", "coordinator", "trainer"]),
     ]);
 
     setPlans(plansData || []);

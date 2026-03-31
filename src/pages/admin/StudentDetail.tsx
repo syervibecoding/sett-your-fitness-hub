@@ -420,7 +420,7 @@ export default function StudentDetail() {
   const loadEnrollmentOptions = async () => {
     const [{ data: plansData }, { data: rolesData }] = await Promise.all([
       supabase.from("plans").select("id, name, duration_weeks").eq("is_active", true).order("name"),
-      supabase.from("user_roles").select("user_id").eq("role", "trainer"),
+      supabase.from("user_roles").select("user_id, role").in("role", ["admin", "coordinator", "trainer"]),
     ]);
     setPlans(plansData || []);
     if (rolesData && rolesData.length > 0) {
