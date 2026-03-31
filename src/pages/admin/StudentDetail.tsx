@@ -1141,6 +1141,9 @@ export default function StudentDetail() {
           </CardContent>
         </Card>
 
+        {/* Workout Analysis - Etapa 6 */}
+        <WorkoutAnalysis studentId={id!} />
+
         {/* Evaluations */}
         <Card className="bg-card border-border">
           <CardHeader>
