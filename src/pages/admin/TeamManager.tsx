@@ -318,7 +318,8 @@ export default function TeamManager() {
 
   const openEditDialog = (member: TeamMember) => {
     setEditUserId(member.user_id);
-    setEditUserName(member.full_name || "Usuário");
+    setEditUserName(member.full_name || "");
+    setEditUserEmail(member.email || "");
     setEditRoles([...member.roles]);
     setEditDialogOpen(true);
   };
