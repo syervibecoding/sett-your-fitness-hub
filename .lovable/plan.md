@@ -1,78 +1,135 @@
 
 
-# Prescrever treinos e simular semana do Syer
+# Plano: Redesenho do Portal do Aluno
 
-## Dados existentes
-- Aluno: Syer Rodrigues de Souza Filho (`3cb1cfae-...`)
-- Enrollment ativo: `e2000001-...-01`
-- Ciclo 1: `6fe83096-69d8-4460-b516-1bd2209ef303` (01/mar - 11/abr) — sem treinos ainda
-- 461 exercícios na biblioteca, incluindo "Supino Inclinado Halteres" (`5c3558f8-...`)
+## Contexto
+O portal atual (`StudentPortal.tsx`, 717 linhas) tem tabs de Treino e Evolução com input de cargas e histórico básico. A tabela `workout_logs` já possui campos `duration_minutes`, `completed_at` e `exercises_data` que estão prontos mas não utilizados. Faltam: cronômetro de treino, resumo pós-treino, e estatísticas avançadas com body map.
 
-## O que será feito
+---
 
-### 1. Inserir 5 treinos (A-E) no ciclo 1
+## Etapa 1: Nova tabela `workout_sessions` + migração
 
-Divisão Push/Pull/Legs clássica com foco em hipertrofia:
+Criar tabela dedicada para sessões de treino (separada dos logs por série):
 
-**Treino A — Peito + Tríceps**
-| Exercício | Séries | Reps | Descanso |
-|-----------|--------|------|----------|
-| Supino Inclinado Halteres | 4 | 8-12 | 90s |
-| Supino Reto Barra | 4 | 8-12 | 90s |
-| Cross Over Polia Alta | 3 | 12-15 | 60s |
-| Crucifixo Inclinado Halteres | 3 | 12-15 | 60s |
-| Tríceps Polia Corda | 3 | 12-15 | 60s |
-| Tríceps Polia Barra | 3 | 12-15 | 60s |
+```sql
+CREATE TABLE workout_sessions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL REFERENCES students(id),
+  workout_id uuid NOT NULL REFERENCES workouts(id),
+  company_id uuid,
+  session_date date DEFAULT CURRENT_DATE,
+  started_at timestamptz,
+  completed_at timestamptz,
+  duration_seconds integer,
+  total_volume numeric DEFAULT 0,      -- peso × reps total
+  total_sets_completed integer DEFAULT 0,
+  status text DEFAULT 'in_progress',   -- in_progress | completed | abandoned
+  notes text,
+  created_at timestamptz DEFAULT now()
+);
+-- RLS: student own + company scoped + master full
+```
 
-**Treino B — Costas + Bíceps**
-| Exercício | Séries | Reps | Descanso |
-|-----------|--------|------|----------|
-| Puxada Pronada Polia | 4 | 8-12 | 90s |
-| Remada Curvada Pronada Barra | 4 | 8-12 | 90s |
-| Remada Baixa Neutra | 3 | 10-12 | 60s |
-| Pulldown Unilateral | 3 | 12-15 | 60s |
-| Rosca Direta Barra W | 3 | 10-12 | 60s |
-| Rosca Martelo Halteres | 3 | 12-15 | 60s |
+Isso separa a "sessão" (cronômetro, duração, resumo) dos "logs por série" já existentes.
 
-**Treino C — Quadríceps + Panturrilha**
-| Exercício | Séries | Reps | Descanso |
-|-----------|--------|------|----------|
-| Agachamento Livre | 4 | 8-10 | 120s |
-| Leg Press 45 | 4 | 10-12 | 90s |
-| Cadeira Extensora | 3 | 12-15 | 60s |
-| Afundo Halteres | 3 | 10-12 | 60s |
-| Panturrilha em Pé Máquina | 4 | 12-15 | 45s |
+---
 
-**Treino D — Ombros + Tríceps**
-| Exercício | Séries | Reps | Descanso |
-|-----------|--------|------|----------|
-| Desenvolvimento Halteres Sentado | 4 | 8-12 | 90s |
-| Elevação Lateral Halteres | 4 | 12-15 | 60s |
-| Crucifixo Invertido Curvado | 3 | 12-15 | 60s |
-| Elevação Frontal Halteres Neutra | 3 | 12-15 | 60s |
-| Supino Fechado Barra | 3 | 8-12 | 60s |
+## Etapa 2: Cronômetro de Treino
 
-**Treino E — Posterior de Coxa + Glúteo**
-| Exercício | Séries | Reps | Descanso |
-|-----------|--------|------|----------|
-| Stiff Barra | 4 | 8-10 | 120s |
-| Mesa Flexora | 4 | 10-12 | 60s |
-| Cadeira Flexora | 3 | 12-15 | 60s |
-| Agachamento Búlgaro | 3 | 10-12 | 90s |
-| Panturrilha Sentado Máquina | 4 | 12-15 | 45s |
+**Novo componente `WorkoutTimer.tsx`**
 
-### 2. Simular 1 semana de treino (workout_logs)
-Inserir logs para 5 dias (24/mar a 28/mar — seg a sex):
-- Cada log com `exercise_index`, `set_number`, `weight` (cargas realistas), `reps_done`, `session_date`
-- Exemplo: Supino Inclinado Halteres — 22kg, 24kg, 26kg, 26kg (4 séries, 10-12 reps)
+- Botão "Iniciar Treino" cria um `workout_session` com `started_at = now()` e `status = in_progress`
+- Cronômetro visível no topo (hh:mm:ss), persistente enquanto navega entre exercícios
+- Timer de descanso entre séries: ao preencher uma série, inicia contagem regressiva do tempo de descanso prescrito (ex: 60s)
+- Vibração/som ao fim do descanso
+- Botão "Finalizar Treino" → salva `completed_at`, calcula `duration_seconds`, muda status para `completed`
+- Estado do cronômetro persiste via `localStorage` (para não perder se fechar o app)
 
-### Execução técnica
-- 5 `INSERT INTO workouts` com o JSONB de exercícios no formato que o WorkoutBuilder usa
-- ~90 `INSERT INTO workout_logs` (5 treinos × ~5-6 exercícios × 3-4 séries cada)
-- Tudo via `supabase--insert` (dados, não schema)
+---
 
-### Resultado esperado
-- O aluno Syer verá os treinos A-E no portal do aluno (`/aluno/treino/{studentId}`)
-- Os logs aparecerão como histórico de treinos realizados
-- O volume semanal por grupamento muscular será calculado automaticamente no WorkoutBuilder
+## Etapa 3: Resumo Pós-Treino
+
+**Novo componente `WorkoutSummary.tsx`** — Modal/tela exibida ao finalizar:
+
+- Duração total (ex: "47min 23s")
+- Volume total (tonelagem = Σ peso × reps)
+- Séries completadas vs prescritas (ex: "18/20")
+- PRs batidos (novos recordes de carga por exercício, comparando com sessões anteriores)
+- Lista de exercícios com resumo compacto (peso máx, volume)
+- Botão "Compartilhar" (screenshot / texto para WhatsApp)
+- Dados salvos no `workout_sessions` para consulta futura
+
+---
+
+## Etapa 4: Redesenho da Tab "Treino"
+
+Refatorar `StudentPortal.tsx` para experiência mobile-first otimizada:
+
+- **Antes de iniciar**: tela mostra treinos A/B/C/D com preview (exercícios, séries) — botão "Iniciar" em cada
+- **Durante treino**: cronômetro fixo no topo, exercícios como cards expansíveis com inputs de carga/reps por série, indicador de série completada (checkbox), timer de descanso integrado
+- **Indicadores visuais de progressão**: seta verde ↑ quando carga > última sessão, seta vermelha ↓ quando menor
+- **Auto-preenchimento**: ao expandir uma série, pré-preenche com valores da última sessão (editáveis)
+
+---
+
+## Etapa 5: Tab "Estatísticas" Avançadas
+
+Substituir a tab "Evolução" atual por uma mais completa com 3 sub-seções:
+
+### 5a. Body Map (Volume por Grupamento)
+- Silhueta SVG do corpo humano (frente + costas)
+- Cada grupo muscular colorido por intensidade de volume (escala de cor: frio → quente)
+- Baseado nos dados de `exercise_muscle_targets` (já existente) × logs executados
+- Período selecionável (semana atual, ciclo atual, último mês)
+
+### 5b. Evolução de Carga
+- Gráfico de linha por exercício (já existe, melhorar)
+- Filtro por exercício específico
+- Indicador de PR por exercício
+
+### 5c. Volume e Frequência
+- Gráfico de barras: tonelagem por semana/ciclo
+- Frequência de treino (dias treinados por semana)
+- Séries por grupamento muscular (volume semanal vs recomendado)
+
+---
+
+## Etapa 6: Visão do Treinador (Volume Executado vs Prescrito)
+
+**No `StudentDetail.tsx`** (painel admin), adicionar nova seção:
+
+- Tabela comparativa: volume prescrito (séries × exercícios) vs volume executado (logs reais)
+- Por grupamento muscular: séries prescritas vs séries feitas
+- Aderência ao treino: % de sessões completadas no período
+- Alertas: grupamentos sub-treinados (< 10 séries/semana) ou super-treinados (> 20)
+
+---
+
+## Estrutura de Arquivos
+
+```text
+src/components/student/
+  WorkoutTimer.tsx          -- Cronômetro + timer descanso
+  WorkoutSummary.tsx        -- Modal resumo pós-treino
+  BodyMap.tsx               -- SVG body map com heat map
+  ExerciseCard.tsx          -- Card de exercício com inputs
+  RestTimer.tsx             -- Countdown de descanso
+  StatsCharts.tsx           -- Gráficos de evolução/volume
+
+src/hooks/
+  useWorkoutSession.ts      -- Hook gerenciando sessão ativa
+
+src/pages/student/
+  StudentPortal.tsx          -- Refatorado (orquestrador)
+```
+
+---
+
+## Detalhes Importantes
+
+- A tabela `exercise_muscle_targets` já mapeia exercício → grupamento muscular com `volume_percentage`, essencial para o body map
+- Os campos `duration_minutes`, `completed_at`, `exercises_data` em `workout_logs` podem ser depreciados em favor da nova `workout_sessions`
+- O body map SVG será criado inline (sem dependência externa), com ~15 regiões clicáveis mapeadas aos `muscle_groups` do banco
+- Timer de descanso usa `ex.rest` (já prescrito como "60s", "90s" etc.)
+- `localStorage` key: `sett_active_session_{student_id}` para persistir estado do cronômetro
 
