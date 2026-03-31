@@ -420,7 +420,7 @@ export default function StudentDetail() {
   // Load plans and trainers for the enrollment dialog
   const loadEnrollmentOptions = async () => {
     const [{ data: plansData }, { data: rolesData }] = await Promise.all([
-      supabase.from("plans").select("id, name, duration_weeks").eq("is_active", true).order("name"),
+      supabase.from("plans").select("id, name, duration_weeks, duration_days").eq("is_active", true).order("name"),
       supabase.from("user_roles").select("user_id, role").in("role", ["admin", "coordinator", "trainer"]),
     ]);
     setPlans(plansData || []);
