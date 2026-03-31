@@ -4,16 +4,19 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Dumbbell, Play, Clock, RotateCcw, ChevronDown, ChevronUp, Timer, CheckCircle2, Circle, Loader2, LogOut, TrendingUp, Save, CalendarDays, History } from "lucide-react";
+import { Dumbbell, Play, Clock, CheckCircle2, Circle, Loader2, LogOut, Save, CalendarDays, History, BarChart3 } from "lucide-react";
 import { format, parseISO, differenceInDays, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
+import { useWorkoutSession } from "@/hooks/useWorkoutSession";
+import { WorkoutTimer } from "@/components/student/WorkoutTimer";
+import { WorkoutSummary } from "@/components/student/WorkoutSummary";
+import { ExerciseCard } from "@/components/student/ExerciseCard";
+import { StatsCharts } from "@/components/student/StatsCharts";
+import { useRestTimer } from "@/components/student/RestTimer";
 
 interface WorkoutExercise {
   exercise_id: string;
@@ -74,6 +77,9 @@ export default function StudentPortal() {
   const selectedWorkout = selectedCycle?.workouts.find(w => w.id === selectedWorkoutId) || selectedCycle?.workouts[0] || null;
   const todayStr = new Date().toISOString().split("T")[0];
 
+  const session = useWorkoutSession(studentId, companyId);
+  const { activeRest, startRest, clearRest } = useRestTimer();
+
   useEffect(() => {
     if (user) loadStudentData();
   }, [user]);
@@ -116,16 +122,14 @@ export default function StudentPortal() {
         const { data: workoutsData } = await supabase
           .from("workouts")
           .select("id, title, description, exercises, cycle_id")
-          .in("cycle_id", cyclesData.map((c) => c.id));
+          .in("cycle_id", cyclesData.map(c => c.id));
 
-        // Collect exercise_ids for video enrichment
         const exerciseIds = new Set<string>();
         (workoutsData || []).forEach(w => {
           const exs = (w.exercises as unknown as WorkoutExercise[]) || [];
           exs.forEach(ex => { if (ex.exercise_id) exerciseIds.add(ex.exercise_id); });
         });
 
-        // Fetch video data from exercise library
         let videoMap: Record<string, { video_url: string | null; video_path: string | null }> = {};
         if (exerciseIds.size > 0) {
           const { data: libraryData } = await supabase
@@ -139,10 +143,10 @@ export default function StudentPortal() {
           }
         }
 
-        const enriched: Cycle[] = cyclesData.map((c) => {
+        const enriched: Cycle[] = cyclesData.map(c => {
           const cycleWorkouts = (workoutsData || [])
-            .filter((w) => w.cycle_id === c.id)
-            .map((w) => ({
+            .filter(w => w.cycle_id === c.id)
+            .map(w => ({
               id: w.id,
               title: w.title,
               description: w.description,
@@ -158,7 +162,7 @@ export default function StudentPortal() {
         setCycles(enriched);
 
         const today = new Date();
-        const activeCycle = enriched.find((c) => {
+        const activeCycle = enriched.find(c => {
           try { return isWithinInterval(today, { start: parseISO(c.start_date), end: parseISO(c.end_date) }); }
           catch { return false; }
         });
@@ -166,8 +170,8 @@ export default function StudentPortal() {
         setSelectedCycle(chosen);
         if (chosen.workouts.length > 0) setSelectedWorkoutId(chosen.workouts[0].id);
 
-        // Load existing logs
-        const workoutIds = workoutsData?.map((w) => w.id) || [];
+        // Load logs
+        const workoutIds = workoutsData?.map(w => w.id) || [];
         if (workoutIds.length > 0) {
           const { data: logsData } = await supabase
             .from("workout_logs")
@@ -177,14 +181,10 @@ export default function StudentPortal() {
 
           if (logsData) {
             setAllLogs(logsData);
-
-            // Today's logs → editable fields
             const todayLogMap: Record<string, WorkoutLog> = {};
-            // Previous session logs → reference display
             const prevLogMap: Record<string, WorkoutLog> = {};
-
-            // Group by workout+exercise+set, then separate today vs most recent previous
             const grouped: Record<string, any[]> = {};
+
             logsData.forEach((l: any) => {
               const key = `${l.workout_id}-${l.exercise_index}-${l.set_number}`;
               if (!grouped[key]) grouped[key] = [];
@@ -192,19 +192,11 @@ export default function StudentPortal() {
             });
 
             Object.entries(grouped).forEach(([key, entries]) => {
-              // Sort by session_date desc
-              entries.sort((a, b) => (b.session_date || b.logged_at || "").localeCompare(a.session_date || a.logged_at || ""));
-
+              entries.sort((a, b) => (b.session_date || "").localeCompare(a.session_date || ""));
               const todayEntry = entries.find(e => e.session_date === todayStr);
-              if (todayEntry) {
-                todayLogMap[key] = todayEntry;
-              }
-
-              // Find most recent entry that is NOT today
+              if (todayEntry) todayLogMap[key] = todayEntry;
               const prevEntry = entries.find(e => e.session_date !== todayStr);
-              if (prevEntry) {
-                prevLogMap[key] = prevEntry;
-              }
+              if (prevEntry) prevLogMap[key] = prevEntry;
             });
 
             setLogs(todayLogMap);
@@ -219,9 +211,11 @@ export default function StudentPortal() {
   const getLogKey = (workoutId: string, exIdx: number, setNum: number) =>
     `${workoutId}-${exIdx}-${setNum}`;
 
-  const updateLog = (workoutId: string, exIdx: number, setNum: number, field: "weight" | "reps_done", value: number) => {
+  const updateLog = (exIdx: number, setNum: number, field: "weight" | "reps_done", value: number) => {
+    if (!selectedWorkout) return;
+    const workoutId = selectedWorkout.id;
     const key = getLogKey(workoutId, exIdx, setNum);
-    setLogs((prev) => ({
+    setLogs(prev => ({
       ...prev,
       [key]: {
         ...prev[key],
@@ -238,14 +232,12 @@ export default function StudentPortal() {
   const saveCurrentLogs = async () => {
     if (!selectedWorkout || !studentId) return;
     setSavingLogs(true);
-
     const workoutId = selectedWorkout.id;
-    const logsToSave = Object.values(logs).filter((l) => l.workout_id === workoutId && (l.weight > 0 || l.reps_done > 0));
+    const logsToSave = Object.values(logs).filter(l => l.workout_id === workoutId && (l.weight > 0 || l.reps_done > 0));
 
     for (const log of logsToSave) {
-      // Check for existing log TODAY
       const existing = allLogs.find(
-        (l) => l.workout_id === log.workout_id && l.exercise_index === log.exercise_index && l.set_number === log.set_number && l.session_date === todayStr
+        l => l.workout_id === log.workout_id && l.exercise_index === log.exercise_index && l.set_number === log.set_number && l.session_date === todayStr
       );
       if (existing) {
         await supabase.from("workout_logs").update({ weight: log.weight, reps_done: log.reps_done }).eq("id", existing.id);
@@ -257,7 +249,6 @@ export default function StudentPortal() {
         });
       }
     }
-
     toast({ title: "Cargas salvas!" });
     setSavingLogs(false);
   };
@@ -305,45 +296,43 @@ export default function StudentPortal() {
 
   const getWorkoutLabel = (index: number) => String.fromCharCode(65 + index);
 
-  const getEvolutionData = () => {
-    if (!selectedWorkout) return [];
-    return cycles
-      .filter((c) => c.workouts.length > 0)
-      .map((c) => {
-        const cycleData: any = { name: `C${c.cycle_number}` };
-        c.workouts.forEach(w => {
-          w.exercises.forEach((ex, idx) => {
-            const logsForEx = allLogs.filter(
-              (l) => l.workout_id === w.id && l.exercise_index === idx
-            );
-            const maxWeight = logsForEx.reduce((max, l) => Math.max(max, Number(l.weight) || 0), 0);
-            if (maxWeight > 0) cycleData[ex.exercise_name] = maxWeight;
-          });
-        });
-        return cycleData;
-      });
+  const handleStartSession = async () => {
+    if (!selectedWorkout) return;
+    await session.startSession(selectedWorkout.id);
+    toast({ title: "Treino iniciado!", description: "O cronômetro está rodando." });
   };
 
-  const getVolumeData = () => {
-    return cycles
-      .filter((c) => c.workouts.length > 0)
-      .map((c) => {
-        const cycleData: any = { name: `C${c.cycle_number}` };
-        let totalTonnage = 0;
-        c.workouts.forEach(w => {
-          w.exercises.forEach((ex, idx) => {
-            const logsForEx = allLogs.filter(
-              (l) => l.workout_id === w.id && l.exercise_index === idx
-            );
-            const tonnage = logsForEx.reduce((sum, l) => sum + (Number(l.weight) || 0) * (Number(l.reps_done) || 0), 0);
-            totalTonnage += tonnage;
-            const group = ex.muscle_group;
-            cycleData[group] = (cycleData[group] || 0) + tonnage;
-          });
-        });
-        cycleData.total = totalTonnage;
-        return cycleData;
-      });
+  const handleFinishSession = async () => {
+    if (!selectedWorkout) return;
+    await saveCurrentLogs();
+
+    // Calculate previous best weights for PR detection
+    const previousBestWeights: Record<string, number> = {};
+    selectedWorkout.exercises.forEach((ex, idx) => {
+      const exLogs = allLogs.filter((l: any) => l.workout_id === selectedWorkout.id && l.exercise_index === idx && l.session_date !== todayStr);
+      const maxW = exLogs.reduce((max: number, l: any) => Math.max(max, Number(l.weight) || 0), 0);
+      previousBestWeights[`ex-${idx}`] = maxW;
+    });
+
+    await session.finishSession(logs, selectedWorkout.exercises, previousBestWeights);
+  };
+
+  const handleAbandonSession = async () => {
+    await session.abandonSession();
+    toast({ title: "Treino abandonado" });
+  };
+
+  const getExerciseHistory = (workoutId: string, idx: number) => {
+    const exLogs = allLogs.filter((l: any) => l.workout_id === workoutId && l.exercise_index === idx && l.session_date !== todayStr);
+    const byDate: Record<string, { weight: number; reps_done: number; set_number: number }[]> = {};
+    exLogs.forEach((l: any) => {
+      if (!byDate[l.session_date]) byDate[l.session_date] = [];
+      byDate[l.session_date].push({ weight: l.weight, reps_done: l.reps_done, set_number: l.set_number });
+    });
+    return Object.entries(byDate)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .slice(0, 5)
+      .map(([date, sets]) => ({ date, sets: sets.sort((a, b) => a.set_number - b.set_number) }));
   };
 
   if (loading) {
@@ -365,9 +354,7 @@ export default function StudentPortal() {
     );
   }
 
-  const evolutionData = getEvolutionData();
-  const volumeData = getVolumeData();
-  const exerciseColors = ["hsl(var(--primary))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
+  const isSessionForCurrentWorkout = session.isActive && session.activeSession?.workoutId === selectedWorkout?.id;
 
   return (
     <div className="min-h-screen bg-background">
@@ -404,14 +391,17 @@ export default function StudentPortal() {
         <Tabs defaultValue="treino" className="space-y-6">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="treino" className="font-sans">Treino</TabsTrigger>
-            <TabsTrigger value="evolucao" className="font-sans">Evolução</TabsTrigger>
+            <TabsTrigger value="estatisticas" className="font-sans gap-1.5">
+              <BarChart3 className="h-3.5 w-3.5" />
+              Estatísticas
+            </TabsTrigger>
           </TabsList>
 
           {/* TREINO TAB */}
           <TabsContent value="treino" className="space-y-6">
             {/* Cycle selector */}
             <div className="flex gap-2 overflow-x-auto pb-2">
-              {cycles.map((cycle) => {
+              {cycles.map(cycle => {
                 const isActive = selectedCycle?.id === cycle.id;
                 const isCurrent = (() => {
                   try { return isWithinInterval(new Date(), { start: parseISO(cycle.start_date), end: parseISO(cycle.end_date) }); }
@@ -451,7 +441,7 @@ export default function StudentPortal() {
 
                 {selectedCycle.workouts.length > 0 ? (
                   <div className="space-y-3">
-                    {/* Workout tabs (A, B, C...) */}
+                    {/* Workout tabs */}
                     {selectedCycle.workouts.length > 1 && (
                       <div className="flex gap-2 overflow-x-auto pb-1">
                         {selectedCycle.workouts.map((w, i) => (
@@ -472,15 +462,26 @@ export default function StudentPortal() {
 
                     {selectedWorkout && (
                       <>
+                        {/* Workout Timer */}
+                        <WorkoutTimer
+                          isActive={isSessionForCurrentWorkout}
+                          elapsed={session.elapsed}
+                          formatTime={session.formatTime}
+                          onStart={handleStartSession}
+                          onFinish={handleFinishSession}
+                          onAbandon={handleAbandonSession}
+                          workoutTitle={selectedWorkout.title}
+                        />
+
                         <div className="flex items-center justify-between">
                           <h3 className="text-lg text-foreground font-sans font-semibold">{selectedWorkout.title}</h3>
                           <Button size="sm" onClick={saveCurrentLogs} disabled={savingLogs}>
                             <Save className="h-3.5 w-3.5 mr-1" />
-                            {savingLogs ? "Salvando..." : "Salvar Cargas"}
+                            {savingLogs ? "Salvando..." : "Salvar"}
                           </Button>
                         </div>
 
-                        {/* Session badge + counter */}
+                        {/* Session badge */}
                         {(() => {
                           const workoutId = selectedWorkout.id;
                           const sessionDates = [...new Set(allLogs.filter(l => l.workout_id === workoutId).map(l => l.session_date))].sort();
@@ -491,137 +492,39 @@ export default function StudentPortal() {
                             <div className="flex items-center gap-3 flex-wrap">
                               <Badge variant="outline" className="gap-1.5 text-xs font-sans border-primary/30 text-primary">
                                 <CalendarDays className="h-3 w-3" />
-                                Sessão de hoje: {format(new Date(), "dd/MM/yyyy")}
+                                {format(new Date(), "dd/MM/yyyy")}
                               </Badge>
                               {sessionCount > 0 && (
                                 <Badge variant="secondary" className="gap-1.5 text-xs font-sans">
                                   <History className="h-3 w-3" />
-                                  {totalSessions}ª sessão deste treino
+                                  {totalSessions}ª sessão
                                 </Badge>
                               )}
                             </div>
                           );
                         })()}
 
+                        {/* Exercises */}
                         <div className="space-y-2">
-                          {selectedWorkout.exercises.map((ex, idx) => {
-                            const isExpanded = expandedExercise === idx;
-                            const numSets = parseInt(ex.sets) || 3;
-                            const workoutId = selectedWorkout.id;
-
-                            // Get history for this exercise (last 5 sessions, excluding today)
-                            const exLogs = allLogs.filter(l => l.workout_id === workoutId && l.exercise_index === idx && l.session_date !== todayStr);
-                            const byDate: Record<string, { weight: number; reps_done: number; set_number: number }[]> = {};
-                            exLogs.forEach(l => {
-                              if (!byDate[l.session_date]) byDate[l.session_date] = [];
-                              byDate[l.session_date].push({ weight: l.weight, reps_done: l.reps_done, set_number: l.set_number });
-                            });
-                            const exerciseHistory = Object.entries(byDate)
-                              .sort(([a], [b]) => b.localeCompare(a))
-                              .slice(0, 5)
-                              .map(([date, sets]) => ({
-                                date,
-                                sets: sets.sort((a, b) => a.set_number - b.set_number),
-                              }));
-
-                            return (
-                              <Card key={idx} className="bg-card border-border overflow-hidden">
-                                <CardContent className="p-0">
-                                  <div className="flex items-center gap-3 p-3 cursor-pointer" onClick={() => setExpandedExercise(isExpanded ? null : idx)}>
-                                    <div className="flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary text-sm font-bold font-sans flex-shrink-0">
-                                      {idx + 1}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="font-sans font-medium text-foreground text-sm truncate">{ex.exercise_name}</p>
-                                      <p className="text-xs text-muted-foreground font-sans">{ex.sets}×{ex.reps} · {ex.rest}</p>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                                      {(ex.video_path || ex.video_url) && (
-                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openVideoForExercise(ex); }}>
-                                          <Play className="h-4 w-4 text-primary" />
-                                        </Button>
-                                      )}
-                                      {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                                    </div>
-                                  </div>
-
-                                  {isExpanded && (
-                                    <div className="border-t border-border px-3 py-3 bg-secondary/30 space-y-3">
-                                      {ex.notes && (
-                                        <p className="text-xs text-muted-foreground font-sans whitespace-pre-wrap break-words"><span className="font-medium text-foreground">Obs:</span> {ex.notes}</p>
-                                      )}
-                                      <div className="space-y-1">
-                                        <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground font-sans font-medium">
-                                          <span>Série</span>
-                                          <span>Peso (kg)</span>
-                                          <span>Reps</span>
-                                        </div>
-                                        {Array.from({ length: numSets }, (_, s) => {
-                                          const key = getLogKey(workoutId, idx, s + 1);
-                                          const log = logs[key];
-                                          const prev = previousLogs[key];
-                                          return (
-                                            <div key={s} className="space-y-0.5">
-                                              <div className="grid grid-cols-3 gap-2 items-center">
-                                                <span className="text-sm font-sans text-foreground font-medium">{s + 1}ª</span>
-                                                <Input
-                                                  type="number"
-                                                  inputMode="decimal"
-                                                  className="h-8 text-sm bg-card border-border"
-                                                  placeholder="0"
-                                                  value={log?.weight || ""}
-                                                  onChange={(e) => updateLog(workoutId, idx, s + 1, "weight", parseFloat(e.target.value) || 0)}
-                                                  onClick={(e) => e.stopPropagation()}
-                                                />
-                                                <Input
-                                                  type="number"
-                                                  inputMode="numeric"
-                                                  className="h-8 text-sm bg-card border-border"
-                                                  placeholder={ex.reps}
-                                                  value={log?.reps_done || ""}
-                                                  onChange={(e) => updateLog(workoutId, idx, s + 1, "reps_done", parseInt(e.target.value) || 0)}
-                                                  onClick={(e) => e.stopPropagation()}
-                                                />
-                                              </div>
-                                              {prev && (prev.weight > 0 || prev.reps_done > 0) && (
-                                                <p className="text-[10px] text-muted-foreground font-sans pl-0 col-span-3 ml-[calc(33.333%+0.25rem)]">
-                                                  Última: {prev.weight}kg × {prev.reps_done}
-                                                </p>
-                                              )}
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-
-                                      {/* Mini-history */}
-                                      {exerciseHistory.length > 0 && (
-                                        <Collapsible>
-                                          <CollapsibleTrigger asChild>
-                                            <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground font-sans gap-1.5 h-7" onClick={(e) => e.stopPropagation()}>
-                                              <History className="h-3 w-3" />
-                                              Ver histórico ({exerciseHistory.length} sessões)
-                                            </Button>
-                                          </CollapsibleTrigger>
-                                          <CollapsibleContent className="mt-2 space-y-1.5">
-                                            {exerciseHistory.map(({ date, sets }) => (
-                                              <div key={date} className="flex items-start gap-2 text-[11px] font-sans text-muted-foreground">
-                                                <span className="font-medium text-foreground/70 min-w-[40px]">
-                                                  {format(parseISO(date), "dd/MM")}
-                                                </span>
-                                                <span className="flex-1">
-                                                  {sets.map(s => `${s.weight}kg×${s.reps_done}`).join(", ")}
-                                                </span>
-                                              </div>
-                                            ))}
-                                          </CollapsibleContent>
-                                        </Collapsible>
-                                      )}
-                                    </div>
-                                  )}
-                                </CardContent>
-                              </Card>
-                            );
-                          })}
+                          {selectedWorkout.exercises.map((ex, idx) => (
+                            <ExerciseCard
+                              key={idx}
+                              exercise={ex}
+                              index={idx}
+                              workoutId={selectedWorkout.id}
+                              isExpanded={expandedExercise === idx}
+                              onToggle={() => setExpandedExercise(expandedExercise === idx ? null : idx)}
+                              onVideoPlay={() => openVideoForExercise(ex)}
+                              logs={logs}
+                              previousLogs={previousLogs}
+                              onUpdateLog={updateLog}
+                              exerciseHistory={getExerciseHistory(selectedWorkout.id, idx)}
+                              isSessionActive={isSessionForCurrentWorkout}
+                              activeRest={activeRest}
+                              onSetComplete={startRest}
+                              onRestComplete={clearRest}
+                            />
+                          ))}
                         </div>
 
                         <Button className="w-full" onClick={saveCurrentLogs} disabled={savingLogs}>
@@ -643,54 +546,13 @@ export default function StudentPortal() {
             )}
           </TabsContent>
 
-          {/* EVOLUÇÃO TAB */}
-          <TabsContent value="evolucao" className="space-y-6">
-            {evolutionData.length > 0 ? (
-              <>
-                <Card className="bg-card border-border">
-                  <CardContent className="p-4">
-                    <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-4">Evolução de Carga (kg)</h3>
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={evolutionData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                          <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                          <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} />
-                          {selectedWorkout?.exercises.slice(0, 5).map((ex, i) => (
-                            <Line key={ex.exercise_name} type="monotone" dataKey={ex.exercise_name} stroke={exerciseColors[i % exerciseColors.length]} strokeWidth={2} dot={{ r: 4 }} />
-                          ))}
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-card border-border">
-                  <CardContent className="p-4">
-                    <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-4">Tonelagem por Ciclo (kg)</h3>
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={volumeData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                          <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                          <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} />
-                          <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-              </>
-            ) : (
-              <Card className="bg-card border-border border-dashed">
-                <CardContent className="p-8 text-center">
-                  <TrendingUp className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-muted-foreground font-sans">Registre suas cargas para ver a evolução.</p>
-                </CardContent>
-              </Card>
-            )}
+          {/* ESTATÍSTICAS TAB */}
+          <TabsContent value="estatisticas" className="space-y-6">
+            <StatsCharts
+              allLogs={allLogs}
+              cycles={cycles}
+              todayStr={todayStr}
+            />
           </TabsContent>
         </Tabs>
       </div>
@@ -712,6 +574,20 @@ export default function StudentPortal() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Workout Summary Modal */}
+      {session.summary && (
+        <WorkoutSummary
+          open={!!session.summary}
+          onClose={session.clearSummary}
+          durationSeconds={session.summary.durationSeconds}
+          totalVolume={session.summary.totalVolume}
+          totalSetsCompleted={session.summary.totalSetsCompleted}
+          totalSetsPrescribed={session.summary.totalSetsPrescribed}
+          exercises={session.summary.exercisesSummary}
+          formatTime={session.formatTime}
+        />
+      )}
     </div>
   );
 }

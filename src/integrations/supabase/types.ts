@@ -1631,6 +1631,82 @@ export type Database = {
           },
         ]
       }
+      workout_sessions: {
+        Row: {
+          company_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          duration_seconds: number | null
+          exercises_summary: Json | null
+          id: string
+          notes: string | null
+          session_date: string | null
+          started_at: string | null
+          status: string | null
+          student_id: string
+          total_sets_completed: number | null
+          total_sets_prescribed: number | null
+          total_volume: number | null
+          workout_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          exercises_summary?: Json | null
+          id?: string
+          notes?: string | null
+          session_date?: string | null
+          started_at?: string | null
+          status?: string | null
+          student_id: string
+          total_sets_completed?: number | null
+          total_sets_prescribed?: number | null
+          total_volume?: number | null
+          workout_id: string
+        }
+        Update: {
+          company_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          exercises_summary?: Json | null
+          id?: string
+          notes?: string | null
+          session_date?: string | null
+          started_at?: string | null
+          status?: string | null
+          student_id?: string
+          total_sets_completed?: number | null
+          total_sets_prescribed?: number | null
+          total_volume?: number | null
+          workout_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_sessions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_sessions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_sessions_workout_id_fkey"
+            columns: ["workout_id"]
+            isOneToOne: false
+            referencedRelation: "workouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workouts: {
         Row: {
           company_id: string | null
