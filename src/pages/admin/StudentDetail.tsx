@@ -22,6 +22,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 import { WorkoutAnalysis } from "@/components/trainer/WorkoutAnalysis";
+import { TrainerWeeklyBar } from "@/components/trainer/TrainerWeeklyBar";
 
 interface Student {
   id: string;
@@ -1140,6 +1141,9 @@ export default function StudentDetail() {
             />
           </CardContent>
         </Card>
+
+        {/* Trainer Weekly Bar */}
+        <TrainerWeeklyBar studentId={id!} />
 
         {/* Workout Analysis - Etapa 6 */}
         <WorkoutAnalysis studentId={id!} />
