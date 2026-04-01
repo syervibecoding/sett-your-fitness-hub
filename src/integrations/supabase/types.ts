@@ -577,18 +577,24 @@ export type Database = {
           id: string
           is_primary: boolean | null
           muscle_group_id: string
+          role: string
+          volume_percentage: number
         }
         Insert: {
           exercise_id: string
           id?: string
           is_primary?: boolean | null
           muscle_group_id: string
+          role?: string
+          volume_percentage?: number
         }
         Update: {
           exercise_id?: string
           id?: string
           is_primary?: boolean | null
           muscle_group_id?: string
+          role?: string
+          volume_percentage?: number
         }
         Relationships: [
           {
