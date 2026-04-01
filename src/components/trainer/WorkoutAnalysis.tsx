@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart3, AlertTriangle, CheckCircle, TrendingUp, Activity } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { BodyMap } from "@/components/student/BodyMap";
 
 interface Props {
   studentId: string;
@@ -295,66 +295,15 @@ export function WorkoutAnalysis({ studentId }: Props) {
           )}
         </div>
 
-        {/* Muscle group table */}
+        {/* Muscle group BodyMap */}
         {muscleData.length > 0 ? (
           <div className="space-y-3">
             <h3 className="text-sm font-sans font-medium text-foreground flex items-center gap-2">
               <Activity className="h-4 w-4 text-primary" />
-              Volume por Grupamento Muscular
+              Distribuição Muscular
             </h3>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-secondary/50">
-                    <TableHead className="text-xs">Grupamento</TableHead>
-                    <TableHead className="text-xs text-center">Prescrito</TableHead>
-                    <TableHead className="text-xs text-center">Executado</TableHead>
-                    <TableHead className="text-xs text-center">%</TableHead>
-                    <TableHead className="text-xs text-center">Volume (kg)</TableHead>
-                    <TableHead className="text-xs text-center">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {muscleData.map(mg => {
-                    const pct = mg.prescribedSets > 0 ? Math.round((mg.executedSets / mg.prescribedSets) * 100) : 0;
-                    const alert = getVolumeAlert(mg);
-                    return (
-                      <TableRow key={mg.name}>
-                        <TableCell className="text-sm font-sans font-medium">{mg.name}</TableCell>
-                        <TableCell className="text-sm text-center font-sans">{mg.prescribedSets}</TableCell>
-                        <TableCell className="text-sm text-center font-sans">{mg.executedSets}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="outline" className={`text-xs ${
-                            pct >= 80 ? "bg-success/15 text-success border-success/30" :
-                            pct >= 50 ? "bg-warning/15 text-warning border-warning/30" :
-                            "bg-destructive/15 text-destructive border-destructive/30"
-                          }`}>
-                            {pct}%
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-center font-sans text-muted-foreground">
-                          {mg.totalVolume >= 1000 ? `${(mg.totalVolume / 1000).toFixed(1)}t` : `${mg.totalVolume}kg`}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {alert === "sub" && (
-                            <Badge variant="outline" className="text-[10px] bg-warning/15 text-warning border-warning/30">
-                              <AlertTriangle className="h-3 w-3 mr-0.5" />Sub
-                            </Badge>
-                          )}
-                          {alert === "over" && (
-                            <Badge variant="outline" className="text-[10px] bg-destructive/15 text-destructive border-destructive/30">
-                              <TrendingUp className="h-3 w-3 mr-0.5" />Excesso
-                            </Badge>
-                          )}
-                          {alert === "ok" && (
-                            <CheckCircle className="h-4 w-4 text-success mx-auto" />
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+            <div className="flex justify-center">
+              <BodyMap muscleVolumes={muscleData.map(mg => ({ muscleGroup: mg.name, volume: mg.totalVolume }))} />
             </div>
 
             {/* Alerts */}

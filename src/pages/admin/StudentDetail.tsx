@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 import { WorkoutAnalysis } from "@/components/trainer/WorkoutAnalysis";
 import { TrainerWeeklyBar } from "@/components/trainer/TrainerWeeklyBar";
+import { BodyMap } from "@/components/student/BodyMap";
 
 interface Student {
   id: string;
@@ -198,6 +199,7 @@ export default function StudentDetail() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [cycles, setCycles] = useState<TrainingCycle[]>([]);
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
+  const [allWorkouts, setAllWorkouts] = useState<any[]>([]);
   const [asaasPayments, setAsaasPayments] = useState<AsaasPayment[]>([]);
   const [refreshingPayment, setRefreshingPayment] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -349,8 +351,9 @@ export default function StudentDetail() {
     }
 
     const cycleIds = cycleData.map((c) => c.id);
-    const { data: workouts } = await supabase.from("workouts").select("cycle_id").in("cycle_id", cycleIds);
+    const { data: workouts } = await supabase.from("workouts").select("id, cycle_id, name, exercises, sort_order").in("cycle_id", cycleIds);
     const workoutCycleIds = new Set((workouts || []).map((w) => w.cycle_id));
+    setAllWorkouts(workouts || []);
 
     setCycles(cycleData.map((c) => ({ ...c, has_workout: workoutCycleIds.has(c.id) })));
 
@@ -798,6 +801,7 @@ export default function StudentDetail() {
           <TabsList className="w-full justify-start overflow-x-auto flex-nowrap h-auto p-1">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Visão Geral</TabsTrigger>
             <TabsTrigger value="program" className="text-xs sm:text-sm">Programa</TabsTrigger>
+            <TabsTrigger value="workouts" className="text-xs sm:text-sm">Treinos</TabsTrigger>
             <TabsTrigger value="analytics" className="text-xs sm:text-sm">Análises</TabsTrigger>
             <TabsTrigger value="anamnesis" className="text-xs sm:text-sm">Anamnese</TabsTrigger>
             <TabsTrigger value="financial" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
@@ -1097,6 +1101,67 @@ export default function StudentDetail() {
                 />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* ===== TREINOS ===== */}
+          <TabsContent value="workouts" className="space-y-4">
+            {(() => {
+              const activeEnroll = enrollments.find(e => e.status === "active" || e.status === "awaiting_training");
+              if (!activeEnroll) return <p className="text-muted-foreground font-sans text-sm text-center py-8">Nenhuma matrícula ativa.</p>;
+              const activeCycles = cycles.filter(c => c.enrollment_id === activeEnroll.id && c.has_workout);
+              if (activeCycles.length === 0) return <p className="text-muted-foreground font-sans text-sm text-center py-8">Nenhum treino prescrito neste ciclo.</p>;
+              return (
+                <div className="space-y-4">
+                  {activeCycles.map(cycle => {
+                    const cycleWorkouts = (allWorkouts || []).filter((w: any) => w.cycle_id === cycle.id);
+                    return (
+                      <div key={cycle.id} className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-sans font-medium text-foreground">Ciclo {cycle.cycle_number} — {format(parseISO(cycle.start_date), "dd/MM")} a {format(parseISO(cycle.end_date), "dd/MM/yy")}</h3>
+                          <Button variant="outline" size="sm" className="text-xs" onClick={() => navigate(`/admin/prescriptions?student=${id}&cycle=${cycle.id}`)}>
+                            <ExternalLink className="h-3 w-3 mr-1" />Abrir Prescrição
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          {cycleWorkouts.map((w: any) => {
+                            const exercises = (w.exercises as any[]) || [];
+                            const muscleVolumes = exercises.reduce((acc: any[], ex: any) => {
+                              const mg = ex.muscle_group || "Outro";
+                              const sets = parseInt(ex.sets) || 0;
+                              const existing = acc.find((a: any) => a.muscleGroup === mg);
+                              if (existing) existing.volume += sets;
+                              else acc.push({ muscleGroup: mg, volume: sets });
+                              return acc;
+                            }, []);
+                            return (
+                              <Card key={w.id} className="bg-card border-border">
+                                <CardHeader className="pb-2">
+                                  <CardTitle className="text-base text-primary flex items-center gap-2">
+                                    <Dumbbell className="h-4 w-4" />
+                                    Treino {w.name}
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
+                                  <div className="space-y-1">
+                                    {exercises.map((ex: any, idx: number) => (
+                                      <div key={idx} className="flex items-center justify-between text-xs font-sans py-1 border-b border-border/50 last:border-0">
+                                        <span className="text-foreground font-medium">{ex.exercise_name || ex.name}</span>
+                                        <span className="text-muted-foreground">{ex.sets}x{ex.reps}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <BodyMap muscleVolumes={muscleVolumes} />
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </TabsContent>
 
           {/* ===== ANÁLISES ===== */}
