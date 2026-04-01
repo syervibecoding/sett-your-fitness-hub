@@ -22,6 +22,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 import { WorkoutAnalysis } from "@/components/trainer/WorkoutAnalysis";
+import { TrainerWeeklyBar } from "@/components/trainer/TrainerWeeklyBar";
 
 interface Student {
   id: string;
