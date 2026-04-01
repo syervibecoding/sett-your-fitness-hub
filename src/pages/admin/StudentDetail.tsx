@@ -15,8 +15,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Mail, Phone, Cake, CalendarDays, Dumbbell, Plus, CalendarIcon, MapPin, CreditCard, MessageCircle, Pencil, DollarSign, Upload, Image, Mic, FileText, Download, Square, MicOff, RefreshCw, ExternalLink, Copy, Link, Check, Trash2, UserPlus } from "lucide-react";
+import { ArrowLeft, Mail, Phone, Cake, CalendarDays, Dumbbell, Plus, CalendarIcon, MapPin, CreditCard, MessageCircle, Pencil, DollarSign, Upload, Image, Mic, FileText, Download, Square, MicOff, RefreshCw, ExternalLink, Copy, Link, Check, Trash2, UserPlus, BarChart3 } from "lucide-react";
 import { format, parseISO, eachDayOfInterval, addWeeks, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -743,499 +744,577 @@ export default function StudentDetail() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+      <div className="space-y-4">
+        {/* Compact Header */}
+        <div className="flex flex-wrap items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/admin/students")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl sm:text-3xl text-primary truncate">{student.full_name.toUpperCase()}</h1>
-            <Badge variant="outline" className={`text-xs mt-1 ${statusColors[student.status]}`}>
-              {statusLabels[student.status] || student.status}
-            </Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl sm:text-2xl text-primary truncate">{student.full_name.toUpperCase()}</h1>
+              <Badge variant="outline" className={`text-xs ${statusColors[student.status]}`}>
+                {statusLabels[student.status] || student.status}
+              </Badge>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground font-sans mt-1">
+              {student.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{student.email}</span>}
+              {student.whatsapp && <span className="flex items-center gap-1"><MessageCircle className="h-3 w-3" />{formatPhone(student.whatsapp)}</span>}
+              {trainerName && <span className="flex items-center gap-1"><Dumbbell className="h-3 w-3" />{trainerName}</span>}
+            </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleActivateStudentAccess}
-            disabled={activatingAccess || !student.email}
-            className="flex-shrink-0"
-          >
-            <UserPlus className="h-4 w-4 mr-1" />
-            {activatingAccess ? "Ativando..." : "Ativar Acesso Aluno"}
-          </Button>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <Button variant="ghost" size="sm" className="text-xs" onClick={async () => {
+              const link = `${window.location.origin}/anamnese/${id}`;
+              try { await navigator.clipboard.writeText(link); } catch {
+                const ta = document.createElement("textarea");
+                ta.value = link; ta.style.position = "fixed"; ta.style.left = "-9999px";
+                document.body.appendChild(ta); ta.focus(); ta.select();
+                document.execCommand("copy"); document.body.removeChild(ta);
+              }
+              toast({ title: "Link da anamnese copiado!" });
+            }}>
+              <Link className="h-3.5 w-3.5 mr-1" />
+              <span className="hidden sm:inline">Anamnese</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={handleActivateStudentAccess}
+              disabled={activatingAccess || !student.email}
+            >
+              <UserPlus className="h-3.5 w-3.5 mr-1" />
+              <span className="hidden sm:inline">{activatingAccess ? "Ativando..." : "Ativar Acesso"}</span>
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openEditStudent}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
-        {/* Personal info */}
-        <Card className="bg-card border-border">
-          <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
-            <CardTitle className="text-primary text-lg">DADOS PESSOAIS</CardTitle>
-            <div className="flex items-center gap-1 flex-wrap">
-              <Button variant="ghost" size="sm" className="text-xs sm:text-sm" onClick={async () => {
-                const link = `${window.location.origin}/anamnese/${id}`;
-                try {
-                  await navigator.clipboard.writeText(link);
-                } catch {
-                  const ta = document.createElement("textarea");
-                  ta.value = link; ta.style.position = "fixed"; ta.style.left = "-9999px";
-                  document.body.appendChild(ta); ta.focus(); ta.select();
-                  document.execCommand("copy"); document.body.removeChild(ta);
-                }
-                toast({ title: "Link da anamnese copiado!" });
-              }}>
-                <Link className="h-4 w-4 mr-1" />
-                <span className="hidden sm:inline">Copiar Link Anamnese</span>
-                <span className="sm:hidden">Anamnese</span>
-              </Button>
-              <Button variant="ghost" size="icon" onClick={openEditStudent}><Pencil className="h-4 w-4" /></Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 text-sm font-sans">
-              {student.email && <div className="flex items-center gap-2 text-muted-foreground"><Mail className="h-4 w-4" />{student.email}</div>}
-              {student.whatsapp && <div className="flex items-center gap-2 text-muted-foreground"><MessageCircle className="h-4 w-4" />{formatPhone(student.whatsapp)}</div>}
-              
-              {student.birth_date && <div className="flex items-center gap-2 text-muted-foreground"><Cake className="h-4 w-4" />{format(parseISO(student.birth_date), "dd/MM/yyyy")}</div>}
-              {student.cpf && <div className="flex items-center gap-2 text-muted-foreground"><CreditCard className="h-4 w-4" />{formatCPF(student.cpf)}</div>}
-              {student.cep && <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" />CEP: {formatCEP(student.cep)}</div>}
-            </div>
-            {(student.address || student.neighborhood || student.city) && (
-              <p className="text-sm text-muted-foreground font-sans mt-3 flex items-start gap-2">
-                <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
-                {[student.address, student.address_number ? `nº ${student.address_number}` : null, student.neighborhood, student.city, student.state].filter(Boolean).join(", ")}
-              </p>
-            )}
-            {trainerName && <p className="text-sm text-muted-foreground font-sans mt-3 flex items-start gap-2"><Dumbbell className="h-4 w-4 mt-0.5 shrink-0" />Treinador: {trainerName}</p>}
-            {student.notes && (
-              <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border">
-                <p className="text-xs font-sans font-medium text-foreground mb-1">Observações:</p>
-                <p className="text-xs text-muted-foreground font-sans whitespace-pre-wrap">{student.notes}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Tabs */}
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="w-full justify-start overflow-x-auto flex-nowrap h-auto p-1">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm">Visão Geral</TabsTrigger>
+            <TabsTrigger value="program" className="text-xs sm:text-sm">Programa</TabsTrigger>
+            <TabsTrigger value="analytics" className="text-xs sm:text-sm">Análises</TabsTrigger>
+            <TabsTrigger value="anamnesis" className="text-xs sm:text-sm">Anamnese</TabsTrigger>
+            <TabsTrigger value="financial" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
+            <TabsTrigger value="evaluations" className="text-xs sm:text-sm">Avaliações</TabsTrigger>
+          </TabsList>
 
-        {/* Anamnesis */}
-        <Card className="bg-card border-border">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-primary text-lg">ANAMNESE</CardTitle>
-            <Button variant="ghost" size="sm" onClick={openEditAnamnesis}>
-              <Pencil className="h-4 w-4 mr-1" />{anamnesis ? "Editar" : "Adicionar"}
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm font-sans">
-            {!anamnesis ? (
-              <p className="text-muted-foreground">Nenhuma anamnese preenchida. Clique em "Adicionar" para preencher.</p>
-            ) : (
-              <>
-                {anamnesis.modalities && (Array.isArray(anamnesis.modalities) ? anamnesis.modalities.length > 0 : anamnesis.modalities) && <div><span className="font-medium text-foreground">Modalidades:</span> <span className="text-muted-foreground">{Array.isArray(anamnesis.modalities) ? anamnesis.modalities.join(", ") : anamnesis.modalities}</span></div>}
-                {anamnesis.training_days && <div><span className="font-medium text-foreground">Dias de treino:</span> <span className="text-muted-foreground">{anamnesis.training_days}</span></div>}
-                {anamnesis.available_days != null && <div><span className="font-medium text-foreground">Dias disponíveis p/ BN:</span> <span className="text-muted-foreground">{anamnesis.available_days}</span></div>}
-                {anamnesis.session_duration && <div><span className="font-medium text-foreground">Tempo por sessão:</span> <span className="text-muted-foreground">{anamnesis.session_duration}</span></div>}
-                {anamnesis.training_location && <div><span className="font-medium text-foreground">Local de treino:</span> <span className="text-muted-foreground">{anamnesis.training_location}</span></div>}
-                {anamnesis.available_equipment && (Array.isArray(anamnesis.available_equipment) ? anamnesis.available_equipment.length > 0 : anamnesis.available_equipment) && <div><span className="font-medium text-foreground">Equipamentos:</span> <span className="text-muted-foreground">{Array.isArray(anamnesis.available_equipment) ? anamnesis.available_equipment.join(", ") : anamnesis.available_equipment}</span></div>}
-                {anamnesis.goals && <div><span className="font-medium text-foreground">Metas:</span> <span className="text-muted-foreground">{anamnesis.goals}</span></div>}
-                {anamnesis.diseases && <div><span className="font-medium text-foreground">Doenças/Remédios:</span> <span className="text-muted-foreground">{anamnesis.diseases}</span></div>}
-                {anamnesis.injuries && <div><span className="font-medium text-foreground">Lesões:</span> <span className="text-muted-foreground">{anamnesis.injuries}</span></div>}
-                {anamnesis.current_pain && <div><span className="font-medium text-foreground">Dores atuais:</span> <span className="text-muted-foreground">{anamnesis.current_pain}</span></div>}
-                {anamnesis.nutrition && <div><span className="font-medium text-foreground">Alimentação:</span> <span className="text-muted-foreground">{anamnesis.nutrition}</span></div>}
-                {anamnesis.profession && <div><span className="font-medium text-foreground">Profissão/Rotina:</span> <span className="text-muted-foreground">{anamnesis.profession}</span></div>}
-                {anamnesis.sleep_hours && <div><span className="font-medium text-foreground">Sono:</span> <span className="text-muted-foreground">{anamnesis.sleep_hours}</span></div>}
-                {anamnesis.restorative_sleep != null && <div><span className="font-medium text-foreground">Sono reparador:</span> <span className="text-muted-foreground">{anamnesis.restorative_sleep ? "Sim" : "Não"}</span></div>}
-                {anamnesis.aware_of_trilogy != null && <div><span className="font-medium text-foreground">Consciente da tríade:</span> <span className="text-muted-foreground">{anamnesis.aware_of_trilogy ? "Sim" : "Não"}</span></div>}
-                {anamnesis.feel_in_3_months && <div><span className="font-medium text-foreground">Como quer se sentir em 3 meses:</span> <span className="text-muted-foreground">{anamnesis.feel_in_3_months}</span></div>}
-                {anamnesis.biggest_obstacle && <div><span className="font-medium text-foreground">Maior obstáculo:</span> <span className="text-muted-foreground">{anamnesis.biggest_obstacle}</span></div>}
-                {anamnesis.extra_comments && <div><span className="font-medium text-foreground">Comentários extras:</span> <span className="text-muted-foreground">{anamnesis.extra_comments}</span></div>}
-                {anamnesis.authorizes_plan != null && <div><span className="font-medium text-foreground">Autoriza criação do plano:</span> <span className="text-muted-foreground">{anamnesis.authorizes_plan ? "SIM" : "NÃO"}</span></div>}
-                {anamnesis.commits_communication != null && <div><span className="font-medium text-foreground">Compromete-se a comunicar:</span> <span className="text-muted-foreground">{anamnesis.commits_communication ? "SIM" : "NÃO"}</span></div>}
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Financial */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-primary text-lg flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />FINANCEIRO
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {enrollments.length === 0 ? (
-              <p className="text-muted-foreground font-sans text-sm">Nenhuma matrícula para rastrear pagamento.</p>
-            ) : (
-              <div className="space-y-3">
-                {enrollments.map((e) => (
-                  <div key={e.id} className="p-3 rounded-lg bg-secondary/50 border border-border flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-sans font-medium text-foreground">{e.plan_name}</p>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground font-sans mt-1">
-                        <Badge variant="outline" className={`text-[10px] ${paymentStatusColors[e.payment_status || "pending"]}`}>
-                          {paymentStatusLabels[e.payment_status || "pending"]}
-                        </Badge>
-                        {e.payment_date && <span>Pago em: {format(parseISO(e.payment_date), "dd/MM/yyyy")}</span>}
-                        {e.payment_method && <span>{e.payment_method}</span>}
-                      </div>
-                      {e.financial_notes && <p className="text-xs text-muted-foreground mt-1">{e.financial_notes}</p>}
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={() => openFinancialEdit(e)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Asaas Payments */}
-            {asaasPayments.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-border space-y-3">
-                <p className="text-xs font-sans font-medium text-foreground">Cobranças Asaas</p>
-                {asaasPayments.map((p) => (
-                  <div key={p.id} className="p-3 rounded-lg bg-secondary/50 border border-border flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px]">
-                          {p.billing_type === "PIX" ? "Pix" : "Cartão"}
-                        </Badge>
-                        <Badge variant="outline" className={`text-[10px] ${
-                          p.status === "RECEIVED" || p.status === "CONFIRMED" ? "bg-success/15 text-success border-success/30" :
-                          p.status === "PENDING" ? "bg-warning/15 text-warning border-warning/30" :
-                          "bg-destructive/15 text-destructive border-destructive/30"
-                        }`}>
-                          {p.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm font-sans font-medium text-foreground mt-1">
-                        R$ {Number(p.value).toFixed(2).replace(".", ",")}
-                      </p>
-                      {p.due_date && <p className="text-xs text-muted-foreground font-sans">Vencimento: {format(parseISO(p.due_date), "dd/MM/yyyy")}</p>}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {p.invoice_url && (
-                        <Button variant="ghost" size="icon" asChild>
-                          <a href={p.invoice_url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => p.asaas_payment_id && refreshAsaasPaymentStatus(p.asaas_payment_id)}
-                        disabled={refreshingPayment === p.asaas_payment_id}
-                      >
-                        <RefreshCw className={`h-4 w-4 ${refreshingPayment === p.asaas_payment_id ? "animate-spin" : ""}`} />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Enrollments */}
-        <Card className="bg-card border-border">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-primary text-lg">MATRÍCULAS</CardTitle>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={async () => {
-                const link = `${window.location.origin}/pagamento/${id}`;
-                try {
-                  await navigator.clipboard.writeText(link);
-                } catch {
-                  const ta = document.createElement("textarea");
-                  ta.value = link; ta.style.position = "fixed"; ta.style.left = "-9999px";
-                  document.body.appendChild(ta); ta.focus(); ta.select();
-                  document.execCommand("copy"); document.body.removeChild(ta);
-                }
-                toast({ title: "Link de renovação copiado!" });
-              }}>
-                <Copy className="h-4 w-4 mr-1" />Link Renovação
-              </Button>
-              <Button size="sm" onClick={openEnrollDialog}><Plus className="h-4 w-4 mr-1" />Nova Matrícula</Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {enrollments.length === 0 ? (
-              <p className="text-muted-foreground font-sans text-sm">Nenhuma matrícula encontrada.</p>
-            ) : (
+          {/* ===== VISÃO GERAL ===== */}
+          <TabsContent value="overview">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Left: Active enrollment + cycles + notes */}
               <div className="space-y-4">
-                {enrollments.map((e) => (
-                  <div key={e.id} className="p-4 rounded-lg bg-secondary/50 border border-border space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-sans font-medium text-foreground">{e.plan_name}</span>
-                      <Badge variant="outline" className={`text-xs ${statusColors[e.status]}`}>
-                        {statusLabels[e.status] || e.status}
-                      </Badge>
-                    </div>
-                    <div className="flex flex-wrap gap-4 text-xs text-muted-foreground font-sans">
-                      <span><Dumbbell className="h-3 w-3 inline mr-1" />{e.trainer_name}</span>
-                      <span><CalendarDays className="h-3 w-3 inline mr-1" />{format(parseISO(e.start_date), "dd/MM/yyyy")} → {format(parseISO(e.end_date), "dd/MM/yyyy")}</span>
-                      {e.plan_duration && <span>{e.plan_duration} semanas</span>}
-                    </div>
+                {/* Active enrollment summary */}
+                {enrollments.length > 0 && (() => {
+                  const active = enrollments.find(e => e.status === "active" || e.status === "awaiting_training") || enrollments[0];
+                  return (
+                    <Card className="bg-card border-border">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-primary text-lg">MATRÍCULA ATIVA</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2 text-sm font-sans">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-foreground">{active.plan_name}</span>
+                          <Badge variant="outline" className={`text-xs ${statusColors[active.status]}`}>
+                            {statusLabels[active.status] || active.status}
+                          </Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                          <span><Dumbbell className="h-3 w-3 inline mr-1" />{active.trainer_name}</span>
+                          <span><CalendarDays className="h-3 w-3 inline mr-1" />{format(parseISO(active.start_date), "dd/MM/yyyy")} → {format(parseISO(active.end_date), "dd/MM/yyyy")}</span>
+                        </div>
+                        {cycles.filter(c => c.enrollment_id === active.id).length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            <p className="text-xs font-medium text-foreground">Ciclos:</p>
+                            {cycles.filter(c => c.enrollment_id === active.id).map(c => (
+                              <div key={c.id} className="flex items-center justify-between text-xs p-1.5 rounded bg-secondary/50 border border-border">
+                                <span>Ciclo {c.cycle_number} — {format(parseISO(c.start_date), "dd/MM")} a {format(parseISO(c.end_date), "dd/MM/yy")}</span>
+                                <div className="flex items-center gap-1">
+                                  {c.has_workout ? (
+                                    <Badge variant="outline" className="text-[10px] bg-success/15 text-success border-success/30">Treino</Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-[10px] bg-destructive/15 text-destructive border-destructive/30">Sem treino</Badge>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
 
-                    {/* Training Start Date */}
-                    <div className="flex items-center gap-3 mt-2 p-2 rounded bg-background border border-border flex-wrap">
-                      <span className="text-xs font-sans font-medium text-foreground whitespace-nowrap">Início do treino:</span>
-                      {e.training_start_date ? (
-                        <>
-                          <span className="text-xs font-sans text-muted-foreground">
-                            {format(parseISO(e.training_start_date), "dd/MM/yyyy")}
-                          </span>
-                        </>
-                      ) : (
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-7 text-xs">
-                              <CalendarIcon className="h-3 w-3 mr-1" />Definir data
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              onSelect={async (date) => {
-                                if (!date) return;
-                                const dateStr = format(date, "yyyy-MM-dd");
-                                const { error } = await supabase.from("enrollments").update({
-                                  training_start_date: dateStr,
-                                  status: "awaiting_training",
-                                }).eq("id", e.id);
-                                if (error) {
-                                  toast({ title: "Erro ao definir data", description: error.message, variant: "destructive" });
-                                } else {
-                                  toast({ title: "Data de início do treino definida! Ciclos gerados." });
-                                  loadData(id!);
-                                }
-                              }}
-                              locale={ptBR}
-                              className="pointer-events-auto"
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      )}
+                {/* Personal details */}
+                <Card className="bg-card border-border">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-primary text-lg">DADOS PESSOAIS</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm font-sans">
+                      {student.birth_date && <div className="flex items-center gap-2 text-muted-foreground"><Cake className="h-4 w-4" />{format(parseISO(student.birth_date), "dd/MM/yyyy")}</div>}
+                      {student.cpf && <div className="flex items-center gap-2 text-muted-foreground"><CreditCard className="h-4 w-4" />{formatCPF(student.cpf)}</div>}
+                      {student.phone && <div className="flex items-center gap-2 text-muted-foreground"><Phone className="h-4 w-4" />{formatPhone(student.phone)}</div>}
+                      {student.cep && <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" />CEP: {formatCEP(student.cep)}</div>}
                     </div>
+                    {(student.address || student.neighborhood || student.city) && (
+                      <p className="text-sm text-muted-foreground font-sans mt-2 flex items-start gap-2">
+                        <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+                        {[student.address, student.address_number ? `nº ${student.address_number}` : null, student.neighborhood, student.city, student.state].filter(Boolean).join(", ")}
+                      </p>
+                    )}
+                    {student.notes && (
+                      <div className="mt-2 p-2 rounded-lg bg-muted/50 border border-border">
+                        <p className="text-xs font-sans font-medium text-foreground mb-1">Observações:</p>
+                        <p className="text-xs text-muted-foreground font-sans whitespace-pre-wrap">{student.notes}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
 
-                    {cycles.filter((c) => c.enrollment_id === e.id).length > 0 && (
-                      <div className="mt-3 space-y-1">
-                        <p className="text-xs font-sans font-medium text-foreground">Ciclos de treino:</p>
-                        <div className="grid grid-cols-1 gap-2">
-                          {cycles.filter((c) => c.enrollment_id === e.id).map((c) => (
-                            <div key={c.id} className="flex flex-wrap items-center justify-between p-2 rounded bg-background border border-border text-xs font-sans gap-2">
-                              <span className="shrink-0 text-[11px] sm:text-xs">Ciclo {c.cycle_number} — {format(parseISO(c.start_date), "dd/MM")} a {format(parseISO(c.end_date), "dd/MM/yy")}</span>
-                              <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                                {c.has_workout ? (
-                                  <Badge variant="outline" className="text-[10px] bg-success/15 text-success border-success/30">Treino</Badge>
-                                ) : (
-                                  <Badge variant="outline" className="text-[10px] bg-destructive/15 text-destructive border-destructive/30">Sem treino</Badge>
-                                )}
-                                <Badge variant="outline" className={`text-[10px] ${statusColors[c.status]}`}>
-                                  {statusLabels[c.status] || c.status}
-                                </Badge>
-                                {/* Prescribe / Edit workout button */}
-                                {(role === "trainer" || role === "admin" || role === "master" || role === "coordinator") && (
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-5 text-[10px] px-2"
-                                      onClick={() => {
-                                        const basePath = role === "coordinator" ? "/coordinator" : role === "trainer" ? "/trainer" : "/admin";
-                                        const returnPath = `${basePath}/students/${id}`;
-                                        navigate(`${basePath}/workout/${c.id}?returnTo=${encodeURIComponent(returnPath)}`);
-                                      }}
-                                    >
-                                      <Dumbbell className="h-3 w-3 mr-1" />
-                                      {c.has_workout ? "Editar Treino" : "Prescrever"}
-                                    </Button>
-                                    {!c.has_workout && (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="h-5 text-[10px] px-2 text-success border-success/30 hover:bg-success/10"
-                                        onClick={async () => {
-                                          if (!session?.user?.id) return;
-                                          const { error } = await supabase.from("workouts").insert({
-                                            cycle_id: c.id,
-                                            title: `Treino Ciclo ${c.cycle_number}`,
-                                            created_by: session.user.id,
-                                            exercises: [],
-                                          });
-                                          if (error) {
-                                            toast({ title: "Erro ao marcar como prescrito", description: error.message, variant: "destructive" });
-                                          } else {
-                                            toast({ title: "Ciclo marcado como prescrito!" });
-                                            if (id) loadData(id);
-                                          }
-                                        }}
-                                      >
-                                        <Check className="h-3 w-3 mr-1" />
-                                        Feito
-                                      </Button>
+              {/* Right: WeeklyBar + quick summary */}
+              <div className="space-y-4">
+                <TrainerWeeklyBar studentId={id!} />
+                {enrollments.length === 0 && (
+                  <Card className="bg-card border-border">
+                    <CardContent className="py-8 text-center">
+                      <p className="text-muted-foreground font-sans text-sm">Nenhuma matrícula encontrada.</p>
+                      <Button size="sm" className="mt-3" onClick={openEnrollDialog}><Plus className="h-4 w-4 mr-1" />Nova Matrícula</Button>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* ===== PROGRAMA DE TREINO ===== */}
+          <TabsContent value="program" className="space-y-4">
+            {/* Enrollments */}
+            <Card className="bg-card border-border">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-primary text-lg">MATRÍCULAS</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={async () => {
+                    const link = `${window.location.origin}/pagamento/${id}`;
+                    try { await navigator.clipboard.writeText(link); } catch {
+                      const ta = document.createElement("textarea");
+                      ta.value = link; ta.style.position = "fixed"; ta.style.left = "-9999px";
+                      document.body.appendChild(ta); ta.focus(); ta.select();
+                      document.execCommand("copy"); document.body.removeChild(ta);
+                    }
+                    toast({ title: "Link de renovação copiado!" });
+                  }}>
+                    <Copy className="h-4 w-4 mr-1" />Link Renovação
+                  </Button>
+                  <Button size="sm" onClick={openEnrollDialog}><Plus className="h-4 w-4 mr-1" />Nova Matrícula</Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {enrollments.length === 0 ? (
+                  <p className="text-muted-foreground font-sans text-sm">Nenhuma matrícula encontrada.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {enrollments.map((e) => (
+                      <div key={e.id} className="p-4 rounded-lg bg-secondary/50 border border-border space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-sans font-medium text-foreground">{e.plan_name}</span>
+                          <Badge variant="outline" className={`text-xs ${statusColors[e.status]}`}>
+                            {statusLabels[e.status] || e.status}
+                          </Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground font-sans">
+                          <span><Dumbbell className="h-3 w-3 inline mr-1" />{e.trainer_name}</span>
+                          <span><CalendarDays className="h-3 w-3 inline mr-1" />{format(parseISO(e.start_date), "dd/MM/yyyy")} → {format(parseISO(e.end_date), "dd/MM/yyyy")}</span>
+                          {e.plan_duration && <span>{e.plan_duration} semanas</span>}
+                        </div>
+
+                        {/* Training Start Date */}
+                        <div className="flex items-center gap-3 mt-2 p-2 rounded bg-background border border-border flex-wrap">
+                          <span className="text-xs font-sans font-medium text-foreground whitespace-nowrap">Início do treino:</span>
+                          {e.training_start_date ? (
+                            <span className="text-xs font-sans text-muted-foreground">
+                              {format(parseISO(e.training_start_date), "dd/MM/yyyy")}
+                            </span>
+                          ) : (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-7 text-xs">
+                                  <CalendarIcon className="h-3 w-3 mr-1" />Definir data
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  onSelect={async (date) => {
+                                    if (!date) return;
+                                    const dateStr = format(date, "yyyy-MM-dd");
+                                    const { error } = await supabase.from("enrollments").update({
+                                      training_start_date: dateStr,
+                                      status: "awaiting_training",
+                                    }).eq("id", e.id);
+                                    if (error) {
+                                      toast({ title: "Erro ao definir data", description: error.message, variant: "destructive" });
+                                    } else {
+                                      toast({ title: "Data de início do treino definida! Ciclos gerados." });
+                                      loadData(id!);
+                                    }
+                                  }}
+                                  locale={ptBR}
+                                  className="pointer-events-auto"
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                        </div>
+
+                        {cycles.filter((c) => c.enrollment_id === e.id).length > 0 && (
+                          <div className="mt-3 space-y-1">
+                            <p className="text-xs font-sans font-medium text-foreground">Ciclos de treino:</p>
+                            <div className="grid grid-cols-1 gap-2">
+                              {cycles.filter((c) => c.enrollment_id === e.id).map((c) => (
+                                <div key={c.id} className="flex flex-wrap items-center justify-between p-2 rounded bg-background border border-border text-xs font-sans gap-2">
+                                  <span className="shrink-0 text-[11px] sm:text-xs">Ciclo {c.cycle_number} — {format(parseISO(c.start_date), "dd/MM")} a {format(parseISO(c.end_date), "dd/MM/yy")}</span>
+                                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                    {c.has_workout ? (
+                                      <Badge variant="outline" className="text-[10px] bg-success/15 text-success border-success/30">Treino</Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-[10px] bg-destructive/15 text-destructive border-destructive/30">Sem treino</Badge>
+                                    )}
+                                    <Badge variant="outline" className={`text-[10px] ${statusColors[c.status]}`}>
+                                      {statusLabels[c.status] || c.status}
+                                    </Badge>
+                                    {(role === "trainer" || role === "admin" || role === "master" || role === "coordinator") && (
+                                      <div className="flex items-center gap-1">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-5 text-[10px] px-2"
+                                          onClick={() => {
+                                            const basePath = role === "coordinator" ? "/coordinator" : role === "trainer" ? "/trainer" : "/admin";
+                                            const returnPath = `${basePath}/students/${id}`;
+                                            navigate(`${basePath}/workout/${c.id}?returnTo=${encodeURIComponent(returnPath)}`);
+                                          }}
+                                        >
+                                          <Dumbbell className="h-3 w-3 mr-1" />
+                                          {c.has_workout ? "Editar Treino" : "Prescrever"}
+                                        </Button>
+                                        {!c.has_workout && (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-5 text-[10px] px-2 text-success border-success/30 hover:bg-success/10"
+                                            onClick={async () => {
+                                              if (!session?.user?.id) return;
+                                              const { error } = await supabase.from("workouts").insert({
+                                                cycle_id: c.id,
+                                                title: `Treino Ciclo ${c.cycle_number}`,
+                                                created_by: session.user.id,
+                                                exercises: [],
+                                              });
+                                              if (error) {
+                                                toast({ title: "Erro ao marcar como prescrito", description: error.message, variant: "destructive" });
+                                              } else {
+                                                toast({ title: "Ciclo marcado como prescrito!" });
+                                                if (id) loadData(id);
+                                              }
+                                            }}
+                                          >
+                                            <Check className="h-3 w-3 mr-1" />
+                                            Feito
+                                          </Button>
+                                        )}
+                                      </div>
+                                    )}
+                                    {c.cycle_number === 1 && (role === "admin" || role === "master" || role === "coordinator") && (
+                                      <Popover>
+                                        <PopoverTrigger asChild>
+                                          <Button variant="ghost" size="sm" className="h-5 text-[10px] px-2">
+                                            <CalendarIcon className="h-3 w-3 mr-0.5" />Alterar data
+                                          </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                          <Calendar
+                                            mode="single"
+                                            onSelect={async (date) => {
+                                              if (!date) return;
+                                              const dateStr = format(date, "yyyy-MM-dd");
+                                              const { error } = await supabase.rpc("recalculate_training_cycles", {
+                                                p_enrollment_id: e.id,
+                                                p_new_start_date: dateStr,
+                                              });
+                                              if (error) {
+                                                toast({ title: "Erro ao recalcular ciclos", description: error.message, variant: "destructive" });
+                                              } else {
+                                                toast({ title: "Ciclos recalculados com sucesso!" });
+                                                loadData(id!);
+                                              }
+                                            }}
+                                            locale={ptBR}
+                                            className="pointer-events-auto"
+                                          />
+                                        </PopoverContent>
+                                      </Popover>
                                     )}
                                   </div>
-                                )}
-                                {/* Change date button for first cycle */}
-                                {c.cycle_number === 1 && (role === "admin" || role === "master" || role === "coordinator") && (
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <Button variant="ghost" size="sm" className="h-5 text-[10px] px-2">
-                                        <CalendarIcon className="h-3 w-3 mr-0.5" />Alterar data
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                      <Calendar
-                                        mode="single"
-                                        onSelect={async (date) => {
-                                          if (!date) return;
-                                          const dateStr = format(date, "yyyy-MM-dd");
-                                          const { error } = await supabase.rpc("recalculate_training_cycles", {
-                                            p_enrollment_id: e.id,
-                                            p_new_start_date: dateStr,
-                                          });
-                                          if (error) {
-                                            toast({ title: "Erro ao recalcular ciclos", description: error.message, variant: "destructive" });
-                                          } else {
-                                            toast({ title: "Ciclos recalculados com sucesso!" });
-                                            loadData(id!);
-                                          }
-                                        }}
-                                        locale={ptBR}
-                                        className="pointer-events-auto"
-                                      />
-                                    </PopoverContent>
-                                  </Popover>
-                                )}
-                              </div>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                )}
+              </CardContent>
+            </Card>
 
-        {/* Calendar */}
-        <Card className="bg-card border-border">
-          <CardHeader><CardTitle className="text-primary text-lg">CALENDÁRIO DE CICLOS</CardTitle></CardHeader>
-          <CardContent>
-            {cycles.length > 0 && (
-              <div className="flex flex-wrap gap-4 mb-4 text-xs font-sans">
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ background: cycleCalendarColors.prescribe.bg, border: `1px solid ${cycleCalendarColors.prescribe.text}` }} />Prescrever</span>
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ background: cycleCalendarColors.done.bg, border: `1px solid ${cycleCalendarColors.done.text}` }} />Entregue</span>
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ background: cycleCalendarColors.expired_no_workout.bg, border: `1px solid ${cycleCalendarColors.expired_no_workout.text}` }} />Vencido sem treino</span>
-              </div>
-            )}
-            {cycles.length === 0 && <p className="text-muted-foreground font-sans text-sm mb-4">Nenhum ciclo de treino ainda.</p>}
-            <Calendar
-              mode="single" month={calendarMonth} onMonthChange={setCalendarMonth} locale={ptBR} className="pointer-events-auto"
-              modifiers={{ prescribeCycle: prescribeDays, doneCycle: doneDays, expiredCycle: expiredDays }}
-              modifiersStyles={{
-                prescribeCycle: { backgroundColor: cycleCalendarColors.prescribe.bg, color: cycleCalendarColors.prescribe.text, borderRadius: "4px" },
-                doneCycle: { backgroundColor: cycleCalendarColors.done.bg, color: cycleCalendarColors.done.text, borderRadius: "4px" },
-                expiredCycle: { backgroundColor: cycleCalendarColors.expired_no_workout.bg, color: cycleCalendarColors.expired_no_workout.text, borderRadius: "4px" },
-              }}
-            />
-          </CardContent>
-        </Card>
+            {/* Calendar */}
+            <Card className="bg-card border-border">
+              <CardHeader><CardTitle className="text-primary text-lg">CALENDÁRIO DE CICLOS</CardTitle></CardHeader>
+              <CardContent>
+                {cycles.length > 0 && (
+                  <div className="flex flex-wrap gap-4 mb-4 text-xs font-sans">
+                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ background: cycleCalendarColors.prescribe.bg, border: `1px solid ${cycleCalendarColors.prescribe.text}` }} />Prescrever</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ background: cycleCalendarColors.done.bg, border: `1px solid ${cycleCalendarColors.done.text}` }} />Entregue</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ background: cycleCalendarColors.expired_no_workout.bg, border: `1px solid ${cycleCalendarColors.expired_no_workout.text}` }} />Vencido sem treino</span>
+                  </div>
+                )}
+                {cycles.length === 0 && <p className="text-muted-foreground font-sans text-sm mb-4">Nenhum ciclo de treino ainda.</p>}
+                <Calendar
+                  mode="single" month={calendarMonth} onMonthChange={setCalendarMonth} locale={ptBR} className="pointer-events-auto"
+                  modifiers={{ prescribeCycle: prescribeDays, doneCycle: doneDays, expiredCycle: expiredDays }}
+                  modifiersStyles={{
+                    prescribeCycle: { backgroundColor: cycleCalendarColors.prescribe.bg, color: cycleCalendarColors.prescribe.text, borderRadius: "4px" },
+                    doneCycle: { backgroundColor: cycleCalendarColors.done.bg, color: cycleCalendarColors.done.text, borderRadius: "4px" },
+                    expiredCycle: { backgroundColor: cycleCalendarColors.expired_no_workout.bg, color: cycleCalendarColors.expired_no_workout.text, borderRadius: "4px" },
+                  }}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {/* Trainer Weekly Bar */}
-        <TrainerWeeklyBar studentId={id!} />
+          {/* ===== ANÁLISES ===== */}
+          <TabsContent value="analytics" className="space-y-4">
+            <TrainerWeeklyBar studentId={id!} />
+            <WorkoutAnalysis studentId={id!} />
+          </TabsContent>
 
-        {/* Workout Analysis - Etapa 6 */}
-        <WorkoutAnalysis studentId={id!} />
-
-        {/* Evaluations */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-primary text-lg flex items-center gap-2">
-              <FileText className="h-5 w-5" />AVALIAÇÕES
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], "photo")} />
-              <input ref={audioInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], "audio")} />
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading || isRecording}>
-                <Image className="h-4 w-4 mr-1" />Foto
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => audioInputRef.current?.click()} disabled={uploading || isRecording}>
-                <Upload className="h-4 w-4 mr-1" />Upload Áudio
-              </Button>
-              {isRecording ? (
-                <Button variant="destructive" size="sm" onClick={stopRecording}>
-                  <Square className="h-4 w-4 mr-1" />Parar Gravação
-                  <span className="ml-1.5 w-2 h-2 rounded-full bg-destructive-foreground animate-pulse" />
+          {/* ===== ANAMNESE ===== */}
+          <TabsContent value="anamnesis">
+            <Card className="bg-card border-border">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-primary text-lg">ANAMNESE</CardTitle>
+                <Button variant="ghost" size="sm" onClick={openEditAnamnesis}>
+                  <Pencil className="h-4 w-4 mr-1" />{anamnesis ? "Editar" : "Adicionar"}
                 </Button>
-              ) : (
-                <Button variant="outline" size="sm" onClick={startRecording} disabled={uploading}>
-                  <Mic className="h-4 w-4 mr-1" />Gravar Áudio
-                </Button>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Textarea value={evalNotes} onChange={(e) => setEvalNotes(e.target.value)} placeholder="Adicionar nota de avaliação..." className="bg-secondary border-border" rows={2} />
-              <Button onClick={handleSaveTextEval} disabled={!evalNotes.trim() || saving} className="self-end">Salvar</Button>
-            </div>
-            {evaluations.length > 0 ? (
-              <div className="space-y-3 mt-4">
-                {evaluations.map((ev) => (
-                  <div key={ev.id} className="p-3 rounded-lg bg-secondary/50 border border-border">
-                    <div className="flex items-center justify-between mb-2">
-                      <Badge variant="outline" className="text-xs">
-                        {ev.type === "photo" ? "📷 Foto" : ev.type === "audio" ? "🎤 Áudio" : "📝 Nota"}
-                      </Badge>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground font-sans">
-                          {format(new Date(ev.created_at), "dd/MM/yyyy HH:mm")} · {ev.created_by_name}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={async () => {
-                            if (!confirm("Excluir esta avaliação?")) return;
-                            // Delete file from storage if exists
-                            if (ev.file_url) {
-                              const pathMatch = ev.file_url.match(/evaluations\/(.+)\?/);
-                              if (pathMatch) {
-                                await supabase.storage.from("evaluations").remove([pathMatch[1]]);
-                              }
-                            }
-                            await supabase.from("student_evaluations").delete().eq("id", ev.id);
-                            toast({ title: "Avaliação excluída" });
-                            if (id) loadEvaluations(id);
-                          }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm font-sans">
+                {!anamnesis ? (
+                  <p className="text-muted-foreground">Nenhuma anamnese preenchida. Clique em "Adicionar" para preencher.</p>
+                ) : (
+                  <>
+                    {anamnesis.modalities && (Array.isArray(anamnesis.modalities) ? anamnesis.modalities.length > 0 : anamnesis.modalities) && <div><span className="font-medium text-foreground">Modalidades:</span> <span className="text-muted-foreground">{Array.isArray(anamnesis.modalities) ? anamnesis.modalities.join(", ") : anamnesis.modalities}</span></div>}
+                    {anamnesis.training_days && <div><span className="font-medium text-foreground">Dias de treino:</span> <span className="text-muted-foreground">{anamnesis.training_days}</span></div>}
+                    {anamnesis.available_days != null && <div><span className="font-medium text-foreground">Dias disponíveis p/ BN:</span> <span className="text-muted-foreground">{anamnesis.available_days}</span></div>}
+                    {anamnesis.session_duration && <div><span className="font-medium text-foreground">Tempo por sessão:</span> <span className="text-muted-foreground">{anamnesis.session_duration}</span></div>}
+                    {anamnesis.training_location && <div><span className="font-medium text-foreground">Local de treino:</span> <span className="text-muted-foreground">{anamnesis.training_location}</span></div>}
+                    {anamnesis.available_equipment && (Array.isArray(anamnesis.available_equipment) ? anamnesis.available_equipment.length > 0 : anamnesis.available_equipment) && <div><span className="font-medium text-foreground">Equipamentos:</span> <span className="text-muted-foreground">{Array.isArray(anamnesis.available_equipment) ? anamnesis.available_equipment.join(", ") : anamnesis.available_equipment}</span></div>}
+                    {anamnesis.goals && <div><span className="font-medium text-foreground">Metas:</span> <span className="text-muted-foreground">{anamnesis.goals}</span></div>}
+                    {anamnesis.diseases && <div><span className="font-medium text-foreground">Doenças/Remédios:</span> <span className="text-muted-foreground">{anamnesis.diseases}</span></div>}
+                    {anamnesis.injuries && <div><span className="font-medium text-foreground">Lesões:</span> <span className="text-muted-foreground">{anamnesis.injuries}</span></div>}
+                    {anamnesis.current_pain && <div><span className="font-medium text-foreground">Dores atuais:</span> <span className="text-muted-foreground">{anamnesis.current_pain}</span></div>}
+                    {anamnesis.nutrition && <div><span className="font-medium text-foreground">Alimentação:</span> <span className="text-muted-foreground">{anamnesis.nutrition}</span></div>}
+                    {anamnesis.profession && <div><span className="font-medium text-foreground">Profissão/Rotina:</span> <span className="text-muted-foreground">{anamnesis.profession}</span></div>}
+                    {anamnesis.sleep_hours && <div><span className="font-medium text-foreground">Sono:</span> <span className="text-muted-foreground">{anamnesis.sleep_hours}</span></div>}
+                    {anamnesis.restorative_sleep != null && <div><span className="font-medium text-foreground">Sono reparador:</span> <span className="text-muted-foreground">{anamnesis.restorative_sleep ? "Sim" : "Não"}</span></div>}
+                    {anamnesis.aware_of_trilogy != null && <div><span className="font-medium text-foreground">Consciente da tríade:</span> <span className="text-muted-foreground">{anamnesis.aware_of_trilogy ? "Sim" : "Não"}</span></div>}
+                    {anamnesis.feel_in_3_months && <div><span className="font-medium text-foreground">Como quer se sentir em 3 meses:</span> <span className="text-muted-foreground">{anamnesis.feel_in_3_months}</span></div>}
+                    {anamnesis.biggest_obstacle && <div><span className="font-medium text-foreground">Maior obstáculo:</span> <span className="text-muted-foreground">{anamnesis.biggest_obstacle}</span></div>}
+                    {anamnesis.extra_comments && <div><span className="font-medium text-foreground">Comentários extras:</span> <span className="text-muted-foreground">{anamnesis.extra_comments}</span></div>}
+                    {anamnesis.authorizes_plan != null && <div><span className="font-medium text-foreground">Autoriza criação do plano:</span> <span className="text-muted-foreground">{anamnesis.authorizes_plan ? "SIM" : "NÃO"}</span></div>}
+                    {anamnesis.commits_communication != null && <div><span className="font-medium text-foreground">Compromete-se a comunicar:</span> <span className="text-muted-foreground">{anamnesis.commits_communication ? "SIM" : "NÃO"}</span></div>}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ===== FINANCEIRO ===== */}
+          <TabsContent value="financial">
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="text-primary text-lg flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />FINANCEIRO
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {enrollments.length === 0 ? (
+                  <p className="text-muted-foreground font-sans text-sm">Nenhuma matrícula para rastrear pagamento.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {enrollments.map((e) => (
+                      <div key={e.id} className="p-3 rounded-lg bg-secondary/50 border border-border flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-sans font-medium text-foreground">{e.plan_name}</p>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground font-sans mt-1">
+                            <Badge variant="outline" className={`text-[10px] ${paymentStatusColors[e.payment_status || "pending"]}`}>
+                              {paymentStatusLabels[e.payment_status || "pending"]}
+                            </Badge>
+                            {e.payment_date && <span>Pago em: {format(parseISO(e.payment_date), "dd/MM/yyyy")}</span>}
+                            {e.payment_method && <span>{e.payment_method}</span>}
+                          </div>
+                          {e.financial_notes && <p className="text-xs text-muted-foreground mt-1">{e.financial_notes}</p>}
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => openFinancialEdit(e)}>
+                          <Pencil className="h-4 w-4" />
                         </Button>
                       </div>
-                    </div>
-                    {ev.type === "photo" && ev.file_url && (
-                      <div className="space-y-2">
-                        <a href={ev.file_url} target="_blank" rel="noopener noreferrer">
-                          <img src={ev.file_url} alt="Avaliação" className="rounded max-h-48 object-cover cursor-pointer hover:opacity-80 transition-opacity" />
-                        </a>
-                        <a href={ev.file_url} target="_blank" rel="noopener noreferrer" download>
-                          <Button variant="ghost" size="sm"><Download className="h-4 w-4 mr-1" />Baixar</Button>
-                        </a>
-                      </div>
-                    )}
-                    {ev.type === "audio" && ev.file_url && (
-                      <audio controls src={ev.file_url} className="w-full" />
-                    )}
-                    {ev.notes && <p className="text-sm text-foreground font-sans mt-1">{ev.notes}</p>}
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground font-sans text-sm">Nenhuma avaliação registrada.</p>
-            )}
-          </CardContent>
-        </Card>
+                )}
+
+                {asaasPayments.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-border space-y-3">
+                    <p className="text-xs font-sans font-medium text-foreground">Cobranças Asaas</p>
+                    {asaasPayments.map((p) => (
+                      <div key={p.id} className="p-3 rounded-lg bg-secondary/50 border border-border flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-[10px]">
+                              {p.billing_type === "PIX" ? "Pix" : "Cartão"}
+                            </Badge>
+                            <Badge variant="outline" className={`text-[10px] ${
+                              p.status === "RECEIVED" || p.status === "CONFIRMED" ? "bg-success/15 text-success border-success/30" :
+                              p.status === "PENDING" ? "bg-warning/15 text-warning border-warning/30" :
+                              "bg-destructive/15 text-destructive border-destructive/30"
+                            }`}>
+                              {p.status}
+                            </Badge>
+                          </div>
+                          <p className="text-sm font-sans font-medium text-foreground mt-1">
+                            R$ {Number(p.value).toFixed(2).replace(".", ",")}
+                          </p>
+                          {p.due_date && <p className="text-xs text-muted-foreground font-sans">Vencimento: {format(parseISO(p.due_date), "dd/MM/yyyy")}</p>}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {p.invoice_url && (
+                            <Button variant="ghost" size="icon" asChild>
+                              <a href={p.invoice_url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => p.asaas_payment_id && refreshAsaasPaymentStatus(p.asaas_payment_id)}
+                            disabled={refreshingPayment === p.asaas_payment_id}
+                          >
+                            <RefreshCw className={`h-4 w-4 ${refreshingPayment === p.asaas_payment_id ? "animate-spin" : ""}`} />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ===== AVALIAÇÕES ===== */}
+          <TabsContent value="evaluations">
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="text-primary text-lg flex items-center gap-2">
+                  <FileText className="h-5 w-5" />AVALIAÇÕES
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], "photo")} />
+                  <input ref={audioInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], "audio")} />
+                  <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading || isRecording}>
+                    <Image className="h-4 w-4 mr-1" />Foto
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => audioInputRef.current?.click()} disabled={uploading || isRecording}>
+                    <Upload className="h-4 w-4 mr-1" />Upload Áudio
+                  </Button>
+                  {isRecording ? (
+                    <Button variant="destructive" size="sm" onClick={stopRecording}>
+                      <Square className="h-4 w-4 mr-1" />Parar Gravação
+                      <span className="ml-1.5 w-2 h-2 rounded-full bg-destructive-foreground animate-pulse" />
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={startRecording} disabled={uploading}>
+                      <Mic className="h-4 w-4 mr-1" />Gravar Áudio
+                    </Button>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Textarea value={evalNotes} onChange={(e) => setEvalNotes(e.target.value)} placeholder="Adicionar nota de avaliação..." className="bg-secondary border-border" rows={2} />
+                  <Button onClick={handleSaveTextEval} disabled={!evalNotes.trim() || saving} className="self-end">Salvar</Button>
+                </div>
+                {evaluations.length > 0 ? (
+                  <div className="space-y-3 mt-4">
+                    {evaluations.map((ev) => (
+                      <div key={ev.id} className="p-3 rounded-lg bg-secondary/50 border border-border">
+                        <div className="flex items-center justify-between mb-2">
+                          <Badge variant="outline" className="text-xs">
+                            {ev.type === "photo" ? "📷 Foto" : ev.type === "audio" ? "🎤 Áudio" : "📝 Nota"}
+                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground font-sans">
+                              {format(new Date(ev.created_at), "dd/MM/yyyy HH:mm")} · {ev.created_by_name}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={async () => {
+                                if (!confirm("Excluir esta avaliação?")) return;
+                                if (ev.file_url) {
+                                  const pathMatch = ev.file_url.match(/evaluations\/(.+)\?/);
+                                  if (pathMatch) {
+                                    await supabase.storage.from("evaluations").remove([pathMatch[1]]);
+                                  }
+                                }
+                                await supabase.from("student_evaluations").delete().eq("id", ev.id);
+                                toast({ title: "Avaliação excluída" });
+                                if (id) loadEvaluations(id);
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                        {ev.type === "photo" && ev.file_url && (
+                          <div className="space-y-2">
+                            <a href={ev.file_url} target="_blank" rel="noopener noreferrer">
+                              <img src={ev.file_url} alt="Avaliação" className="rounded max-h-48 object-cover cursor-pointer hover:opacity-80 transition-opacity" />
+                            </a>
+                            <a href={ev.file_url} target="_blank" rel="noopener noreferrer" download>
+                              <Button variant="ghost" size="sm"><Download className="h-4 w-4 mr-1" />Baixar</Button>
+                            </a>
+                          </div>
+                        )}
+                        {ev.type === "audio" && ev.file_url && (
+                          <audio controls src={ev.file_url} className="w-full" />
+                        )}
+                        {ev.notes && <p className="text-sm text-foreground font-sans mt-1">{ev.notes}</p>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground font-sans text-sm">Nenhuma avaliação registrada.</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Enrollment Dialog */}
         <Dialog open={enrollOpen} onOpenChange={setEnrollOpen}>
