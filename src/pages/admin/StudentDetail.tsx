@@ -1142,6 +1142,9 @@ export default function StudentDetail() {
           </CardContent>
         </Card>
 
+        {/* Trainer Weekly Bar */}
+        <TrainerWeeklyBar studentId={id!} />
+
         {/* Workout Analysis - Etapa 6 */}
         <WorkoutAnalysis studentId={id!} />
 
