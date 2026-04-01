@@ -34,6 +34,7 @@ interface ProfileOption {
 interface TrainerPerformance {
   user_id: string;
   full_name: string;
+  role: string;
   activeStudents: number;
   workoutsByMonth: Record<string, number>; // "YYYY-MM" -> count
 }
@@ -132,10 +133,24 @@ export default function TeamManager() {
       .in("user_id", userIds);
 
     const grouped: Record<string, TeamMember> = {};
-    const masterUserIds = new Set(roles.filter((r) => r.role === "master").map((r) => r.user_id));
+    const excludeUserIds = new Set<string>();
+    
+    // Build a map of all roles per user
+    const rolesByUser = new Map<string, string[]>();
+    for (const r of roles) {
+      if (!rolesByUser.has(r.user_id)) rolesByUser.set(r.user_id, []);
+      rolesByUser.get(r.user_id)!.push(r.role);
+    }
+    
+    // Exclude masters and users with ONLY the student role
+    for (const [uid, userRoles] of rolesByUser) {
+      if (userRoles.includes("master")) excludeUserIds.add(uid);
+      if (userRoles.length === 1 && userRoles[0] === "student") excludeUserIds.add(uid);
+    }
 
     for (const r of roles) {
-      if (masterUserIds.has(r.user_id)) continue;
+      if (excludeUserIds.has(r.user_id)) continue;
+      if (r.role === "student") continue; // don't show student badge for team members
       if (!grouped[r.user_id]) {
         grouped[r.user_id] = {
           user_id: r.user_id,
@@ -193,19 +208,25 @@ export default function TeamManager() {
 
     const companyUserIds = companyMembers.map((m) => m.user_id);
 
-    const { data: trainerRoles } = await supabase
+    const { data: memberRoles } = await supabase
       .from("user_roles")
-      .select("user_id")
-      .eq("role", "trainer")
+      .select("user_id, role")
+      .in("role", ["trainer", "coordinator", "admin"])
       .in("user_id", companyUserIds);
 
-    if (!trainerRoles || trainerRoles.length === 0) {
+    if (!memberRoles || memberRoles.length === 0) {
       setTrainerPerformance([]);
       setPerfLoading(false);
       return;
     }
 
-    const trainerIds = trainerRoles.map((r) => r.user_id);
+    // Deduplicate and build role map
+    const roleMap = new Map<string, string>();
+    for (const r of memberRoles) {
+      // Keep highest priority role for display
+      if (!roleMap.has(r.user_id)) roleMap.set(r.user_id, r.role);
+    }
+    const trainerIds = [...roleMap.keys()];
 
     // Get profiles, students, workouts in parallel
     const now = new Date();
@@ -240,6 +261,7 @@ export default function TeamManager() {
       return {
         user_id: tid,
         full_name: profile?.full_name || "Sem nome",
+        role: roleMap.get(tid) || "trainer",
         activeStudents,
         workoutsByMonth,
       };
@@ -674,23 +696,28 @@ export default function TeamManager() {
                   <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : trainerPerformance.length === 0 ? (
-                <p className="text-muted-foreground font-sans text-center py-12">Nenhum treinador encontrado nesta empresa</p>
+                <p className="text-muted-foreground font-sans text-center py-12">Nenhum membro encontrado nesta empresa</p>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2">
                   {trainerPerformance.map((t) => (
                     <Card key={t.user_id} className="bg-card border-border">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-base font-sans flex items-center gap-2">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            {t.full_name}
-                          </CardTitle>
-                          <Badge variant="secondary" className="gap-1">
-                            <Users className="h-3 w-3" />
-                            {t.activeStudents} {t.activeStudents === 1 ? "aluno" : "alunos"}
-                          </Badge>
-                        </div>
-                      </CardHeader>
+                       <CardHeader className="pb-3">
+                         <div className="flex items-center justify-between">
+                           <div className="flex items-center gap-2">
+                             <CardTitle className="text-base font-sans flex items-center gap-2">
+                               <Users className="h-4 w-4 text-muted-foreground" />
+                               {t.full_name}
+                             </CardTitle>
+                             <span className={`text-xs font-sans font-medium px-2 py-0.5 rounded capitalize ${roleColors[t.role] || ""}`}>
+                               {roleLabels[t.role] || t.role}
+                             </span>
+                           </div>
+                           <Badge variant="secondary" className="gap-1">
+                             <Users className="h-3 w-3" />
+                             {t.activeStudents} {t.activeStudents === 1 ? "aluno" : "alunos"}
+                           </Badge>
+                         </div>
+                       </CardHeader>
                       <CardContent>
                         <p className="text-xs text-muted-foreground font-sans mb-2 flex items-center gap-1">
                           <BarChart3 className="h-3 w-3" /> Prescrições por mês
