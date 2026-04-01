@@ -17,6 +17,7 @@ import { WorkoutSummary } from "@/components/student/WorkoutSummary";
 import { ExerciseCard } from "@/components/student/ExerciseCard";
 import { StatsCharts } from "@/components/student/StatsCharts";
 import { useRestTimer } from "@/components/student/RestTimer";
+import { WeeklyBar } from "@/components/student/WeeklyBar";
 
 interface WorkoutExercise {
   exercise_id: string;
