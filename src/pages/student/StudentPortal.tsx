@@ -152,6 +152,7 @@ export default function StudentPortal() {
               id: w.id,
               title: w.title,
               description: w.description,
+              day_of_week: (w as any).day_of_week as number | null,
               exercises: ((w.exercises as unknown as WorkoutExercise[]) || []).map(ex => ({
                 ...ex,
                 video_url: (ex.video_url && ex.video_url.trim()) || videoMap[ex.exercise_id]?.video_url || null,
