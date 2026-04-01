@@ -261,6 +261,7 @@ export default function TeamManager() {
       return {
         user_id: tid,
         full_name: profile?.full_name || "Sem nome",
+        role: roleMap.get(tid) || "trainer",
         activeStudents,
         workoutsByMonth,
       };
