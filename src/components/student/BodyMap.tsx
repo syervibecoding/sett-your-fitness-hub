@@ -1,7 +1,5 @@
-import { useMemo, lazy, Suspense } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
-
-const BodyMap3D = lazy(() => import("./BodyMap3D").then(m => ({ default: m.BodyMap3D })));
+import { useMemo } from "react";
+import { BodyMap3D } from "./BodyMap3D";
 
 interface MuscleVolume {
   muscleGroup: string;
@@ -67,9 +65,7 @@ export function BodyMap({ muscleVolumes }: BodyMapProps) {
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <Suspense fallback={<Skeleton className="w-full h-[320px] rounded-lg" />}>
-        <BodyMap3D regionColors={regionColors} muscleVolumes={muscleVolumes} />
-      </Suspense>
+      <BodyMap3D regionColors={regionColors} muscleVolumes={muscleVolumes} />
 
       {/* Legend */}
       <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-sans">
