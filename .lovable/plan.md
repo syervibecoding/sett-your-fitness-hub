@@ -1,59 +1,44 @@
 
 
-# Plano: BodyMap 3D Interativo com React Three Fiber
+# Plano: Melhorar BodyMap 3D — Corpo Humano Realista
 
-## Visão geral
+## Problema atual
+As peças estão soltas no espaço, sem conexão entre si. Não existe um "corpo base" que una tudo — são apenas cápsulas e esferas flutuando, impossível reconhecer como humano.
 
-Substituir o SVG atual por um modelo 3D de corpo humano construído com primitivas geométricas do Three.js (capsules, spheres, cylinders) posicionadas anatomicamente. O usuário poderá rotacionar o modelo arrastando, vendo frente e costas em um único viewport.
+## Solução
+Reescrever `BodyMap3D.tsx` com uma abordagem em **duas camadas**:
 
-## Dependências
+1. **Camada base (silhueta)** — um corpo completo em cor neutra escura formado por primitivas sobrepostas e encaixadas (torso cilíndrico, pelve, braços, pernas, pescoço). Isso cria a **forma humana reconhecível**.
 
-- `three@^0.160` — motor 3D
-- `@react-three/fiber@^8.18` — binding React (v8 para React 18)
-- `@react-three/drei@^9.122.0` — helpers (OrbitControls, RoundedBox, Capsule)
+2. **Camada muscular (heatmap)** — grupos musculares coloridos posicionados **sobre** o corpo base com leve offset para frente/trás, ligeiramente maiores para "destacar" do corpo.
 
-## Arquitetura
+### Mudanças específicas no arquivo `BodyMap3D.tsx`
 
-```text
-BodyMap.tsx (mantém interface + lógica de cores)
-└── BodyMap3D.tsx (novo componente)
-    ├── <Canvas> com OrbitControls (rotação horizontal)
-    ├── <HumanBody> — grupo de meshes por região muscular
-    │   ├── Head (sphere, cor neutra fixa)
-    │   ├── Chest (2x rounded capsules, cor dinâmica)
-    │   ├── Shoulders (2x spheres)
-    │   ├── Biceps / Triceps (capsules, posição braço)
-    │   ├── Forearms (capsules menores)
-    │   ├── Abs (stack de capsules achatadas)
-    │   ├── Upper/Lower Back (capsules traseiras)
-    │   ├── Glutes (2x spheres)
-    │   ├── Quads / Hamstrings (capsules perna)
-    │   └── Calves (capsules)
-    └── Iluminação ambiente + direcional suave
-```
+**Corpo base (nova):**
+- Torso: capsule grande vertical (raio ~0.14, altura ~0.5) — forma o tronco inteiro
+- Pelve: sphere achatada (scale Y 0.6) conectando tronco às pernas
+- Braços superiores: 2x capsules conectadas aos ombros, anguladas ~5° para fora
+- Antebraços: 2x capsules menores continuando os braços
+- Coxas: 2x capsules grossas saindo da pelve
+- Canelas: 2x capsules finas continuando as coxas
+- Pescoço: capsule fina entre cabeça e torso
+- Tudo em cor neutra `hsl(220 10% 15%)` sem hover/interação
 
-## Detalhes
+**Camada muscular (ajustes):**
+- Reposicionar todas as peças para ficarem encostadas/sobrepostas ao corpo base
+- Aumentar segmentos das geometrias (de 8/16 para 12/24) para ficarem mais suaves
+- Peitorais: posição Z +0.08 (mais para frente, sobre o torso)
+- Dorsais: posição Z -0.08 (mais para trás)
+- Quadríceps/posterior: encostados nas coxas base
+- Ombros: spheres maiores (raio 0.11) encaixadas na junção braço-torso
 
-### Novo: `src/components/student/BodyMap3D.tsx`
-- Componente `<Canvas>` com fundo transparente, câmera posicionada de frente
-- `OrbitControls` limitado a rotação horizontal (azimuth livre, polar travado) para que o usuário gire e veja frente/costas
-- Cada grupo muscular é um `<mesh>` com geometria Capsule/Sphere do drei
-- Material `MeshStandardMaterial` com cor vinda do heatmap (mesma função `getHeatColor`)
-- Emissão leve (emissive) nos músculos ativos para efeito de "brilho"
-- Tooltip via `onPointerOver` mostrando nome do músculo + volume
+**Câmera e iluminação:**
+- Câmera mais próxima: `position: [0, 1.1, 2.8]`, `fov: 38`
+- Adicionar `pointLight` suave de baixo para iluminar pernas
+- Target do OrbitControls no centro do corpo `[0, 1.1, 0]`
 
-### Alteração: `src/components/student/BodyMap.tsx`
-- Importar `BodyMap3D` com lazy loading (`React.lazy` + `Suspense`)
-- Substituir os dois SVGs pelo componente 3D único
-- Manter legenda de calor e lista de volumes abaixo
-- Fallback: skeleton loader enquanto carrega o Three.js
+**Altura do container:** Aumentar de 320px para 380px para dar mais espaço
 
-### Sem mudanças em outros arquivos
-- `StudentDetail.tsx` e `WorkoutAnalysis.tsx` continuam passando `muscleVolumes` normalmente
-
-## Resultado esperado
-- Corpo humano 3D com formas anatômicas arredondadas (não blocos retangulares)
-- Heatmap de cores por grupo muscular
-- Rotação livre por arraste para ver frente/costas/lados
-- Leve, sem modelo .glb externo — tudo construído com primitivas
+### Resultado
+Silhueta humana sólida e reconhecível com músculos coloridos destacados sobre ela — muito mais próximo de um manequim anatômico.
 
