@@ -1108,55 +1108,103 @@ export default function StudentDetail() {
             {(() => {
               const activeEnroll = enrollments.find(e => e.status === "active" || e.status === "awaiting_training");
               if (!activeEnroll) return <p className="text-muted-foreground font-sans text-sm text-center py-8">Nenhuma matrícula ativa.</p>;
-              const activeCycles = cycles.filter(c => c.enrollment_id === activeEnroll.id && c.has_workout);
-              if (activeCycles.length === 0) return <p className="text-muted-foreground font-sans text-sm text-center py-8">Nenhum treino prescrito neste ciclo.</p>;
+              const enrollCycles = cycles.filter(c => c.enrollment_id === activeEnroll.id);
+              if (enrollCycles.length === 0) {
+                return (
+                  <Card className="bg-card border-border border-dashed">
+                    <CardContent className="p-8 text-center">
+                      <CalendarDays className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+                      <p className="text-muted-foreground font-sans">Nenhum ciclo de treino criado.</p>
+                      <p className="text-xs text-muted-foreground/60 font-sans mt-1">Defina a data de início do treino na matrícula do aluno.</p>
+                    </CardContent>
+                  </Card>
+                );
+              }
+              const prefix = role === "master" ? "/admin" : `/${role}`;
               return (
                 <div className="space-y-4">
-                  {activeCycles.map(cycle => {
+                  {enrollCycles.map(cycle => {
                     const cycleWorkouts = (allWorkouts || []).filter((w: any) => w.cycle_id === cycle.id);
                     return (
-                      <div key={cycle.id} className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-sm font-sans font-medium text-foreground">Ciclo {cycle.cycle_number} — {format(parseISO(cycle.start_date), "dd/MM")} a {format(parseISO(cycle.end_date), "dd/MM/yy")}</h3>
-                          <Button variant="outline" size="sm" className="text-xs" onClick={() => navigate(`/admin/prescriptions?student=${id}&cycle=${cycle.id}`)}>
-                            <ExternalLink className="h-3 w-3 mr-1" />Abrir Prescrição
-                          </Button>
-                        </div>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          {cycleWorkouts.map((w: any) => {
-                            const exercises = (w.exercises as any[]) || [];
-                            const muscleVolumes = exercises.reduce((acc: any[], ex: any) => {
-                              const mg = ex.muscle_group || "Outro";
-                              const sets = parseInt(ex.sets) || 0;
-                              const existing = acc.find((a: any) => a.muscleGroup === mg);
-                              if (existing) existing.volume += sets;
-                              else acc.push({ muscleGroup: mg, volume: sets });
-                              return acc;
-                            }, []);
-                            return (
-                              <Card key={w.id} className="bg-card border-border">
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="text-base text-primary flex items-center gap-2">
-                                    <Dumbbell className="h-4 w-4" />
-                                    Treino {w.name}
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                  <div className="space-y-1">
-                                    {exercises.map((ex: any, idx: number) => (
-                                      <div key={idx} className="flex items-center justify-between text-xs font-sans py-1 border-b border-border/50 last:border-0">
-                                        <span className="text-foreground font-medium">{ex.exercise_name || ex.name}</span>
-                                        <span className="text-muted-foreground">{ex.sets}x{ex.reps}</span>
-                                      </div>
-                                    ))}
+                      <Card key={cycle.id} className="bg-card border-border">
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-primary font-bold text-sm" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+                                CICLO {cycle.cycle_number}
+                              </h3>
+                              <Badge
+                                variant={cycle.status === "active" ? "default" : "outline"}
+                                className="text-[10px]"
+                              >
+                                {cycle.status === "active" ? "Ativo" : cycle.status === "completed" ? "Concluído" : "Futuro"}
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground font-sans">
+                              {format(parseISO(cycle.start_date), "dd/MM", { locale: ptBR })} — {format(parseISO(cycle.end_date), "dd/MM", { locale: ptBR })}
+                            </span>
+                          </div>
+
+                          {cycleWorkouts.length > 0 ? (
+                            <div className="space-y-2">
+                              {cycleWorkouts.map((w: any) => {
+                                const exercises = (w.exercises as any[]) || [];
+                                return (
+                                  <div key={w.id} className="flex items-center justify-between bg-secondary/30 rounded-md px-3 py-2">
+                                    <div className="flex items-center gap-2">
+                                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                                      <span className="text-sm font-sans text-foreground">{w.title || `Treino ${w.name}`}</span>
+                                      <Badge variant="outline" className="text-[10px]">{exercises.length} ex.</Badge>
+                                    </div>
                                   </div>
-                                  <BodyMap muscleVolumes={muscleVolumes} />
-                                </CardContent>
-                              </Card>
-                            );
-                          })}
-                        </div>
-                      </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Clock className="h-4 w-4" />
+                              <span className="text-sm font-sans">Nenhum treino prescrito</span>
+                            </div>
+                          )}
+
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant={cycleWorkouts.length > 0 ? "outline" : "default"}
+                              onClick={() => navigate(`${prefix}/workout/${cycle.id}`)}
+                            >
+                              {cycleWorkouts.length > 0 ? (
+                                <><Edit className="h-3.5 w-3.5 mr-1" />Editar Treinos</>
+                              ) : (
+                                <><Plus className="h-3.5 w-3.5 mr-1" />Prescrever Treino</>
+                              )}
+                            </Button>
+                          </div>
+
+                          {/* BodyMap por treino */}
+                          {cycleWorkouts.length > 0 && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2 border-t border-border/50">
+                              {cycleWorkouts.map((w: any) => {
+                                const exercises = (w.exercises as any[]) || [];
+                                const muscleVolumes = exercises.reduce((acc: any[], ex: any) => {
+                                  const mg = ex.muscle_group || "Outro";
+                                  const sets = parseInt(ex.sets) || 0;
+                                  const existing = acc.find((a: any) => a.muscleGroup === mg);
+                                  if (existing) existing.volume += sets;
+                                  else acc.push({ muscleGroup: mg, volume: sets });
+                                  return acc;
+                                }, []);
+                                return (
+                                  <div key={w.id} className="space-y-2">
+                                    <p className="text-xs font-sans font-medium text-muted-foreground">{w.title || `Treino ${w.name}`}</p>
+                                    <BodyMap muscleVolumes={muscleVolumes} />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
                     );
                   })}
                 </div>
