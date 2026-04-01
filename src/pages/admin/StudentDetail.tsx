@@ -351,8 +351,9 @@ export default function StudentDetail() {
     }
 
     const cycleIds = cycleData.map((c) => c.id);
-    const { data: workouts } = await supabase.from("workouts").select("cycle_id").in("cycle_id", cycleIds);
+    const { data: workouts } = await supabase.from("workouts").select("id, cycle_id, name, exercises, sort_order").in("cycle_id", cycleIds);
     const workoutCycleIds = new Set((workouts || []).map((w) => w.cycle_id));
+    setAllWorkouts(workouts || []);
 
     setCycles(cycleData.map((c) => ({ ...c, has_workout: workoutCycleIds.has(c.id) })));
 
