@@ -34,6 +34,7 @@ interface ProfileOption {
 interface TrainerPerformance {
   user_id: string;
   full_name: string;
+  role: string;
   activeStudents: number;
   workoutsByMonth: Record<string, number>; // "YYYY-MM" -> count
 }
