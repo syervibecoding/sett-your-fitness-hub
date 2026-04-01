@@ -36,6 +36,7 @@ interface WorkoutData {
   title: string;
   description: string | null;
   exercises: WorkoutExercise[];
+  day_of_week: number | null;
 }
 
 interface Cycle {
