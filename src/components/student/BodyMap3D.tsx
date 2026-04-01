@@ -28,7 +28,7 @@ interface MusclePartProps {
   region: string;
   color: string;
   position: [number, number, number];
-  args: [number, number, number?];
+  args: number[];
   type: "capsule" | "sphere";
   rotation?: [number, number, number];
   onHover?: (name: string | null) => void;
