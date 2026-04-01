@@ -701,22 +701,23 @@ export default function TeamManager() {
                 <div className="grid gap-4 md:grid-cols-2">
                   {trainerPerformance.map((t) => (
                     <Card key={t.user_id} className="bg-card border-border">
-                      <CardHeader className="pb-3">
-                         <div className="flex items-center gap-2">
-                           <CardTitle className="text-base font-sans flex items-center gap-2">
-                             <Users className="h-4 w-4 text-muted-foreground" />
-                             {t.full_name}
-                           </CardTitle>
-                           <span className={`text-xs font-sans font-medium px-2 py-0.5 rounded capitalize ${roleColors[t.role] || ""}`}>
-                             {roleLabels[t.role] || t.role}
-                           </span>
+                       <CardHeader className="pb-3">
+                         <div className="flex items-center justify-between">
+                           <div className="flex items-center gap-2">
+                             <CardTitle className="text-base font-sans flex items-center gap-2">
+                               <Users className="h-4 w-4 text-muted-foreground" />
+                               {t.full_name}
+                             </CardTitle>
+                             <span className={`text-xs font-sans font-medium px-2 py-0.5 rounded capitalize ${roleColors[t.role] || ""}`}>
+                               {roleLabels[t.role] || t.role}
+                             </span>
+                           </div>
+                           <Badge variant="secondary" className="gap-1">
+                             <Users className="h-3 w-3" />
+                             {t.activeStudents} {t.activeStudents === 1 ? "aluno" : "alunos"}
+                           </Badge>
                          </div>
-                          <Badge variant="secondary" className="gap-1">
-                            <Users className="h-3 w-3" />
-                            {t.activeStudents} {t.activeStudents === 1 ? "aluno" : "alunos"}
-                          </Badge>
-                        </div>
-                      </CardHeader>
+                       </CardHeader>
                       <CardContent>
                         <p className="text-xs text-muted-foreground font-sans mb-2 flex items-center gap-1">
                           <BarChart3 className="h-3 w-3" /> Prescrições por mês
