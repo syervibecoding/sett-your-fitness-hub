@@ -1,7 +1,5 @@
-import { useMemo, lazy, Suspense } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
-
-const BodyMap3D = lazy(() => import("./BodyMap3D").then(m => ({ default: m.BodyMap3D })));
+import { useMemo } from "react";
+import { BodyMap3D } from "./BodyMap3D";
 
 interface MuscleVolume {
   muscleGroup: string;
