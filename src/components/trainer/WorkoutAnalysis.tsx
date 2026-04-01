@@ -41,36 +41,18 @@ export function WorkoutAnalysis({ studentId }: Props) {
 
     const daysAgo = new Date();
     daysAgo.setDate(daysAgo.getDate() - parseInt(period));
-    const sinceDate = daysAgo.toISOString();
+    const sinceDate = daysAgo.toISOString().split("T")[0]; // YYYY-MM-DD for session_date comparison
 
-    // Load sessions
+    // Load sessions (if any)
     const { data: sessions } = await supabase
       .from("workout_sessions")
       .select("*")
       .eq("student_id", studentId)
-      .gte("created_at", sinceDate);
+      .gte("created_at", daysAgo.toISOString());
 
     const allSessions = sessions || [];
     const completedSessions = allSessions.filter(s => s.status === "completed");
     const abandonedSessions = allSessions.filter(s => s.status === "abandoned");
-
-    const totalDuration = completedSessions.reduce((sum, s) => sum + (s.duration_seconds || 0), 0);
-    const totalVolume = completedSessions.reduce((sum, s) => sum + Number(s.total_volume || 0), 0);
-
-    setSessionSummary({
-      total: allSessions.length,
-      completed: completedSessions.length,
-      abandoned: abandonedSessions.length,
-      avgDuration: completedSessions.length > 0 ? Math.round(totalDuration / completedSessions.length) : 0,
-      totalVolume,
-    });
-
-    // Load workout logs for this period
-    const { data: logs } = await supabase
-      .from("workout_logs")
-      .select("workout_id, exercise_index, weight, reps_done, set_number")
-      .eq("student_id", studentId)
-      .gte("created_at", sinceDate);
 
     // Load all workouts for this student (via enrollments -> cycles -> workouts)
     const { data: enrollments } = await supabase
@@ -102,37 +84,51 @@ export function WorkoutAnalysis({ studentId }: Props) {
       .select("id, exercises")
       .in("cycle_id", cycleIds);
 
-    // Get all exercise IDs from workouts
+    const workoutIds = (workouts || []).map(w => w.id);
+
+    // Load workout logs for this period - use session_date for filtering
+    const { data: logs } = await supabase
+      .from("workout_logs")
+      .select("workout_id, exercise_index, weight, reps_done, set_number, session_date")
+      .eq("student_id", studentId)
+      .in("workout_id", workoutIds)
+      .gte("session_date", sinceDate);
+
+    const filteredLogs = logs || [];
+
+    // Get all exercise IDs from workouts — support both exercise_id and exerciseId
     const exerciseIds = new Set<string>();
     const prescribedByExercise: Record<string, number> = {};
 
     (workouts || []).forEach(w => {
       const exercises = (w.exercises as any[]) || [];
       exercises.forEach(ex => {
-        if (ex.exerciseId) {
-          exerciseIds.add(ex.exerciseId);
+        const exId = ex.exercise_id || ex.exerciseId;
+        if (exId) {
+          exerciseIds.add(exId);
           const sets = parseInt(ex.sets) || 0;
-          prescribedByExercise[ex.exerciseId] = (prescribedByExercise[ex.exerciseId] || 0) + sets;
+          prescribedByExercise[exId] = (prescribedByExercise[exId] || 0) + sets;
         }
       });
     });
 
-    // Count executed sets per exercise from logs
-    const executedByExercise: Record<string, number> = {};
-    const volumeByExercise: Record<string, number> = {};
-    
     // Map workout_id + exercise_index to exerciseId
     const workoutExerciseMap: Record<string, string> = {};
     (workouts || []).forEach(w => {
       const exercises = (w.exercises as any[]) || [];
       exercises.forEach((ex, idx) => {
-        if (ex.exerciseId) {
-          workoutExerciseMap[`${w.id}_${idx}`] = ex.exerciseId;
+        const exId = ex.exercise_id || ex.exerciseId;
+        if (exId) {
+          workoutExerciseMap[`${w.id}_${idx}`] = exId;
         }
       });
     });
 
-    (logs || []).forEach(log => {
+    // Count executed sets and volume per exercise from logs
+    const executedByExercise: Record<string, number> = {};
+    const volumeByExercise: Record<string, number> = {};
+
+    filteredLogs.forEach(log => {
       const key = `${log.workout_id}_${log.exercise_index}`;
       const exId = workoutExerciseMap[key];
       if (exId) {
@@ -140,6 +136,31 @@ export function WorkoutAnalysis({ studentId }: Props) {
         volumeByExercise[exId] = (volumeByExercise[exId] || 0) + (Number(log.weight) || 0) * (Number(log.reps_done) || 0);
       }
     });
+
+    // Derive session summary from logs when no workout_sessions exist
+    const totalVolumeFromLogs = Object.values(volumeByExercise).reduce((s, v) => s + v, 0);
+    const uniqueSessionDates = new Set(filteredLogs.map(l => l.session_date).filter(Boolean));
+
+    if (allSessions.length > 0) {
+      const totalDuration = completedSessions.reduce((sum, s) => sum + (s.duration_seconds || 0), 0);
+      const totalVolume = completedSessions.reduce((sum, s) => sum + Number(s.total_volume || 0), 0);
+      setSessionSummary({
+        total: allSessions.length,
+        completed: completedSessions.length,
+        abandoned: abandonedSessions.length,
+        avgDuration: completedSessions.length > 0 ? Math.round(totalDuration / completedSessions.length) : 0,
+        totalVolume,
+      });
+    } else {
+      // Fallback: derive from workout_logs
+      setSessionSummary({
+        total: uniqueSessionDates.size,
+        completed: uniqueSessionDates.size,
+        abandoned: 0,
+        avgDuration: 0,
+        totalVolume: Math.round(totalVolumeFromLogs),
+      });
+    }
 
     if (exerciseIds.size === 0) {
       setMuscleData([]);
@@ -191,6 +212,7 @@ export function WorkoutAnalysis({ studentId }: Props) {
     : 0;
 
   const formatDuration = (seconds: number) => {
+    if (seconds === 0) return "—";
     const m = Math.floor(seconds / 60);
     return `${m}min`;
   };
