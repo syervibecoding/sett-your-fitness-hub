@@ -696,7 +696,7 @@ export default function TeamManager() {
                   <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : trainerPerformance.length === 0 ? (
-                <p className="text-muted-foreground font-sans text-center py-12">Nenhum treinador encontrado nesta empresa</p>
+                <p className="text-muted-foreground font-sans text-center py-12">Nenhum membro encontrado nesta empresa</p>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2">
                   {trainerPerformance.map((t) => (
