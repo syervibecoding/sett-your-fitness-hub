@@ -207,19 +207,25 @@ export default function TeamManager() {
 
     const companyUserIds = companyMembers.map((m) => m.user_id);
 
-    const { data: trainerRoles } = await supabase
+    const { data: memberRoles } = await supabase
       .from("user_roles")
-      .select("user_id")
-      .eq("role", "trainer")
+      .select("user_id, role")
+      .in("role", ["trainer", "coordinator", "admin"])
       .in("user_id", companyUserIds);
 
-    if (!trainerRoles || trainerRoles.length === 0) {
+    if (!memberRoles || memberRoles.length === 0) {
       setTrainerPerformance([]);
       setPerfLoading(false);
       return;
     }
 
-    const trainerIds = trainerRoles.map((r) => r.user_id);
+    // Deduplicate and build role map
+    const roleMap = new Map<string, string>();
+    for (const r of memberRoles) {
+      // Keep highest priority role for display
+      if (!roleMap.has(r.user_id)) roleMap.set(r.user_id, r.role);
+    }
+    const trainerIds = [...roleMap.keys()];
 
     // Get profiles, students, workouts in parallel
     const now = new Date();
