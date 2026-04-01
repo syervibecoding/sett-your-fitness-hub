@@ -199,6 +199,7 @@ export default function StudentDetail() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [cycles, setCycles] = useState<TrainingCycle[]>([]);
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
+  const [allWorkouts, setAllWorkouts] = useState<any[]>([]);
   const [asaasPayments, setAsaasPayments] = useState<AsaasPayment[]>([]);
   const [refreshingPayment, setRefreshingPayment] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
