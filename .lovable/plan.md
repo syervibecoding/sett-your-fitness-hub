@@ -1,36 +1,30 @@
 
 
-# Plano: Dados Simulados, Aba Treinos e BodyMap nas Análises
+# Plano: Prescrição inline na aba Treinos
 
-## 3 Entregas
+## O que muda
 
-### 1. Inserir dados simulados de treino para Syer Rodrigues
-- Criar uma migration SQL que insere `workout_logs` realistas para o aluno Syer Rodrigues
-- Buscar o `student_id`, `workout_id` e exercícios prescritos via subqueries
-- Gerar logs com pesos, repetições e datas variados nos últimos 30 dias
-- Isso fará os cards de sessões, aderência, volume e a tabela muscular mostrarem dados reais
+Substituir o conteúdo atual da aba "Treinos" no `StudentDetail.tsx` pelo mesmo layout usado na tela de Prescrição (`WorkoutPrescriptions.tsx`) quando um aluno é selecionado:
 
-### 2. Adicionar aba "Treinos" no detalhe do aluno
-- Nova aba entre "Programa" e "Análises" no `StudentDetail.tsx`
-- Conteúdo: lista dos treinos (A, B, C...) do ciclo ativo com exercícios, séries, reps e notas
-- Cada treino mostra o BodyMap com distribuição muscular daquele treino específico
-- Link para abrir o WorkoutBuilder do ciclo correspondente
+- Cards por ciclo com header (CICLO N + badge Ativo/Concluído/Futuro + datas)
+- Lista de treinos com check icon, nome e contagem de exercícios
+- Botão "Editar Treinos" (se já tem treinos) ou "Prescrever Treino" (se vazio)
+- Botão navega para `/admin/workout/{cycleId}` (WorkoutBuilder)
+- Manter o BodyMap abaixo da lista de exercícios em cada treino (diferencial que já existe)
 
-### 3. Substituir tabela muscular por BodyMap na aba Análises
-- No `WorkoutAnalysis.tsx`, trocar a tabela "Volume por Grupamento Muscular" pelo componente `BodyMap` já existente
-- Passar os dados de `muscleData` (nome + totalVolume) para o `BodyMap`
-- Manter os cards de resumo (sessões, aderência, duração, volume) e a barra de aderência
-- Manter os alertas de sub/sobre-treinamento abaixo do BodyMap
-- Layout: BodyMap centralizado com a legenda de calor, seguido pela lista de alertas
+## Arquivo: `src/pages/admin/StudentDetail.tsx`
 
-## Detalhes técnicos
+### Mudanças na aba "Treinos" (linhas ~1106-1165)
 
-**Arquivos modificados:**
-- `supabase/migrations/` — nova migration para inserir workout_logs simulados
-- `src/pages/admin/StudentDetail.tsx` — adicionar TabsTrigger "Treinos" e TabsContent com lista de treinos + BodyMap por treino
-- `src/components/trainer/WorkoutAnalysis.tsx` — importar `BodyMap`, substituir `<Table>` pela visualização com bonecos
+1. Buscar todos os ciclos da matrícula ativa (não filtrar apenas `has_workout`)
+2. Renderizar cards por ciclo no formato da WorkoutPrescriptions:
+   - Header: "CICLO {n}" em Bebas Neue + Badge de status + datas dd/MM
+   - Se tem workouts: listar com CheckCircle2 + nome + badge "N ex."
+   - Se não tem: mostrar Clock + "Nenhum treino prescrito"
+   - Botão Editar/Prescrever que navega para `{prefix}/workout/{cycle.id}`
+3. Remover o botão "Abrir Prescrição" com ExternalLink (não navega mais para outra página)
+4. Manter BodyMap por treino expandível ou inline abaixo de cada workout card
 
-**Componente `BodyMap` já existe** em `src/components/student/BodyMap.tsx` com SVG frente/costas e heatmap por intensidade. Só precisa receber os dados corretos do `WorkoutAnalysis`.
-
-**Mapeamento de nomes:** O BodyMap já suporta nomes como "Quadríceps", "Peitoral", "Dorsal", "Bíceps", "Tríceps", "Panturrilha", "Glúteos" via fuzzy match — compatível com os nomes vindos da tabela `muscle_groups`.
+### Sem mudanças em queries ou estados
+- Usa `cycles` e `allWorkouts` já carregados
 
