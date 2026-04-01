@@ -171,7 +171,14 @@ export default function StudentPortal() {
         });
         const chosen = activeCycle || enriched[0];
         setSelectedCycle(chosen);
-        if (chosen.workouts.length > 0) setSelectedWorkoutId(chosen.workouts[0].id);
+        // Auto-select today's workout based on day_of_week
+        const todayDow = new Date().getDay();
+        const todaysWorkout = chosen.workouts.find(w => w.day_of_week === todayDow);
+        if (todaysWorkout) {
+          setSelectedWorkoutId(todaysWorkout.id);
+        } else if (chosen.workouts.length > 0) {
+          setSelectedWorkoutId(chosen.workouts[0].id);
+        }
 
         // Load logs
         const workoutIds = workoutsData?.map(w => w.id) || [];
