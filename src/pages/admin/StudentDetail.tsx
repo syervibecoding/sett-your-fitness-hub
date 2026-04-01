@@ -798,6 +798,7 @@ export default function StudentDetail() {
           <TabsList className="w-full justify-start overflow-x-auto flex-nowrap h-auto p-1">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Visão Geral</TabsTrigger>
             <TabsTrigger value="program" className="text-xs sm:text-sm">Programa</TabsTrigger>
+            <TabsTrigger value="workouts" className="text-xs sm:text-sm">Treinos</TabsTrigger>
             <TabsTrigger value="analytics" className="text-xs sm:text-sm">Análises</TabsTrigger>
             <TabsTrigger value="anamnesis" className="text-xs sm:text-sm">Anamnese</TabsTrigger>
             <TabsTrigger value="financial" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
