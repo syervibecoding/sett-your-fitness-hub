@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 import { WorkoutAnalysis } from "@/components/trainer/WorkoutAnalysis";
 import { TrainerWeeklyBar } from "@/components/trainer/TrainerWeeklyBar";
+import { BodyMap } from "@/components/student/BodyMap";
 
 interface Student {
   id: string;
