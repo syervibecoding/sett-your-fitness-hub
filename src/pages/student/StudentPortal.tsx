@@ -17,6 +17,7 @@ import { WorkoutSummary } from "@/components/student/WorkoutSummary";
 import { ExerciseCard } from "@/components/student/ExerciseCard";
 import { StatsCharts } from "@/components/student/StatsCharts";
 import { useRestTimer } from "@/components/student/RestTimer";
+import { WeeklyBar } from "@/components/student/WeeklyBar";
 
 interface WorkoutExercise {
   exercise_id: string;
@@ -35,6 +36,7 @@ interface WorkoutData {
   title: string;
   description: string | null;
   exercises: WorkoutExercise[];
+  day_of_week: number | null;
 }
 
 interface Cycle {
@@ -121,7 +123,7 @@ export default function StudentPortal() {
       if (cyclesData && cyclesData.length > 0) {
         const { data: workoutsData } = await supabase
           .from("workouts")
-          .select("id, title, description, exercises, cycle_id")
+          .select("id, title, description, exercises, cycle_id, day_of_week")
           .in("cycle_id", cyclesData.map(c => c.id));
 
         const exerciseIds = new Set<string>();
@@ -150,6 +152,7 @@ export default function StudentPortal() {
               id: w.id,
               title: w.title,
               description: w.description,
+              day_of_week: (w as any).day_of_week as number | null,
               exercises: ((w.exercises as unknown as WorkoutExercise[]) || []).map(ex => ({
                 ...ex,
                 video_url: (ex.video_url && ex.video_url.trim()) || videoMap[ex.exercise_id]?.video_url || null,
@@ -168,7 +171,14 @@ export default function StudentPortal() {
         });
         const chosen = activeCycle || enriched[0];
         setSelectedCycle(chosen);
-        if (chosen.workouts.length > 0) setSelectedWorkoutId(chosen.workouts[0].id);
+        // Auto-select today's workout based on day_of_week
+        const todayDow = new Date().getDay();
+        const todaysWorkout = chosen.workouts.find(w => w.day_of_week === todayDow);
+        if (todaysWorkout) {
+          setSelectedWorkoutId(todaysWorkout.id);
+        } else if (chosen.workouts.length > 0) {
+          setSelectedWorkoutId(chosen.workouts[0].id);
+        }
 
         // Load logs
         const workoutIds = workoutsData?.map(w => w.id) || [];
@@ -441,6 +451,64 @@ export default function StudentPortal() {
 
                 {selectedCycle.workouts.length > 0 ? (
                   <div className="space-y-3">
+                    {/* Weekly Bar */}
+                    {(() => {
+                      const scheduledDays = new Map<number, string>();
+                      selectedCycle.workouts.forEach(w => {
+                        if (w.day_of_week !== null && w.day_of_week !== undefined) {
+                          scheduledDays.set(w.day_of_week, w.id);
+                        }
+                      });
+
+                      // Compute completed days this week from logs
+                      const now = new Date();
+                      const jsDow = now.getDay(); // 0=Sun
+                      // Start of week (Monday)
+                      const mondayOffset = jsDow === 0 ? -6 : 1 - jsDow;
+                      const weekStart = new Date(now);
+                      weekStart.setDate(now.getDate() + mondayOffset);
+                      weekStart.setHours(0, 0, 0, 0);
+                      const weekEnd = new Date(weekStart);
+                      weekEnd.setDate(weekStart.getDate() + 6);
+                      weekEnd.setHours(23, 59, 59, 999);
+
+                      const completedDays = new Set<number>();
+                      const workoutDowMap = new Map<string, number>();
+                      selectedCycle.workouts.forEach(w => {
+                        if (w.day_of_week !== null && w.day_of_week !== undefined) {
+                          workoutDowMap.set(w.id, w.day_of_week);
+                        }
+                      });
+
+                      allLogs.forEach((l: any) => {
+                        if (l.session_date && workoutDowMap.has(l.workout_id)) {
+                          const logDate = new Date(l.session_date + "T12:00:00");
+                          if (logDate >= weekStart && logDate <= weekEnd) {
+                            completedDays.add(workoutDowMap.get(l.workout_id)!);
+                          }
+                        }
+                      });
+
+                      const selectedDow = selectedWorkout?.day_of_week ?? null;
+
+                      if (scheduledDays.size === 0) return null;
+
+                      return (
+                        <WeeklyBar
+                          scheduledDays={scheduledDays}
+                          completedDays={completedDays}
+                          currentDayOfWeek={jsDow}
+                          selectedDayOfWeek={selectedDow}
+                          onDayClick={(dow) => {
+                            const wId = scheduledDays.get(dow);
+                            if (wId) {
+                              setSelectedWorkoutId(wId);
+                              setExpandedExercise(null);
+                            }
+                          }}
+                        />
+                      );
+                    })()}
                     {/* Workout tabs */}
                     {selectedCycle.workouts.length > 1 && (
                       <div className="flex gap-2 overflow-x-auto pb-1">
