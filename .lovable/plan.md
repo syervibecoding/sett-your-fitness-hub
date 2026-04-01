@@ -1,30 +1,59 @@
 
 
-# Plano: Prescrição inline na aba Treinos
+# Plano: BodyMap 3D Interativo com React Three Fiber
 
-## O que muda
+## Visão geral
 
-Substituir o conteúdo atual da aba "Treinos" no `StudentDetail.tsx` pelo mesmo layout usado na tela de Prescrição (`WorkoutPrescriptions.tsx`) quando um aluno é selecionado:
+Substituir o SVG atual por um modelo 3D de corpo humano construído com primitivas geométricas do Three.js (capsules, spheres, cylinders) posicionadas anatomicamente. O usuário poderá rotacionar o modelo arrastando, vendo frente e costas em um único viewport.
 
-- Cards por ciclo com header (CICLO N + badge Ativo/Concluído/Futuro + datas)
-- Lista de treinos com check icon, nome e contagem de exercícios
-- Botão "Editar Treinos" (se já tem treinos) ou "Prescrever Treino" (se vazio)
-- Botão navega para `/admin/workout/{cycleId}` (WorkoutBuilder)
-- Manter o BodyMap abaixo da lista de exercícios em cada treino (diferencial que já existe)
+## Dependências
 
-## Arquivo: `src/pages/admin/StudentDetail.tsx`
+- `three@^0.160` — motor 3D
+- `@react-three/fiber@^8.18` — binding React (v8 para React 18)
+- `@react-three/drei@^9.122.0` — helpers (OrbitControls, RoundedBox, Capsule)
 
-### Mudanças na aba "Treinos" (linhas ~1106-1165)
+## Arquitetura
 
-1. Buscar todos os ciclos da matrícula ativa (não filtrar apenas `has_workout`)
-2. Renderizar cards por ciclo no formato da WorkoutPrescriptions:
-   - Header: "CICLO {n}" em Bebas Neue + Badge de status + datas dd/MM
-   - Se tem workouts: listar com CheckCircle2 + nome + badge "N ex."
-   - Se não tem: mostrar Clock + "Nenhum treino prescrito"
-   - Botão Editar/Prescrever que navega para `{prefix}/workout/{cycle.id}`
-3. Remover o botão "Abrir Prescrição" com ExternalLink (não navega mais para outra página)
-4. Manter BodyMap por treino expandível ou inline abaixo de cada workout card
+```text
+BodyMap.tsx (mantém interface + lógica de cores)
+└── BodyMap3D.tsx (novo componente)
+    ├── <Canvas> com OrbitControls (rotação horizontal)
+    ├── <HumanBody> — grupo de meshes por região muscular
+    │   ├── Head (sphere, cor neutra fixa)
+    │   ├── Chest (2x rounded capsules, cor dinâmica)
+    │   ├── Shoulders (2x spheres)
+    │   ├── Biceps / Triceps (capsules, posição braço)
+    │   ├── Forearms (capsules menores)
+    │   ├── Abs (stack de capsules achatadas)
+    │   ├── Upper/Lower Back (capsules traseiras)
+    │   ├── Glutes (2x spheres)
+    │   ├── Quads / Hamstrings (capsules perna)
+    │   └── Calves (capsules)
+    └── Iluminação ambiente + direcional suave
+```
 
-### Sem mudanças em queries ou estados
-- Usa `cycles` e `allWorkouts` já carregados
+## Detalhes
+
+### Novo: `src/components/student/BodyMap3D.tsx`
+- Componente `<Canvas>` com fundo transparente, câmera posicionada de frente
+- `OrbitControls` limitado a rotação horizontal (azimuth livre, polar travado) para que o usuário gire e veja frente/costas
+- Cada grupo muscular é um `<mesh>` com geometria Capsule/Sphere do drei
+- Material `MeshStandardMaterial` com cor vinda do heatmap (mesma função `getHeatColor`)
+- Emissão leve (emissive) nos músculos ativos para efeito de "brilho"
+- Tooltip via `onPointerOver` mostrando nome do músculo + volume
+
+### Alteração: `src/components/student/BodyMap.tsx`
+- Importar `BodyMap3D` com lazy loading (`React.lazy` + `Suspense`)
+- Substituir os dois SVGs pelo componente 3D único
+- Manter legenda de calor e lista de volumes abaixo
+- Fallback: skeleton loader enquanto carrega o Three.js
+
+### Sem mudanças em outros arquivos
+- `StudentDetail.tsx` e `WorkoutAnalysis.tsx` continuam passando `muscleVolumes` normalmente
+
+## Resultado esperado
+- Corpo humano 3D com formas anatômicas arredondadas (não blocos retangulares)
+- Heatmap de cores por grupo muscular
+- Rotação livre por arraste para ver frente/costas/lados
+- Leve, sem modelo .glb externo — tudo construído com primitivas
 
