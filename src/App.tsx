@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { MasterProvider } from "@/contexts/MasterContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { FeatureRoute } from "@/components/FeatureRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Lazy load all pages
 const Auth = lazy(() => import("./pages/Auth"));
@@ -77,6 +78,7 @@ const App = () => (
         <AuthProvider>
         <ThemeProvider>
         <MasterProvider>
+        <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/auth" element={<Auth />} />
@@ -133,6 +135,7 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
         </Routes>
         </Suspense>
+        </ErrorBoundary>
         </MasterProvider>
         </ThemeProvider>
         </AuthProvider>
