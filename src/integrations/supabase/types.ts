@@ -435,8 +435,11 @@ export type Database = {
           created_at: string
           cycle_duration_days: number | null
           end_date: string | null
+          financial_notes: string | null
           id: string
           notes: string | null
+          payment_date: string | null
+          payment_method: string | null
           payment_status: string | null
           plan_id: string | null
           start_date: string | null
@@ -451,8 +454,11 @@ export type Database = {
           created_at?: string
           cycle_duration_days?: number | null
           end_date?: string | null
+          financial_notes?: string | null
           id?: string
           notes?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
           payment_status?: string | null
           plan_id?: string | null
           start_date?: string | null
@@ -467,8 +473,11 @@ export type Database = {
           created_at?: string
           cycle_duration_days?: number | null
           end_date?: string | null
+          financial_notes?: string | null
           id?: string
           notes?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
           payment_status?: string | null
           plan_id?: string | null
           start_date?: string | null
@@ -1078,6 +1087,7 @@ export type Database = {
           body_fat_percentage: number | null
           company_id: string | null
           created_at: string
+          created_by: string | null
           evaluation_date: string | null
           evaluator_id: string | null
           file_url: string | null
@@ -1095,6 +1105,7 @@ export type Database = {
           body_fat_percentage?: number | null
           company_id?: string | null
           created_at?: string
+          created_by?: string | null
           evaluation_date?: string | null
           evaluator_id?: string | null
           file_url?: string | null
@@ -1112,6 +1123,7 @@ export type Database = {
           body_fat_percentage?: number | null
           company_id?: string | null
           created_at?: string
+          created_by?: string | null
           evaluation_date?: string | null
           evaluator_id?: string | null
           file_url?: string | null
