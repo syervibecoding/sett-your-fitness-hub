@@ -46,7 +46,16 @@ export default function TrainerDashboard() {
 
   useEffect(() => { if (user) loadData(); }, [user]);
 
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && user) loadData();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [user]);
+
   const loadData = async () => {
+    await supabase.rpc("advance_training_cycles");
     const { data: enroll } = await supabase
       .from("enrollments")
       .select("*, students(full_name), plans(name, duration_weeks)")
