@@ -1,34 +1,30 @@
 
+# Plano: Corrigir cálculo de ciclos de treino
 
-# Plano: Corrigir bugs nas Avaliações e Financeiro
+## Problema
+A função `generate_training_cycles` gera ciclos demais porque usa `end_date` da matrícula (data financeira/contratual) em vez de calcular o fim baseado na `duration_days` do plano a partir da `training_start_date`.
 
-## Problemas identificados
+Exemplo da Adrielly:
+- `training_start_date` = 22/02/2026
+- `end_date` (financeiro) = 13/02/2027
+- Plano: 48 semanas = 336 dias, ciclos de 42 dias → **deveria ter 8 ciclos** (336 / 42 = 8)
+- Mas como `end_date` é 21 dias depois de `training_start_date + 336`, gera **9 ciclos** (o 9º parcial)
 
-### Bug 1: Erro ao salvar avaliação (foto/áudio/texto)
-A tabela `student_evaluations` **não possui** a coluna `created_by`. O código em `StudentDetail.tsx` tenta inserir `created_by: session.user.id` nas linhas 646 e 694, causando erro no banco.
-
-### Bug 2: Erro ao salvar informações financeiras
-A tabela `enrollments` **não possui** as colunas `financial_notes`, `payment_date` e `payment_method`. O código tenta fazer update dessas colunas (linha 608-611), causando o erro visível no screenshot: *"Could not find the 'financial_notes' column of 'enrollments'"*.
+Outros afetados: Beatriz Dutra, Bianca Borges, e outros com `training_start_date` diferente de `start_date`.
 
 ## Solução
 
-### Migração SQL — adicionar colunas faltantes
+### Migração SQL — corrigir a função `generate_training_cycles`
+Remover a linha que sobrescreve `v_end` com `NEW.end_date`. Os ciclos devem ser calculados exclusivamente com base em:
+- **Início**: `training_start_date`
+- **Fim**: `training_start_date + duration_days - 1` (do plano)
 
-```sql
--- Avaliações: adicionar evaluator_id que já existe, mas created_by não
-ALTER TABLE public.student_evaluations
-ADD COLUMN IF NOT EXISTS created_by uuid;
+Isso separa corretamente:
+- **Ciclos de treino**: baseados no plano (duração + ciclo)
+- **Data de renovação financeira**: `start_date` / `end_date` na matrícula
 
--- Financeiro: adicionar colunas ao enrollments
-ALTER TABLE public.enrollments
-ADD COLUMN IF NOT EXISTS financial_notes text,
-ADD COLUMN IF NOT EXISTS payment_date date,
-ADD COLUMN IF NOT EXISTS payment_method text;
-```
-
-### Código — nenhuma alteração necessária
-O código já está correto; apenas faltam as colunas no banco. Após a migração, tudo funcionará.
+### Recalcular ciclos existentes
+Após corrigir a função, executar um recálculo dos ciclos que estão errados (onde `cycle_count > duration_days / cycle_duration_days`). Isso será feito via UPDATE no `training_start_date` para o mesmo valor, o que dispara o trigger e recalcula.
 
 ## Arquivos alterados
-- Nova migração SQL (colunas `created_by` em `student_evaluations`, `financial_notes`/`payment_date`/`payment_method` em `enrollments`)
-
+- Nova migração SQL: atualiza `generate_training_cycles()` e recalcula ciclos existentes
