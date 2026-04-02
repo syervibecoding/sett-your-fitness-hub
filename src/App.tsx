@@ -78,6 +78,7 @@ const App = () => (
         <AuthProvider>
         <ThemeProvider>
         <MasterProvider>
+        <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/auth" element={<Auth />} />
