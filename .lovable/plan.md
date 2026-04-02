@@ -1,30 +1,63 @@
 
-# Plano: Corrigir cálculo de ciclos de treino
+# Plano: Sincronizar "Troca de Treino" no Dashboard
 
 ## Problema
-A função `generate_training_cycles` gera ciclos demais porque usa `end_date` da matrícula (data financeira/contratual) em vez de calcular o fim baseado na `duration_days` do plano a partir da `training_start_date`.
+O campo "TROCA DE TREINO" no dashboard mostra dados desatualizados porque:
 
-Exemplo da Adrielly:
-- `training_start_date` = 22/02/2026
-- `end_date` (financeiro) = 13/02/2027
-- Plano: 48 semanas = 336 dias, ciclos de 42 dias → **deveria ter 8 ciclos** (336 / 42 = 8)
-- Mas como `end_date` é 21 dias depois de `training_start_date + 336`, gera **9 ciclos** (o 9º parcial)
-
-Outros afetados: Beatriz Dutra, Bianca Borges, e outros com `training_start_date` diferente de `start_date`.
+1. **Ciclos nunca avançam de status**: A função `generate_training_cycles` cria o ciclo 1 como `active` e todos os demais como `pending`. Não existe nenhum mecanismo (trigger, cron, ou lógica no front) que mude o ciclo 2 para `active` quando o ciclo 1 vence.
+2. **Dashboard não recarrega**: O `loadData()` só roda no mount ou quando `effectiveCompanyId` muda — navegar para alunos e voltar não atualiza.
 
 ## Solução
 
-### Migração SQL — corrigir a função `generate_training_cycles`
-Remover a linha que sobrescreve `v_end` com `NEW.end_date`. Os ciclos devem ser calculados exclusivamente com base em:
-- **Início**: `training_start_date`
-- **Fim**: `training_start_date + duration_days - 1` (do plano)
+### 1. Migração SQL — função para avançar ciclos automaticamente
+Criar uma função `advance_training_cycles()` que:
+- Marca como `completed` todos os ciclos com `status = 'active'` e `end_date < CURRENT_DATE`
+- Ativa o próximo ciclo (`pending` com menor `cycle_number`) da mesma matrícula
+- É chamada via trigger (BEFORE SELECT não existe no PG), então a melhor abordagem é chamá-la no front-end antes de renderizar o dashboard
 
-Isso separa corretamente:
-- **Ciclos de treino**: baseados no plano (duração + ciclo)
-- **Data de renovação financeira**: `start_date` / `end_date` na matrícula
+Alternativamente (mais confiável): executar a lógica de avanço diretamente no front-end ao carregar o dashboard, com uma chamada RPC.
 
-### Recalcular ciclos existentes
-Após corrigir a função, executar um recálculo dos ciclos que estão errados (onde `cycle_count > duration_days / cycle_duration_days`). Isso será feito via UPDATE no `training_start_date` para o mesmo valor, o que dispara o trigger e recalcula.
+```sql
+CREATE OR REPLACE FUNCTION public.advance_training_cycles()
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  -- Mark expired active cycles as completed
+  UPDATE training_cycles SET status = 'completed'
+  WHERE status = 'active' AND end_date < CURRENT_DATE;
+
+  -- Activate next pending cycle for each enrollment
+  UPDATE training_cycles tc SET status = 'active'
+  FROM (
+    SELECT DISTINCT ON (enrollment_id) id
+    FROM training_cycles
+    WHERE status = 'pending'
+    AND enrollment_id IN (
+      SELECT enrollment_id FROM training_cycles
+      WHERE status = 'completed'
+      AND NOT EXISTS (
+        SELECT 1 FROM training_cycles tc2
+        WHERE tc2.enrollment_id = training_cycles.enrollment_id AND tc2.status = 'active'
+      )
+    )
+    ORDER BY enrollment_id, cycle_number
+  ) next_cycle
+  WHERE tc.id = next_cycle.id;
+END;
+$$;
+```
+
+### 2. Código — chamar `advance_training_cycles()` no dashboard
+Em `AdminDashboard.tsx`, no início de `loadData()`, adicionar:
+```ts
+await supabase.rpc("advance_training_cycles");
+```
+
+Isso garante que ao abrir o dashboard, os ciclos vencidos são finalizados e os próximos ativados antes de exibir os countdowns.
+
+### 3. Código — forçar refresh ao voltar para o dashboard
+Adicionar listener de `visibilitychange` ou usar `useEffect` com dependência na rota para recarregar dados quando o usuário navega de volta ao dashboard.
 
 ## Arquivos alterados
-- Nova migração SQL: atualiza `generate_training_cycles()` e recalcula ciclos existentes
+- Nova migração SQL: cria `advance_training_cycles()`
+- `src/pages/admin/AdminDashboard.tsx`: chama RPC no início de `loadData()` + adiciona refresh automático
+- `src/pages/trainer/TrainerDashboard.tsx`: mesmo tratamento (se usar ciclos)
