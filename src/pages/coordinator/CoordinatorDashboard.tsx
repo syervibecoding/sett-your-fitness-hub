@@ -98,7 +98,6 @@ export default function CoordinatorDashboard() {
       trainer_id: null,
       start_date: format(startDate, "yyyy-MM-dd"),
       end_date: format(endDate, "yyyy-MM-dd"),
-      created_by: user!.id,
       company_id: companyId,
     });
 
