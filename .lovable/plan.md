@@ -1,27 +1,34 @@
 
 
-# Plano: Melhorias na aba Equipe
+# Plano: Corrigir bugs nas Avaliações e Financeiro
 
-## Problema 1: Alunos aparecendo na lista da Equipe
-A função `loadTeam()` carrega todos os `company_members` e seus `user_roles`, filtrando apenas masters. Alunos com `user_id` (que tiveram acesso ativado) aparecem na lista da equipe com badge "student". O login do aluno já está no `StudentDetail.tsx` — então basta filtrar alunos fora da lista de equipe.
+## Problemas identificados
 
-### Mudança em `TeamManager.tsx`
-- Na função `loadTeam()`, após buscar os roles (linha ~137), filtrar também os user_ids que possuem **apenas** o role `student` — ou seja, se o usuário tem role `student` e nenhum outro role (admin/coordinator/trainer), não mostrar na lista.
-- Ajustar o loop que constrói `grouped` para ignorar entries com role `"student"`.
+### Bug 1: Erro ao salvar avaliação (foto/áudio/texto)
+A tabela `student_evaluations` **não possui** a coluna `created_by`. O código em `StudentDetail.tsx` tenta inserir `created_by: session.user.id` nas linhas 646 e 694, causando erro no banco.
 
-## Problema 2: Performance só mostra treinadores
-A função `loadPerformance()` filtra apenas `role = "trainer"` (linha 198). Coordenadores e admins que também prescrevem treinos ficam de fora.
+### Bug 2: Erro ao salvar informações financeiras
+A tabela `enrollments` **não possui** as colunas `financial_notes`, `payment_date` e `payment_method`. O código tenta fazer update dessas colunas (linha 608-611), causando o erro visível no screenshot: *"Could not find the 'financial_notes' column of 'enrollments'"*.
 
-### Mudança em `TeamManager.tsx`
-- Na função `loadPerformance()`, buscar roles `trainer`, `coordinator` e `admin` em vez de apenas `trainer`.
-- Usar `.in("role", ["trainer", "coordinator", "admin"])` na query de `user_roles`.
-- Ajustar o label da aba/mensagem vazia de "Nenhum treinador encontrado" para "Nenhum membro encontrado".
-- Adicionar um badge com o role de cada membro no card de performance para diferenciar.
+## Solução
+
+### Migração SQL — adicionar colunas faltantes
+
+```sql
+-- Avaliações: adicionar evaluator_id que já existe, mas created_by não
+ALTER TABLE public.student_evaluations
+ADD COLUMN IF NOT EXISTS created_by uuid;
+
+-- Financeiro: adicionar colunas ao enrollments
+ALTER TABLE public.enrollments
+ADD COLUMN IF NOT EXISTS financial_notes text,
+ADD COLUMN IF NOT EXISTS payment_date date,
+ADD COLUMN IF NOT EXISTS payment_method text;
+```
+
+### Código — nenhuma alteração necessária
+O código já está correto; apenas faltam as colunas no banco. Após a migração, tudo funcionará.
 
 ## Arquivos alterados
-- `src/pages/admin/TeamManager.tsx` — único arquivo modificado
-
-## Resultado
-- Lista de equipe mostra apenas admin, coordenador e treinador (sem alunos)
-- Quadro de performance inclui admin, coordenador e treinador
+- Nova migração SQL (colunas `created_by` em `student_evaluations`, `financial_notes`/`payment_date`/`payment_method` em `enrollments`)
 
