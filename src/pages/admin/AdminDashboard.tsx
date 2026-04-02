@@ -43,7 +43,18 @@ export default function AdminDashboard() {
 
   useEffect(() => { loadData(); }, [effectiveCompanyId]);
 
+  // Refresh data when tab becomes visible (user navigates back)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") loadData();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [effectiveCompanyId]);
+
   const loadData = async () => {
+    // Advance expired cycles before loading dashboard data
+    await supabase.rpc("advance_training_cycles");
     const thirtyDaysFromNow = format(addDays(new Date(), 30), "yyyy-MM-dd");
 
     // Build queries with optional company filter
