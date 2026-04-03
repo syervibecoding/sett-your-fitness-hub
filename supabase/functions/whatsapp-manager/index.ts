@@ -168,17 +168,28 @@ Deno.serve(async (req) => {
       }
 
       // Try to connect existing instance
+      console.log("[init-connection] Connecting existing instance:", instanceName);
       const connectRes = await fetch(`${evoUrl}/instance/connect/${instanceName}`, {
         headers: evoHeaders,
       });
-      const connectData = await connectRes.json();
 
-      const qr = connectData?.base64 || null;
+      if (!connectRes.ok) {
+        const errText = await connectRes.text();
+        console.error("[init-connection] connect failed:", connectRes.status, errText);
+        // Connection endpoint failed — destroy and recreate
+        await destroyInstance();
+        return await createFreshInstance();
+      }
+
+      const connectData = await connectRes.json();
+      console.log("[init-connection] connect response:", JSON.stringify(connectData));
+
+      const qr = connectData?.base64 || connectData?.qrcode?.base64 || null;
       const state = connectData?.instance?.state || "waiting_qr";
 
       // If stuck (no QR and not open), destroy and recreate
       if (state !== "open" && !qr) {
-        console.log("Instance stuck without QR, destroying and recreating...");
+        console.log("[init-connection] Instance stuck without QR, destroying and recreating...");
         await destroyInstance();
         return await createFreshInstance();
       }
