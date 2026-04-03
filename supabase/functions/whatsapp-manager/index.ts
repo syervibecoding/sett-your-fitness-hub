@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
 
     // ─── Helper: create fresh instance ───
     const createFreshInstance = async () => {
+      console.log("[createFreshInstance] Creating instance:", instanceName);
       const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/whatsapp-webhook`;
       const createRes = await fetch(`${evoUrl}/instance/create`, {
         method: "POST",
@@ -100,7 +101,7 @@ Deno.serve(async (req) => {
       }
 
       const createData = await createRes.json();
-
+      console.log("[createFreshInstance] Response:", JSON.stringify(createData));
       await adminClient.from("whatsapp_instances").upsert(
         {
           instance_name: instanceName,
@@ -168,17 +169,28 @@ Deno.serve(async (req) => {
       }
 
       // Try to connect existing instance
+      console.log("[init-connection] Connecting existing instance:", instanceName);
       const connectRes = await fetch(`${evoUrl}/instance/connect/${instanceName}`, {
         headers: evoHeaders,
       });
-      const connectData = await connectRes.json();
 
-      const qr = connectData?.base64 || null;
+      if (!connectRes.ok) {
+        const errText = await connectRes.text();
+        console.error("[init-connection] connect failed:", connectRes.status, errText);
+        // Connection endpoint failed — destroy and recreate
+        await destroyInstance();
+        return await createFreshInstance();
+      }
+
+      const connectData = await connectRes.json();
+      console.log("[init-connection] connect response:", JSON.stringify(connectData));
+
+      const qr = connectData?.base64 || connectData?.qrcode?.base64 || null;
       const state = connectData?.instance?.state || "waiting_qr";
 
       // If stuck (no QR and not open), destroy and recreate
       if (state !== "open" && !qr) {
-        console.log("Instance stuck without QR, destroying and recreating...");
+        console.log("[init-connection] Instance stuck without QR, destroying and recreating...");
         await destroyInstance();
         return await createFreshInstance();
       }
@@ -218,7 +230,8 @@ Deno.serve(async (req) => {
       );
 
       // Small delay to let Evolution clean up
-      await new Promise(r => setTimeout(r, 1500));
+      // Increased delay to give Evolution API time to clean up
+      await new Promise(r => setTimeout(r, 3000));
 
       return await createFreshInstance();
     }
