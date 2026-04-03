@@ -229,7 +229,8 @@ Deno.serve(async (req) => {
       );
 
       // Small delay to let Evolution clean up
-      await new Promise(r => setTimeout(r, 1500));
+      // Increased delay to give Evolution API time to clean up
+      await new Promise(r => setTimeout(r, 3000));
 
       return await createFreshInstance();
     }
