@@ -1,63 +1,38 @@
 
-# Plano: Sincronizar "Troca de Treino" no Dashboard
 
-## Problema
-O campo "TROCA DE TREINO" no dashboard mostra dados desatualizados porque:
+# Plano: Alinhar WhatsApp Manager com projeto BN Performance (referência funcional)
 
-1. **Ciclos nunca avançam de status**: A função `generate_training_cycles` cria o ciclo 1 como `active` e todos os demais como `pending`. Não existe nenhum mecanismo (trigger, cron, ou lógica no front) que mude o ciclo 2 para `active` quando o ciclo 1 vence.
-2. **Dashboard não recarrega**: O `loadData()` só roda no mount ou quando `effectiveCompanyId` muda — navegar para alunos e voltar não atualiza.
+## Diferenças encontradas
+
+Comparei linha a linha os dois projetos. A edge function é quase idêntica, mas há diferenças sutis que podem causar o problema:
+
+### 1. Falta de verificação `connectRes.ok` (linha 174)
+No projeto atual, após `fetch(connect/${instanceName})`, o código faz `connectRes.json()` sem verificar se a resposta HTTP foi bem-sucedida. Se a Evolution retorna erro HTTP (ex: 404, 500), o `json()` pode falhar silenciosamente ou retornar dados inesperados.
+
+### 2. Polling interval diferente
+- BN Performance: `setInterval(checkStatus, 5000)` (5s)
+- Projeto atual: `setInterval(checkStatus, 10000)` (10s)
+
+O QR code da Evolution API expira rapidamente (~40s). Com polling a cada 10s, o front pode não detectar a conexão a tempo.
+
+### 3. Front-end tem `handleRestart` que destrói e recria
+O BN Performance não tem botão "Reconectar" — só "Cancelar". O `restart-connection` do projeto atual faz `destroyInstance()` + `createFreshInstance()`, o que pode gerar problemas se a instância não for limpa a tempo (delay de 1.5s pode não ser suficiente).
+
+### 4. Sem logs na edge function
+Não há `console.log` nos pontos críticos para diagnosticar onde exatamente falha.
 
 ## Solução
 
-### 1. Migração SQL — função para avançar ciclos automaticamente
-Criar uma função `advance_training_cycles()` que:
-- Marca como `completed` todos os ciclos com `status = 'active'` e `end_date < CURRENT_DATE`
-- Ativa o próximo ciclo (`pending` com menor `cycle_number`) da mesma matrícula
-- É chamada via trigger (BEFORE SELECT não existe no PG), então a melhor abordagem é chamá-la no front-end antes de renderizar o dashboard
+### Edge function `whatsapp-manager/index.ts`
+1. Adicionar `console.log` com payloads da Evolution API nos pontos de `init-connection`, `connect`, e `check-status`
+2. Verificar `connectRes.ok` antes de parsear JSON — se falhar, fazer fallback para `destroyInstance` + `createFreshInstance`
+3. Aumentar delay do `restart-connection` de 1.5s para 3s para dar tempo à Evolution limpar
 
-Alternativamente (mais confiável): executar a lógica de avanço diretamente no front-end ao carregar o dashboard, com uma chamada RPC.
-
-```sql
-CREATE OR REPLACE FUNCTION public.advance_training_cycles()
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
-BEGIN
-  -- Mark expired active cycles as completed
-  UPDATE training_cycles SET status = 'completed'
-  WHERE status = 'active' AND end_date < CURRENT_DATE;
-
-  -- Activate next pending cycle for each enrollment
-  UPDATE training_cycles tc SET status = 'active'
-  FROM (
-    SELECT DISTINCT ON (enrollment_id) id
-    FROM training_cycles
-    WHERE status = 'pending'
-    AND enrollment_id IN (
-      SELECT enrollment_id FROM training_cycles
-      WHERE status = 'completed'
-      AND NOT EXISTS (
-        SELECT 1 FROM training_cycles tc2
-        WHERE tc2.enrollment_id = training_cycles.enrollment_id AND tc2.status = 'active'
-      )
-    )
-    ORDER BY enrollment_id, cycle_number
-  ) next_cycle
-  WHERE tc.id = next_cycle.id;
-END;
-$$;
-```
-
-### 2. Código — chamar `advance_training_cycles()` no dashboard
-Em `AdminDashboard.tsx`, no início de `loadData()`, adicionar:
-```ts
-await supabase.rpc("advance_training_cycles");
-```
-
-Isso garante que ao abrir o dashboard, os ciclos vencidos são finalizados e os próximos ativados antes de exibir os countdowns.
-
-### 3. Código — forçar refresh ao voltar para o dashboard
-Adicionar listener de `visibilitychange` ou usar `useEffect` com dependência na rota para recarregar dados quando o usuário navega de volta ao dashboard.
+### Front-end `WhatsAppSettings.tsx`
+4. Reduzir polling de 10s para 5s (igual ao BN Performance)
+5. Mostrar detalhes do erro no toast quando `invoke()` falha (incluir `details` do servidor)
 
 ## Arquivos alterados
-- Nova migração SQL: cria `advance_training_cycles()`
-- `src/pages/admin/AdminDashboard.tsx`: chama RPC no início de `loadData()` + adiciona refresh automático
-- `src/pages/trainer/TrainerDashboard.tsx`: mesmo tratamento (se usar ciclos)
+- `supabase/functions/whatsapp-manager/index.ts` — logs, verificação `connectRes.ok`, delay maior
+- `src/pages/admin/WhatsAppSettings.tsx` — polling 5s, erros detalhados
+
