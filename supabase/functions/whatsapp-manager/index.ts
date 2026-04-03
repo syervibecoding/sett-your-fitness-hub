@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
       }
 
       const createData = await createRes.json();
-
+      console.log("[createFreshInstance] Response:", JSON.stringify(createData));
       await adminClient.from("whatsapp_instances").upsert(
         {
           instance_name: instanceName,
