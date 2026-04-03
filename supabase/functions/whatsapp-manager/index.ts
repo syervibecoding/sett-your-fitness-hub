@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
 
     // ─── Helper: create fresh instance ───
     const createFreshInstance = async () => {
+      console.log("[createFreshInstance] Creating instance:", instanceName);
       const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/whatsapp-webhook`;
       const createRes = await fetch(`${evoUrl}/instance/create`, {
         method: "POST",
