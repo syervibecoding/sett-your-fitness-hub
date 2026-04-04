@@ -127,7 +127,7 @@ export default function StudentPortal() {
       if (cyclesData && cyclesData.length > 0) {
         const { data: workoutsData } = await supabase
           .from("workouts")
-          .select("id, title, description, exercises, cycle_id, day_of_week")
+          .select("id, name, title, description, exercises, cycle_id, day_of_week")
           .in("cycle_id", cyclesData.map(c => c.id));
 
         const exerciseIds = new Set<string>();
