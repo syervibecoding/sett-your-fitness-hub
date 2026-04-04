@@ -225,7 +225,7 @@ export default function StudentPortal() {
   const getLogKey = (workoutId: string, exIdx: number, setNum: number) =>
     `${workoutId}-${exIdx}-${setNum}`;
 
-  const updateLog = (exIdx: number, setNum: number, field: "weight" | "reps_done", value: number) => {
+  const updateLog = (exIdx: number, setNum: number, field: string, value: number | string | boolean) => {
     if (!selectedWorkout) return;
     const workoutId = selectedWorkout.id;
     const key = getLogKey(workoutId, exIdx, setNum);
@@ -241,6 +241,44 @@ export default function StudentPortal() {
         [field]: value,
       },
     }));
+  };
+
+  const getTotalSets = (exIdx: number) => {
+    const baseSets = parseInt(selectedWorkout?.exercises[exIdx]?.sets || "3") || 3;
+    return baseSets + (extraSets[exIdx] || 0);
+  };
+
+  const handleAddSet = (exIdx: number) => {
+    setExtraSets(prev => ({ ...prev, [exIdx]: (prev[exIdx] || 0) + 1 }));
+  };
+
+  const handleRemoveSet = (exIdx: number, setNum: number) => {
+    if (!selectedWorkout) return;
+    const workoutId = selectedWorkout.id;
+    const total = getTotalSets(exIdx);
+    if (total <= 1) return;
+
+    // Remove the log for this set and shift subsequent sets down
+    setLogs(prev => {
+      const newLogs = { ...prev };
+      delete newLogs[getLogKey(workoutId, exIdx, setNum)];
+      // Shift sets above the removed one
+      for (let s = setNum + 1; s <= total; s++) {
+        const oldKey = getLogKey(workoutId, exIdx, s);
+        const newKey = getLogKey(workoutId, exIdx, s - 1);
+        if (newLogs[oldKey]) {
+          newLogs[newKey] = { ...newLogs[oldKey], set_number: s - 1 };
+          delete newLogs[oldKey];
+        }
+      }
+      return newLogs;
+    });
+
+    const baseSets = parseInt(selectedWorkout.exercises[exIdx]?.sets || "3") || 3;
+    const currentExtra = extraSets[exIdx] || 0;
+    if (currentExtra > 0) {
+      setExtraSets(prev => ({ ...prev, [exIdx]: currentExtra - 1 }));
+    }
   };
 
   const saveCurrentLogs = async () => {
