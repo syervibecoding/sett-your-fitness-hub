@@ -215,6 +215,18 @@ export default function StudentPortal() {
 
             setLogs(todayLogMap);
             setPreviousLogs(prevLogMap);
+
+            // Detect extra sets from today's logs (beyond prescribed)
+            const extraSetsMap: Record<number, number> = {};
+            const todayLogs = logsData.filter((l: any) => l.session_date === todayStr);
+            // Group today's logs by workout+exercise to find max set_number
+            const maxSetByExercise: Record<string, number> = {};
+            todayLogs.forEach((l: any) => {
+              const ek = `${l.workout_id}-${l.exercise_index}`;
+              maxSetByExercise[ek] = Math.max(maxSetByExercise[ek] || 0, l.set_number);
+            });
+            // We'll compute extra sets per exercise when workout is selected
+            // For now store raw data - extraSets will be computed on workout selection
           }
         }
       }
