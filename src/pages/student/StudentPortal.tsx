@@ -154,7 +154,7 @@ export default function StudentPortal() {
             .filter(w => w.cycle_id === c.id)
             .map(w => ({
               id: w.id,
-              title: w.title,
+              title: w.title || w.name || "Treino",
               description: w.description,
               day_of_week: (w as any).day_of_week as number | null,
               exercises: ((w.exercises as unknown as WorkoutExercise[]) || []).map(ex => ({
@@ -163,7 +163,7 @@ export default function StudentPortal() {
                 video_path: (ex.video_path && ex.video_path.trim()) || videoMap[ex.exercise_id]?.video_path || null,
               })),
             }))
-            .sort((a, b) => a.title.localeCompare(b.title));
+            .sort((a, b) => (a.title || "").localeCompare(b.title || ""));
           return { ...c, workouts: cycleWorkouts };
         });
         setCycles(enriched);
