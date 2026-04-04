@@ -224,7 +224,7 @@ export default function WorkoutBuilder() {
     }));
   };
 
-  const updateExercise = (workoutIdx: number, exIdx: number, field: keyof WorkoutExercise, value: string) => {
+  const updateExercise = (workoutIdx: number, exIdx: number, field: keyof WorkoutExercise, value: any) => {
     setWorkouts(prev => prev.map((w, i) => {
       if (i !== workoutIdx) return w;
       return {
