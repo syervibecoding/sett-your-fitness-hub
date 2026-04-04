@@ -622,6 +622,9 @@ export default function StudentPortal() {
                               activeRest={activeRest}
                               onSetComplete={startRest}
                               onRestComplete={clearRest}
+                              totalSets={getTotalSets(idx)}
+                              onAddSet={handleAddSet}
+                              onRemoveSet={handleRemoveSet}
                             />
                           ))}
                         </div>
