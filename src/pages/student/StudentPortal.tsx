@@ -56,6 +56,9 @@ interface WorkoutLog {
   weight: number;
   reps_done: number;
   session_date?: string;
+  set_type?: string;
+  rpe?: number;
+  completed?: boolean;
 }
 
 export default function StudentPortal() {
