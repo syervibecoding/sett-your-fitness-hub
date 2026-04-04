@@ -35,6 +35,7 @@ interface WorkoutExercise {
   reps: string;
   rest: string;
   notes: string;
+  set_types?: string[];
 }
 
 interface Workout {
