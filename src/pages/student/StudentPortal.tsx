@@ -78,6 +78,7 @@ export default function StudentPortal() {
   const [savingLogs, setSavingLogs] = useState(false);
   const [enrollmentInfo, setEnrollmentInfo] = useState<{ plan_name: string; start_date: string; end_date: string } | null>(null);
   const [allLogs, setAllLogs] = useState<any[]>([]);
+  const [extraSets, setExtraSets] = useState<Record<number, number>>({}); // exIdx -> extra sets count
 
   const selectedWorkout = selectedCycle?.workouts.find(w => w.id === selectedWorkoutId) || selectedCycle?.workouts[0] || null;
   const todayStr = new Date().toISOString().split("T")[0];
