@@ -1588,6 +1588,7 @@ export type Database = {
       }
       workout_logs: {
         Row: {
+          completed: boolean | null
           completed_at: string | null
           created_at: string
           duration_minutes: number | null
@@ -1596,13 +1597,16 @@ export type Database = {
           id: string
           notes: string | null
           reps_done: number | null
+          rpe: number | null
           session_date: string | null
           set_number: number | null
+          set_type: string | null
           student_id: string
           weight: number | null
           workout_id: string
         }
         Insert: {
+          completed?: boolean | null
           completed_at?: string | null
           created_at?: string
           duration_minutes?: number | null
@@ -1611,13 +1615,16 @@ export type Database = {
           id?: string
           notes?: string | null
           reps_done?: number | null
+          rpe?: number | null
           session_date?: string | null
           set_number?: number | null
+          set_type?: string | null
           student_id: string
           weight?: number | null
           workout_id: string
         }
         Update: {
+          completed?: boolean | null
           completed_at?: string | null
           created_at?: string
           duration_minutes?: number | null
@@ -1626,8 +1633,10 @@ export type Database = {
           id?: string
           notes?: string | null
           reps_done?: number | null
+          rpe?: number | null
           session_date?: string | null
           set_number?: number | null
+          set_type?: string | null
           student_id?: string
           weight?: number | null
           workout_id?: string

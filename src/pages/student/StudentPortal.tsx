@@ -56,6 +56,9 @@ interface WorkoutLog {
   weight: number;
   reps_done: number;
   session_date?: string;
+  set_type?: string;
+  rpe?: number;
+  completed?: boolean;
 }
 
 export default function StudentPortal() {
@@ -75,6 +78,7 @@ export default function StudentPortal() {
   const [savingLogs, setSavingLogs] = useState(false);
   const [enrollmentInfo, setEnrollmentInfo] = useState<{ plan_name: string; start_date: string; end_date: string } | null>(null);
   const [allLogs, setAllLogs] = useState<any[]>([]);
+  const [extraSets, setExtraSets] = useState<Record<number, number>>({}); // exIdx -> extra sets count
 
   const selectedWorkout = selectedCycle?.workouts.find(w => w.id === selectedWorkoutId) || selectedCycle?.workouts[0] || null;
   const todayStr = new Date().toISOString().split("T")[0];
@@ -211,6 +215,18 @@ export default function StudentPortal() {
 
             setLogs(todayLogMap);
             setPreviousLogs(prevLogMap);
+
+            // Detect extra sets from today's logs (beyond prescribed)
+            const extraSetsMap: Record<number, number> = {};
+            const todayLogs = logsData.filter((l: any) => l.session_date === todayStr);
+            // Group today's logs by workout+exercise to find max set_number
+            const maxSetByExercise: Record<string, number> = {};
+            todayLogs.forEach((l: any) => {
+              const ek = `${l.workout_id}-${l.exercise_index}`;
+              maxSetByExercise[ek] = Math.max(maxSetByExercise[ek] || 0, l.set_number);
+            });
+            // We'll compute extra sets per exercise when workout is selected
+            // For now store raw data - extraSets will be computed on workout selection
           }
         }
       }
@@ -221,7 +237,7 @@ export default function StudentPortal() {
   const getLogKey = (workoutId: string, exIdx: number, setNum: number) =>
     `${workoutId}-${exIdx}-${setNum}`;
 
-  const updateLog = (exIdx: number, setNum: number, field: "weight" | "reps_done", value: number) => {
+  const updateLog = (exIdx: number, setNum: number, field: string, value: number | string | boolean) => {
     if (!selectedWorkout) return;
     const workoutId = selectedWorkout.id;
     const key = getLogKey(workoutId, exIdx, setNum);
@@ -239,6 +255,44 @@ export default function StudentPortal() {
     }));
   };
 
+  const getTotalSets = (exIdx: number) => {
+    const baseSets = parseInt(selectedWorkout?.exercises[exIdx]?.sets || "3") || 3;
+    return baseSets + (extraSets[exIdx] || 0);
+  };
+
+  const handleAddSet = (exIdx: number) => {
+    setExtraSets(prev => ({ ...prev, [exIdx]: (prev[exIdx] || 0) + 1 }));
+  };
+
+  const handleRemoveSet = (exIdx: number, setNum: number) => {
+    if (!selectedWorkout) return;
+    const workoutId = selectedWorkout.id;
+    const total = getTotalSets(exIdx);
+    if (total <= 1) return;
+
+    // Remove the log for this set and shift subsequent sets down
+    setLogs(prev => {
+      const newLogs = { ...prev };
+      delete newLogs[getLogKey(workoutId, exIdx, setNum)];
+      // Shift sets above the removed one
+      for (let s = setNum + 1; s <= total; s++) {
+        const oldKey = getLogKey(workoutId, exIdx, s);
+        const newKey = getLogKey(workoutId, exIdx, s - 1);
+        if (newLogs[oldKey]) {
+          newLogs[newKey] = { ...newLogs[oldKey], set_number: s - 1 };
+          delete newLogs[oldKey];
+        }
+      }
+      return newLogs;
+    });
+
+    const baseSets = parseInt(selectedWorkout.exercises[exIdx]?.sets || "3") || 3;
+    const currentExtra = extraSets[exIdx] || 0;
+    if (currentExtra > 0) {
+      setExtraSets(prev => ({ ...prev, [exIdx]: currentExtra - 1 }));
+    }
+  };
+
   const saveCurrentLogs = async () => {
     if (!selectedWorkout || !studentId) return;
     setSavingLogs(true);
@@ -249,12 +303,19 @@ export default function StudentPortal() {
       const existing = allLogs.find(
         l => l.workout_id === log.workout_id && l.exercise_index === log.exercise_index && l.set_number === log.set_number && l.session_date === todayStr
       );
+      const payload = {
+        weight: log.weight,
+        reps_done: log.reps_done,
+        set_type: log.set_type || 'normal',
+        rpe: log.rpe || null,
+        completed: log.completed || false,
+      };
       if (existing) {
-        await supabase.from("workout_logs").update({ weight: log.weight, reps_done: log.reps_done }).eq("id", existing.id);
+        await supabase.from("workout_logs").update(payload).eq("id", existing.id);
       } else {
         await supabase.from("workout_logs").insert({
           workout_id: log.workout_id, exercise_index: log.exercise_index,
-          set_number: log.set_number, weight: log.weight, reps_done: log.reps_done,
+          set_number: log.set_number, ...payload,
           student_id: studentId, company_id: companyId, session_date: todayStr,
         });
       }
@@ -573,6 +634,9 @@ export default function StudentPortal() {
                               activeRest={activeRest}
                               onSetComplete={startRest}
                               onRestComplete={clearRest}
+                              totalSets={getTotalSets(idx)}
+                              onAddSet={handleAddSet}
+                              onRemoveSet={handleRemoveSet}
                             />
                           ))}
                         </div>

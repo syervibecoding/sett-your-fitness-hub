@@ -92,7 +92,7 @@ export function useWorkoutSession(studentId: string | null, companyId: string | 
   }, [studentId, companyId]);
 
   const finishSession = useCallback(async (
-    logs: Record<string, { weight: number; reps_done: number; workout_id: string; exercise_index: number; set_number: number }>,
+    logs: Record<string, { weight: number; reps_done: number; workout_id: string; exercise_index: number; set_number: number; set_type?: string; rpe?: number; completed?: boolean }>,
     exercises: { exercise_name: string; muscle_group: string; sets: string }[],
     previousBestWeights: Record<string, number>
   ) => {
