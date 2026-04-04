@@ -291,12 +291,19 @@ export default function StudentPortal() {
       const existing = allLogs.find(
         l => l.workout_id === log.workout_id && l.exercise_index === log.exercise_index && l.set_number === log.set_number && l.session_date === todayStr
       );
+      const payload = {
+        weight: log.weight,
+        reps_done: log.reps_done,
+        set_type: log.set_type || 'normal',
+        rpe: log.rpe || null,
+        completed: log.completed || false,
+      };
       if (existing) {
-        await supabase.from("workout_logs").update({ weight: log.weight, reps_done: log.reps_done }).eq("id", existing.id);
+        await supabase.from("workout_logs").update(payload).eq("id", existing.id);
       } else {
         await supabase.from("workout_logs").insert({
           workout_id: log.workout_id, exercise_index: log.exercise_index,
-          set_number: log.set_number, weight: log.weight, reps_done: log.reps_done,
+          set_number: log.set_number, ...payload,
           student_id: studentId, company_id: companyId, session_date: todayStr,
         });
       }
