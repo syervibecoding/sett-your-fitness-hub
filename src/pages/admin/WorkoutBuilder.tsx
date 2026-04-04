@@ -518,6 +518,51 @@ export default function WorkoutBuilder() {
                                   />
                                 </div>
                               </div>
+
+                              {/* Set Types Config */}
+                              {(() => {
+                                const numSets = parseInt(ex.sets) || 3;
+                                const currentTypes: string[] = (ex as any).set_types || [];
+                                return (
+                                  <div className="space-y-1.5">
+                                    <Label className="text-xs text-muted-foreground font-sans">Tipos de Série</Label>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {Array.from({ length: numSets }, (_, s) => {
+                                        const type = currentTypes[s] || 'normal';
+                                        const config: Record<string, { label: string; color: string }> = {
+                                          warmup: { label: 'W', color: 'bg-yellow-400/20 text-yellow-400 border-yellow-400/40' },
+                                          normal: { label: `${s + 1}`, color: 'bg-muted text-foreground border-border' },
+                                          failure: { label: 'F', color: 'bg-red-400/20 text-red-400 border-red-400/40' },
+                                          drop: { label: 'D', color: 'bg-blue-400/20 text-blue-400 border-blue-400/40' },
+                                        };
+                                        const c = config[type] || config.normal;
+                                        return (
+                                          <Select
+                                            key={s}
+                                            value={type}
+                                            onValueChange={(val) => {
+                                              const newTypes = [...currentTypes];
+                                              while (newTypes.length < numSets) newTypes.push('normal');
+                                              newTypes[s] = val;
+                                              updateExercise(wIdx, exIdx, "set_types" as any, newTypes as any);
+                                            }}
+                                          >
+                                            <SelectTrigger className={`h-7 w-10 text-xs font-bold border ${c.color} px-0 justify-center`}>
+                                              <span>{c.label}</span>
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="warmup">W — Aquecimento</SelectItem>
+                                              <SelectItem value="normal">Normal</SelectItem>
+                                              <SelectItem value="failure">F — Falha</SelectItem>
+                                              <SelectItem value="drop">D — Drop</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
                         </CardContent>
