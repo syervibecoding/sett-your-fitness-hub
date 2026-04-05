@@ -13,6 +13,7 @@ interface WorkoutSummaryProps {
   totalSetsPrescribed: number;
   exercises: ExerciseSummaryItem[];
   formatTime: (s: number) => string;
+  whatsappNumber?: string | null;
 }
 
 export function WorkoutSummary({
