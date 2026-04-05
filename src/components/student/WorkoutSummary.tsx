@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Clock, Dumbbell, TrendingUp, CheckCircle2, Share2 } from "lucide-react";
+import { Trophy, Clock, Dumbbell, TrendingUp, CheckCircle2, Share2, MessageCircle } from "lucide-react";
 import type { ExerciseSummaryItem } from "@/hooks/useWorkoutSession";
 
 interface WorkoutSummaryProps {
@@ -13,10 +13,11 @@ interface WorkoutSummaryProps {
   totalSetsPrescribed: number;
   exercises: ExerciseSummaryItem[];
   formatTime: (s: number) => string;
+  whatsappNumber?: string | null;
 }
 
 export function WorkoutSummary({
-  open, onClose, durationSeconds, totalVolume, totalSetsCompleted, totalSetsPrescribed, exercises, formatTime
+  open, onClose, durationSeconds, totalVolume, totalSetsCompleted, totalSetsPrescribed, exercises, formatTime, whatsappNumber
 }: WorkoutSummaryProps) {
   const prs = exercises.filter(e => e.isPR);
 
@@ -108,6 +109,24 @@ export function WorkoutSummary({
             <Share2 className="h-4 w-4" />
             Compartilhar
           </Button>
+          {whatsappNumber && (
+            <Button
+              onClick={() => {
+                const feedbackText = [
+                  `💬 Feedback do treino`,
+                  `⏱ Duração: ${formatTime(durationSeconds)}`,
+                  `📊 Volume: ${totalVolume.toLocaleString("pt-BR")}kg`,
+                  `✅ Séries: ${totalSetsCompleted}/${totalSetsPrescribed}`,
+                  prs.length > 0 ? `🏆 ${prs.length} PR(s)!` : "",
+                ].filter(Boolean).join("\n");
+                window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(feedbackText)}`, "_blank");
+              }}
+              className="w-full font-sans gap-2 bg-[#25D366] hover:bg-[#20bd5a] text-white"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Enviar Feedback
+            </Button>
+          )}
           <Button onClick={onClose} className="w-full font-sans">
             Fechar
           </Button>

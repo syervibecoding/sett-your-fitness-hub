@@ -79,6 +79,7 @@ export default function StudentPortal() {
   const [enrollmentInfo, setEnrollmentInfo] = useState<{ plan_name: string; start_date: string; end_date: string } | null>(null);
   const [allLogs, setAllLogs] = useState<any[]>([]);
   const [extraSets, setExtraSets] = useState<Record<number, number>>({}); // exIdx -> extra sets count
+  const [companyWhatsapp, setCompanyWhatsapp] = useState<string | null>(null);
 
   const selectedWorkout = selectedCycle?.workouts.find(w => w.id === selectedWorkoutId) || selectedCycle?.workouts[0] || null;
   const todayStr = new Date().toISOString().split("T")[0];
@@ -101,6 +102,20 @@ export default function StudentPortal() {
     setStudentId(student.id);
     setStudentName(student.full_name);
     setCompanyId(student.company_id);
+
+    // Buscar WhatsApp da empresa
+    if (student.company_id) {
+      const { data: waInstance } = await supabase
+        .from("whatsapp_instances")
+        .select("phone_number")
+        .eq("company_id", student.company_id)
+        .eq("status", "connected")
+        .limit(1)
+        .maybeSingle();
+      if (waInstance?.phone_number) {
+        setCompanyWhatsapp(waInstance.phone_number.replace(/\D/g, ""));
+      }
+    }
 
     const { data: enrollment } = await supabase
       .from("enrollments")
@@ -700,6 +715,7 @@ export default function StudentPortal() {
           totalSetsPrescribed={session.summary.totalSetsPrescribed}
           exercises={session.summary.exercisesSummary}
           formatTime={session.formatTime}
+          whatsappNumber={companyWhatsapp}
         />
       )}
     </div>
