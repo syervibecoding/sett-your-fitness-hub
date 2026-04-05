@@ -109,6 +109,24 @@ export function WorkoutSummary({
             <Share2 className="h-4 w-4" />
             Compartilhar
           </Button>
+          {whatsappNumber && (
+            <Button
+              onClick={() => {
+                const feedbackText = [
+                  `💬 Feedback do treino`,
+                  `⏱ Duração: ${formatTime(durationSeconds)}`,
+                  `📊 Volume: ${totalVolume.toLocaleString("pt-BR")}kg`,
+                  `✅ Séries: ${totalSetsCompleted}/${totalSetsPrescribed}`,
+                  prs.length > 0 ? `🏆 ${prs.length} PR(s)!` : "",
+                ].filter(Boolean).join("\n");
+                window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(feedbackText)}`, "_blank");
+              }}
+              className="w-full font-sans gap-2 bg-[#25D366] hover:bg-[#20bd5a] text-white"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Enviar Feedback
+            </Button>
+          )}
           <Button onClick={onClose} className="w-full font-sans">
             Fechar
           </Button>

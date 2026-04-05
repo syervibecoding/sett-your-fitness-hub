@@ -715,6 +715,7 @@ export default function StudentPortal() {
           totalSetsPrescribed={session.summary.totalSetsPrescribed}
           exercises={session.summary.exercisesSummary}
           formatTime={session.formatTime}
+          whatsappNumber={companyWhatsapp}
         />
       )}
     </div>
