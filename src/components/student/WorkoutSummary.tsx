@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Clock, Dumbbell, TrendingUp, CheckCircle2, Share2 } from "lucide-react";
+import { Trophy, Clock, Dumbbell, TrendingUp, CheckCircle2, Share2, MessageCircle } from "lucide-react";
 import type { ExerciseSummaryItem } from "@/hooks/useWorkoutSession";
 
 interface WorkoutSummaryProps {
