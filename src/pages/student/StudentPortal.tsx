@@ -103,6 +103,20 @@ export default function StudentPortal() {
     setStudentName(student.full_name);
     setCompanyId(student.company_id);
 
+    // Buscar WhatsApp da empresa
+    if (student.company_id) {
+      const { data: waInstance } = await supabase
+        .from("whatsapp_instances")
+        .select("phone_number")
+        .eq("company_id", student.company_id)
+        .eq("status", "connected")
+        .limit(1)
+        .maybeSingle();
+      if (waInstance?.phone_number) {
+        setCompanyWhatsapp(waInstance.phone_number.replace(/\D/g, ""));
+      }
+    }
+
     const { data: enrollment } = await supabase
       .from("enrollments")
       .select("id, start_date, end_date, plan_id, plans(name)")
