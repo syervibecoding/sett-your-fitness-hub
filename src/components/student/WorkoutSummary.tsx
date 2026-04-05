@@ -17,7 +17,7 @@ interface WorkoutSummaryProps {
 }
 
 export function WorkoutSummary({
-  open, onClose, durationSeconds, totalVolume, totalSetsCompleted, totalSetsPrescribed, exercises, formatTime
+  open, onClose, durationSeconds, totalVolume, totalSetsCompleted, totalSetsPrescribed, exercises, formatTime, whatsappNumber
 }: WorkoutSummaryProps) {
   const prs = exercises.filter(e => e.isPR);
 
