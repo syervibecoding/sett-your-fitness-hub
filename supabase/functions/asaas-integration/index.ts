@@ -434,17 +434,6 @@ async function ensureEnrollmentExists(studentId: string, planId?: string) {
   }
 
   // --- FIRST ENROLLMENT: create new ---
-  let createdBy = studentId;
-  if (companyId) {
-    const { data: company } = await supabaseAdmin
-      .from("companies")
-      .select("owner_user_id")
-      .eq("id", companyId)
-      .single();
-    if (company?.owner_user_id) {
-      createdBy = company.owner_user_id;
-    }
-  }
 
   const today = new Date();
   const endDate = new Date(today);
