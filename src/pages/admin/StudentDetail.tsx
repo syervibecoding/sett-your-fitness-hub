@@ -693,7 +693,7 @@ export default function StudentDetail() {
     if (!id || !session?.user?.id || !evalNotes.trim()) return;
     setSaving(true);
     const { error } = await supabase.from("student_evaluations").insert({
-      student_id: id, created_by: session.user.id, type: "text", notes: evalNotes.trim(),
+      student_id: id, created_by: session.user.id, company_id: student?.company_id, type: "text", notes: evalNotes.trim(),
     });
     setSaving(false);
     if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
