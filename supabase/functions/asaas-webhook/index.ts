@@ -123,7 +123,6 @@ async function ensureEnrollmentExists(studentId: string) {
       student_id: studentId,
       plan_id: student.selected_plan_id,
       trainer_id: student.assigned_trainer_id || null,
-      created_by: createdBy,
       start_date: today.toISOString().split("T")[0],
       end_date: endDate.toISOString().split("T")[0],
       payment_status: "paid",
