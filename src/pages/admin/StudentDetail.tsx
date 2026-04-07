@@ -644,6 +644,7 @@ export default function StudentDetail() {
     const { error } = await supabase.from("student_evaluations").insert({
       student_id: id,
       created_by: session.user.id,
+      company_id: student?.company_id,
       type,
       file_url: signedData.signedUrl,
     });
