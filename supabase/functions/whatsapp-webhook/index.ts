@@ -384,14 +384,19 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Link student
+        // Link student (supports both @s.whatsapp.net and @lid)
         let isStudent = !!chat.student_id;
-        const phone = remoteJid.replace("@s.whatsapp.net", "").replace(/^55/, "");
-        if (phone && remoteJid.includes("@s.whatsapp.net")) {
-          const { data: student } = await adminClient.from("students").select("id").or(`whatsapp.ilike.%${phone}%,phone.ilike.%${phone}%`).limit(1).maybeSingle();
+        const phoneBase = remoteJid.replace(/@.*$/, "");
+        const phoneClean = phoneBase.replace(/^55/, "");
+        if (phoneClean && !remoteJid.includes("@g.us") && !chat.student_id) {
+          const { data: student } = await adminClient.from("students").select("id")
+            .eq("company_id", instance.company_id)
+            .or(`whatsapp.ilike.%${phoneClean}%,phone.ilike.%${phoneClean}%`)
+            .limit(1).maybeSingle();
           if (student) {
             isStudent = true;
             await adminClient.from("whatsapp_chats").update({ student_id: student.id }).eq("id", chat.id);
+            console.log("[webhook] Auto-linked student", student.id, "to chat", chat.id);
           }
         }
 
