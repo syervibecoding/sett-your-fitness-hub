@@ -101,17 +101,6 @@ async function ensureEnrollmentExists(studentId: string) {
     }
   }
 
-  // Get company owner for created_by (enrollment FK requires auth.users id)
-  let createdBy = studentId;
-  if (studentCompanyId) {
-    const { data: company } = await supabaseAdmin
-      .from("companies")
-      .select("owner_user_id")
-      .eq("id", studentCompanyId)
-      .single();
-    if (company) createdBy = company.owner_user_id;
-  }
-
   // Get plan duration
   const { data: plan } = await supabaseAdmin
     .from("plans")
@@ -134,7 +123,6 @@ async function ensureEnrollmentExists(studentId: string) {
       student_id: studentId,
       plan_id: student.selected_plan_id,
       trainer_id: student.assigned_trainer_id || null,
-      created_by: createdBy,
       start_date: today.toISOString().split("T")[0],
       end_date: endDate.toISOString().split("T")[0],
       payment_status: "paid",
