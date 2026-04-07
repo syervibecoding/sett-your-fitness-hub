@@ -1,26 +1,17 @@
 
 
-# Plano: Botão de Feedback via WhatsApp no Summary do Treino
+# Correção: RLS bloqueando inserção em student_evaluations
 
-## Resumo
-Adicionar um botão "Enviar Feedback" no dialog de resumo do treino que abre o WhatsApp da empresa com uma mensagem pré-preenchida com o resumo do treino.
+## Problema
+O treinador Matheus Loreto não consegue adicionar notas/avaliações porque os inserts na tabela `student_evaluations` não incluem o `company_id`. A política RLS exige que `company_id = get_user_company_id(auth.uid())`, mas como o campo não é enviado, fica `NULL` e a política rejeita.
 
-## Como funciona
-1. Ao carregar o portal do aluno, buscar o `phone_number` da `whatsapp_instances` da empresa do aluno
-2. Passar esse número como prop para o `WorkoutSummary`
-3. Renderizar um botão verde "Enviar Feedback" que abre `https://wa.me/{number}?text={resumo}` com o resumo do treino pré-preenchido
-4. Se a empresa não tiver instância WhatsApp configurada, o botão não aparece
+## Solução
+Adicionar `company_id` em todas as chamadas de insert na tabela `student_evaluations` dentro de `StudentDetail.tsx`.
 
-## Arquivos alterados
+## Arquivo alterado
 
-### `src/pages/student/StudentPortal.tsx`
-- Na função `loadProfile`, após obter `companyId`, buscar `whatsapp_instances` para pegar o `phone_number`
-- Guardar em estado `companyWhatsapp`
-- Passar para `WorkoutSummary` como prop `whatsappNumber`
-
-### `src/components/student/WorkoutSummary.tsx`
-- Adicionar prop opcional `whatsappNumber?: string`
-- Adicionar botão "Enviar Feedback" (verde, ícone WhatsApp) entre "Compartilhar" e "Fechar"
-- Ao clicar, monta a URL `https://wa.me/{number}?text={resumo}` e abre em nova aba
-- Botão só aparece se `whatsappNumber` estiver definido
+### `src/pages/admin/StudentDetail.tsx`
+- Na função `handleFileUpload` (linha 644): adicionar `company_id` ao objeto de insert, obtendo da variável `student.company_id` já disponível no componente
+- Na função `handleSaveTextEval` (linha 693): mesmo ajuste — incluir `company_id`
+- Verificar se o `student` já tem `company_id` carregado; caso contrário, buscar do perfil do usuário via `get_user_company_id` ou do próprio student
 
