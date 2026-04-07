@@ -44,6 +44,7 @@ interface Student {
   whatsapp: string | null;
   selected_plan_id: string | null;
   assigned_trainer_id: string | null;
+  company_id: string | null;
 }
 
 interface Anamnesis {
@@ -644,6 +645,7 @@ export default function StudentDetail() {
     const { error } = await supabase.from("student_evaluations").insert({
       student_id: id,
       created_by: session.user.id,
+      company_id: student?.company_id,
       type,
       file_url: signedData.signedUrl,
     });
@@ -691,7 +693,7 @@ export default function StudentDetail() {
     if (!id || !session?.user?.id || !evalNotes.trim()) return;
     setSaving(true);
     const { error } = await supabase.from("student_evaluations").insert({
-      student_id: id, created_by: session.user.id, type: "text", notes: evalNotes.trim(),
+      student_id: id, created_by: session.user.id, company_id: student?.company_id, type: "text", notes: evalNotes.trim(),
     });
     setSaving(false);
     if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
