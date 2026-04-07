@@ -1,17 +1,43 @@
 
 
-# Correção: RLS bloqueando inserção em student_evaluations
+# Correção: Matrícula automática falhando no webhook Asaas
 
-## Problema
-O treinador Matheus Loreto não consegue adicionar notas/avaliações porque os inserts na tabela `student_evaluations` não incluem o `company_id`. A política RLS exige que `company_id = get_user_company_id(auth.uid())`, mas como o campo não é enviado, fica `NULL` e a política rejeita.
+## Diagnóstico
+
+A Taísa Madiã tem:
+- **Pagamento**: CONFIRMED ✅
+- **Status do aluno**: active ✅ (o webhook atualizou)
+- **Matrícula**: NÃO EXISTE ❌
+
+O problema está na função `ensureEnrollmentExists` dentro de `supabase/functions/asaas-webhook/index.ts`. Na linha 137, o insert tenta inserir um campo `created_by` que **não existe** na tabela `enrollments`. Isso causa um erro silencioso e a matrícula nunca é criada.
 
 ## Solução
-Adicionar `company_id` em todas as chamadas de insert na tabela `student_evaluations` dentro de `StudentDetail.tsx`.
 
-## Arquivo alterado
+### 1. Corrigir `supabase/functions/asaas-webhook/index.ts`
+- Remover o campo `created_by` do insert na função `ensureEnrollmentExists` (linhas 104-113 e 137)
+- Remover toda a lógica de buscar `owner_user_id` da company, que só servia para popular esse campo inexistente
 
-### `src/pages/admin/StudentDetail.tsx`
-- Na função `handleFileUpload` (linha 644): adicionar `company_id` ao objeto de insert, obtendo da variável `student.company_id` já disponível no componente
-- Na função `handleSaveTextEval` (linha 693): mesmo ajuste — incluir `company_id`
-- Verificar se o `student` já tem `company_id` carregado; caso contrário, buscar do perfil do usuário via `get_user_company_id` ou do próprio student
+### 2. Criar matrícula manualmente para a Taísa
+- Usar o insert tool para criar a matrícula da Taísa agora, já que o webhook já passou e não vai disparar novamente
+
+## Detalhes técnicos
+
+**Arquivo**: `supabase/functions/asaas-webhook/index.ts`
+
+O insert corrigido ficará:
+```ts
+.insert({
+  student_id: studentId,
+  plan_id: student.selected_plan_id,
+  trainer_id: student.assigned_trainer_id || null,
+  start_date: today.toISOString().split("T")[0],
+  end_date: endDate.toISOString().split("T")[0],
+  payment_status: "paid",
+  payment_date: today.toISOString().split("T")[0],
+  status: "active",
+  company_id: studentCompanyId || null,
+})
+```
+
+A matrícula da Taísa será inserida com os dados: `student_id`, `plan_id` (88faf03c), `company_id` (c051e80e), status active, payment_status paid.
 
