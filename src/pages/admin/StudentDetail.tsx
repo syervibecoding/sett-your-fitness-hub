@@ -44,6 +44,7 @@ interface Student {
   whatsapp: string | null;
   selected_plan_id: string | null;
   assigned_trainer_id: string | null;
+  company_id: string | null;
 }
 
 interface Anamnesis {
