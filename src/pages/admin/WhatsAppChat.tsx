@@ -763,7 +763,7 @@ export default function WhatsAppChat() {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             {!selectedChat ? (
               <div className="flex-1 flex items-center justify-center text-muted-foreground">
                 <div className="text-center space-y-2">
@@ -1035,10 +1035,11 @@ export default function WhatsAppChat() {
 
           {/* Student Context Panel */}
           {selectedChat && (
-            <div className="w-64 border-l border-border flex flex-col bg-muted/20 shrink-0">
+            <div className="w-64 border-l border-border flex flex-col bg-muted/20 shrink-0 overflow-hidden">
               <div className="p-4 border-b border-border">
                 <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><User className="h-4 w-4" />Contexto</h3>
               </div>
+              <ScrollArea className="flex-1">
               <div className="p-4 space-y-4">
                 <div className="space-y-1">
                   <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Contato</p>
@@ -1130,6 +1131,7 @@ export default function WhatsAppChat() {
                   </>
                 )}
               </div>
+              </ScrollArea>
             </div>
           )}
         </div>
