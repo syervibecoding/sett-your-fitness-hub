@@ -129,7 +129,7 @@ export default function AdminDashboard() {
       const enrollsWithDate = activeEnrolls.filter((e: any) => e.training_start_date);
       if (enrollsWithDate.length > 0) {
         const enrollIds = enrollsWithDate.map((e: any) => e.id);
-        const enrollInfoMap: Record<string, { name: string; trainer_id: string | null }> = {};
+        const enrollInfoMap: Record<string, { name: string; trainer_id: string | null; student_id: string }> = {};
         enrollsWithDate.forEach((e: any) => { enrollInfoMap[e.id] = { name: e.students?.full_name || "—", trainer_id: e.students?.assigned_trainer_id || e.trainer_id, student_id: e.student_id }; });
         const { data: activeCycles } = await supabase.from("training_cycles").select("*").in("enrollment_id", enrollIds).eq("status", "active");
         if (activeCycles && activeCycles.length > 0) {
