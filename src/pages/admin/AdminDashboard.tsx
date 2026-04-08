@@ -121,7 +121,7 @@ export default function AdminDashboard() {
     setExpiringContracts(filteredExpiring);
 
     // Cycle countdowns: for each active enrollment, find the current active cycle and show days remaining
-    let cycleEnrollQuery = supabase.from("enrollments").select("id, training_start_date, trainer_id, students(full_name, assigned_trainer_id)").in("status", ["active", "awaiting_training"]) as any;
+    let cycleEnrollQuery = supabase.from("enrollments").select("id, student_id, training_start_date, trainer_id, students(full_name, assigned_trainer_id)").in("status", ["active", "awaiting_training"]) as any;
     if (effectiveCompanyId) cycleEnrollQuery = cycleEnrollQuery.eq("company_id", effectiveCompanyId);
     const { data: activeEnrolls } = await cycleEnrollQuery;
     const countdowns: any[] = [];
@@ -130,7 +130,7 @@ export default function AdminDashboard() {
       if (enrollsWithDate.length > 0) {
         const enrollIds = enrollsWithDate.map((e: any) => e.id);
         const enrollInfoMap: Record<string, { name: string; trainer_id: string | null }> = {};
-        enrollsWithDate.forEach((e: any) => { enrollInfoMap[e.id] = { name: e.students?.full_name || "—", trainer_id: e.students?.assigned_trainer_id || e.trainer_id }; });
+        enrollsWithDate.forEach((e: any) => { enrollInfoMap[e.id] = { name: e.students?.full_name || "—", trainer_id: e.students?.assigned_trainer_id || e.trainer_id, student_id: e.student_id }; });
         const { data: activeCycles } = await supabase.from("training_cycles").select("*").in("enrollment_id", enrollIds).eq("status", "active");
         if (activeCycles && activeCycles.length > 0) {
           activeCycles.forEach((c: any) => {
@@ -138,6 +138,7 @@ export default function AdminDashboard() {
             const daysLeft = Math.ceil((new Date(c.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
             countdowns.push({
               student_name: info?.name || "—",
+              student_id: info?.student_id,
               cycle_number: c.cycle_number,
               end_date: c.end_date,
               days_left: daysLeft,
@@ -241,7 +242,7 @@ export default function AdminDashboard() {
                   {expiringContracts.map((contract: any) => {
                     const daysLeft = Math.ceil((new Date(contract.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
                     return (
-                      <div key={contract.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border">
+                      <div key={contract.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border cursor-pointer hover:brightness-110 transition-all" onClick={() => navigate(`/${routePrefix}/students/${contract.student_id}`)}>
                         <div>
                           <p className="text-foreground font-sans font-medium text-sm">{contract.students?.full_name}</p>
                           <p className="text-muted-foreground text-xs font-sans">{contract.plans?.name}</p>
@@ -277,7 +278,7 @@ export default function AdminDashboard() {
             {cycleCountdowns.length > 0 ? (
               <div className="space-y-3 max-h-[300px] overflow-auto">
                 {cycleCountdowns.map((m: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border">
+                  <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border cursor-pointer hover:brightness-110 transition-all" onClick={() => m.student_id && navigate(`/${routePrefix}/students/${m.student_id}`)}>
                     <div>
                       <p className="text-foreground font-sans font-medium text-sm">{m.student_name}</p>
                       <p className="text-muted-foreground text-xs font-sans">Ciclo {m.cycle_number} · vence {format(new Date(m.end_date), "dd/MM")}</p>
