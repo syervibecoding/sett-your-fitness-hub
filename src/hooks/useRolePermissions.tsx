@@ -73,19 +73,27 @@ export function useRolePermissions(): UseRolePermissionsReturn {
     loadData();
 
     // Subscribe to realtime changes on role_permissions
-    const channel = supabase
-      .channel("role_permissions_realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "role_permissions" },
-        () => {
-          loadData();
-        }
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      const channelName = `role_permissions_realtime_${Date.now()}`;
+      channel = supabase
+        .channel(channelName)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "role_permissions" },
+          () => {
+            loadData();
+          }
+        )
+        .subscribe();
+    } catch (error) {
+      console.error("Failed to subscribe to role permissions realtime:", error);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [user, role, authLoading]);
 
