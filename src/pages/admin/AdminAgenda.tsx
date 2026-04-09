@@ -78,7 +78,7 @@ export default function AdminAgenda() {
     let cyclesQuery = supabase
       .from("training_cycles")
       .select("id, start_date, end_date, cycle_number, enrollment_id, status, enrollments(student_id, students(full_name), trainer_id)")
-      .in("status", ["active", "upcoming", "completed"])
+      .in("status", ["active", "pending", "completed"])
       .gte("start_date", monthStart)
       .lte("start_date", monthEnd);
     if (effectiveCompanyId) cyclesQuery = cyclesQuery.eq("company_id", effectiveCompanyId);
