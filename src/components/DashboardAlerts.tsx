@@ -84,7 +84,7 @@ export function DashboardAlerts({ trainerId }: Props) {
       queries.push(addCompanyFilter(supabase.from("students").select("id, full_name, assigned_trainer_id")
         .in("status", ["active", "pending"]).is("assigned_trainer_id", null)));
       // 2: Awaiting training date
-      queries.push(addCompanyFilter(supabase.from("enrollments").select("id, student_id, students(full_name)")
+      queries.push(addCompanyFilter(supabase.from("enrollments").select("id, student_id, trainer_id, students(full_name)")
         .in("status", ["active", "awaiting_training"]).is("training_start_date", null)));
       // 3: Active students
       queries.push(addCompanyFilter(supabase.from("students").select("id, full_name").eq("status", "active")));
@@ -93,7 +93,7 @@ export function DashboardAlerts({ trainerId }: Props) {
     }
 
     // 5/1: Active enrollments for cycles
-    let enrollQuery = supabase.from("enrollments").select("id, student_id, students(full_name)")
+    let enrollQuery = supabase.from("enrollments").select("id, student_id, trainer_id, students(full_name)")
       .eq("status", "active") as any;
     if (trainerId) enrollQuery = enrollQuery.eq("trainer_id", trainerId);
     if (effectiveCompanyId) enrollQuery = enrollQuery.eq("company_id", effectiveCompanyId);
