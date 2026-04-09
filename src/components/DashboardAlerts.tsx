@@ -21,12 +21,14 @@ interface MissingWorkout {
   cycle_id: string;
   start_date: string;
   end_date: string;
+  trainer_name?: string;
 }
 
 interface AwaitingTrainingDate {
   student_name: string;
   student_id: string;
   enrollment_id: string;
+  trainer_name?: string;
 }
 
 interface AwaitingTrainer {
@@ -82,7 +84,7 @@ export function DashboardAlerts({ trainerId }: Props) {
       queries.push(addCompanyFilter(supabase.from("students").select("id, full_name, assigned_trainer_id")
         .in("status", ["active", "pending"]).is("assigned_trainer_id", null)));
       // 2: Awaiting training date
-      queries.push(addCompanyFilter(supabase.from("enrollments").select("id, student_id, students(full_name)")
+      queries.push(addCompanyFilter(supabase.from("enrollments").select("id, student_id, trainer_id, students(full_name)")
         .in("status", ["active", "awaiting_training"]).is("training_start_date", null)));
       // 3: Active students
       queries.push(addCompanyFilter(supabase.from("students").select("id, full_name").eq("status", "active")));
@@ -91,13 +93,33 @@ export function DashboardAlerts({ trainerId }: Props) {
     }
 
     // 5/1: Active enrollments for cycles
-    let enrollQuery = supabase.from("enrollments").select("id, student_id, students(full_name)")
+    let enrollQuery = supabase.from("enrollments").select("id, student_id, trainer_id, students(full_name)")
       .eq("status", "active") as any;
     if (trainerId) enrollQuery = enrollQuery.eq("trainer_id", trainerId);
     if (effectiveCompanyId) enrollQuery = enrollQuery.eq("company_id", effectiveCompanyId);
     queries.push(enrollQuery);
 
     const results = await Promise.all(queries);
+
+    // Collect all trainer_ids from enrollments to resolve names
+    const allTrainerIds = new Set<string>();
+    const collectTrainerIds = (data: any[]) => {
+      data?.forEach((e: any) => { if (e.trainer_id) allTrainerIds.add(e.trainer_id); });
+    };
+
+    if (!trainerId) {
+      collectTrainerIds(results[2]?.data || []);
+    }
+    collectTrainerIds(results[trainerId ? 1 : 5]?.data || []);
+
+    // Fetch trainer names from profiles
+    let trainerMap: Record<string, string> = {};
+    if (allTrainerIds.size > 0) {
+      const { data: profiles } = await supabase.from("profiles")
+        .select("user_id, full_name")
+        .in("user_id", Array.from(allTrainerIds));
+      (profiles || []).forEach((p: any) => { trainerMap[p.user_id] = p.full_name || "—"; });
+    }
 
     // Process birthdays (index 0)
     const students = results[0].data;
@@ -124,6 +146,7 @@ export function DashboardAlerts({ trainerId }: Props) {
       // Awaiting training date (index 2)
       setAwaitingTrainingDate((results[2].data || []).map((e: any) => ({
         student_name: e.students?.full_name || "—", student_id: e.student_id, enrollment_id: e.id,
+        trainer_name: e.trainer_id ? trainerMap[e.trainer_id] : undefined,
       })));
       // Missing enrollment (index 3 + 4)
       const activeStudents = results[3].data || [];
@@ -141,8 +164,8 @@ export function DashboardAlerts({ trainerId }: Props) {
     const enrollments = results[nextIdx].data;
     if (enrollments && enrollments.length > 0) {
       const enrollIds = enrollments.map((e: any) => e.id);
-      const enrollMap: Record<string, { name: string; student_id: string }> = {};
-      enrollments.forEach((e: any) => { enrollMap[e.id] = { name: e.students?.full_name || "—", student_id: e.student_id }; });
+      const enrollMap: Record<string, { name: string; student_id: string; trainer_name?: string }> = {};
+      enrollments.forEach((e: any) => { enrollMap[e.id] = { name: e.students?.full_name || "—", student_id: e.student_id, trainer_name: e.trainer_id ? trainerMap[e.trainer_id] : undefined }; });
 
       const { data: allCycles } = await supabase
         .from("training_cycles").select("*")
@@ -158,7 +181,7 @@ export function DashboardAlerts({ trainerId }: Props) {
         (allCycles || []).forEach((c: any) => {
           if (!cyclesWithWorkout.has(c.id)) {
             const info = enrollMap[c.enrollment_id];
-            missing.push({ student_name: info?.name || "—", student_id: info?.student_id || "", cycle_number: c.cycle_number, cycle_id: c.id, start_date: c.start_date, end_date: c.end_date });
+            missing.push({ student_name: info?.name || "—", student_id: info?.student_id || "", cycle_number: c.cycle_number, cycle_id: c.id, start_date: c.start_date, end_date: c.end_date, trainer_name: info?.trainer_name });
           }
         });
         const firstPerStudent = new Map<string, MissingWorkout>();
@@ -193,7 +216,10 @@ export function DashboardAlerts({ trainerId }: Props) {
             <div className="space-y-2 max-h-[200px] overflow-auto">
               {awaitingTrainingDate.map((a, i) => (
                 <div key={i} className={`${itemClass} bg-warning/5 border border-warning/20`} onClick={() => goToStudent(a.student_id)}>
-                  <p className="text-sm font-sans text-foreground">{a.student_name}</p>
+                  <div>
+                    <p className="text-sm font-sans text-foreground">{a.student_name}</p>
+                    {a.trainer_name && <p className="text-xs text-muted-foreground/70 font-sans">{a.trainer_name}</p>}
+                  </div>
                   <span className="text-xs font-sans font-medium px-2 py-0.5 rounded bg-warning/20 text-warning">Sem data</span>
                 </div>
               ))}
@@ -278,6 +304,7 @@ export function DashboardAlerts({ trainerId }: Props) {
                   <div>
                     <p className="text-sm font-sans text-foreground">{m.student_name}</p>
                     <p className="text-xs text-muted-foreground font-sans">Ciclo {m.cycle_number} — {new Date(m.start_date).toLocaleDateString("pt-BR")} a {new Date(m.end_date).toLocaleDateString("pt-BR")}</p>
+                    {m.trainer_name && <p className="text-xs text-muted-foreground/70 font-sans">{m.trainer_name}</p>}
                   </div>
                   <span className="text-xs font-sans font-medium px-2 py-0.5 rounded bg-destructive/20 text-destructive">Sem treino</span>
                 </div>
