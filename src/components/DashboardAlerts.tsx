@@ -21,12 +21,14 @@ interface MissingWorkout {
   cycle_id: string;
   start_date: string;
   end_date: string;
+  trainer_name?: string;
 }
 
 interface AwaitingTrainingDate {
   student_name: string;
   student_id: string;
   enrollment_id: string;
+  trainer_name?: string;
 }
 
 interface AwaitingTrainer {
