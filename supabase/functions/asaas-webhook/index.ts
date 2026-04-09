@@ -62,7 +62,7 @@ async function ensureEnrollmentExists(studentId: string) {
     .from("enrollments")
     .select("id")
     .eq("student_id", studentId)
-    .eq("status", "active")
+    .in("status", ["active", "awaiting_training"])
     .maybeSingle();
 
   if (existing) {
