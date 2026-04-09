@@ -1,29 +1,44 @@
 
 
-# Correção: Agenda não mostra ciclos pendentes (ex: Camila Santos)
+# Mostrar professor atribuído nos cards "Definir Data de Treino" e "Sem Treino no Ciclo"
 
 ## Problema
+Os cards "Definir Data de Treino" e "Sem Treino no Ciclo" no dashboard não mostram qual treinador está atribuído ao aluno.
 
-No `AdminAgenda.tsx` (linha ~79), a query de ciclos filtra por:
+## Solução — `src/components/DashboardAlerts.tsx`
+
+### 1. Adicionar `trainer_name` às interfaces
+- `AwaitingTrainingDate`: adicionar campo `trainer_name?: string`
+- `MissingWorkout`: adicionar campo `trainer_name?: string`
+
+### 2. Buscar nome do treinador nos dados
+
+**Definir Data de Treino (linha 85):** Alterar a query de enrollments para incluir `trainer_id` e fazer um lookup nos profiles:
 ```typescript
-.in("status", ["active", "upcoming", "completed"])
+supabase.from("enrollments")
+  .select("id, student_id, trainer_id, students(full_name)")
 ```
 
-Mas o status `"upcoming"` **não existe** no banco. Os status reais são: `active`, `completed`, `pending`.
-
-O ciclo 3 da Camila Santos Bergamo tem `status = 'pending'` e `start_date = 2026-04-14`. Como `"pending"` não está no filtro, ela não aparece na agenda.
-
-Isso afeta **todos** os ciclos futuros que ainda não foram ativados — exatamente os que mais precisam aparecer na agenda para o treinador saber que precisa prescrever.
-
-## Solução
-
-### `src/pages/admin/AdminAgenda.tsx` — 1 linha
-
-Mudar `"upcoming"` para `"pending"`:
-
+**Sem Treino no Ciclo (linha 94):** Mesma alteração:
 ```typescript
-.in("status", ["active", "pending", "completed"])
+supabase.from("enrollments")
+  .select("id, student_id, trainer_id, students(full_name)")
 ```
 
-Isso faz com que ciclos pendentes (como o ciclo 3 da Camila no dia 14/04) apareçam corretamente no calendário como "Prescrever" (amarelo) ou "Entregue" (verde).
+Após obter os `trainer_id`s únicos, buscar nomes na tabela `profiles` (mesmo padrão já usado no `AdminAgenda.tsx`).
+
+### 3. Exibir nome do treinador no card
+
+Adicionar uma linha abaixo do nome do aluno em ambos os cards:
+```
+Juliana Campos Nardo
+Ciclo 8 — 29/03/2026 a 09/05/2026
+Matheus Loreto                        ← nova linha
+```
+
+Texto em `text-xs text-muted-foreground/70`, mesmo estilo usado na agenda.
+
+### Escopo
+- 1 arquivo alterado: `DashboardAlerts.tsx`
+- Sem mudanças no banco
 
