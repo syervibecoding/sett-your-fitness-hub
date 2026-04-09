@@ -216,7 +216,10 @@ export function DashboardAlerts({ trainerId }: Props) {
             <div className="space-y-2 max-h-[200px] overflow-auto">
               {awaitingTrainingDate.map((a, i) => (
                 <div key={i} className={`${itemClass} bg-warning/5 border border-warning/20`} onClick={() => goToStudent(a.student_id)}>
-                  <p className="text-sm font-sans text-foreground">{a.student_name}</p>
+                  <div>
+                    <p className="text-sm font-sans text-foreground">{a.student_name}</p>
+                    {a.trainer_name && <p className="text-xs text-muted-foreground/70 font-sans">{a.trainer_name}</p>}
+                  </div>
                   <span className="text-xs font-sans font-medium px-2 py-0.5 rounded bg-warning/20 text-warning">Sem data</span>
                 </div>
               ))}
@@ -301,6 +304,7 @@ export function DashboardAlerts({ trainerId }: Props) {
                   <div>
                     <p className="text-sm font-sans text-foreground">{m.student_name}</p>
                     <p className="text-xs text-muted-foreground font-sans">Ciclo {m.cycle_number} — {new Date(m.start_date).toLocaleDateString("pt-BR")} a {new Date(m.end_date).toLocaleDateString("pt-BR")}</p>
+                    {m.trainer_name && <p className="text-xs text-muted-foreground/70 font-sans">{m.trainer_name}</p>}
                   </div>
                   <span className="text-xs font-sans font-medium px-2 py-0.5 rounded bg-destructive/20 text-destructive">Sem treino</span>
                 </div>
