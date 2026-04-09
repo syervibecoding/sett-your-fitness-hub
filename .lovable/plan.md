@@ -1,28 +1,29 @@
 
 
-# Correção: Coordenador clica no aluno e página só recarrega
+# Correção: Agenda não mostra ciclos pendentes (ex: Camila Santos)
 
 ## Problema
 
-No `DashboardAlerts.tsx` (linha 51), o `routePrefix` está definido assim:
-
+No `AdminAgenda.tsx` (linha ~79), a query de ciclos filtra por:
+```typescript
+.in("status", ["active", "upcoming", "completed"])
 ```
-role === "master" ? "admin" : role === "trainer" ? "trainer" : "admin"
-```
 
-Quando o role é `"coordinator"`, ele cai no else final e vira `"admin"`. O link gerado é `/admin/students/:id`, mas o coordinator não tem permissão para acessar rotas `/admin/*` — o `FeatureRoute` rejeita e redireciona de volta, causando o "recarregamento" sem navegar.
+Mas o status `"upcoming"` **não existe** no banco. Os status reais são: `active`, `completed`, `pending`.
+
+O ciclo 3 da Camila Santos Bergamo tem `status = 'pending'` e `start_date = 2026-04-14`. Como `"pending"` não está no filtro, ela não aparece na agenda.
+
+Isso afeta **todos** os ciclos futuros que ainda não foram ativados — exatamente os que mais precisam aparecer na agenda para o treinador saber que precisa prescrever.
 
 ## Solução
 
-### `src/components/DashboardAlerts.tsx` — Linha 51
+### `src/pages/admin/AdminAgenda.tsx` — 1 linha
 
-Alterar o cálculo do `routePrefix` para usar o `role` diretamente (igual ao `AdminDashboard.tsx`):
+Mudar `"upcoming"` para `"pending"`:
 
 ```typescript
-const routePrefix = role === "master" && isViewingCompany ? "admin" : role;
+.in("status", ["active", "pending", "completed"])
 ```
 
-Isso gera `/coordinator/students/:id` para coordinator, `/trainer/students/:id` para trainer, `/admin/students/:id` para admin — todas rotas que já existem no `App.tsx`.
-
-Alteração de 1 linha, sem efeitos colaterais.
+Isso faz com que ciclos pendentes (como o ciclo 3 da Camila no dia 14/04) apareçam corretamente no calendário como "Prescrever" (amarelo) ou "Entregue" (verde).
 
