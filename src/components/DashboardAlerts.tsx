@@ -48,7 +48,7 @@ export function DashboardAlerts({ trainerId }: Props) {
   const { viewingCompany, isViewingCompany } = useMaster();
   const navigate = useNavigate();
   const effectiveCompanyId = role === "master" ? (isViewingCompany ? viewingCompany?.id : null) : companyId;
-  const routePrefix = role === "master" && isViewingCompany ? "admin" : role === "trainer" ? "trainer" : "admin";
+  const routePrefix = role === "master" && isViewingCompany ? "admin" : role;
 
   const [birthdays, setBirthdays] = useState<Birthday[]>([]);
   const [missingWorkouts, setMissingWorkouts] = useState<MissingWorkout[]>([]);
