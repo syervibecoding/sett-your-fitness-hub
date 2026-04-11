@@ -711,6 +711,7 @@ export default function StudentPortal() {
             trainedDays={trainedDays}
             currentDayOfWeek={new Date().getDay()}
             onSelectWorkout={handleCalendarSelectWorkout}
+            allLogs={allLogs}
           />
         )}
 
