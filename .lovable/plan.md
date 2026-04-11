@@ -1,44 +1,65 @@
 
 
-# Mostrar professor atribuído nos cards "Definir Data de Treino" e "Sem Treino no Ciclo"
+# Novo Visual do Portal do Aluno — Tela Inicial com Menu
 
-## Problema
-Os cards "Definir Data de Treino" e "Sem Treino no Ciclo" no dashboard não mostram qual treinador está atribuído ao aluno.
+## Situação Atual
+Após o login, o aluno cai direto no treino com tabs "Treino" e "Estatísticas". Tudo em uma única página monolítica (`StudentPortal.tsx` — 723 linhas).
 
-## Solução — `src/components/DashboardAlerts.tsx`
+## Nova Experiência
 
-### 1. Adicionar `trainer_name` às interfaces
-- `AwaitingTrainingDate`: adicionar campo `trainer_name?: string`
-- `MissingWorkout`: adicionar campo `trainer_name?: string`
+Após o login, o aluno vê uma **tela inicial (Home)** com saudação e cards grandes para navegar:
 
-### 2. Buscar nome do treinador nos dados
-
-**Definir Data de Treino (linha 85):** Alterar a query de enrollments para incluir `trainer_id` e fazer um lookup nos profiles:
-```typescript
-supabase.from("enrollments")
-  .select("id, student_id, trainer_id, students(full_name)")
+```text
+┌────────────────────────────┐
+│  Olá, João!                │
+│  Plano X • Ciclo 3 (Atual) │
+│  ████████████░░░ 72%       │
+├────────────────────────────┤
+│  ┌──────────┐ ┌──────────┐ │
+│  │ 🏋️ TREINO │ │ 📊 STATS │ │
+│  │  Treino A │ │ Volume   │ │
+│  │  do dia   │ │ e força  │ │
+│  └──────────┘ └──────────┘ │
+│  ┌──────────┐ ┌──────────┐ │
+│  │ 📅 CALEN │ │ 📜 HIST. │ │
+│  │ Agenda   │ │ Sessões  │ │
+│  │ semanal  │ │ passadas │ │
+│  └──────────┘ └──────────┘ │
+└────────────────────────────┘
 ```
 
-**Sem Treino no Ciclo (linha 94):** Mesma alteração:
-```typescript
-supabase.from("enrollments")
-  .select("id, student_id, trainer_id, students(full_name)")
-```
+Cada card navega para uma "view" dentro do portal (mantendo tudo no `StudentPortal.tsx` com state interno, sem novas rotas).
 
-Após obter os `trainer_id`s únicos, buscar nomes na tabela `profiles` (mesmo padrão já usado no `AdminAgenda.tsx`).
+## Plano Técnico
 
-### 3. Exibir nome do treinador no card
+### 1. Criar estado de navegação interna
+Adicionar `activeView: "home" | "treino" | "stats" | "calendario" | "historico"` ao `StudentPortal.tsx`. Default: `"home"`.
 
-Adicionar uma linha abaixo do nome do aluno em ambos os cards:
-```
-Juliana Campos Nardo
-Ciclo 8 — 29/03/2026 a 09/05/2026
-Matheus Loreto                        ← nova linha
-```
+### 2. Criar componente `StudentHome.tsx`
+Nova tela inicial com:
+- Saudação com nome do aluno
+- Barra de progresso do plano
+- Grid 2x2 de cards com ícones grandes (Treino, Estatísticas, Calendário, Histórico)
+- Card de Treino mostra qual treino é do dia
+- WeeklyBar integrado
 
-Texto em `text-xs text-muted-foreground/70`, mesmo estilo usado na agenda.
+### 3. Criar componente `StudentCalendar.tsx`
+Calendário visual mostrando os dias de treino da semana (quais treinos em quais dias), baseado no `day_of_week` dos workouts.
 
-### Escopo
-- 1 arquivo alterado: `DashboardAlerts.tsx`
-- Sem mudanças no banco
+### 4. Criar componente `StudentHistory.tsx`
+Lista de sessões passadas agrupadas por data, mostrando qual treino foi feito, duração e volume total.
+
+### 5. Refatorar `StudentPortal.tsx`
+- Extrair a lógica de treino atual para continuar funcionando como view "treino"
+- Extrair estatísticas como view "stats" (já usa `StatsCharts`)
+- Adicionar header com botão voltar quando não está na home
+- Manter toda a lógica de dados existente (logs, cycles, etc.)
+
+### Arquivos
+- **Novo**: `src/components/student/StudentHome.tsx`
+- **Novo**: `src/components/student/StudentCalendar.tsx`
+- **Novo**: `src/components/student/StudentHistory.tsx`
+- **Modificado**: `src/pages/student/StudentPortal.tsx`
+
+Sem mudanças no banco de dados ou rotas.
 
