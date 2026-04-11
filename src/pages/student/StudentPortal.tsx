@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,8 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dumbbell, Play, Clock, CheckCircle2, Circle, Loader2, LogOut, Save, CalendarDays, History, BarChart3 } from "lucide-react";
+import { Dumbbell, Play, Clock, CheckCircle2, Circle, Loader2, LogOut, Save, CalendarDays, History, BarChart3, ArrowLeft } from "lucide-react";
 import { format, parseISO, differenceInDays, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +17,11 @@ import { ExerciseCard } from "@/components/student/ExerciseCard";
 import { StatsCharts } from "@/components/student/StatsCharts";
 import { useRestTimer } from "@/components/student/RestTimer";
 import { WeeklyBar } from "@/components/student/WeeklyBar";
+import { StudentHome } from "@/components/student/StudentHome";
+import { StudentCalendar } from "@/components/student/StudentCalendar";
+import { StudentHistory } from "@/components/student/StudentHistory";
+
+type ActiveView = "home" | "treino" | "stats" | "calendario" | "historico";
 
 interface WorkoutExercise {
   exercise_id: string;
@@ -64,6 +68,7 @@ interface WorkoutLog {
 export default function StudentPortal() {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const [activeView, setActiveView] = useState<ActiveView>("home");
   const [studentId, setStudentId] = useState<string | null>(null);
   const [studentName, setStudentName] = useState("");
   const [companyId, setCompanyId] = useState<string | null>(null);
@@ -78,8 +83,9 @@ export default function StudentPortal() {
   const [savingLogs, setSavingLogs] = useState(false);
   const [enrollmentInfo, setEnrollmentInfo] = useState<{ plan_name: string; start_date: string; end_date: string } | null>(null);
   const [allLogs, setAllLogs] = useState<any[]>([]);
-  const [extraSets, setExtraSets] = useState<Record<number, number>>({}); // exIdx -> extra sets count
+  const [extraSets, setExtraSets] = useState<Record<number, number>>({});
   const [companyWhatsapp, setCompanyWhatsapp] = useState<string | null>(null);
+  const [workoutSessions, setWorkoutSessions] = useState<any[]>([]);
 
   const selectedWorkout = selectedCycle?.workouts.find(w => w.id === selectedWorkoutId) || selectedCycle?.workouts[0] || null;
   const todayStr = new Date().toISOString().split("T")[0];
@@ -103,7 +109,6 @@ export default function StudentPortal() {
     setStudentName(student.full_name);
     setCompanyId(student.company_id);
 
-    // Buscar WhatsApp da empresa
     if (student.company_id) {
       const { data: waInstance } = await supabase
         .from("whatsapp_instances")
@@ -190,7 +195,6 @@ export default function StudentPortal() {
         });
         const chosen = activeCycle || enriched[0];
         setSelectedCycle(chosen);
-        // Auto-select today's workout based on day_of_week
         const todayDow = new Date().getDay();
         const todaysWorkout = chosen.workouts.find(w => w.day_of_week === todayDow);
         if (todaysWorkout) {
@@ -199,7 +203,6 @@ export default function StudentPortal() {
           setSelectedWorkoutId(chosen.workouts[0].id);
         }
 
-        // Load logs
         const workoutIds = workoutsData?.map(w => w.id) || [];
         if (workoutIds.length > 0) {
           const { data: logsData } = await supabase
@@ -207,6 +210,15 @@ export default function StudentPortal() {
             .select("*")
             .eq("student_id", student.id)
             .in("workout_id", workoutIds);
+
+          // Load workout sessions for history
+          const { data: sessionsData } = await supabase
+            .from("workout_sessions")
+            .select("*")
+            .eq("student_id", student.id)
+            .in("workout_id", workoutIds);
+
+          if (sessionsData) setWorkoutSessions(sessionsData);
 
           if (logsData) {
             setAllLogs(logsData);
@@ -230,18 +242,6 @@ export default function StudentPortal() {
 
             setLogs(todayLogMap);
             setPreviousLogs(prevLogMap);
-
-            // Detect extra sets from today's logs (beyond prescribed)
-            const extraSetsMap: Record<number, number> = {};
-            const todayLogs = logsData.filter((l: any) => l.session_date === todayStr);
-            // Group today's logs by workout+exercise to find max set_number
-            const maxSetByExercise: Record<string, number> = {};
-            todayLogs.forEach((l: any) => {
-              const ek = `${l.workout_id}-${l.exercise_index}`;
-              maxSetByExercise[ek] = Math.max(maxSetByExercise[ek] || 0, l.set_number);
-            });
-            // We'll compute extra sets per exercise when workout is selected
-            // For now store raw data - extraSets will be computed on workout selection
           }
         }
       }
@@ -285,11 +285,9 @@ export default function StudentPortal() {
     const total = getTotalSets(exIdx);
     if (total <= 1) return;
 
-    // Remove the log for this set and shift subsequent sets down
     setLogs(prev => {
       const newLogs = { ...prev };
       delete newLogs[getLogKey(workoutId, exIdx, setNum)];
-      // Shift sets above the removed one
       for (let s = setNum + 1; s <= total; s++) {
         const oldKey = getLogKey(workoutId, exIdx, s);
         const newKey = getLogKey(workoutId, exIdx, s - 1);
@@ -392,7 +390,6 @@ export default function StudentPortal() {
     if (!selectedWorkout) return;
     await saveCurrentLogs();
 
-    // Calculate previous best weights for PR detection
     const previousBestWeights: Record<string, number> = {};
     selectedWorkout.exercises.forEach((ex, idx) => {
       const exLogs = allLogs.filter((l: any) => l.workout_id === selectedWorkout.id && l.exercise_index === idx && l.session_date !== todayStr);
@@ -421,6 +418,56 @@ export default function StudentPortal() {
       .map(([date, sets]) => ({ date, sets: sets.sort((a, b) => a.set_number - b.set_number) }));
   };
 
+  // Computed values for Home
+  const scheduledDays = useMemo(() => {
+    const days = new Set<number>();
+    selectedCycle?.workouts.forEach(w => {
+      if (w.day_of_week !== null && w.day_of_week !== undefined) days.add(w.day_of_week);
+    });
+    return days;
+  }, [selectedCycle]);
+
+  const trainedDays = useMemo(() => {
+    const now = new Date();
+    const jsDow = now.getDay();
+    const mondayOffset = jsDow === 0 ? -6 : 1 - jsDow;
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() + mondayOffset);
+    weekStart.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    const days = new Set<number>();
+    allLogs.forEach((l: any) => {
+      if (l.session_date) {
+        const logDate = new Date(l.session_date + "T12:00:00");
+        if (logDate >= weekStart && logDate <= weekEnd) days.add(logDate.getDay());
+      }
+    });
+    return days;
+  }, [allLogs]);
+
+  const todaysWorkoutTitle = useMemo(() => {
+    const todayDow = new Date().getDay();
+    const w = selectedCycle?.workouts.find(w => w.day_of_week === todayDow);
+    return w?.title || null;
+  }, [selectedCycle]);
+
+  const totalSessions = useMemo(() => {
+    const dates = new Set(allLogs.map((l: any) => l.session_date));
+    return dates.size;
+  }, [allLogs]);
+
+  const handleNavigate = (view: ActiveView) => {
+    setActiveView(view);
+  };
+
+  const handleCalendarSelectWorkout = (workoutId: string) => {
+    setSelectedWorkoutId(workoutId);
+    setActiveView("treino");
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -442,6 +489,14 @@ export default function StudentPortal() {
 
   const isSessionForCurrentWorkout = session.isActive && session.activeSession?.workoutId === selectedWorkout?.id;
 
+  const viewTitles: Record<ActiveView, string> = {
+    home: "MEU TREINO",
+    treino: "TREINO",
+    stats: "ESTATÍSTICAS",
+    calendario: "CALENDÁRIO",
+    historico: "HISTÓRICO",
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -449,42 +504,47 @@ export default function StudentPortal() {
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-3">
+              {activeView !== "home" && (
+                <Button variant="ghost" size="icon" onClick={() => setActiveView("home")} className="mr-1">
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+              )}
               <Dumbbell className="h-6 w-6 text-primary" />
               <h1 className="text-2xl text-primary font-bold tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
-                MEU TREINO
+                {viewTitles[activeView]}
               </h1>
             </div>
             <Button variant="ghost" size="icon" onClick={signOut}>
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
-          <p className="text-foreground font-sans text-lg">{studentName}</p>
-          {enrollmentInfo && (
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground font-sans">{enrollmentInfo.plan_name}</span>
-                <span className="text-muted-foreground font-sans">
-                  {format(parseISO(enrollmentInfo.start_date), "dd/MM/yy")} — {format(parseISO(enrollmentInfo.end_date), "dd/MM/yy")}
-                </span>
-              </div>
-              <Progress value={getOverallProgress()} className="h-2" />
-            </div>
+          {activeView === "home" && (
+            <p className="text-foreground font-sans text-lg">{studentName}</p>
           )}
         </div>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6">
-        <Tabs defaultValue="treino" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="treino" className="font-sans">Treino</TabsTrigger>
-            <TabsTrigger value="estatisticas" className="font-sans gap-1.5">
-              <BarChart3 className="h-3.5 w-3.5" />
-              Estatísticas
-            </TabsTrigger>
-          </TabsList>
+        {/* HOME VIEW */}
+        {activeView === "home" && (
+          <StudentHome
+            studentName={studentName}
+            enrollmentInfo={enrollmentInfo}
+            overallProgress={getOverallProgress()}
+            selectedCycle={selectedCycle}
+            cycleProgress={selectedCycle ? getCycleProgress(selectedCycle) : 0}
+            todaysWorkoutTitle={todaysWorkoutTitle}
+            scheduledDays={scheduledDays}
+            trainedDays={trainedDays}
+            currentDayOfWeek={new Date().getDay()}
+            totalSessions={totalSessions}
+            onNavigate={handleNavigate}
+          />
+        )}
 
-          {/* TREINO TAB */}
-          <TabsContent value="treino" className="space-y-6">
+        {/* TREINO VIEW */}
+        {activeView === "treino" && (
+          <div className="space-y-6">
             {/* Cycle selector */}
             <div className="flex gap-2 overflow-x-auto pb-2">
               {cycles.map(cycle => {
@@ -510,7 +570,6 @@ export default function StudentPortal() {
               })}
             </div>
 
-            {/* Selected cycle */}
             {selectedCycle && (
               <div className="space-y-4">
                 <Card className="bg-card border-border">
@@ -527,47 +586,14 @@ export default function StudentPortal() {
 
                 {selectedCycle.workouts.length > 0 ? (
                   <div className="space-y-3">
-                    {/* Weekly Bar - frequência visual */}
-                    {(() => {
-                      const scheduledDays = new Set<number>();
-                      selectedCycle.workouts.forEach(w => {
-                        if (w.day_of_week !== null && w.day_of_week !== undefined) {
-                          scheduledDays.add(w.day_of_week);
-                        }
-                      });
+                    {scheduledDays.size > 0 && (
+                      <WeeklyBar
+                        scheduledDays={scheduledDays}
+                        trainedDays={trainedDays}
+                        currentDayOfWeek={new Date().getDay()}
+                      />
+                    )}
 
-                      const now = new Date();
-                      const jsDow = now.getDay();
-                      const mondayOffset = jsDow === 0 ? -6 : 1 - jsDow;
-                      const weekStart = new Date(now);
-                      weekStart.setDate(now.getDate() + mondayOffset);
-                      weekStart.setHours(0, 0, 0, 0);
-                      const weekEnd = new Date(weekStart);
-                      weekEnd.setDate(weekStart.getDate() + 6);
-                      weekEnd.setHours(23, 59, 59, 999);
-
-                      // trainedDays: dia da semana em que o aluno treinou (baseado na data do log)
-                      const trainedDays = new Set<number>();
-                      allLogs.forEach((l: any) => {
-                        if (l.session_date) {
-                          const logDate = new Date(l.session_date + "T12:00:00");
-                          if (logDate >= weekStart && logDate <= weekEnd) {
-                            trainedDays.add(logDate.getDay());
-                          }
-                        }
-                      });
-
-                      if (scheduledDays.size === 0) return null;
-
-                      return (
-                        <WeeklyBar
-                          scheduledDays={scheduledDays}
-                          trainedDays={trainedDays}
-                          currentDayOfWeek={jsDow}
-                        />
-                      );
-                    })()}
-                    {/* Workout tabs */}
                     {selectedCycle.workouts.length > 1 && (
                       <div className="flex gap-2 overflow-x-auto pb-1">
                         {selectedCycle.workouts.map((w, i) => (
@@ -588,7 +614,6 @@ export default function StudentPortal() {
 
                     {selectedWorkout && (
                       <>
-                        {/* Workout Timer */}
                         <WorkoutTimer
                           isActive={isSessionForCurrentWorkout}
                           elapsed={session.elapsed}
@@ -607,7 +632,6 @@ export default function StudentPortal() {
                           </Button>
                         </div>
 
-                        {/* Session badge */}
                         {(() => {
                           const workoutId = selectedWorkout.id;
                           const sessionDates = [...new Set(allLogs.filter(l => l.workout_id === workoutId).map(l => l.session_date))].sort();
@@ -630,7 +654,6 @@ export default function StudentPortal() {
                           );
                         })()}
 
-                        {/* Exercises */}
                         <div className="space-y-2">
                           {selectedWorkout.exercises.map((ex, idx) => (
                             <ExerciseCard
@@ -673,17 +696,32 @@ export default function StudentPortal() {
                 )}
               </div>
             )}
-          </TabsContent>
+          </div>
+        )}
 
-          {/* ESTATÍSTICAS TAB */}
-          <TabsContent value="estatisticas" className="space-y-6">
-            <StatsCharts
-              allLogs={allLogs}
-              cycles={cycles}
-              todayStr={todayStr}
-            />
-          </TabsContent>
-        </Tabs>
+        {/* STATS VIEW */}
+        {activeView === "stats" && (
+          <StatsCharts allLogs={allLogs} cycles={cycles} todayStr={todayStr} />
+        )}
+
+        {/* CALENDARIO VIEW */}
+        {activeView === "calendario" && selectedCycle && (
+          <StudentCalendar
+            workouts={selectedCycle.workouts}
+            trainedDays={trainedDays}
+            currentDayOfWeek={new Date().getDay()}
+            onSelectWorkout={handleCalendarSelectWorkout}
+          />
+        )}
+
+        {/* HISTORICO VIEW */}
+        {activeView === "historico" && (
+          <StudentHistory
+            allLogs={allLogs}
+            workouts={cycles.flatMap(c => c.workouts.map(w => ({ id: w.id, title: w.title })))}
+            sessions={workoutSessions}
+          />
+        )}
       </div>
 
       {/* Video Modal */}
