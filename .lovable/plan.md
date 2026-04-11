@@ -1,65 +1,55 @@
 
 
-# Novo Visual do Portal do Aluno — Tela Inicial com Menu
+# Calendário em formato Agenda com detalhes ao clicar
 
 ## Situação Atual
-Após o login, o aluno cai direto no treino com tabs "Treino" e "Estatísticas". Tudo em uma única página monolítica (`StudentPortal.tsx` — 723 linhas).
+O `StudentCalendar` já mostra uma agenda semanal, mas ao clicar num dia com treino, ele navega para a view "Treino" (muda de tela). O usuário quer clicar no dia e ver os detalhes do treino **ali mesmo**, sem sair do calendário.
 
 ## Nova Experiência
 
-Após o login, o aluno vê uma **tela inicial (Home)** com saudação e cards grandes para navegar:
+Ao clicar num card de dia que tem treino, ele **expande** mostrando:
+- Nome do treino
+- Lista de exercícios com séries × repetições
+- Se já treinou naquele dia: carga e reps realizadas
+- Botão "Ir para o treino" para abrir na view treino
 
 ```text
-┌────────────────────────────┐
-│  Olá, João!                │
-│  Plano X • Ciclo 3 (Atual) │
-│  ████████████░░░ 72%       │
-├────────────────────────────┤
-│  ┌──────────┐ ┌──────────┐ │
-│  │ 🏋️ TREINO │ │ 📊 STATS │ │
-│  │  Treino A │ │ Volume   │ │
-│  │  do dia   │ │ e força  │ │
-│  └──────────┘ └──────────┘ │
-│  ┌──────────┐ ┌──────────┐ │
-│  │ 📅 CALEN │ │ 📜 HIST. │ │
-│  │ Agenda   │ │ Sessões  │ │
-│  │ semanal  │ │ passadas │ │
-│  └──────────┘ └──────────┘ │
-└────────────────────────────┘
+┌─────────────────────────────────┐
+│ [Seg] Segunda                 ✅ │
+│  Treino A • 6 exercícios        │
+├─────────────────────────────────┤
+│  1. Agachamento — 4×12          │
+│     Último: 80kg × 12           │
+│  2. Leg Press — 3×15            │
+│     Último: 120kg × 15          │
+│  ...                            │
+│  [Ir para o treino →]           │
+└─────────────────────────────────┘
+│ [Ter] Terça                   🏋️ │  ← colapsado
+│  Treino B • 5 exercícios        │
 ```
 
-Cada card navega para uma "view" dentro do portal (mantendo tudo no `StudentPortal.tsx` com state interno, sem novas rotas).
+## Plano Técnico — `StudentCalendar.tsx`
 
-## Plano Técnico
+### 1. Adicionar estado de dia expandido
+`expandedDay: number | null` — ao clicar num card, expande/colapsa.
 
-### 1. Criar estado de navegação interna
-Adicionar `activeView: "home" | "treino" | "stats" | "calendario" | "historico"` ao `StudentPortal.tsx`. Default: `"home"`.
+### 2. Receber logs do treino como prop
+Adicionar prop `allLogs` para mostrar a última carga registrada de cada exercício.
 
-### 2. Criar componente `StudentHome.tsx`
-Nova tela inicial com:
-- Saudação com nome do aluno
-- Barra de progresso do plano
-- Grid 2x2 de cards com ícones grandes (Treino, Estatísticas, Calendário, Histórico)
-- Card de Treino mostra qual treino é do dia
-- WeeklyBar integrado
+### 3. Expandir card com detalhes
+Quando expandido, mostrar lista de exercícios do treino daquele dia:
+- Nome do exercício e grupo muscular
+- Séries × Reps prescritas
+- Último registro de carga (se houver)
 
-### 3. Criar componente `StudentCalendar.tsx`
-Calendário visual mostrando os dias de treino da semana (quais treinos em quais dias), baseado no `day_of_week` dos workouts.
+### 4. Botão "Ir para o treino"
+Mantém o `onSelectWorkout` existente como ação secundária dentro do card expandido.
 
-### 4. Criar componente `StudentHistory.tsx`
-Lista de sessões passadas agrupadas por data, mostrando qual treino foi feito, duração e volume total.
-
-### 5. Refatorar `StudentPortal.tsx`
-- Extrair a lógica de treino atual para continuar funcionando como view "treino"
-- Extrair estatísticas como view "stats" (já usa `StatsCharts`)
-- Adicionar header com botão voltar quando não está na home
-- Manter toda a lógica de dados existente (logs, cycles, etc.)
+### 5. Atualizar `StudentPortal.tsx`
+Passar `allLogs` como prop para `StudentCalendar`.
 
 ### Arquivos
-- **Novo**: `src/components/student/StudentHome.tsx`
-- **Novo**: `src/components/student/StudentCalendar.tsx`
-- **Novo**: `src/components/student/StudentHistory.tsx`
-- **Modificado**: `src/pages/student/StudentPortal.tsx`
-
-Sem mudanças no banco de dados ou rotas.
+- **Modificado**: `src/components/student/StudentCalendar.tsx`
+- **Modificado**: `src/pages/student/StudentPortal.tsx` (apenas passar nova prop)
 
