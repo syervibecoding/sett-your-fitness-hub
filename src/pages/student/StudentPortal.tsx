@@ -418,15 +418,7 @@ export default function StudentPortal() {
       .map(([date, sets]) => ({ date, sets: sets.sort((a, b) => a.set_number - b.set_number) }));
   };
 
-  // Computed values for Home
-  const scheduledDays = useMemo(() => {
-    const days = new Set<number>();
-    selectedCycle?.workouts.forEach(w => {
-      if (w.day_of_week !== null && w.day_of_week !== undefined) days.add(w.day_of_week);
-    });
-    return days;
-  }, [selectedCycle]);
-
+  // Computed values for Home — based on actual sessions, not day_of_week
   const trainedDays = useMemo(() => {
     const now = new Date();
     const jsDow = now.getDay();
@@ -448,11 +440,9 @@ export default function StudentPortal() {
     return days;
   }, [allLogs]);
 
-  const todaysWorkoutTitle = useMemo(() => {
-    const todayDow = new Date().getDay();
-    const w = selectedCycle?.workouts.find(w => w.day_of_week === todayDow);
-    return w?.title || null;
-  }, [selectedCycle]);
+  const weeklySessionCount = useMemo(() => trainedDays.size, [trainedDays]);
+
+  const workoutCount = useMemo(() => selectedCycle?.workouts.length || 0, [selectedCycle]);
 
   const totalSessions = useMemo(() => {
     const dates = new Set(allLogs.map((l: any) => l.session_date));
