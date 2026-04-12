@@ -697,13 +697,14 @@ export default function StudentPortal() {
         {/* CALENDARIO VIEW */}
         {activeView === "calendario" && selectedCycle && (
           <StudentCalendar
-            workouts={selectedCycle.workouts}
+            workouts={cycles.flatMap(c => c.workouts)}
             trainedDays={trainedDays}
             currentDayOfWeek={new Date().getDay()}
             onSelectWorkout={handleCalendarSelectWorkout}
             allLogs={allLogs}
             cycleStartDate={selectedCycle.start_date}
             cycleEndDate={selectedCycle.end_date}
+            workoutSessions={workoutSessions}
           />
         )}
 
