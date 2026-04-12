@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, format, isSameMonth, isSameDay,
-  addMonths, subMonths, getDay, isToday as isDateToday
+  addMonths, subMonths, isToday as isDateToday
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -46,27 +46,27 @@ interface StudentCalendarProps {
   cycleEndDate?: string;
 }
 
-export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], cycleStartDate, cycleEndDate }: StudentCalendarProps) {
+export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [] }: StudentCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  // Map workouts by day_of_week (0=Sun, 1=Mon, etc.)
-  const workoutByDow = useMemo(() => {
-    const map: Record<number, Workout> = {};
-    workouts.forEach(w => {
-      if (w.day_of_week !== null && w.day_of_week !== undefined) {
-        map[w.day_of_week] = w;
+  // Map logs by session_date to know which dates were trained and which workout
+  const logsByDate = useMemo(() => {
+    const map: Record<string, { workout_id: string; logs: WorkoutLog[] }[]> = {};
+    allLogs.forEach(l => {
+      if (!l.session_date) return;
+      if (!map[l.session_date]) map[l.session_date] = [];
+      const existing = map[l.session_date].find(g => g.workout_id === l.workout_id);
+      if (existing) {
+        existing.logs.push(l);
+      } else {
+        map[l.session_date].push({ workout_id: l.workout_id, logs: [l] });
       }
     });
     return map;
-  }, [workouts]);
-
-  // Set of dates (YYYY-MM-DD) that have logs
-  const trainedDates = useMemo(() => {
-    const s = new Set<string>();
-    allLogs.forEach(l => { if (l.session_date) s.add(l.session_date); });
-    return s;
   }, [allLogs]);
+
+  const trainedDates = useMemo(() => new Set(Object.keys(logsByDate)), [logsByDate]);
 
   // Generate calendar days grid
   const calendarDays = useMemo(() => {
@@ -77,36 +77,22 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], cycle
     return eachDayOfInterval({ start: gridStart, end: gridEnd });
   }, [currentMonth]);
 
-  const getWorkoutForDate = (date: Date): Workout | null => {
-    const dow = getDay(date); // 0=Sun
-    return workoutByDow[dow] || null;
-  };
-
   const isDateTrained = (date: Date): boolean => {
     return trainedDates.has(format(date, "yyyy-MM-dd"));
   };
 
-  const isInCycle = (date: Date): boolean => {
-    if (!cycleStartDate || !cycleEndDate) return true;
-    const d = format(date, "yyyy-MM-dd");
-    return d >= cycleStartDate && d <= cycleEndDate;
+  const getWorkoutsForDate = (date: Date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    const dayGroups = logsByDate[dateStr] || [];
+    return dayGroups.map(g => {
+      const workout = workouts.find(w => w.id === g.workout_id);
+      return { workout, logs: g.logs };
+    }).filter(g => g.workout);
   };
 
-  const getLastLogForExercise = (workoutId: string, exerciseIndex: number) => {
-    const exLogs = allLogs
-      .filter(l => l.workout_id === workoutId && l.exercise_index === exerciseIndex)
-      .sort((a, b) => (b.session_date || "").localeCompare(a.session_date || ""));
-    if (exLogs.length === 0) return null;
-    const lastDate = exLogs[0].session_date;
-    const lastSets = exLogs.filter(l => l.session_date === lastDate).sort((a, b) => a.set_number - b.set_number);
-    const maxWeight = Math.max(...lastSets.map(s => s.weight || 0));
-    const maxReps = lastSets.find(s => s.weight === maxWeight)?.reps_done || lastSets[0]?.reps_done || 0;
-    return { weight: maxWeight, reps: maxReps };
-  };
-
-  const selectedWorkout = selectedDate ? getWorkoutForDate(selectedDate) : null;
   const selectedDateStr = selectedDate ? format(selectedDate, "yyyy-MM-dd") : null;
   const selectedDateTrained = selectedDate ? isDateTrained(selectedDate) : false;
+  const selectedDateWorkouts = selectedDate ? getWorkoutsForDate(selectedDate) : [];
 
   return (
     <div className="space-y-4">
@@ -135,11 +121,8 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], cycle
         {calendarDays.map((day, idx) => {
           const inMonth = isSameMonth(day, currentMonth);
           const today = isDateToday(day);
-          const workout = getWorkoutForDate(day);
           const trained = isDateTrained(day);
-          const inCycle = isInCycle(day);
           const isSelected = selectedDate && isSameDay(day, selectedDate);
-          const hasPrescribed = workout && inCycle && inMonth;
 
           return (
             <button
@@ -157,9 +140,6 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], cycle
               <span className={cn("text-sm", !isSelected && !trained && inMonth && "text-foreground")}>
                 {format(day, "d")}
               </span>
-              {hasPrescribed && !trained && !isSelected && (
-                <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-primary" />
-              )}
               {trained && inMonth && !isSelected && (
                 <CheckCircle2 className="absolute bottom-0.5 h-3 w-3 text-green-500" />
               )}
@@ -170,10 +150,6 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], cycle
 
       {/* Legend */}
       <div className="flex items-center gap-4 text-xs text-muted-foreground font-sans">
-        <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-primary" />
-          Treino prescrito
-        </div>
         <div className="flex items-center gap-1">
           <CheckCircle2 className="h-3 w-3 text-green-500" />
           Treinado
@@ -195,44 +171,75 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], cycle
               )}
             </div>
 
-            {selectedWorkout && isInCycle(selectedDate) && isSameMonth(selectedDate, currentMonth) ? (
+            {selectedDateTrained && selectedDateWorkouts.length > 0 ? (
+              <div className="space-y-4">
+                {selectedDateWorkouts.map(({ workout, logs }) => (
+                  <div key={workout!.id}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Dumbbell className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium text-foreground font-sans">
+                        {workout!.title} • {workout!.exercises.length} exercícios
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 mb-4">
+                      {workout!.exercises.map((ex, idx) => {
+                        const exLogs = logs.filter(l => l.exercise_index === idx);
+                        const maxWeight = exLogs.length > 0 ? Math.max(...exLogs.map(l => l.weight || 0)) : 0;
+                        const bestReps = exLogs.find(l => l.weight === maxWeight)?.reps_done || 0;
+                        return (
+                          <div key={idx} className="flex items-start justify-between py-1.5 border-b border-border/50 last:border-0">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground font-sans truncate">
+                                {idx + 1}. {ex.exercise_name}
+                              </p>
+                              <p className="text-xs text-muted-foreground font-sans">
+                                {ex.muscle_group} • {ex.sets}×{ex.reps}
+                              </p>
+                              {maxWeight > 0 && (
+                                <p className="text-xs text-primary/80 font-sans mt-0.5">
+                                  Carga: {maxWeight}kg × {bestReps}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <Button size="sm" className="w-full font-sans" onClick={() => onSelectWorkout(workout!.id)}>
+                      Ir para o treino <ArrowRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : !selectedDateTrained ? (
               <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Dumbbell className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium text-foreground font-sans">
-                    {selectedWorkout.title} • {selectedWorkout.exercises.length} exercícios
-                  </span>
-                </div>
-
-                <div className="space-y-2 mb-4">
-                  {selectedWorkout.exercises.map((ex, idx) => {
-                    const lastLog = getLastLogForExercise(selectedWorkout.id, idx);
-                    return (
-                      <div key={idx} className="flex items-start justify-between py-1.5 border-b border-border/50 last:border-0">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground font-sans truncate">
-                            {idx + 1}. {ex.exercise_name}
-                          </p>
-                          <p className="text-xs text-muted-foreground font-sans">
-                            {ex.muscle_group} • {ex.sets}×{ex.reps}
-                          </p>
-                          {lastLog && lastLog.weight > 0 && (
-                            <p className="text-xs text-primary/80 font-sans mt-0.5">
-                              Último: {lastLog.weight}kg × {lastLog.reps}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <Button size="sm" className="w-full font-sans" onClick={() => onSelectWorkout(selectedWorkout.id)}>
-                  Ir para o treino <ArrowRight className="h-4 w-4 ml-1" />
-                </Button>
+                {workouts.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground font-sans mb-3">Treinos disponíveis no ciclo:</p>
+                    {workouts.map(w => (
+                      <Button
+                        key={w.id}
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-between font-sans"
+                        onClick={() => onSelectWorkout(w.id)}
+                      >
+                        <span className="flex items-center gap-2">
+                          <Dumbbell className="h-3.5 w-3.5 text-primary" />
+                          {w.title}
+                        </span>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground font-sans">Sem treinos prescritos neste ciclo.</p>
+                )}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground font-sans">Sem treino prescrito para este dia.</p>
+              <p className="text-sm text-muted-foreground font-sans">Sem detalhes disponíveis.</p>
             )}
           </CardContent>
         </Card>

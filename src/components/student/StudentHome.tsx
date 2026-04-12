@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Dumbbell, BarChart3, CalendarDays, History, TrendingUp } from "lucide-react";
+import { Dumbbell, BarChart3, CalendarDays, History } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { WeeklyBar } from "./WeeklyBar";
@@ -21,8 +21,8 @@ interface StudentHomeProps {
   overallProgress: number;
   selectedCycle: Cycle | null;
   cycleProgress: number;
-  todaysWorkoutTitle: string | null;
-  scheduledDays: Set<number>;
+  workoutCount: number;
+  weeklySessionCount: number;
   trainedDays: Set<number>;
   currentDayOfWeek: number;
   totalSessions: number;
@@ -35,8 +35,8 @@ export function StudentHome({
   overallProgress,
   selectedCycle,
   cycleProgress,
-  todaysWorkoutTitle,
-  scheduledDays,
+  workoutCount,
+  weeklySessionCount,
   trainedDays,
   currentDayOfWeek,
   totalSessions,
@@ -84,14 +84,12 @@ export function StudentHome({
         </Card>
       )}
 
-      {/* Weekly bar */}
-      {scheduledDays.size > 0 && (
-        <WeeklyBar
-          scheduledDays={scheduledDays}
-          trainedDays={trainedDays}
-          currentDayOfWeek={currentDayOfWeek}
-        />
-      )}
+      {/* Weekly bar - shows actual trained days */}
+      <WeeklyBar
+        trainedDays={trainedDays}
+        currentDayOfWeek={currentDayOfWeek}
+        weeklySessionCount={weeklySessionCount}
+      />
 
       {/* Navigation grid */}
       <div className="grid grid-cols-2 gap-3">
@@ -105,7 +103,7 @@ export function StudentHome({
               <div>
                 <h3 className="font-bold text-foreground font-sans text-sm">Treino</h3>
                 <p className="text-xs text-muted-foreground font-sans mt-0.5">
-                  {todaysWorkoutTitle ? `${todaysWorkoutTitle} hoje` : "Ver treinos do ciclo"}
+                  {workoutCount > 0 ? `${workoutCount} treinos disponíveis` : "Ver treinos do ciclo"}
                 </p>
               </div>
             </CardContent>
@@ -136,7 +134,7 @@ export function StudentHome({
               </div>
               <div>
                 <h3 className="font-bold text-foreground font-sans text-sm">Calendário</h3>
-                <p className="text-xs text-muted-foreground font-sans mt-0.5">Agenda semanal</p>
+                <p className="text-xs text-muted-foreground font-sans mt-0.5">Histórico mensal</p>
               </div>
             </CardContent>
           </Card>
