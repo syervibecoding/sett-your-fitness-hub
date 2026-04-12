@@ -712,6 +712,8 @@ export default function StudentPortal() {
             currentDayOfWeek={new Date().getDay()}
             onSelectWorkout={handleCalendarSelectWorkout}
             allLogs={allLogs}
+            cycleStartDate={selectedCycle.start_date}
+            cycleEndDate={selectedCycle.end_date}
           />
         )}
 
