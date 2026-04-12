@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Dumbbell, CheckCircle2, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Dumbbell, CheckCircle2, ArrowRight, TrendingUp, TrendingDown, Clock, Target } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
@@ -36,6 +36,17 @@ interface WorkoutLog {
   session_date?: string;
 }
 
+interface WorkoutSession {
+  id: string;
+  workout_id: string;
+  session_date?: string;
+  duration_seconds?: number | null;
+  total_volume?: number | null;
+  total_sets_completed?: number | null;
+  total_sets_prescribed?: number | null;
+  completed_at?: string | null;
+}
+
 interface StudentCalendarProps {
   workouts: Workout[];
   trainedDays: Set<number>;
@@ -44,13 +55,13 @@ interface StudentCalendarProps {
   allLogs?: WorkoutLog[];
   cycleStartDate?: string;
   cycleEndDate?: string;
+  workoutSessions?: WorkoutSession[];
 }
 
-export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [] }: StudentCalendarProps) {
+export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], workoutSessions = [] }: StudentCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  // Map logs by session_date to know which dates were trained and which workout
   const logsByDate = useMemo(() => {
     const map: Record<string, { workout_id: string; logs: WorkoutLog[] }[]> = {};
     allLogs.forEach(l => {
@@ -66,9 +77,40 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [] }: Stu
     return map;
   }, [allLogs]);
 
+  const sessionsByDate = useMemo(() => {
+    const map: Record<string, WorkoutSession[]> = {};
+    workoutSessions.forEach(s => {
+      if (!s.session_date) return;
+      if (!map[s.session_date]) map[s.session_date] = [];
+      map[s.session_date].push(s);
+    });
+    return map;
+  }, [workoutSessions]);
+
+  // Previous session volume for comparison
+  const previousSessionVolume = useMemo(() => {
+    const map: Record<string, Record<string, number>> = {}; // date -> workout_id -> previous volume
+    const sessionsByWorkout: Record<string, { date: string; volume: number }[]> = {};
+    
+    workoutSessions.forEach(s => {
+      if (!s.session_date || !s.total_volume) return;
+      if (!sessionsByWorkout[s.workout_id]) sessionsByWorkout[s.workout_id] = [];
+      sessionsByWorkout[s.workout_id].push({ date: s.session_date, volume: s.total_volume });
+    });
+
+    Object.entries(sessionsByWorkout).forEach(([wId, sessions]) => {
+      sessions.sort((a, b) => a.date.localeCompare(b.date));
+      for (let i = 1; i < sessions.length; i++) {
+        const date = sessions[i].date;
+        if (!map[date]) map[date] = {};
+        map[date][wId] = sessions[i - 1].volume;
+      }
+    });
+    return map;
+  }, [workoutSessions]);
+
   const trainedDates = useMemo(() => new Set(Object.keys(logsByDate)), [logsByDate]);
 
-  // Generate calendar days grid
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(currentMonth);
@@ -77,22 +119,42 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [] }: Stu
     return eachDayOfInterval({ start: gridStart, end: gridEnd });
   }, [currentMonth]);
 
-  const isDateTrained = (date: Date): boolean => {
-    return trainedDates.has(format(date, "yyyy-MM-dd"));
-  };
+  const isDateTrained = (date: Date): boolean => trainedDates.has(format(date, "yyyy-MM-dd"));
 
   const getWorkoutsForDate = (date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
     const dayGroups = logsByDate[dateStr] || [];
     return dayGroups.map(g => {
       const workout = workouts.find(w => w.id === g.workout_id);
-      return { workout, logs: g.logs };
+      const session = (sessionsByDate[dateStr] || []).find(s => s.workout_id === g.workout_id);
+      const prevVolume = previousSessionVolume[dateStr]?.[g.workout_id];
+      return { workout, logs: g.logs, session, prevVolume };
     }).filter(g => g.workout);
   };
 
-  const selectedDateStr = selectedDate ? format(selectedDate, "yyyy-MM-dd") : null;
   const selectedDateTrained = selectedDate ? isDateTrained(selectedDate) : false;
   const selectedDateWorkouts = selectedDate ? getWorkoutsForDate(selectedDate) : [];
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    if (mins < 60) return `${mins}min`;
+    const hrs = Math.floor(mins / 60);
+    const remainMins = mins % 60;
+    return `${hrs}h${remainMins > 0 ? ` ${remainMins}min` : ""}`;
+  };
+
+  const computeVolume = (logs: WorkoutLog[]) =>
+    logs.reduce((sum, l) => sum + (l.weight || 0) * (l.reps_done || 0), 0);
+
+  // Deduplicate workouts for the "available" list (when clicking untrained day)
+  const uniqueWorkouts = useMemo(() => {
+    const seen = new Set<string>();
+    return workouts.filter(w => {
+      if (seen.has(w.id)) return false;
+      seen.add(w.id);
+      return true;
+    });
+  }, [workouts]);
 
   return (
     <div className="space-y-4">
@@ -117,7 +179,6 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [] }: Stu
           </div>
         ))}
 
-        {/* Day Cells */}
         {calendarDays.map((day, idx) => {
           const inMonth = isSameMonth(day, currentMonth);
           const today = isDateToday(day);
@@ -172,53 +233,100 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [] }: Stu
             </div>
 
             {selectedDateTrained && selectedDateWorkouts.length > 0 ? (
-              <div className="space-y-4">
-                {selectedDateWorkouts.map(({ workout, logs }) => (
-                  <div key={workout!.id}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Dumbbell className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium text-foreground font-sans">
-                        {workout!.title} • {workout!.exercises.length} exercícios
-                      </span>
-                    </div>
+              <div className="space-y-5">
+                {selectedDateWorkouts.map(({ workout, logs, session, prevVolume }) => {
+                  const totalVolume = session?.total_volume || computeVolume(logs);
+                  const setsCompleted = session?.total_sets_completed || logs.length;
+                  const setsPrescribed = session?.total_sets_prescribed || 
+                    workout!.exercises.reduce((sum, ex) => sum + (parseInt(ex.sets) || 3), 0);
+                  const durationSec = session?.duration_seconds;
+                  const volumeDiff = prevVolume && totalVolume ? totalVolume - prevVolume : null;
+                  const volumePercent = prevVolume && totalVolume ? Math.round(((totalVolume - prevVolume) / prevVolume) * 100) : null;
 
-                    <div className="space-y-2 mb-4">
-                      {workout!.exercises.map((ex, idx) => {
-                        const exLogs = logs.filter(l => l.exercise_index === idx);
-                        const maxWeight = exLogs.length > 0 ? Math.max(...exLogs.map(l => l.weight || 0)) : 0;
-                        const bestReps = exLogs.find(l => l.weight === maxWeight)?.reps_done || 0;
-                        return (
-                          <div key={idx} className="flex items-start justify-between py-1.5 border-b border-border/50 last:border-0">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground font-sans truncate">
-                                {idx + 1}. {ex.exercise_name}
-                              </p>
-                              <p className="text-xs text-muted-foreground font-sans">
-                                {ex.muscle_group} • {ex.sets}×{ex.reps}
-                              </p>
-                              {maxWeight > 0 && (
-                                <p className="text-xs text-primary/80 font-sans mt-0.5">
-                                  Carga: {maxWeight}kg × {bestReps}
+                  return (
+                    <div key={workout!.id}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Dumbbell className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium text-foreground font-sans">
+                          {workout!.title}
+                        </span>
+                      </div>
+
+                      {/* Performance Summary */}
+                      <div className="grid grid-cols-3 gap-2 mb-3">
+                        <div className="bg-muted/50 rounded-lg p-2 text-center">
+                          <Target className="h-3.5 w-3.5 text-primary mx-auto mb-0.5" />
+                          <p className="text-xs text-muted-foreground font-sans">Séries</p>
+                          <p className="text-sm font-bold text-foreground font-sans">{setsCompleted}/{setsPrescribed}</p>
+                        </div>
+                        <div className="bg-muted/50 rounded-lg p-2 text-center">
+                          <TrendingUp className="h-3.5 w-3.5 text-primary mx-auto mb-0.5" />
+                          <p className="text-xs text-muted-foreground font-sans">Volume</p>
+                          <p className="text-sm font-bold text-foreground font-sans">
+                            {totalVolume > 0 ? `${(totalVolume / 1000).toFixed(1)}t` : "—"}
+                          </p>
+                        </div>
+                        <div className="bg-muted/50 rounded-lg p-2 text-center">
+                          <Clock className="h-3.5 w-3.5 text-primary mx-auto mb-0.5" />
+                          <p className="text-xs text-muted-foreground font-sans">Duração</p>
+                          <p className="text-sm font-bold text-foreground font-sans">
+                            {durationSec ? formatDuration(durationSec) : "—"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Volume comparison badge */}
+                      {volumePercent !== null && (
+                        <div className={cn(
+                          "flex items-center gap-1 text-xs font-sans mb-3 px-2 py-1 rounded-md w-fit",
+                          volumeDiff! >= 0 ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
+                        )}>
+                          {volumeDiff! >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                          {volumeDiff! >= 0 ? "+" : ""}{volumePercent}% vs sessão anterior
+                        </div>
+                      )}
+
+                      {/* Exercise details */}
+                      <div className="space-y-2 mb-4">
+                        {workout!.exercises.map((ex, idx) => {
+                          const exLogs = logs.filter(l => l.exercise_index === idx);
+                          const completedSets = exLogs.length;
+                          const prescribedSets = parseInt(ex.sets) || 3;
+                          const maxWeight = exLogs.length > 0 ? Math.max(...exLogs.map(l => l.weight || 0)) : 0;
+                          const bestReps = exLogs.find(l => l.weight === maxWeight)?.reps_done || 0;
+                          return (
+                            <div key={idx} className="flex items-start justify-between py-1.5 border-b border-border/50 last:border-0">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-foreground font-sans truncate">
+                                  {idx + 1}. {ex.exercise_name}
                                 </p>
-                              )}
+                                <p className="text-xs text-muted-foreground font-sans">
+                                  {ex.muscle_group} • {completedSets}/{prescribedSets} séries • {ex.reps} reps
+                                </p>
+                                {maxWeight > 0 && (
+                                  <p className="text-xs text-primary/80 font-sans mt-0.5">
+                                    Melhor: {maxWeight}kg × {bestReps}
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
 
-                    <Button size="sm" className="w-full font-sans" onClick={() => onSelectWorkout(workout!.id)}>
-                      Ir para o treino <ArrowRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </div>
-                ))}
+                      <Button size="sm" className="w-full font-sans" onClick={() => onSelectWorkout(workout!.id)}>
+                        Ir para o treino <ArrowRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             ) : !selectedDateTrained ? (
               <div>
-                {workouts.length > 0 ? (
+                {uniqueWorkouts.length > 0 ? (
                   <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground font-sans mb-3">Treinos disponíveis no ciclo:</p>
-                    {workouts.map(w => (
+                    <p className="text-sm text-muted-foreground font-sans mb-3">Treinos disponíveis:</p>
+                    {uniqueWorkouts.map(w => (
                       <Button
                         key={w.id}
                         variant="outline"
@@ -235,7 +343,7 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [] }: Stu
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground font-sans">Sem treinos prescritos neste ciclo.</p>
+                  <p className="text-sm text-muted-foreground font-sans">Sem treinos prescritos.</p>
                 )}
               </div>
             ) : (
