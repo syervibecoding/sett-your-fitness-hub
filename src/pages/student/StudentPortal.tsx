@@ -523,8 +523,8 @@ export default function StudentPortal() {
             overallProgress={getOverallProgress()}
             selectedCycle={selectedCycle}
             cycleProgress={selectedCycle ? getCycleProgress(selectedCycle) : 0}
-            todaysWorkoutTitle={todaysWorkoutTitle}
-            scheduledDays={scheduledDays}
+            workoutCount={workoutCount}
+            weeklySessionCount={weeklySessionCount}
             trainedDays={trainedDays}
             currentDayOfWeek={new Date().getDay()}
             totalSessions={totalSessions}
@@ -576,11 +576,11 @@ export default function StudentPortal() {
 
                 {selectedCycle.workouts.length > 0 ? (
                   <div className="space-y-3">
-                    {scheduledDays.size > 0 && (
+                    {trainedDays.size > 0 && (
                       <WeeklyBar
-                        scheduledDays={scheduledDays}
                         trainedDays={trainedDays}
                         currentDayOfWeek={new Date().getDay()}
+                        weeklySessionCount={weeklySessionCount}
                       />
                     )}
 
