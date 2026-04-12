@@ -1,55 +1,49 @@
 
 
-# Calendário em formato Agenda com detalhes ao clicar
+# Calendário em formato de grade mensal com detalhes ao clicar
 
-## Situação Atual
-O `StudentCalendar` já mostra uma agenda semanal, mas ao clicar num dia com treino, ele navega para a view "Treino" (muda de tela). O usuário quer clicar no dia e ver os detalhes do treino **ali mesmo**, sem sair do calendário.
+## Problema
+O calendário atual é uma lista vertical dos 7 dias da semana — parece uma agenda simples, não um calendário real. Todos os dias mostram "Descanso" porque os treinos provavelmente não têm `day_of_week` atribuído ou o ciclo não tem treinos.
 
 ## Nova Experiência
 
-Ao clicar num card de dia que tem treino, ele **expande** mostrando:
-- Nome do treino
-- Lista de exercícios com séries × repetições
-- Se já treinou naquele dia: carga e reps realizadas
-- Botão "Ir para o treino" para abrir na view treino
+Calendário mensal em grid, mostrando o mês atual com as datas do ciclo. Cada dia mostra se teve treino, qual treino era, e se foi completado. Ao clicar num dia, expande um painel com detalhes.
 
 ```text
-┌─────────────────────────────────┐
-│ [Seg] Segunda                 ✅ │
-│  Treino A • 6 exercícios        │
-├─────────────────────────────────┤
-│  1. Agachamento — 4×12          │
-│     Último: 80kg × 12           │
-│  2. Leg Press — 3×15            │
-│     Último: 120kg × 15          │
-│  ...                            │
-│  [Ir para o treino →]           │
-└─────────────────────────────────┘
-│ [Ter] Terça                   🏋️ │  ← colapsado
-│  Treino B • 5 exercícios        │
+       Abril 2026
+ Seg Ter Qua Qui Sex Sáb Dom
+       1   2   3   4   5   6
+  7   8   9  10  11  12  13
+ 14  15  16  17  18  19  20
+ 21  22  23  24  25  26  27
+ 28  29  30
+
+ ● = treino prescrito  ✅ = treinado
 ```
 
-## Plano Técnico — `StudentCalendar.tsx`
+Ao clicar num dia com treino → painel abaixo do calendário com:
+- Nome do treino
+- Lista de exercícios com séries × reps
+- Última carga registrada (se houver)
+- Botão "Ir para o treino"
 
-### 1. Adicionar estado de dia expandido
-`expandedDay: number | null` — ao clicar num card, expande/colapsa.
+## Plano Técnico
 
-### 2. Receber logs do treino como prop
-Adicionar prop `allLogs` para mostrar a última carga registrada de cada exercício.
+### 1. Reescrever `StudentCalendar.tsx`
+- Substituir a lista semanal por um grid de calendário mensal
+- Usar `date-fns` (já instalado) para gerar dias do mês, navegação entre meses
+- Estado: `selectedMonth` (Date) e `selectedDate` (string | null)
+- Mapear treinos por `day_of_week` para saber quais dias da semana têm treino prescrito
+- Mapear `allLogs` por `session_date` para saber quais datas foram treinadas
+- Ao clicar num dia: mostrar painel de detalhes abaixo do grid (exercícios, cargas, botão)
+- Botões `<` `>` para navegar entre meses
+- Destacar: hoje (ring primary), dias treinados (verde), dias com treino prescrito (dot)
 
-### 3. Expandir card com detalhes
-Quando expandido, mostrar lista de exercícios do treino daquele dia:
-- Nome do exercício e grupo muscular
-- Séries × Reps prescritas
-- Último registro de carga (se houver)
-
-### 4. Botão "Ir para o treino"
-Mantém o `onSelectWorkout` existente como ação secundária dentro do card expandido.
-
-### 5. Atualizar `StudentPortal.tsx`
-Passar `allLogs` como prop para `StudentCalendar`.
+### 2. Atualizar props se necessário
+- Adicionar prop `cycleStartDate` e `cycleEndDate` para destacar o período do ciclo no calendário
+- `StudentPortal.tsx`: passar essas datas do `selectedCycle`
 
 ### Arquivos
-- **Modificado**: `src/components/student/StudentCalendar.tsx`
-- **Modificado**: `src/pages/student/StudentPortal.tsx` (apenas passar nova prop)
+- **Reescrito**: `src/components/student/StudentCalendar.tsx`
+- **Modificado**: `src/pages/student/StudentPortal.tsx` (passar datas do ciclo)
 
