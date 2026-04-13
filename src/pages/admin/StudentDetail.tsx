@@ -292,14 +292,8 @@ export default function StudentDetail() {
     if (!studentData) { setLoading(false); return; }
     setStudent(studentData as Student);
 
-    // Load trainer name
-    if (studentData.assigned_trainer_id) {
-      const { data: profile } = await supabase
-        .from("profiles").select("full_name").eq("user_id", studentData.assigned_trainer_id).maybeSingle();
-      setTrainerName(profile?.full_name || null);
-    } else {
-      setTrainerName(null);
-    }
+    // Load trainer name — will be set after enrollments load (uses active enrollment trainer)
+    setTrainerName(null);
 
     // Load anamnesis (latest version)
     const { data: anamnesisData } = await supabase
