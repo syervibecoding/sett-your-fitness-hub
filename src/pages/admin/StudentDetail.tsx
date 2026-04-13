@@ -468,11 +468,14 @@ export default function StudentDetail() {
       end_date: format(computedEndDate, "yyyy-MM-dd"),
       created_by: session.user.id,
     });
-    setSaving(false);
     if (error) {
+      setSaving(false);
       toast({ title: "Erro ao criar matrícula", description: error.message, variant: "destructive" });
       return;
     }
+    // Sync assigned_trainer_id on student
+    await supabase.from("students").update({ assigned_trainer_id: selectedTrainerId }).eq("id", id);
+    setSaving(false);
     toast({ title: "Matrícula criada com sucesso!" });
     setEnrollOpen(false);
     loadData(id);
