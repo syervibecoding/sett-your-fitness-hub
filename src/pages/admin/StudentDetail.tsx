@@ -292,14 +292,8 @@ export default function StudentDetail() {
     if (!studentData) { setLoading(false); return; }
     setStudent(studentData as Student);
 
-    // Load trainer name
-    if (studentData.assigned_trainer_id) {
-      const { data: profile } = await supabase
-        .from("profiles").select("full_name").eq("user_id", studentData.assigned_trainer_id).maybeSingle();
-      setTrainerName(profile?.full_name || null);
-    } else {
-      setTrainerName(null);
-    }
+    // Load trainer name — will be set after enrollments load (uses active enrollment trainer)
+    setTrainerName(null);
 
     // Load anamnesis (latest version)
     const { data: anamnesisData } = await supabase
@@ -338,6 +332,16 @@ export default function StudentDetail() {
       trainer_name: trainerMap.get(e.trainer_id) || "Treinador desconhecido",
     }));
     setEnrollments(enrichedEnrollments);
+
+    // Set header trainer from active enrollment, fallback to assigned_trainer_id
+    const activeEnrollment = enrichedEnrollments.find(e => e.status === "active" || e.status === "awaiting_training") || enrichedEnrollments[0];
+    if (activeEnrollment) {
+      setTrainerName(trainerMap.get(activeEnrollment.trainer_id) || null);
+    } else if (studentData.assigned_trainer_id) {
+      const { data: fallbackProfile } = await supabase
+        .from("profiles").select("full_name").eq("user_id", studentData.assigned_trainer_id).maybeSingle();
+      setTrainerName(fallbackProfile?.full_name || null);
+    }
 
     const enrollmentIds = enrollmentData.map((e) => e.id);
     const { data: cycleData } = await supabase
@@ -464,11 +468,14 @@ export default function StudentDetail() {
       end_date: format(computedEndDate, "yyyy-MM-dd"),
       created_by: session.user.id,
     });
-    setSaving(false);
     if (error) {
+      setSaving(false);
       toast({ title: "Erro ao criar matrícula", description: error.message, variant: "destructive" });
       return;
     }
+    // Sync assigned_trainer_id on student
+    await supabase.from("students").update({ assigned_trainer_id: selectedTrainerId }).eq("id", id);
+    setSaving(false);
     toast({ title: "Matrícula criada com sucesso!" });
     setEnrollOpen(false);
     loadData(id);
