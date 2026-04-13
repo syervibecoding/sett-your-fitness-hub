@@ -1,23 +1,22 @@
 
 
-# Corrigir exibição de treinadores inconsistentes
+# Corrigir treinador na Agenda — usar `assigned_trainer_id`
 
 ## Problema
-O detalhe do aluno (`StudentDetail.tsx`) mostra o treinador em dois lugares diferentes com fontes de dados distintas:
-1. **Header do aluno** (linha 768): usa `student.assigned_trainer_id` — o treinador atribuído diretamente no cadastro do aluno
-2. **Matrícula ativa / Programa** (linhas 834, 938): usa `enrollment.trainer_id` — o treinador vinculado à matrícula
-
-Quando o aluno troca de treinador ou tem múltiplas matrículas, esses valores divergem, causando confusão.
+A agenda busca o treinador via `enrollments.trainer_id` (join nos training_cycles). Mas quando o treinador do aluno é alterado no cadastro (`assigned_trainer_id`), a matrícula antiga não é atualizada, causando divergência.
 
 ## Solução
 
-### 1. Usar o treinador da matrícula ativa como fonte principal
-- No header do aluno, exibir o treinador da matrícula ativa (mais recente) em vez do `assigned_trainer_id`
-- Se não houver matrícula ativa, usar o `assigned_trainer_id` como fallback
+### 1. Agenda: usar `assigned_trainer_id` do aluno como fonte do treinador
+Em `AdminAgenda.tsx`, ao montar os eventos de ciclos, buscar o treinador via `students.assigned_trainer_id` em vez de `enrollments.trainer_id`. Isso garante que a agenda mostra o treinador atual do aluno.
 
-### 2. Sincronizar `assigned_trainer_id` ao criar/editar matrícula
-- Quando uma nova matrícula for criada ou o treinador da matrícula for alterado, atualizar também o `assigned_trainer_id` do aluno para manter consistência
+**Mudança na query de ciclos (linha 80)**:
+- Adicionar join até `students` para pegar `assigned_trainer_id`
+- Buscar nomes dos treinadores usando `assigned_trainer_id` em vez de `enrollment.trainer_id`
+
+### 2. (Opcional) Corrigir dados existentes
+Criar uma migration que sincronize `enrollments.trainer_id` com `students.assigned_trainer_id` para matrículas ativas, eliminando a divergência histórica.
 
 ### Arquivos
-- **Modificado**: `src/pages/admin/StudentDetail.tsx` — trocar a lógica do `trainerName` no header para usar o treinador da matrícula ativa, com fallback para `assigned_trainer_id`
+- **Modificado**: `src/pages/admin/AdminAgenda.tsx` — trocar fonte do treinador de `enrollment.trainer_id` para `student.assigned_trainer_id`
 
