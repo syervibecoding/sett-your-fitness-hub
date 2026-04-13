@@ -77,7 +77,7 @@ export default function AdminAgenda() {
     // Training cycles — filter by start_date in month, include completed status
     let cyclesQuery = supabase
       .from("training_cycles")
-      .select("id, start_date, end_date, cycle_number, enrollment_id, status, enrollments(student_id, students(full_name), trainer_id)")
+      .select("id, start_date, end_date, cycle_number, enrollment_id, status, enrollments(student_id, students(full_name, assigned_trainer_id))")
       .in("status", ["active", "pending", "completed"])
       .gte("start_date", monthStart)
       .lte("start_date", monthEnd);
@@ -93,8 +93,8 @@ export default function AdminAgenda() {
 
       const cyclesWithWorkout = new Set((workouts || []).map((w: any) => w.cycle_id));
 
-      // Collect unique trainer_ids to fetch names
-      const trainerIds = [...new Set(cycles.map((c: any) => (c as any).enrollments?.trainer_id).filter(Boolean))];
+      // Collect unique assigned_trainer_ids from students to fetch names
+      const trainerIds = [...new Set(cycles.map((c: any) => (c as any).enrollments?.students?.assigned_trainer_id).filter(Boolean))];
       const trainerMap: Record<string, string> = {};
       if (trainerIds.length > 0) {
         const { data: profiles } = await supabase
@@ -108,7 +108,7 @@ export default function AdminAgenda() {
 
       cycles.forEach((c: any) => {
         const hasWorkout = cyclesWithWorkout.has(c.id);
-        const trainerId = (c as any).enrollments?.trainer_id;
+        const trainerId = (c as any).enrollments?.students?.assigned_trainer_id;
         collected.push({
           id: `cyc-${c.id}`,
           date: c.start_date,
