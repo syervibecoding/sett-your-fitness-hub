@@ -333,6 +333,16 @@ export default function StudentDetail() {
     }));
     setEnrollments(enrichedEnrollments);
 
+    // Set header trainer from active enrollment, fallback to assigned_trainer_id
+    const activeEnrollment = enrichedEnrollments.find(e => e.status === "active" || e.status === "awaiting_training") || enrichedEnrollments[0];
+    if (activeEnrollment) {
+      setTrainerName(trainerMap.get(activeEnrollment.trainer_id) || null);
+    } else if (studentData.assigned_trainer_id) {
+      const { data: fallbackProfile } = await supabase
+        .from("profiles").select("full_name").eq("user_id", studentData.assigned_trainer_id).maybeSingle();
+      setTrainerName(fallbackProfile?.full_name || null);
+    }
+
     const enrollmentIds = enrollmentData.map((e) => e.id);
     const { data: cycleData } = await supabase
       .from("training_cycles").select("*").in("enrollment_id", enrollmentIds).order("end_date", { ascending: true });
