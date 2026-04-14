@@ -213,12 +213,29 @@ async function createCardPayment(body: any) {
 
   const { data: student } = await supabaseAdmin
     .from("students")
-    .select("asaas_customer_id, company_id")
+    .select("asaas_customer_id, company_id, full_name, email, cpf, phone, whatsapp, cep, address, address_number, neighborhood, city, state")
     .eq("id", studentId)
     .single();
 
-  if (!student?.asaas_customer_id) {
-    throw new Error("Cliente Asaas não encontrado.");
+  if (!student) {
+    throw new Error("Aluno não encontrado.");
+  }
+
+  // Auto-create Asaas customer if missing
+  if (!student.asaas_customer_id) {
+    console.log(`[CARD] Auto-creating Asaas customer for student ${studentId}`);
+    const { customerId } = await createCustomer({
+      studentId,
+      name: student.full_name,
+      email: student.email || undefined,
+      cpfCnpj: student.cpf || "",
+      mobilePhone: (student.whatsapp || student.phone || "").replace(/\D/g, ""),
+      postalCode: (student.cep || "").replace(/\D/g, ""),
+      address: student.address || undefined,
+      addressNumber: student.address_number || undefined,
+      province: student.neighborhood || undefined,
+    });
+    student.asaas_customer_id = customerId;
   }
 
   const paymentPayload: any = {
