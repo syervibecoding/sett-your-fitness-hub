@@ -113,8 +113,22 @@ export default function PublicRegistration() {
   const titleText = branding?.platform_title || "BN PERFORMANCE";
 
   const handleSubmit = async () => {
-    if (!fullName || !birthDate || !cpf || !cep || !address || !addressNumber || !neighborhood || !city || !state || !whatsapp || !email || !selectedPlanId) {
-      toast({ title: "Preencha todos os campos obrigatórios", variant: "destructive" });
+    const missing: string[] = [];
+    if (!fullName) missing.push("Nome Completo");
+    if (!birthDate) missing.push("Data de Nascimento");
+    if (!cpf) missing.push("CPF");
+    if (!cep) missing.push("CEP");
+    if (!address) missing.push("Rua");
+    if (!addressNumber) missing.push("Número");
+    if (!neighborhood) missing.push("Bairro");
+    if (!city) missing.push("Cidade");
+    if (!state) missing.push("Estado");
+    if (!whatsapp) missing.push("WhatsApp");
+    if (!email) missing.push("Email");
+    if (!selectedPlanId) missing.push("Plano");
+
+    if (missing.length > 0) {
+      toast({ title: "Campos obrigatórios", description: `Preencha: ${missing.join(", ")}`, variant: "destructive" });
       return;
     }
     if (!companyId) {
