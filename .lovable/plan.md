@@ -1,22 +1,17 @@
 
 
-# Corrigir treinador na Agenda — usar `assigned_trainer_id`
+# Corrigir erro "created_by" ao criar matrícula
 
 ## Problema
-A agenda busca o treinador via `enrollments.trainer_id` (join nos training_cycles). Mas quando o treinador do aluno é alterado no cadastro (`assigned_trainer_id`), a matrícula antiga não é atualizada, causando divergência.
+Na função `handleCreateEnrollment` (linha ~467 de `StudentDetail.tsx`), o insert na tabela `enrollments` inclui o campo `created_by: session.user.id`. Porém, a tabela `enrollments` **não possui** a coluna `created_by`, causando o erro:
+
+> Could not find the 'created_by' column of 'enrollments' in the schema cache
 
 ## Solução
+Remover o campo `created_by` do objeto de insert da matrícula na linha 469 de `StudentDetail.tsx`. A tabela `enrollments` não precisa dessa coluna — ela já rastreia `trainer_id` e `student_id`.
 
-### 1. Agenda: usar `assigned_trainer_id` do aluno como fonte do treinador
-Em `AdminAgenda.tsx`, ao montar os eventos de ciclos, buscar o treinador via `students.assigned_trainer_id` em vez de `enrollments.trainer_id`. Isso garante que a agenda mostra o treinador atual do aluno.
+### Arquivo
+- **Modificado**: `src/pages/admin/StudentDetail.tsx` — remover `created_by: session.user.id` do insert de enrollment (linha 469)
 
-**Mudança na query de ciclos (linha 80)**:
-- Adicionar join até `students` para pegar `assigned_trainer_id`
-- Buscar nomes dos treinadores usando `assigned_trainer_id` em vez de `enrollment.trainer_id`
-
-### 2. (Opcional) Corrigir dados existentes
-Criar uma migration que sincronize `enrollments.trainer_id` com `students.assigned_trainer_id` para matrículas ativas, eliminando a divergência histórica.
-
-### Arquivos
-- **Modificado**: `src/pages/admin/AdminAgenda.tsx` — trocar fonte do treinador de `enrollment.trainer_id` para `student.assigned_trainer_id`
+Sem alterações no banco de dados.
 
