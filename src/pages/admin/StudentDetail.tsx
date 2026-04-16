@@ -466,7 +466,6 @@ export default function StudentDetail() {
       trainer_id: selectedTrainerId,
       start_date: format(startDate, "yyyy-MM-dd"),
       end_date: format(computedEndDate, "yyyy-MM-dd"),
-      created_by: session.user.id,
     });
     if (error) {
       setSaving(false);
