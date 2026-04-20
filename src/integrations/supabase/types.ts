@@ -1269,6 +1269,53 @@ export type Database = {
           },
         ]
       }
+      trainer_assignments_history: {
+        Row: {
+          assigned_at: string
+          changed_by: string | null
+          company_id: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          previous_trainer_id: string | null
+          student_id: string
+          trainer_id: string | null
+          unassigned_at: string | null
+        }
+        Insert: {
+          assigned_at?: string
+          changed_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          previous_trainer_id?: string | null
+          student_id: string
+          trainer_id?: string | null
+          unassigned_at?: string | null
+        }
+        Update: {
+          assigned_at?: string
+          changed_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          previous_trainer_id?: string | null
+          student_id?: string
+          trainer_id?: string | null
+          unassigned_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trainer_assignments_history_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_cycles: {
         Row: {
           company_id: string | null
