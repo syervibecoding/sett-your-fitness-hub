@@ -281,19 +281,59 @@ export default function TeamManager() {
     const students = studentsRes.data || [];
     const studentIds = students.map((s) => s.id);
 
-    let sessions: { student_id: string; completed_at: string | null }[] = [];
+    // 1) Manual/off-app completed sessions (workout_id is null)
+    let manualSessions: { student_id: string; completed_at: string | null }[] = [];
+    // 2) Prescribed cycles: count cycles where trainer created at least 1 workout, grouped by cycle start month
+    let prescribedCycles: { cycle_id: string; student_id: string; start_date: string }[] = [];
+
     if (studentIds.length > 0) {
+      // Manual sessions
       const { data: sessRes } = await supabase
         .from("workout_sessions")
-        .select("student_id, completed_at")
+        .select("student_id, completed_at, workout_id")
         .eq("status", "completed")
+        .is("workout_id", null)
         .in("student_id", studentIds)
         .gte("completed_at", rangeStart)
         .lte("completed_at", rangeEnd);
-      sessions = sessRes || [];
+      manualSessions = (sessRes || []).map((s) => ({ student_id: s.student_id, completed_at: s.completed_at }));
+
+      // Get all enrollments for these students
+      const { data: enrolls } = await supabase
+        .from("enrollments")
+        .select("id, student_id")
+        .in("student_id", studentIds);
+      const enrollmentIds = (enrolls || []).map((e) => e.id);
+      const enrollStudent = new Map((enrolls || []).map((e) => [e.id, e.student_id]));
+
+      if (enrollmentIds.length > 0) {
+        // Cycles in date range
+        const { data: cycles } = await supabase
+          .from("training_cycles")
+          .select("id, enrollment_id, start_date")
+          .in("enrollment_id", enrollmentIds)
+          .gte("start_date", rangeStart.slice(0, 10))
+          .lte("start_date", rangeEnd.slice(0, 10));
+
+        const cycleIds = (cycles || []).map((c) => c.id);
+        if (cycleIds.length > 0) {
+          // Workouts existing for those cycles
+          const { data: workouts } = await supabase
+            .from("workouts")
+            .select("cycle_id")
+            .in("cycle_id", cycleIds);
+          const cyclesWithWorkout = new Set((workouts || []).map((w) => w.cycle_id));
+          prescribedCycles = (cycles || [])
+            .filter((c) => cyclesWithWorkout.has(c.id))
+            .map((c) => ({
+              cycle_id: c.id,
+              student_id: enrollStudent.get(c.enrollment_id) as string,
+              start_date: c.start_date,
+            }));
+        }
+      }
     }
 
-    // Map student_id -> trainer_id
     const studentTrainer = new Map<string, string>();
     for (const s of students) {
       if (s.assigned_trainer_id) studentTrainer.set(s.id, s.assigned_trainer_id);
@@ -307,7 +347,19 @@ export default function TeamManager() {
       for (const m of performanceMonths) sessionsByMonth[m.key] = 0;
 
       let total = 0;
-      for (const sess of sessions) {
+
+      // Count prescribed cycles by start month
+      for (const c of prescribedCycles) {
+        if (studentTrainer.get(c.student_id) !== tid) continue;
+        const key = format(new Date(c.start_date), "yyyy-MM");
+        if (sessionsByMonth[key] !== undefined) {
+          sessionsByMonth[key]++;
+          total++;
+        }
+      }
+
+      // Count manual sessions by completed month
+      for (const sess of manualSessions) {
         if (!sess.completed_at) continue;
         if (studentTrainer.get(sess.student_id) !== tid) continue;
         const key = format(new Date(sess.completed_at), "yyyy-MM");
@@ -828,7 +880,7 @@ export default function TeamManager() {
                        </CardHeader>
                       <CardContent className="space-y-3">
                         <p className="text-xs text-muted-foreground font-sans flex items-center gap-1">
-                          <BarChart3 className="h-3 w-3" /> Treinos concluídos por mês
+                          <BarChart3 className="h-3 w-3" /> Ciclos prescritos + treinos avulsos por mês
                         </p>
                         <div className={`grid gap-2 ${performanceMonths.length <= 3 ? 'grid-cols-3' : performanceMonths.length <= 4 ? 'grid-cols-4' : 'grid-cols-3 sm:grid-cols-6'}`}>
                           {performanceMonths.map((m) => (
