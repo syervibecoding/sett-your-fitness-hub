@@ -1023,6 +1023,91 @@ export default function TeamManager() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+            <DialogContent className="bg-card border-border max-w-3xl">
+              <DialogHeader>
+                <DialogTitle className="text-primary">AJUSTAR HISTÓRICO DE TREINADOR</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p className="text-xs text-muted-foreground font-sans">
+                  Edite as datas em que cada treinador esteve responsável pelo aluno. A performance será recalculada automaticamente.
+                </p>
+                <div className="space-y-2">
+                  <Label className="font-sans">Aluno</Label>
+                  <Select value={historyStudentId} onValueChange={loadHistoryFor}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o aluno" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allCompanyStudents.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {historyStudentId && (
+                  <>
+                    {historyLoading ? (
+                      <p className="text-sm text-muted-foreground">Carregando...</p>
+                    ) : historyRows.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Nenhum registro de histórico para este aluno.</p>
+                    ) : (
+                      <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                        {historyRows.map((row) => (
+                          <div key={row.id} className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] gap-2 items-end p-3 rounded-md border border-border">
+                            <div className="space-y-1">
+                              <Label className="font-sans text-xs">Treinador</Label>
+                              <Select
+                                value={row.trainer_id || ""}
+                                onValueChange={(v) => updateHistoryRow(row.id, { trainer_id: v || null })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Sem treinador" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {allCompanyTrainers.map((p) => (
+                                    <SelectItem key={p.user_id} value={p.user_id}>{p.full_name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="font-sans text-xs">Início</Label>
+                              <Input
+                                type="date"
+                                value={row.assigned_at ? row.assigned_at.slice(0, 10) : ""}
+                                onChange={(e) => updateHistoryRow(row.id, { assigned_at: new Date(e.target.value + "T12:00:00").toISOString() })}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="font-sans text-xs">Fim (vazio = atual)</Label>
+                              <Input
+                                type="date"
+                                value={row.unassigned_at ? row.unassigned_at.slice(0, 10) : ""}
+                                onChange={(e) => updateHistoryRow(row.id, { unassigned_at: e.target.value ? new Date(e.target.value + "T12:00:00").toISOString() : null })}
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => saveHistoryRow(row)}>Salvar</Button>
+                              <Button size="sm" variant="destructive" onClick={() => deleteHistoryRow(row.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <Button variant="outline" size="sm" onClick={addHistoryRow}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Adicionar período
+                    </Button>
+                  </>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
         </Tabs>
       </div>
     </AppLayout>
