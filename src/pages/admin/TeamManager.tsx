@@ -37,7 +37,9 @@ interface TrainerPerformance {
   full_name: string;
   role: string;
   activeStudents: number;
-  workoutsByMonth: Record<string, number>; // "YYYY-MM" -> count
+  sessionsByMonth: Record<string, number>; // "YYYY-MM" -> count
+  totalSessions: number;
+  students: { id: string; full_name: string }[];
 }
 
 const ALL_ROLES = ["admin", "coordinator", "trainer"] as const;
