@@ -815,6 +815,25 @@ export default function TeamManager() {
           {/* ====== TAB: Performance ====== */}
           <TabsContent value="performance">
             <div className="space-y-4">
+              <Card className="bg-card border-border">
+                <CardContent className="pt-6 flex flex-wrap items-end gap-3">
+                  <div className="space-y-1">
+                    <Label className="font-sans text-xs">Mês inicial</Label>
+                    <Input type="month" value={startMonth} onChange={(e) => setStartMonth(e.target.value)} className="w-[160px]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="font-sans text-xs">Mês final</Label>
+                    <Input type="month" value={endMonthState} onChange={(e) => setEndMonthState(e.target.value)} className="w-[160px]" />
+                  </div>
+                  <Button onClick={loadPerformance} disabled={perfLoading}>
+                    {perfLoading ? "Carregando..." : "Atualizar"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground font-sans ml-auto max-w-xs">
+                    Conta treinos <strong>concluídos</strong> pelos alunos atribuídos a cada treinador.
+                  </p>
+                </CardContent>
+              </Card>
+
               {perfLoading ? (
                 <div className="flex justify-center py-12">
                   <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -826,8 +845,8 @@ export default function TeamManager() {
                   {trainerPerformance.map((t) => (
                     <Card key={t.user_id} className="bg-card border-border">
                        <CardHeader className="pb-3">
-                         <div className="flex items-center justify-between">
-                           <div className="flex items-center gap-2">
+                         <div className="flex items-center justify-between gap-2">
+                           <div className="flex items-center gap-2 flex-wrap">
                              <CardTitle className="text-base font-sans flex items-center gap-2">
                                <Users className="h-4 w-4 text-muted-foreground" />
                                {t.full_name}
@@ -835,25 +854,32 @@ export default function TeamManager() {
                              <span className={`text-xs font-sans font-medium px-2 py-0.5 rounded capitalize ${roleColors[t.role] || ""}`}>
                                {roleLabels[t.role] || t.role}
                              </span>
+                             <Badge variant="default" className="gap-1">
+                               {t.totalSessions} no período
+                             </Badge>
                            </div>
-                           <Badge variant="secondary" className="gap-1">
+                           <Badge variant="secondary" className="gap-1 shrink-0">
                              <Users className="h-3 w-3" />
-                             {t.activeStudents} {t.activeStudents === 1 ? "aluno" : "alunos"}
+                             {t.activeStudents}
                            </Badge>
                          </div>
                        </CardHeader>
-                      <CardContent>
-                        <p className="text-xs text-muted-foreground font-sans mb-2 flex items-center gap-1">
-                          <BarChart3 className="h-3 w-3" /> Prescrições por mês
+                      <CardContent className="space-y-3">
+                        <p className="text-xs text-muted-foreground font-sans flex items-center gap-1">
+                          <BarChart3 className="h-3 w-3" /> Treinos concluídos por mês
                         </p>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className={`grid gap-2 ${performanceMonths.length <= 3 ? 'grid-cols-3' : performanceMonths.length <= 4 ? 'grid-cols-4' : 'grid-cols-3 sm:grid-cols-6'}`}>
                           {performanceMonths.map((m) => (
                             <div key={m.key} className="text-center p-2 rounded-md bg-secondary/50">
                               <p className="text-xs text-muted-foreground font-sans capitalize">{m.label}</p>
-                              <p className="text-lg font-bold text-foreground">{t.workoutsByMonth[m.key] || 0}</p>
+                              <p className="text-lg font-bold text-foreground">{t.sessionsByMonth[m.key] || 0}</p>
                             </div>
                           ))}
                         </div>
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => openManualDialog(t)} disabled={t.students.length === 0}>
+                          <CalendarPlus className="h-4 w-4 mr-2" />
+                          Registrar treino avulso
+                        </Button>
                       </CardContent>
                     </Card>
                   ))}
@@ -861,6 +887,45 @@ export default function TeamManager() {
               )}
             </div>
           </TabsContent>
+
+          <Dialog open={manualOpen} onOpenChange={setManualOpen}>
+            <DialogContent className="bg-card border-border">
+              <DialogHeader>
+                <DialogTitle className="text-primary">REGISTRAR TREINO AVULSO</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                {manualTrainer && (
+                  <p className="text-sm text-muted-foreground font-sans">
+                    Treinador: <strong className="text-foreground">{manualTrainer.full_name}</strong>
+                  </p>
+                )}
+                <div className="space-y-2">
+                  <Label className="font-sans">Aluno</Label>
+                  <Select value={manualStudentId} onValueChange={setManualStudentId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o aluno" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {manualTrainer?.students.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-sans">Data do treino</Label>
+                  <Input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-sans">Observação (opcional)</Label>
+                  <Textarea value={manualNotes} onChange={(e) => setManualNotes(e.target.value)} placeholder="Ex: treino presencial na academia" />
+                </div>
+                <Button onClick={handleSaveManualSession} className="w-full" disabled={manualSaving || !manualStudentId || !manualDate}>
+                  {manualSaving ? "Salvando..." : "Registrar treino"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </Tabs>
       </div>
     </AppLayout>
