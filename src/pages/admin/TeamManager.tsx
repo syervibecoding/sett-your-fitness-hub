@@ -205,44 +205,6 @@ export default function TeamManager() {
     if (companyProfiles) setAvailableUsers(companyProfiles);
   };
 
-  const loadPerformance = useCallback(async () => {
-    if (!effectiveCompanyId) return;
-    setPerfLoading(true);
-
-    // Get trainers in this company
-    const { data: companyMembers } = await supabase
-      .from("company_members")
-      .select("user_id")
-      .eq("company_id", effectiveCompanyId);
-
-    if (!companyMembers || companyMembers.length === 0) {
-      setTrainerPerformance([]);
-      setPerfLoading(false);
-      return;
-    }
-
-    const companyUserIds = companyMembers.map((m) => m.user_id);
-
-    const { data: memberRoles } = await supabase
-      .from("user_roles")
-      .select("user_id, role")
-      .in("role", ["trainer", "coordinator", "admin"])
-      .in("user_id", companyUserIds);
-
-    if (!memberRoles || memberRoles.length === 0) {
-      setTrainerPerformance([]);
-      setPerfLoading(false);
-      return;
-    }
-
-    // Deduplicate and build role map
-    const roleMap = new Map<string, string>();
-    for (const r of memberRoles) {
-      // Keep highest priority role for display
-      if (!roleMap.has(r.user_id)) roleMap.set(r.user_id, r.role);
-    }
-    const trainerIds = [...roleMap.keys()];
-
   // Compute months in selected range
   const performanceMonths = useMemo(() => {
     const months: { key: string; label: string; start: string; end: string }[] = [];
