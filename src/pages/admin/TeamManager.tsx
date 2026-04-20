@@ -278,24 +278,41 @@ export default function TeamManager() {
     const rangeStart = performanceMonths[0].start;
     const rangeEnd = performanceMonths[performanceMonths.length - 1].end;
 
-    const [profilesRes, studentsRes] = await Promise.all([
+    const [profilesRes, studentsRes, historyRes] = await Promise.all([
       supabase.from("profiles").select("user_id, full_name").in("user_id", trainerIds),
       supabase.from("students").select("id, full_name, assigned_trainer_id")
-        .eq("company_id", effectiveCompanyId)
-        .in("assigned_trainer_id", trainerIds),
+        .eq("company_id", effectiveCompanyId),
+      supabase.from("trainer_assignments_history")
+        .select("student_id, trainer_id, assigned_at, unassigned_at")
+        .eq("company_id", effectiveCompanyId),
     ]);
 
     const profiles = profilesRes.data || [];
     const students = studentsRes.data || [];
+    const history = historyRes.data || [];
     const studentIds = students.map((s) => s.id);
+
+    // Helper: who was the trainer of `studentId` at instant `date`?
+    const trainerAt = (studentId: string, date: Date): string | null => {
+      const t = date.getTime();
+      // Find a history entry covering this date
+      const match = history.find((h) => {
+        if (h.student_id !== studentId) return false;
+        const startT = new Date(h.assigned_at).getTime();
+        const endT = h.unassigned_at ? new Date(h.unassigned_at).getTime() : Infinity;
+        return t >= startT && t <= endT;
+      });
+      if (match) return match.trainer_id;
+      // Fallback: current assigned trainer
+      const s = students.find((x) => x.id === studentId);
+      return s?.assigned_trainer_id || null;
+    };
 
     // 1) Manual/off-app completed sessions (workout_id is null)
     let manualSessions: { student_id: string; completed_at: string | null }[] = [];
-    // 2) Prescribed cycles: count cycles where trainer created at least 1 workout, grouped by cycle start month
     let prescribedCycles: { cycle_id: string; student_id: string; start_date: string }[] = [];
 
     if (studentIds.length > 0) {
-      // Manual sessions
       const { data: sessRes } = await supabase
         .from("workout_sessions")
         .select("student_id, completed_at, workout_id")
@@ -306,7 +323,6 @@ export default function TeamManager() {
         .lte("completed_at", rangeEnd);
       manualSessions = (sessRes || []).map((s) => ({ student_id: s.student_id, completed_at: s.completed_at }));
 
-      // Get all enrollments for these students
       const { data: enrolls } = await supabase
         .from("enrollments")
         .select("id, student_id")
@@ -315,7 +331,6 @@ export default function TeamManager() {
       const enrollStudent = new Map((enrolls || []).map((e) => [e.id, e.student_id]));
 
       if (enrollmentIds.length > 0) {
-        // Cycles in date range
         const { data: cycles } = await supabase
           .from("training_cycles")
           .select("id, enrollment_id, start_date")
@@ -325,7 +340,6 @@ export default function TeamManager() {
 
         const cycleIds = (cycles || []).map((c) => c.id);
         if (cycleIds.length > 0) {
-          // Workouts existing for those cycles
           const { data: workouts } = await supabase
             .from("workouts")
             .select("cycle_id")
@@ -342,11 +356,6 @@ export default function TeamManager() {
       }
     }
 
-    const studentTrainer = new Map<string, string>();
-    for (const s of students) {
-      if (s.assigned_trainer_id) studentTrainer.set(s.id, s.assigned_trainer_id);
-    }
-
     const performance: TrainerPerformance[] = trainerIds.map((tid) => {
       const profile = profiles.find((p) => p.user_id === tid);
       const trainerStudents = students.filter((s) => s.assigned_trainer_id === tid);
@@ -356,21 +365,23 @@ export default function TeamManager() {
 
       let total = 0;
 
-      // Count prescribed cycles by start month
+      // Attribute prescribed cycles using historical trainer at cycle start_date
       for (const c of prescribedCycles) {
-        if (studentTrainer.get(c.student_id) !== tid) continue;
-        const key = format(new Date(c.start_date), "yyyy-MM");
+        const cycleDate = new Date(c.start_date);
+        if (trainerAt(c.student_id, cycleDate) !== tid) continue;
+        const key = format(cycleDate, "yyyy-MM");
         if (sessionsByMonth[key] !== undefined) {
           sessionsByMonth[key]++;
           total++;
         }
       }
 
-      // Count manual sessions by completed month
+      // Attribute manual sessions using historical trainer at completed_at
       for (const sess of manualSessions) {
         if (!sess.completed_at) continue;
-        if (studentTrainer.get(sess.student_id) !== tid) continue;
-        const key = format(new Date(sess.completed_at), "yyyy-MM");
+        const sessDate = new Date(sess.completed_at);
+        if (trainerAt(sess.student_id, sessDate) !== tid) continue;
+        const key = format(sessDate, "yyyy-MM");
         if (sessionsByMonth[key] !== undefined) {
           sessionsByMonth[key]++;
           total++;
@@ -387,6 +398,10 @@ export default function TeamManager() {
         students: trainerStudents.map((s) => ({ id: s.id, full_name: s.full_name })),
       };
     });
+
+    // Cache for history dialog
+    setAllCompanyTrainers(profiles.map((p) => ({ user_id: p.user_id, full_name: p.full_name || "Sem nome" })));
+    setAllCompanyStudents(students.map((s) => ({ id: s.id, full_name: s.full_name })));
 
     setTrainerPerformance(performance);
     setPerfLoading(false);
