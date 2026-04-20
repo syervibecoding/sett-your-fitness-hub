@@ -243,48 +243,163 @@ export default function TeamManager() {
     }
     const trainerIds = [...roleMap.keys()];
 
-    // Get profiles, students, workouts in parallel
-    const now = new Date();
-    const months = [0, 1, 2].map((i) => {
-      const d = subMonths(now, i);
-      return { key: format(d, "yyyy-MM"), start: startOfMonth(d).toISOString(), end: endOfMonth(d).toISOString() };
-    });
+  // Compute months in selected range
+  const performanceMonths = useMemo(() => {
+    const months: { key: string; label: string; start: string; end: string }[] = [];
+    let start = parse(startMonth, "yyyy-MM", new Date());
+    const end = parse(endMonthState, "yyyy-MM", new Date());
+    if (isAfter(start, end)) return months;
+    // cap to 24 months
+    let i = 0;
+    while (!isAfter(start, end) && i < 24) {
+      months.push({
+        key: format(start, "yyyy-MM"),
+        label: format(start, "MMM/yy", { locale: ptBR }),
+        start: startOfMonth(start).toISOString(),
+        end: endOfMonth(start).toISOString(),
+      });
+      start = addMonths(start, 1);
+      i++;
+    }
+    return months;
+  }, [startMonth, endMonthState]);
 
-    const [profilesRes, studentsRes, workoutsRes] = await Promise.all([
+  const loadPerformance = useCallback(async () => {
+    if (!effectiveCompanyId) return;
+    setPerfLoading(true);
+
+    const { data: companyMembers } = await supabase
+      .from("company_members")
+      .select("user_id")
+      .eq("company_id", effectiveCompanyId);
+
+    if (!companyMembers || companyMembers.length === 0) {
+      setTrainerPerformance([]);
+      setPerfLoading(false);
+      return;
+    }
+
+    const companyUserIds = companyMembers.map((m) => m.user_id);
+
+    const { data: memberRoles } = await supabase
+      .from("user_roles")
+      .select("user_id, role")
+      .in("role", ["trainer", "coordinator", "admin"])
+      .in("user_id", companyUserIds);
+
+    if (!memberRoles || memberRoles.length === 0) {
+      setTrainerPerformance([]);
+      setPerfLoading(false);
+      return;
+    }
+
+    const roleMap = new Map<string, string>();
+    for (const r of memberRoles) {
+      if (!roleMap.has(r.user_id)) roleMap.set(r.user_id, r.role);
+    }
+    const trainerIds = [...roleMap.keys()];
+
+    if (performanceMonths.length === 0) {
+      setTrainerPerformance([]);
+      setPerfLoading(false);
+      return;
+    }
+
+    const rangeStart = performanceMonths[0].start;
+    const rangeEnd = performanceMonths[performanceMonths.length - 1].end;
+
+    const [profilesRes, studentsRes] = await Promise.all([
       supabase.from("profiles").select("user_id, full_name").in("user_id", trainerIds),
-      supabase.from("students").select("id, assigned_trainer_id").eq("company_id", effectiveCompanyId).eq("status", "active").in("assigned_trainer_id", trainerIds),
-      supabase.from("workouts").select("id, created_by, created_at").eq("company_id", effectiveCompanyId).in("created_by", trainerIds).gte("created_at", months[2].start),
+      supabase.from("students").select("id, full_name, assigned_trainer_id")
+        .eq("company_id", effectiveCompanyId)
+        .in("assigned_trainer_id", trainerIds),
     ]);
 
     const profiles = profilesRes.data || [];
     const students = studentsRes.data || [];
-    const workouts = workoutsRes.data || [];
+    const studentIds = students.map((s) => s.id);
+
+    let sessions: { student_id: string; completed_at: string | null }[] = [];
+    if (studentIds.length > 0) {
+      const { data: sessRes } = await supabase
+        .from("workout_sessions")
+        .select("student_id, completed_at")
+        .eq("status", "completed")
+        .in("student_id", studentIds)
+        .gte("completed_at", rangeStart)
+        .lte("completed_at", rangeEnd);
+      sessions = sessRes || [];
+    }
+
+    // Map student_id -> trainer_id
+    const studentTrainer = new Map<string, string>();
+    for (const s of students) {
+      if (s.assigned_trainer_id) studentTrainer.set(s.id, s.assigned_trainer_id);
+    }
 
     const performance: TrainerPerformance[] = trainerIds.map((tid) => {
       const profile = profiles.find((p) => p.user_id === tid);
-      const activeStudents = students.filter((s) => s.assigned_trainer_id === tid).length;
+      const trainerStudents = students.filter((s) => s.assigned_trainer_id === tid);
 
-      const workoutsByMonth: Record<string, number> = {};
-      for (const m of months) workoutsByMonth[m.key] = 0;
+      const sessionsByMonth: Record<string, number> = {};
+      for (const m of performanceMonths) sessionsByMonth[m.key] = 0;
 
-      for (const w of workouts) {
-        if (w.created_by !== tid) continue;
-        const key = format(new Date(w.created_at), "yyyy-MM");
-        if (workoutsByMonth[key] !== undefined) workoutsByMonth[key]++;
+      let total = 0;
+      for (const sess of sessions) {
+        if (!sess.completed_at) continue;
+        if (studentTrainer.get(sess.student_id) !== tid) continue;
+        const key = format(new Date(sess.completed_at), "yyyy-MM");
+        if (sessionsByMonth[key] !== undefined) {
+          sessionsByMonth[key]++;
+          total++;
+        }
       }
 
       return {
         user_id: tid,
         full_name: profile?.full_name || "Sem nome",
         role: roleMap.get(tid) || "trainer",
-        activeStudents,
-        workoutsByMonth,
+        activeStudents: trainerStudents.length,
+        sessionsByMonth,
+        totalSessions: total,
+        students: trainerStudents.map((s) => ({ id: s.id, full_name: s.full_name })),
       };
     });
 
     setTrainerPerformance(performance);
     setPerfLoading(false);
-  }, [effectiveCompanyId]);
+  }, [effectiveCompanyId, performanceMonths]);
+
+  const openManualDialog = (trainer: TrainerPerformance) => {
+    setManualTrainer(trainer);
+    setManualStudentId("");
+    setManualDate(format(new Date(), "yyyy-MM-dd"));
+    setManualNotes("");
+    setManualOpen(true);
+  };
+
+  const handleSaveManualSession = async () => {
+    if (!manualTrainer || !manualStudentId || !manualDate || !effectiveCompanyId) return;
+    setManualSaving(true);
+    const completedIso = new Date(manualDate + "T12:00:00").toISOString();
+    const { error } = await supabase.from("workout_sessions").insert({
+      student_id: manualStudentId,
+      company_id: effectiveCompanyId,
+      workout_id: null,
+      status: "completed",
+      started_at: completedIso,
+      completed_at: completedIso,
+      notes: manualNotes || null,
+    });
+    setManualSaving(false);
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Treino avulso registrado!" });
+    setManualOpen(false);
+    loadPerformance();
+  };
 
   const handleAddRole = async () => {
     if (!userId || !newRole) return;
