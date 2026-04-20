@@ -16,8 +16,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 import { useManageRolePermissions, type PermissionModule } from "@/hooks/useRolePermissions";
-import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, parse, addMonths, isAfter, isBefore } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Textarea } from "@/components/ui/textarea";
 
 interface TeamMember {
   user_id: string;
