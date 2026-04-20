@@ -107,6 +107,14 @@ export default function TeamManager() {
   const [manualNotes, setManualNotes] = useState("");
   const [manualSaving, setManualSaving] = useState(false);
 
+  // Trainer history dialog
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyStudentId, setHistoryStudentId] = useState("");
+  const [historyRows, setHistoryRows] = useState<Array<{ id: string; trainer_id: string | null; assigned_at: string; unassigned_at: string | null }>>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [allCompanyTrainers, setAllCompanyTrainers] = useState<Array<{ user_id: string; full_name: string }>>([]);
+  const [allCompanyStudents, setAllCompanyStudents] = useState<Array<{ id: string; full_name: string }>>([]);
+
   const { toast } = useToast();
   const { companyId, role } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
@@ -270,24 +278,41 @@ export default function TeamManager() {
     const rangeStart = performanceMonths[0].start;
     const rangeEnd = performanceMonths[performanceMonths.length - 1].end;
 
-    const [profilesRes, studentsRes] = await Promise.all([
+    const [profilesRes, studentsRes, historyRes] = await Promise.all([
       supabase.from("profiles").select("user_id, full_name").in("user_id", trainerIds),
       supabase.from("students").select("id, full_name, assigned_trainer_id")
-        .eq("company_id", effectiveCompanyId)
-        .in("assigned_trainer_id", trainerIds),
+        .eq("company_id", effectiveCompanyId),
+      supabase.from("trainer_assignments_history")
+        .select("student_id, trainer_id, assigned_at, unassigned_at")
+        .eq("company_id", effectiveCompanyId),
     ]);
 
     const profiles = profilesRes.data || [];
     const students = studentsRes.data || [];
+    const history = historyRes.data || [];
     const studentIds = students.map((s) => s.id);
+
+    // Helper: who was the trainer of `studentId` at instant `date`?
+    const trainerAt = (studentId: string, date: Date): string | null => {
+      const t = date.getTime();
+      // Find a history entry covering this date
+      const match = history.find((h) => {
+        if (h.student_id !== studentId) return false;
+        const startT = new Date(h.assigned_at).getTime();
+        const endT = h.unassigned_at ? new Date(h.unassigned_at).getTime() : Infinity;
+        return t >= startT && t <= endT;
+      });
+      if (match) return match.trainer_id;
+      // Fallback: current assigned trainer
+      const s = students.find((x) => x.id === studentId);
+      return s?.assigned_trainer_id || null;
+    };
 
     // 1) Manual/off-app completed sessions (workout_id is null)
     let manualSessions: { student_id: string; completed_at: string | null }[] = [];
-    // 2) Prescribed cycles: count cycles where trainer created at least 1 workout, grouped by cycle start month
     let prescribedCycles: { cycle_id: string; student_id: string; start_date: string }[] = [];
 
     if (studentIds.length > 0) {
-      // Manual sessions
       const { data: sessRes } = await supabase
         .from("workout_sessions")
         .select("student_id, completed_at, workout_id")
@@ -298,7 +323,6 @@ export default function TeamManager() {
         .lte("completed_at", rangeEnd);
       manualSessions = (sessRes || []).map((s) => ({ student_id: s.student_id, completed_at: s.completed_at }));
 
-      // Get all enrollments for these students
       const { data: enrolls } = await supabase
         .from("enrollments")
         .select("id, student_id")
@@ -307,7 +331,6 @@ export default function TeamManager() {
       const enrollStudent = new Map((enrolls || []).map((e) => [e.id, e.student_id]));
 
       if (enrollmentIds.length > 0) {
-        // Cycles in date range
         const { data: cycles } = await supabase
           .from("training_cycles")
           .select("id, enrollment_id, start_date")
@@ -317,7 +340,6 @@ export default function TeamManager() {
 
         const cycleIds = (cycles || []).map((c) => c.id);
         if (cycleIds.length > 0) {
-          // Workouts existing for those cycles
           const { data: workouts } = await supabase
             .from("workouts")
             .select("cycle_id")
@@ -334,11 +356,6 @@ export default function TeamManager() {
       }
     }
 
-    const studentTrainer = new Map<string, string>();
-    for (const s of students) {
-      if (s.assigned_trainer_id) studentTrainer.set(s.id, s.assigned_trainer_id);
-    }
-
     const performance: TrainerPerformance[] = trainerIds.map((tid) => {
       const profile = profiles.find((p) => p.user_id === tid);
       const trainerStudents = students.filter((s) => s.assigned_trainer_id === tid);
@@ -348,21 +365,23 @@ export default function TeamManager() {
 
       let total = 0;
 
-      // Count prescribed cycles by start month
+      // Attribute prescribed cycles using historical trainer at cycle start_date
       for (const c of prescribedCycles) {
-        if (studentTrainer.get(c.student_id) !== tid) continue;
-        const key = format(new Date(c.start_date), "yyyy-MM");
+        const cycleDate = new Date(c.start_date);
+        if (trainerAt(c.student_id, cycleDate) !== tid) continue;
+        const key = format(cycleDate, "yyyy-MM");
         if (sessionsByMonth[key] !== undefined) {
           sessionsByMonth[key]++;
           total++;
         }
       }
 
-      // Count manual sessions by completed month
+      // Attribute manual sessions using historical trainer at completed_at
       for (const sess of manualSessions) {
         if (!sess.completed_at) continue;
-        if (studentTrainer.get(sess.student_id) !== tid) continue;
-        const key = format(new Date(sess.completed_at), "yyyy-MM");
+        const sessDate = new Date(sess.completed_at);
+        if (trainerAt(sess.student_id, sessDate) !== tid) continue;
+        const key = format(sessDate, "yyyy-MM");
         if (sessionsByMonth[key] !== undefined) {
           sessionsByMonth[key]++;
           total++;
@@ -379,6 +398,10 @@ export default function TeamManager() {
         students: trainerStudents.map((s) => ({ id: s.id, full_name: s.full_name })),
       };
     });
+
+    // Cache for history dialog
+    setAllCompanyTrainers(profiles.map((p) => ({ user_id: p.user_id, full_name: p.full_name || "Sem nome" })));
+    setAllCompanyStudents(students.map((s) => ({ id: s.id, full_name: s.full_name })));
 
     setTrainerPerformance(performance);
     setPerfLoading(false);
@@ -414,6 +437,62 @@ export default function TeamManager() {
     setManualOpen(false);
     loadPerformance();
   };
+
+  // ===== Trainer history adjustment =====
+  const openHistoryDialog = () => {
+    setHistoryStudentId("");
+    setHistoryRows([]);
+    setHistoryOpen(true);
+  };
+
+  const loadHistoryFor = async (studentId: string) => {
+    setHistoryStudentId(studentId);
+    if (!studentId) { setHistoryRows([]); return; }
+    setHistoryLoading(true);
+    const { data } = await supabase
+      .from("trainer_assignments_history")
+      .select("id, trainer_id, assigned_at, unassigned_at")
+      .eq("student_id", studentId)
+      .order("assigned_at", { ascending: true });
+    setHistoryRows((data || []) as any);
+    setHistoryLoading(false);
+  };
+
+  const updateHistoryRow = (id: string, patch: Partial<{ trainer_id: string | null; assigned_at: string; unassigned_at: string | null }>) => {
+    setHistoryRows((rows) => rows.map((r) => r.id === id ? { ...r, ...patch } : r));
+  };
+
+  const saveHistoryRow = async (row: { id: string; trainer_id: string | null; assigned_at: string; unassigned_at: string | null }) => {
+    const { error } = await supabase.from("trainer_assignments_history").update({
+      trainer_id: row.trainer_id,
+      assigned_at: row.assigned_at,
+      unassigned_at: row.unassigned_at,
+    }).eq("id", row.id);
+    if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Período atualizado" });
+    loadPerformance();
+  };
+
+  const deleteHistoryRow = async (id: string) => {
+    const { error } = await supabase.from("trainer_assignments_history").delete().eq("id", id);
+    if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
+    setHistoryRows((rows) => rows.filter((r) => r.id !== id));
+    toast({ title: "Período removido" });
+    loadPerformance();
+  };
+
+  const addHistoryRow = async () => {
+    if (!historyStudentId || !effectiveCompanyId) return;
+    const { data, error } = await supabase.from("trainer_assignments_history").insert({
+      student_id: historyStudentId,
+      trainer_id: null,
+      company_id: effectiveCompanyId,
+      assigned_at: new Date().toISOString(),
+    }).select("id, trainer_id, assigned_at, unassigned_at").single();
+    if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
+    setHistoryRows((rows) => [...rows, data as any]);
+  };
+
 
   const handleAddRole = async () => {
     if (!userId || !newRole) return;
@@ -842,6 +921,10 @@ export default function TeamManager() {
                   <Button onClick={loadPerformance} disabled={perfLoading}>
                     {perfLoading ? "Carregando..." : "Atualizar"}
                   </Button>
+                  <Button variant="outline" onClick={openHistoryDialog}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Ajustar histórico
+                  </Button>
                   <p className="text-xs text-muted-foreground font-sans ml-auto max-w-xs">
                     Conta treinos <strong>concluídos</strong> pelos alunos atribuídos a cada treinador.
                   </p>
@@ -937,6 +1020,91 @@ export default function TeamManager() {
                 <Button onClick={handleSaveManualSession} className="w-full" disabled={manualSaving || !manualStudentId || !manualDate}>
                   {manualSaving ? "Salvando..." : "Registrar treino"}
                 </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+            <DialogContent className="bg-card border-border max-w-3xl">
+              <DialogHeader>
+                <DialogTitle className="text-primary">AJUSTAR HISTÓRICO DE TREINADOR</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p className="text-xs text-muted-foreground font-sans">
+                  Edite as datas em que cada treinador esteve responsável pelo aluno. A performance será recalculada automaticamente.
+                </p>
+                <div className="space-y-2">
+                  <Label className="font-sans">Aluno</Label>
+                  <Select value={historyStudentId} onValueChange={loadHistoryFor}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o aluno" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allCompanyStudents.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {historyStudentId && (
+                  <>
+                    {historyLoading ? (
+                      <p className="text-sm text-muted-foreground">Carregando...</p>
+                    ) : historyRows.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Nenhum registro de histórico para este aluno.</p>
+                    ) : (
+                      <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                        {historyRows.map((row) => (
+                          <div key={row.id} className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] gap-2 items-end p-3 rounded-md border border-border">
+                            <div className="space-y-1">
+                              <Label className="font-sans text-xs">Treinador</Label>
+                              <Select
+                                value={row.trainer_id || ""}
+                                onValueChange={(v) => updateHistoryRow(row.id, { trainer_id: v || null })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Sem treinador" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {allCompanyTrainers.map((p) => (
+                                    <SelectItem key={p.user_id} value={p.user_id}>{p.full_name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="font-sans text-xs">Início</Label>
+                              <Input
+                                type="date"
+                                value={row.assigned_at ? row.assigned_at.slice(0, 10) : ""}
+                                onChange={(e) => updateHistoryRow(row.id, { assigned_at: new Date(e.target.value + "T12:00:00").toISOString() })}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="font-sans text-xs">Fim (vazio = atual)</Label>
+                              <Input
+                                type="date"
+                                value={row.unassigned_at ? row.unassigned_at.slice(0, 10) : ""}
+                                onChange={(e) => updateHistoryRow(row.id, { unassigned_at: e.target.value ? new Date(e.target.value + "T12:00:00").toISOString() : null })}
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => saveHistoryRow(row)}>Salvar</Button>
+                              <Button size="sm" variant="destructive" onClick={() => deleteHistoryRow(row.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <Button variant="outline" size="sm" onClick={addHistoryRow}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Adicionar período
+                    </Button>
+                  </>
+                )}
               </div>
             </DialogContent>
           </Dialog>
