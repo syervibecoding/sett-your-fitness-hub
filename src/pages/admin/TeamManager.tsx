@@ -438,6 +438,62 @@ export default function TeamManager() {
     loadPerformance();
   };
 
+  // ===== Trainer history adjustment =====
+  const openHistoryDialog = () => {
+    setHistoryStudentId("");
+    setHistoryRows([]);
+    setHistoryOpen(true);
+  };
+
+  const loadHistoryFor = async (studentId: string) => {
+    setHistoryStudentId(studentId);
+    if (!studentId) { setHistoryRows([]); return; }
+    setHistoryLoading(true);
+    const { data } = await supabase
+      .from("trainer_assignments_history")
+      .select("id, trainer_id, assigned_at, unassigned_at")
+      .eq("student_id", studentId)
+      .order("assigned_at", { ascending: true });
+    setHistoryRows((data || []) as any);
+    setHistoryLoading(false);
+  };
+
+  const updateHistoryRow = (id: string, patch: Partial<{ trainer_id: string | null; assigned_at: string; unassigned_at: string | null }>) => {
+    setHistoryRows((rows) => rows.map((r) => r.id === id ? { ...r, ...patch } : r));
+  };
+
+  const saveHistoryRow = async (row: { id: string; trainer_id: string | null; assigned_at: string; unassigned_at: string | null }) => {
+    const { error } = await supabase.from("trainer_assignments_history").update({
+      trainer_id: row.trainer_id,
+      assigned_at: row.assigned_at,
+      unassigned_at: row.unassigned_at,
+    }).eq("id", row.id);
+    if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Período atualizado" });
+    loadPerformance();
+  };
+
+  const deleteHistoryRow = async (id: string) => {
+    const { error } = await supabase.from("trainer_assignments_history").delete().eq("id", id);
+    if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
+    setHistoryRows((rows) => rows.filter((r) => r.id !== id));
+    toast({ title: "Período removido" });
+    loadPerformance();
+  };
+
+  const addHistoryRow = async () => {
+    if (!historyStudentId || !effectiveCompanyId) return;
+    const { data, error } = await supabase.from("trainer_assignments_history").insert({
+      student_id: historyStudentId,
+      trainer_id: null,
+      company_id: effectiveCompanyId,
+      assigned_at: new Date().toISOString(),
+    }).select("id, trainer_id, assigned_at, unassigned_at").single();
+    if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
+    setHistoryRows((rows) => [...rows, data as any]);
+  };
+
+
   const handleAddRole = async () => {
     if (!userId || !newRole) return;
     const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole as Role });
