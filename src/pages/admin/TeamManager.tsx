@@ -94,6 +94,18 @@ export default function TeamManager() {
   // Performance tab
   const [trainerPerformance, setTrainerPerformance] = useState<TrainerPerformance[]>([]);
   const [perfLoading, setPerfLoading] = useState(false);
+  // Default: last 3 months range
+  const _now = new Date();
+  const [startMonth, setStartMonth] = useState<string>(format(subMonths(_now, 2), "yyyy-MM"));
+  const [endMonthState, setEndMonthState] = useState<string>(format(_now, "yyyy-MM"));
+
+  // Manual session dialog
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualTrainer, setManualTrainer] = useState<TrainerPerformance | null>(null);
+  const [manualStudentId, setManualStudentId] = useState("");
+  const [manualDate, setManualDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
+  const [manualNotes, setManualNotes] = useState("");
+  const [manualSaving, setManualSaving] = useState(false);
 
   const { toast } = useToast();
   const { companyId, role } = useAuth();
