@@ -107,6 +107,14 @@ export default function TeamManager() {
   const [manualNotes, setManualNotes] = useState("");
   const [manualSaving, setManualSaving] = useState(false);
 
+  // Trainer history dialog
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyStudentId, setHistoryStudentId] = useState("");
+  const [historyRows, setHistoryRows] = useState<Array<{ id: string; trainer_id: string | null; assigned_at: string; unassigned_at: string | null }>>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [allCompanyTrainers, setAllCompanyTrainers] = useState<Array<{ user_id: string; full_name: string }>>([]);
+  const [allCompanyStudents, setAllCompanyStudents] = useState<Array<{ id: string; full_name: string }>>([]);
+
   const { toast } = useToast();
   const { companyId, role } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
