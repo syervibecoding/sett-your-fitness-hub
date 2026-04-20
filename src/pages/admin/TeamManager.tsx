@@ -552,12 +552,6 @@ export default function TeamManager() {
     master: "Master",
   };
 
-  // Get last 3 months for performance display
-  const now = new Date();
-  const performanceMonths = [0, 1, 2].map((i) => {
-    const d = subMonths(now, i);
-    return { key: format(d, "yyyy-MM"), label: format(d, "MMM/yy", { locale: ptBR }) };
-  });
 
   return (
     <AppLayout>
