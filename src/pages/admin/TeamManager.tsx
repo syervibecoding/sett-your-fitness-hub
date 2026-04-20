@@ -921,6 +921,10 @@ export default function TeamManager() {
                   <Button onClick={loadPerformance} disabled={perfLoading}>
                     {perfLoading ? "Carregando..." : "Atualizar"}
                   </Button>
+                  <Button variant="outline" onClick={openHistoryDialog}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Ajustar histórico
+                  </Button>
                   <p className="text-xs text-muted-foreground font-sans ml-auto max-w-xs">
                     Conta treinos <strong>concluídos</strong> pelos alunos atribuídos a cada treinador.
                   </p>
