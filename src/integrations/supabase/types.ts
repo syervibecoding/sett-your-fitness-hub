@@ -1674,7 +1674,7 @@ export type Database = {
           total_sets_completed: number | null
           total_sets_prescribed: number | null
           total_volume: number | null
-          workout_id: string
+          workout_id: string | null
         }
         Insert: {
           company_id?: string | null
@@ -1691,7 +1691,7 @@ export type Database = {
           total_sets_completed?: number | null
           total_sets_prescribed?: number | null
           total_volume?: number | null
-          workout_id: string
+          workout_id?: string | null
         }
         Update: {
           company_id?: string | null
@@ -1708,7 +1708,7 @@ export type Database = {
           total_sets_completed?: number | null
           total_sets_prescribed?: number | null
           total_volume?: number | null
-          workout_id?: string
+          workout_id?: string | null
         }
         Relationships: [
           {

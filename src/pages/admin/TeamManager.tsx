@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
-import { Trash2, UserPlus, Shield, KeyRound, Plus, Eye, EyeOff, Pencil, Users, BarChart3 } from "lucide-react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { Trash2, UserPlus, Shield, KeyRound, Plus, Eye, EyeOff, Pencil, Users, BarChart3, CalendarPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 import { useManageRolePermissions, type PermissionModule } from "@/hooks/useRolePermissions";
-import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, parse, addMonths, isAfter, isBefore } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Textarea } from "@/components/ui/textarea";
 
 interface TeamMember {
   user_id: string;
@@ -36,7 +37,9 @@ interface TrainerPerformance {
   full_name: string;
   role: string;
   activeStudents: number;
-  workoutsByMonth: Record<string, number>; // "YYYY-MM" -> count
+  sessionsByMonth: Record<string, number>; // "YYYY-MM" -> count
+  totalSessions: number;
+  students: { id: string; full_name: string }[];
 }
 
 const ALL_ROLES = ["admin", "coordinator", "trainer"] as const;
@@ -91,6 +94,18 @@ export default function TeamManager() {
   // Performance tab
   const [trainerPerformance, setTrainerPerformance] = useState<TrainerPerformance[]>([]);
   const [perfLoading, setPerfLoading] = useState(false);
+  // Default: last 3 months range
+  const _now = new Date();
+  const [startMonth, setStartMonth] = useState<string>(format(subMonths(_now, 2), "yyyy-MM"));
+  const [endMonthState, setEndMonthState] = useState<string>(format(_now, "yyyy-MM"));
+
+  // Manual session dialog
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualTrainer, setManualTrainer] = useState<TrainerPerformance | null>(null);
+  const [manualStudentId, setManualStudentId] = useState("");
+  const [manualDate, setManualDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
+  const [manualNotes, setManualNotes] = useState("");
+  const [manualSaving, setManualSaving] = useState(false);
 
   const { toast } = useToast();
   const { companyId, role } = useAuth();
@@ -228,48 +243,163 @@ export default function TeamManager() {
     }
     const trainerIds = [...roleMap.keys()];
 
-    // Get profiles, students, workouts in parallel
-    const now = new Date();
-    const months = [0, 1, 2].map((i) => {
-      const d = subMonths(now, i);
-      return { key: format(d, "yyyy-MM"), start: startOfMonth(d).toISOString(), end: endOfMonth(d).toISOString() };
-    });
+  // Compute months in selected range
+  const performanceMonths = useMemo(() => {
+    const months: { key: string; label: string; start: string; end: string }[] = [];
+    let start = parse(startMonth, "yyyy-MM", new Date());
+    const end = parse(endMonthState, "yyyy-MM", new Date());
+    if (isAfter(start, end)) return months;
+    // cap to 24 months
+    let i = 0;
+    while (!isAfter(start, end) && i < 24) {
+      months.push({
+        key: format(start, "yyyy-MM"),
+        label: format(start, "MMM/yy", { locale: ptBR }),
+        start: startOfMonth(start).toISOString(),
+        end: endOfMonth(start).toISOString(),
+      });
+      start = addMonths(start, 1);
+      i++;
+    }
+    return months;
+  }, [startMonth, endMonthState]);
 
-    const [profilesRes, studentsRes, workoutsRes] = await Promise.all([
+  const loadPerformance = useCallback(async () => {
+    if (!effectiveCompanyId) return;
+    setPerfLoading(true);
+
+    const { data: companyMembers } = await supabase
+      .from("company_members")
+      .select("user_id")
+      .eq("company_id", effectiveCompanyId);
+
+    if (!companyMembers || companyMembers.length === 0) {
+      setTrainerPerformance([]);
+      setPerfLoading(false);
+      return;
+    }
+
+    const companyUserIds = companyMembers.map((m) => m.user_id);
+
+    const { data: memberRoles } = await supabase
+      .from("user_roles")
+      .select("user_id, role")
+      .in("role", ["trainer", "coordinator", "admin"])
+      .in("user_id", companyUserIds);
+
+    if (!memberRoles || memberRoles.length === 0) {
+      setTrainerPerformance([]);
+      setPerfLoading(false);
+      return;
+    }
+
+    const roleMap = new Map<string, string>();
+    for (const r of memberRoles) {
+      if (!roleMap.has(r.user_id)) roleMap.set(r.user_id, r.role);
+    }
+    const trainerIds = [...roleMap.keys()];
+
+    if (performanceMonths.length === 0) {
+      setTrainerPerformance([]);
+      setPerfLoading(false);
+      return;
+    }
+
+    const rangeStart = performanceMonths[0].start;
+    const rangeEnd = performanceMonths[performanceMonths.length - 1].end;
+
+    const [profilesRes, studentsRes] = await Promise.all([
       supabase.from("profiles").select("user_id, full_name").in("user_id", trainerIds),
-      supabase.from("students").select("id, assigned_trainer_id").eq("company_id", effectiveCompanyId).eq("status", "active").in("assigned_trainer_id", trainerIds),
-      supabase.from("workouts").select("id, created_by, created_at").eq("company_id", effectiveCompanyId).in("created_by", trainerIds).gte("created_at", months[2].start),
+      supabase.from("students").select("id, full_name, assigned_trainer_id")
+        .eq("company_id", effectiveCompanyId)
+        .in("assigned_trainer_id", trainerIds),
     ]);
 
     const profiles = profilesRes.data || [];
     const students = studentsRes.data || [];
-    const workouts = workoutsRes.data || [];
+    const studentIds = students.map((s) => s.id);
+
+    let sessions: { student_id: string; completed_at: string | null }[] = [];
+    if (studentIds.length > 0) {
+      const { data: sessRes } = await supabase
+        .from("workout_sessions")
+        .select("student_id, completed_at")
+        .eq("status", "completed")
+        .in("student_id", studentIds)
+        .gte("completed_at", rangeStart)
+        .lte("completed_at", rangeEnd);
+      sessions = sessRes || [];
+    }
+
+    // Map student_id -> trainer_id
+    const studentTrainer = new Map<string, string>();
+    for (const s of students) {
+      if (s.assigned_trainer_id) studentTrainer.set(s.id, s.assigned_trainer_id);
+    }
 
     const performance: TrainerPerformance[] = trainerIds.map((tid) => {
       const profile = profiles.find((p) => p.user_id === tid);
-      const activeStudents = students.filter((s) => s.assigned_trainer_id === tid).length;
+      const trainerStudents = students.filter((s) => s.assigned_trainer_id === tid);
 
-      const workoutsByMonth: Record<string, number> = {};
-      for (const m of months) workoutsByMonth[m.key] = 0;
+      const sessionsByMonth: Record<string, number> = {};
+      for (const m of performanceMonths) sessionsByMonth[m.key] = 0;
 
-      for (const w of workouts) {
-        if (w.created_by !== tid) continue;
-        const key = format(new Date(w.created_at), "yyyy-MM");
-        if (workoutsByMonth[key] !== undefined) workoutsByMonth[key]++;
+      let total = 0;
+      for (const sess of sessions) {
+        if (!sess.completed_at) continue;
+        if (studentTrainer.get(sess.student_id) !== tid) continue;
+        const key = format(new Date(sess.completed_at), "yyyy-MM");
+        if (sessionsByMonth[key] !== undefined) {
+          sessionsByMonth[key]++;
+          total++;
+        }
       }
 
       return {
         user_id: tid,
         full_name: profile?.full_name || "Sem nome",
         role: roleMap.get(tid) || "trainer",
-        activeStudents,
-        workoutsByMonth,
+        activeStudents: trainerStudents.length,
+        sessionsByMonth,
+        totalSessions: total,
+        students: trainerStudents.map((s) => ({ id: s.id, full_name: s.full_name })),
       };
     });
 
     setTrainerPerformance(performance);
     setPerfLoading(false);
-  }, [effectiveCompanyId]);
+  }, [effectiveCompanyId, performanceMonths]);
+
+  const openManualDialog = (trainer: TrainerPerformance) => {
+    setManualTrainer(trainer);
+    setManualStudentId("");
+    setManualDate(format(new Date(), "yyyy-MM-dd"));
+    setManualNotes("");
+    setManualOpen(true);
+  };
+
+  const handleSaveManualSession = async () => {
+    if (!manualTrainer || !manualStudentId || !manualDate || !effectiveCompanyId) return;
+    setManualSaving(true);
+    const completedIso = new Date(manualDate + "T12:00:00").toISOString();
+    const { error } = await supabase.from("workout_sessions").insert({
+      student_id: manualStudentId,
+      company_id: effectiveCompanyId,
+      workout_id: null,
+      status: "completed",
+      started_at: completedIso,
+      completed_at: completedIso,
+      notes: manualNotes || null,
+    });
+    setManualSaving(false);
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Treino avulso registrado!" });
+    setManualOpen(false);
+    loadPerformance();
+  };
 
   const handleAddRole = async () => {
     if (!userId || !newRole) return;
@@ -422,12 +552,6 @@ export default function TeamManager() {
     master: "Master",
   };
 
-  // Get last 3 months for performance display
-  const now = new Date();
-  const performanceMonths = [0, 1, 2].map((i) => {
-    const d = subMonths(now, i);
-    return { key: format(d, "yyyy-MM"), label: format(d, "MMM/yy", { locale: ptBR }) };
-  });
 
   return (
     <AppLayout>
@@ -691,6 +815,25 @@ export default function TeamManager() {
           {/* ====== TAB: Performance ====== */}
           <TabsContent value="performance">
             <div className="space-y-4">
+              <Card className="bg-card border-border">
+                <CardContent className="pt-6 flex flex-wrap items-end gap-3">
+                  <div className="space-y-1">
+                    <Label className="font-sans text-xs">Mês inicial</Label>
+                    <Input type="month" value={startMonth} onChange={(e) => setStartMonth(e.target.value)} className="w-[160px]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="font-sans text-xs">Mês final</Label>
+                    <Input type="month" value={endMonthState} onChange={(e) => setEndMonthState(e.target.value)} className="w-[160px]" />
+                  </div>
+                  <Button onClick={loadPerformance} disabled={perfLoading}>
+                    {perfLoading ? "Carregando..." : "Atualizar"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground font-sans ml-auto max-w-xs">
+                    Conta treinos <strong>concluídos</strong> pelos alunos atribuídos a cada treinador.
+                  </p>
+                </CardContent>
+              </Card>
+
               {perfLoading ? (
                 <div className="flex justify-center py-12">
                   <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -702,8 +845,8 @@ export default function TeamManager() {
                   {trainerPerformance.map((t) => (
                     <Card key={t.user_id} className="bg-card border-border">
                        <CardHeader className="pb-3">
-                         <div className="flex items-center justify-between">
-                           <div className="flex items-center gap-2">
+                         <div className="flex items-center justify-between gap-2">
+                           <div className="flex items-center gap-2 flex-wrap">
                              <CardTitle className="text-base font-sans flex items-center gap-2">
                                <Users className="h-4 w-4 text-muted-foreground" />
                                {t.full_name}
@@ -711,25 +854,32 @@ export default function TeamManager() {
                              <span className={`text-xs font-sans font-medium px-2 py-0.5 rounded capitalize ${roleColors[t.role] || ""}`}>
                                {roleLabels[t.role] || t.role}
                              </span>
+                             <Badge variant="default" className="gap-1">
+                               {t.totalSessions} no período
+                             </Badge>
                            </div>
-                           <Badge variant="secondary" className="gap-1">
+                           <Badge variant="secondary" className="gap-1 shrink-0">
                              <Users className="h-3 w-3" />
-                             {t.activeStudents} {t.activeStudents === 1 ? "aluno" : "alunos"}
+                             {t.activeStudents}
                            </Badge>
                          </div>
                        </CardHeader>
-                      <CardContent>
-                        <p className="text-xs text-muted-foreground font-sans mb-2 flex items-center gap-1">
-                          <BarChart3 className="h-3 w-3" /> Prescrições por mês
+                      <CardContent className="space-y-3">
+                        <p className="text-xs text-muted-foreground font-sans flex items-center gap-1">
+                          <BarChart3 className="h-3 w-3" /> Treinos concluídos por mês
                         </p>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className={`grid gap-2 ${performanceMonths.length <= 3 ? 'grid-cols-3' : performanceMonths.length <= 4 ? 'grid-cols-4' : 'grid-cols-3 sm:grid-cols-6'}`}>
                           {performanceMonths.map((m) => (
                             <div key={m.key} className="text-center p-2 rounded-md bg-secondary/50">
                               <p className="text-xs text-muted-foreground font-sans capitalize">{m.label}</p>
-                              <p className="text-lg font-bold text-foreground">{t.workoutsByMonth[m.key] || 0}</p>
+                              <p className="text-lg font-bold text-foreground">{t.sessionsByMonth[m.key] || 0}</p>
                             </div>
                           ))}
                         </div>
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => openManualDialog(t)} disabled={t.students.length === 0}>
+                          <CalendarPlus className="h-4 w-4 mr-2" />
+                          Registrar treino avulso
+                        </Button>
                       </CardContent>
                     </Card>
                   ))}
@@ -737,6 +887,45 @@ export default function TeamManager() {
               )}
             </div>
           </TabsContent>
+
+          <Dialog open={manualOpen} onOpenChange={setManualOpen}>
+            <DialogContent className="bg-card border-border">
+              <DialogHeader>
+                <DialogTitle className="text-primary">REGISTRAR TREINO AVULSO</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                {manualTrainer && (
+                  <p className="text-sm text-muted-foreground font-sans">
+                    Treinador: <strong className="text-foreground">{manualTrainer.full_name}</strong>
+                  </p>
+                )}
+                <div className="space-y-2">
+                  <Label className="font-sans">Aluno</Label>
+                  <Select value={manualStudentId} onValueChange={setManualStudentId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o aluno" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {manualTrainer?.students.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-sans">Data do treino</Label>
+                  <Input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-sans">Observação (opcional)</Label>
+                  <Textarea value={manualNotes} onChange={(e) => setManualNotes(e.target.value)} placeholder="Ex: treino presencial na academia" />
+                </div>
+                <Button onClick={handleSaveManualSession} className="w-full" disabled={manualSaving || !manualStudentId || !manualDate}>
+                  {manualSaving ? "Salvando..." : "Registrar treino"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </Tabs>
       </div>
     </AppLayout>
