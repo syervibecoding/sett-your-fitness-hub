@@ -880,7 +880,7 @@ export default function TeamManager() {
                        </CardHeader>
                       <CardContent className="space-y-3">
                         <p className="text-xs text-muted-foreground font-sans flex items-center gap-1">
-                          <BarChart3 className="h-3 w-3" /> Treinos concluídos por mês
+                          <BarChart3 className="h-3 w-3" /> Ciclos prescritos + treinos avulsos por mês
                         </p>
                         <div className={`grid gap-2 ${performanceMonths.length <= 3 ? 'grid-cols-3' : performanceMonths.length <= 4 ? 'grid-cols-4' : 'grid-cols-3 sm:grid-cols-6'}`}>
                           {performanceMonths.map((m) => (
