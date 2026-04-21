@@ -1866,6 +1866,7 @@ export type Database = {
         Args: { p_enrollment_id: string; p_new_start_date: string }
         Returns: undefined
       }
+      unaccent_simple: { Args: { t: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "coordinator" | "trainer" | "master" | "student"
