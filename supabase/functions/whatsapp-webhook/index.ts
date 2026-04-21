@@ -407,13 +407,17 @@ Deno.serve(async (req) => {
           if (existing) continue;
         }
 
-        // Insert message — track origin for outgoing messages not sent by our system
-        const msgOrigin = isFromMe ? "provider_external" : null;
-        await adminClient.from("whatsapp_messages").insert({
-          chat_id: chat.id, message_id_external: msgExtId, content, type: msgType,
+        // Insert message
+        const { error: msgInsertError } = await adminClient.from("whatsapp_messages").insert({
+          chat_id: chat.id, company_id: instance.company_id, message_id_external: msgExtId,
+          content, type: msgType, is_from_me: isFromMe,
           source: isFromMe ? "outgoing" : "incoming", sender_id: isFromMe ? null : remoteJid,
-          media_url: mediaUrl, media_type: finalMediaType, origin: msgOrigin,
+          media_url: mediaUrl, media_type: finalMediaType,
+          timestamp: new Date().toISOString(),
         });
+        if (msgInsertError) console.error("[webhook] msg insert error:", msgInsertError);
+        // Update chat last_message preview
+        await adminClient.from("whatsapp_chats").update({ last_message: content }).eq("id", chat.id);
 
         // Increment unread
         if (!isFromMe) {
