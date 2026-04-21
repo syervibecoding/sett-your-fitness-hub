@@ -50,8 +50,8 @@ async function sendText(
     if (res.ok) {
       const d = await res.json();
       await adminClient.from("whatsapp_messages").insert({
-        chat_id: chatId, content: text, source: "outgoing", type: "text",
-        message_id_external: d?.key?.id || null, origin: "flow_internal",
+        chat_id: chatId, content: text, source: "outgoing", type: "text", is_from_me: true,
+        message_id_external: d?.key?.id || null, timestamp: new Date().toISOString(),
       });
     } else {
       console.error("[flow] Send failed:", await res.text());
