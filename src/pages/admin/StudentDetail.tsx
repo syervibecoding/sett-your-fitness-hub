@@ -18,9 +18,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Mail, Phone, Cake, CalendarDays, Dumbbell, Plus, CalendarIcon, MapPin, CreditCard, MessageCircle, Pencil, DollarSign, Upload, Image, Mic, FileText, Download, Square, MicOff, RefreshCw, ExternalLink, Copy, Link, Check, Trash2, UserPlus, BarChart3, Clock, CheckCircle2, Edit } from "lucide-react";
-import { format, parseISO, eachDayOfInterval, addWeeks, addDays } from "date-fns";
+import { format, parseISO, eachDayOfInterval, addWeeks, addDays, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+
+// Safely format a date string. Returns "—" when value is missing or invalid.
+function safeFormatDate(value: string | null | undefined, fmt: string, opts?: Parameters<typeof format>[2]): string {
+  if (!value) return "—";
+  try {
+    const d = parseISO(value);
+    if (!isValid(d)) return "—";
+    return format(d, fmt, opts);
+  } catch {
+    return "—";
+  }
+}
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 import { WorkoutAnalysis } from "@/components/trainer/WorkoutAnalysis";
 import { TrainerWeeklyBar } from "@/components/trainer/TrainerWeeklyBar";
@@ -315,11 +327,13 @@ export default function StudentDetail() {
     }
 
     const planIds = [...new Set(enrollmentData.map((e) => e.plan_id))];
-    const trainerIds = [...new Set(enrollmentData.map((e) => e.trainer_id))];
+    const trainerIds = [...new Set(enrollmentData.map((e) => e.trainer_id).filter((id): id is string => !!id))];
 
     const [{ data: plansData }, { data: profiles }] = await Promise.all([
       supabase.from("plans").select("id, name, duration_weeks, duration_days").in("id", planIds),
-      supabase.from("profiles").select("user_id, full_name").in("user_id", trainerIds),
+      trainerIds.length > 0
+        ? supabase.from("profiles").select("user_id, full_name").in("user_id", trainerIds)
+        : Promise.resolve({ data: [] as { user_id: string; full_name: string | null }[] }),
     ]);
 
     const planMap = new Map((plansData || []).map((p) => [p.id, p]));
