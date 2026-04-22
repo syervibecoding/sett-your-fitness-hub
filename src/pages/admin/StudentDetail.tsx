@@ -852,7 +852,7 @@ export default function StudentDetail() {
                         </div>
                         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                           <span><Dumbbell className="h-3 w-3 inline mr-1" />{active.trainer_name}</span>
-                          <span><CalendarDays className="h-3 w-3 inline mr-1" />{format(parseISO(active.start_date), "dd/MM/yyyy")} → {format(parseISO(active.end_date), "dd/MM/yyyy")}</span>
+                          <span><CalendarDays className="h-3 w-3 inline mr-1" />{safeFormatDate(active.start_date, "dd/MM/yyyy")} → {safeFormatDate(active.end_date, "dd/MM/yyyy")}</span>
                         </div>
                         {cycles.filter(c => c.enrollment_id === active.id).length > 0 && (
                           <div className="mt-2 space-y-1">
@@ -883,7 +883,7 @@ export default function StudentDetail() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm font-sans">
-                      {student.birth_date && <div className="flex items-center gap-2 text-muted-foreground"><Cake className="h-4 w-4" />{format(parseISO(student.birth_date), "dd/MM/yyyy")}</div>}
+                      {student.birth_date && <div className="flex items-center gap-2 text-muted-foreground"><Cake className="h-4 w-4" />{safeFormatDate(student.birth_date, "dd/MM/yyyy")}</div>}
                       {student.cpf && <div className="flex items-center gap-2 text-muted-foreground"><CreditCard className="h-4 w-4" />{formatCPF(student.cpf)}</div>}
                       {student.phone && <div className="flex items-center gap-2 text-muted-foreground"><Phone className="h-4 w-4" />{formatPhone(student.phone)}</div>}
                       {student.cep && <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" />CEP: {formatCEP(student.cep)}</div>}
@@ -956,7 +956,7 @@ export default function StudentDetail() {
                         </div>
                         <div className="flex flex-wrap gap-4 text-xs text-muted-foreground font-sans">
                           <span><Dumbbell className="h-3 w-3 inline mr-1" />{e.trainer_name}</span>
-                          <span><CalendarDays className="h-3 w-3 inline mr-1" />{format(parseISO(e.start_date), "dd/MM/yyyy")} → {format(parseISO(e.end_date), "dd/MM/yyyy")}</span>
+                          <span><CalendarDays className="h-3 w-3 inline mr-1" />{safeFormatDate(e.start_date, "dd/MM/yyyy")} → {safeFormatDate(e.end_date, "dd/MM/yyyy")}</span>
                           {e.plan_duration && <span>{e.plan_duration} semanas</span>}
                         </div>
 
@@ -965,7 +965,7 @@ export default function StudentDetail() {
                           <span className="text-xs font-sans font-medium text-foreground whitespace-nowrap">Início do treino:</span>
                           {e.training_start_date ? (
                             <span className="text-xs font-sans text-muted-foreground">
-                              {format(parseISO(e.training_start_date), "dd/MM/yyyy")}
+                              {safeFormatDate(e.training_start_date, "dd/MM/yyyy")}
                             </span>
                           ) : (
                             <Popover>
@@ -1163,7 +1163,7 @@ export default function StudentDetail() {
                               </Badge>
                             </div>
                             <span className="text-xs text-muted-foreground font-sans">
-                              {format(parseISO(cycle.start_date), "dd/MM", { locale: ptBR })} — {format(parseISO(cycle.end_date), "dd/MM", { locale: ptBR })}
+                              {safeFormatDate(cycle.start_date, "dd/MM", { locale: ptBR })} — {safeFormatDate(cycle.end_date, "dd/MM", { locale: ptBR })}
                             </span>
                           </div>
 
@@ -1301,7 +1301,7 @@ export default function StudentDetail() {
                             <Badge variant="outline" className={`text-[10px] ${paymentStatusColors[e.payment_status || "pending"]}`}>
                               {paymentStatusLabels[e.payment_status || "pending"]}
                             </Badge>
-                            {e.payment_date && <span>Pago em: {format(parseISO(e.payment_date), "dd/MM/yyyy")}</span>}
+                            {e.payment_date && <span>Pago em: {safeFormatDate(e.payment_date, "dd/MM/yyyy")}</span>}
                             {e.payment_method && <span>{e.payment_method}</span>}
                           </div>
                           {e.financial_notes && <p className="text-xs text-muted-foreground mt-1">{e.financial_notes}</p>}
@@ -1335,7 +1335,7 @@ export default function StudentDetail() {
                           <p className="text-sm font-sans font-medium text-foreground mt-1">
                             R$ {Number(p.value).toFixed(2).replace(".", ",")}
                           </p>
-                          {p.due_date && <p className="text-xs text-muted-foreground font-sans">Vencimento: {format(parseISO(p.due_date), "dd/MM/yyyy")}</p>}
+                          {p.due_date && <p className="text-xs text-muted-foreground font-sans">Vencimento: {safeFormatDate(p.due_date, "dd/MM/yyyy")}</p>}
                         </div>
                         <div className="flex items-center gap-1">
                           {p.invoice_url && (
