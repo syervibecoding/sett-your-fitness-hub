@@ -859,7 +859,7 @@ export default function StudentDetail() {
                             <p className="text-xs font-medium text-foreground">Ciclos:</p>
                             {cycles.filter(c => c.enrollment_id === active.id).map(c => (
                               <div key={c.id} className="flex items-center justify-between text-xs p-1.5 rounded bg-secondary/50 border border-border">
-                                <span>Ciclo {c.cycle_number} — {format(parseISO(c.start_date), "dd/MM")} a {format(parseISO(c.end_date), "dd/MM/yy")}</span>
+                                <span>Ciclo {c.cycle_number} — {safeFormatDate(c.start_date, "dd/MM")} a {safeFormatDate(c.end_date, "dd/MM/yy")}</span>
                                 <div className="flex items-center gap-1">
                                   {c.has_workout ? (
                                     <Badge variant="outline" className="text-[10px] bg-success/15 text-success border-success/30">Treino</Badge>
@@ -1005,7 +1005,7 @@ export default function StudentDetail() {
                             <div className="grid grid-cols-1 gap-2">
                               {cycles.filter((c) => c.enrollment_id === e.id).map((c) => (
                                 <div key={c.id} className="flex flex-wrap items-center justify-between p-2 rounded bg-background border border-border text-xs font-sans gap-2">
-                                  <span className="shrink-0 text-[11px] sm:text-xs">Ciclo {c.cycle_number} — {format(parseISO(c.start_date), "dd/MM")} a {format(parseISO(c.end_date), "dd/MM/yy")}</span>
+                                  <span className="shrink-0 text-[11px] sm:text-xs">Ciclo {c.cycle_number} — {safeFormatDate(c.start_date, "dd/MM")} a {safeFormatDate(c.end_date, "dd/MM/yy")}</span>
                                   <div className="flex items-center gap-1.5 flex-wrap justify-end">
                                     {c.has_workout ? (
                                       <Badge variant="outline" className="text-[10px] bg-success/15 text-success border-success/30">Treino</Badge>
