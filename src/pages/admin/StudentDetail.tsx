@@ -18,9 +18,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Mail, Phone, Cake, CalendarDays, Dumbbell, Plus, CalendarIcon, MapPin, CreditCard, MessageCircle, Pencil, DollarSign, Upload, Image, Mic, FileText, Download, Square, MicOff, RefreshCw, ExternalLink, Copy, Link, Check, Trash2, UserPlus, BarChart3, Clock, CheckCircle2, Edit } from "lucide-react";
-import { format, parseISO, eachDayOfInterval, addWeeks, addDays } from "date-fns";
+import { format, parseISO, eachDayOfInterval, addWeeks, addDays, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+
+// Safely format a date string. Returns "—" when value is missing or invalid.
+function safeFormatDate(value: string | null | undefined, fmt: string, opts?: Parameters<typeof format>[2]): string {
+  if (!value) return "—";
+  try {
+    const d = parseISO(value);
+    if (!isValid(d)) return "—";
+    return format(d, fmt, opts);
+  } catch {
+    return "—";
+  }
+}
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 import { WorkoutAnalysis } from "@/components/trainer/WorkoutAnalysis";
 import { TrainerWeeklyBar } from "@/components/trainer/TrainerWeeklyBar";
@@ -315,11 +327,13 @@ export default function StudentDetail() {
     }
 
     const planIds = [...new Set(enrollmentData.map((e) => e.plan_id))];
-    const trainerIds = [...new Set(enrollmentData.map((e) => e.trainer_id))];
+    const trainerIds = [...new Set(enrollmentData.map((e) => e.trainer_id).filter((id): id is string => !!id))];
 
     const [{ data: plansData }, { data: profiles }] = await Promise.all([
       supabase.from("plans").select("id, name, duration_weeks, duration_days").in("id", planIds),
-      supabase.from("profiles").select("user_id, full_name").in("user_id", trainerIds),
+      trainerIds.length > 0
+        ? supabase.from("profiles").select("user_id, full_name").in("user_id", trainerIds)
+        : Promise.resolve({ data: [] as { user_id: string; full_name: string | null }[] }),
     ]);
 
     const planMap = new Map((plansData || []).map((p) => [p.id, p]));
@@ -838,14 +852,14 @@ export default function StudentDetail() {
                         </div>
                         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                           <span><Dumbbell className="h-3 w-3 inline mr-1" />{active.trainer_name}</span>
-                          <span><CalendarDays className="h-3 w-3 inline mr-1" />{format(parseISO(active.start_date), "dd/MM/yyyy")} → {format(parseISO(active.end_date), "dd/MM/yyyy")}</span>
+                          <span><CalendarDays className="h-3 w-3 inline mr-1" />{safeFormatDate(active.start_date, "dd/MM/yyyy")} → {safeFormatDate(active.end_date, "dd/MM/yyyy")}</span>
                         </div>
                         {cycles.filter(c => c.enrollment_id === active.id).length > 0 && (
                           <div className="mt-2 space-y-1">
                             <p className="text-xs font-medium text-foreground">Ciclos:</p>
                             {cycles.filter(c => c.enrollment_id === active.id).map(c => (
                               <div key={c.id} className="flex items-center justify-between text-xs p-1.5 rounded bg-secondary/50 border border-border">
-                                <span>Ciclo {c.cycle_number} — {format(parseISO(c.start_date), "dd/MM")} a {format(parseISO(c.end_date), "dd/MM/yy")}</span>
+                                <span>Ciclo {c.cycle_number} — {safeFormatDate(c.start_date, "dd/MM")} a {safeFormatDate(c.end_date, "dd/MM/yy")}</span>
                                 <div className="flex items-center gap-1">
                                   {c.has_workout ? (
                                     <Badge variant="outline" className="text-[10px] bg-success/15 text-success border-success/30">Treino</Badge>
@@ -869,7 +883,7 @@ export default function StudentDetail() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm font-sans">
-                      {student.birth_date && <div className="flex items-center gap-2 text-muted-foreground"><Cake className="h-4 w-4" />{format(parseISO(student.birth_date), "dd/MM/yyyy")}</div>}
+                      {student.birth_date && <div className="flex items-center gap-2 text-muted-foreground"><Cake className="h-4 w-4" />{safeFormatDate(student.birth_date, "dd/MM/yyyy")}</div>}
                       {student.cpf && <div className="flex items-center gap-2 text-muted-foreground"><CreditCard className="h-4 w-4" />{formatCPF(student.cpf)}</div>}
                       {student.phone && <div className="flex items-center gap-2 text-muted-foreground"><Phone className="h-4 w-4" />{formatPhone(student.phone)}</div>}
                       {student.cep && <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" />CEP: {formatCEP(student.cep)}</div>}
@@ -942,7 +956,7 @@ export default function StudentDetail() {
                         </div>
                         <div className="flex flex-wrap gap-4 text-xs text-muted-foreground font-sans">
                           <span><Dumbbell className="h-3 w-3 inline mr-1" />{e.trainer_name}</span>
-                          <span><CalendarDays className="h-3 w-3 inline mr-1" />{format(parseISO(e.start_date), "dd/MM/yyyy")} → {format(parseISO(e.end_date), "dd/MM/yyyy")}</span>
+                          <span><CalendarDays className="h-3 w-3 inline mr-1" />{safeFormatDate(e.start_date, "dd/MM/yyyy")} → {safeFormatDate(e.end_date, "dd/MM/yyyy")}</span>
                           {e.plan_duration && <span>{e.plan_duration} semanas</span>}
                         </div>
 
@@ -951,7 +965,7 @@ export default function StudentDetail() {
                           <span className="text-xs font-sans font-medium text-foreground whitespace-nowrap">Início do treino:</span>
                           {e.training_start_date ? (
                             <span className="text-xs font-sans text-muted-foreground">
-                              {format(parseISO(e.training_start_date), "dd/MM/yyyy")}
+                              {safeFormatDate(e.training_start_date, "dd/MM/yyyy")}
                             </span>
                           ) : (
                             <Popover>
@@ -991,7 +1005,7 @@ export default function StudentDetail() {
                             <div className="grid grid-cols-1 gap-2">
                               {cycles.filter((c) => c.enrollment_id === e.id).map((c) => (
                                 <div key={c.id} className="flex flex-wrap items-center justify-between p-2 rounded bg-background border border-border text-xs font-sans gap-2">
-                                  <span className="shrink-0 text-[11px] sm:text-xs">Ciclo {c.cycle_number} — {format(parseISO(c.start_date), "dd/MM")} a {format(parseISO(c.end_date), "dd/MM/yy")}</span>
+                                  <span className="shrink-0 text-[11px] sm:text-xs">Ciclo {c.cycle_number} — {safeFormatDate(c.start_date, "dd/MM")} a {safeFormatDate(c.end_date, "dd/MM/yy")}</span>
                                   <div className="flex items-center gap-1.5 flex-wrap justify-end">
                                     {c.has_workout ? (
                                       <Badge variant="outline" className="text-[10px] bg-success/15 text-success border-success/30">Treino</Badge>
@@ -1149,7 +1163,7 @@ export default function StudentDetail() {
                               </Badge>
                             </div>
                             <span className="text-xs text-muted-foreground font-sans">
-                              {format(parseISO(cycle.start_date), "dd/MM", { locale: ptBR })} — {format(parseISO(cycle.end_date), "dd/MM", { locale: ptBR })}
+                              {safeFormatDate(cycle.start_date, "dd/MM", { locale: ptBR })} — {safeFormatDate(cycle.end_date, "dd/MM", { locale: ptBR })}
                             </span>
                           </div>
 
@@ -1287,7 +1301,7 @@ export default function StudentDetail() {
                             <Badge variant="outline" className={`text-[10px] ${paymentStatusColors[e.payment_status || "pending"]}`}>
                               {paymentStatusLabels[e.payment_status || "pending"]}
                             </Badge>
-                            {e.payment_date && <span>Pago em: {format(parseISO(e.payment_date), "dd/MM/yyyy")}</span>}
+                            {e.payment_date && <span>Pago em: {safeFormatDate(e.payment_date, "dd/MM/yyyy")}</span>}
                             {e.payment_method && <span>{e.payment_method}</span>}
                           </div>
                           {e.financial_notes && <p className="text-xs text-muted-foreground mt-1">{e.financial_notes}</p>}
@@ -1321,7 +1335,7 @@ export default function StudentDetail() {
                           <p className="text-sm font-sans font-medium text-foreground mt-1">
                             R$ {Number(p.value).toFixed(2).replace(".", ",")}
                           </p>
-                          {p.due_date && <p className="text-xs text-muted-foreground font-sans">Vencimento: {format(parseISO(p.due_date), "dd/MM/yyyy")}</p>}
+                          {p.due_date && <p className="text-xs text-muted-foreground font-sans">Vencimento: {safeFormatDate(p.due_date, "dd/MM/yyyy")}</p>}
                         </div>
                         <div className="flex items-center gap-1">
                           {p.invoice_url && (
