@@ -43,6 +43,7 @@ export default function PublicAnamnesis() {
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
   const [studentName, setStudentName] = useState("");
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [logoSrc, setLogoSrc] = useState<string>(bnLogo);
   const [titleText, setTitleText] = useState("ANAMNESE");
@@ -84,6 +85,7 @@ export default function PublicAnamnesis() {
       
       if (error || !student) { setNotFound(true); return; }
       setStudentName(student.full_name);
+      setCompanyId(student.company_id ?? null);
 
       // Load company branding
       if (student.company_id) {
@@ -120,6 +122,7 @@ export default function PublicAnamnesis() {
 
     const payload = {
       student_id: studentId!,
+      company_id: companyId,
       modalities: allModalities,
       training_days: trainingDays,
       available_days: availableDays ? parseInt(availableDays) : null,
