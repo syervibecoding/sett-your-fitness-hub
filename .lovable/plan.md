@@ -1,33 +1,50 @@
 
 
-## Erro ao abrir o perfil da Ludmila
+## Bruna não vê a anamnese da Ludmila
 
 ### Causa raiz
-A migração que cadastrei a Ludmila ontem criou a matrícula (`enrollments`) sem `end_date` e sem `trainer_id`. O `StudentDetail.tsx` chama `format(parseISO(active.end_date), "dd/MM/yyyy")` (linha 841) — passar `null` para `parseISO` gera o erro minificado **`null is not an object (evaluating 't.split')`** que aparece na tela.
+As 2 anamneses da Ludmila no banco estão com `company_id = NULL`:
 
-Confirmado no banco:
 ```
-enrollment df9fad52… → end_date: NULL, trainer_id: NULL
+anamnesis e0e5… → company_id: NULL  (submetida 22/04)
+anamnesis 59fc… → company_id: NULL  (submetida 23/04)
 ```
 
-### Plano de correção
+A RLS de `anamnesis` para usuários autenticados exige:
+```sql
+company_id = get_user_company_id(auth.uid())
+```
 
-**1. Migration (dados): completar a matrícula da Ludmila**
-- Definir `end_date = start_date + duration_days` do plano `88faf03c-c488-421f-af1d-d406fb4bb70f` (calculado dinamicamente a partir de `plans.duration_days` ou `duration_weeks * 7`).
-- Definir `trainer_id` para o admin/owner da empresa `c051e80e-c10c-4522-a88a-e5da26a74d82` (uso o `owner_user_id` da company). Você poderá reatribuir depois pela tela de aluno.
-- Ajustar também `students.assigned_trainer_id` para o mesmo treinador, para o cabeçalho exibir o nome corretamente.
+`NULL = <uuid>` é **falso**, então a Bruna (admin da empresa `c051e80e…`) não enxerga nenhuma das duas. Você consegue ver porque sua conta tem role `master`, que dá bypass total via policy "Master full access".
 
-**2. Hardening em `src/pages/admin/StudentDetail.tsx` (evita quebra futura)**
-- Criar helper local `safeFormatDate(value, fmt)` que retorna `"—"` quando `value` é `null`/inválido.
-- Substituir todas as chamadas `format(parseISO(x), …)` no arquivo por esse helper. Pontos identificados:
-  - L841: datas de início/fim da matrícula ativa
-  - L848: datas dos ciclos
-  - L872: data de nascimento
-  - Demais ocorrências (matrículas históricas, pagamentos, avaliações)
-- Filtrar `null` em `trainerIds` antes do `.in("user_id", trainerIds)` para não passar lixo ao Supabase.
+A origem do bug está em `src/pages/PublicAnamnesis.tsx` (linhas 121–143): o `payload` enviado pelo formulário público da anamnese **não inclui `company_id`**. Como a rota é anônima e não há trigger no banco para preencher esse campo a partir de `student_id`, ele fica `NULL` para sempre.
+
+### Correções
+
+**1. Backfill dos dados existentes (migração)**
+Atualizar todas as anamneses com `company_id IS NULL`, copiando do `students.company_id`:
+```sql
+UPDATE public.anamnesis a
+SET company_id = s.company_id
+FROM public.students s
+WHERE a.student_id = s.id
+  AND a.company_id IS NULL;
+```
+
+**2. Trigger no banco para nunca mais acontecer**
+Espelhar o padrão já usado em `enrollments` (`set_enrollment_company_id`). Criar `set_anamnesis_company_id()` + trigger `BEFORE INSERT OR UPDATE` que, se `NEW.company_id IS NULL`, busca de `students.company_id` via `student_id`. Garante consistência mesmo se outro fluxo esquecer o campo.
+
+**3. Hardening do frontend (`PublicAnamnesis.tsx`)**
+Buscar `company_id` do aluno no início do componente (já carrega o student por `studentId`) e incluir no `payload` do insert/update. Defesa em profundidade: o trigger cobre, mas o cliente também envia explicitamente.
 
 ### Resultado esperado
-- A página `/students/23472c23…` carrega sem erro.
-- Cabeçalho mostra treinador, datas formatadas corretamente, e a matrícula da Ludmila aparece como ativa com período válido.
-- Qualquer outro aluno com dados parciais (ex.: importações futuras) não derruba mais a tela.
+- As duas anamneses já existentes da Ludmila ficam visíveis para a Bruna (e qualquer admin/coordenador/treinador da empresa, conforme RLS).
+- Novas submissões públicas de anamnese sempre nascem com `company_id` correto.
+- Nenhum impacto em outras empresas — backfill é idempotente e usa o `company_id` do próprio aluno.
+
+### Detalhes técnicos
+- Tabelas tocadas: `anamnesis` (UPDATE de backfill + novo trigger).
+- Arquivos tocados: `src/pages/PublicAnamnesis.tsx` (inclusão de `company_id` no payload).
+- RLS não muda — está correta. O bug é de dado faltando, não de policy.
+- Não afeta a policy `"Anon can insert anamnesis"`: o anônimo continua podendo inserir; o trigger preenche o `company_id` antes do INSERT efetivar.
 
