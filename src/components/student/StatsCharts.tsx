@@ -29,6 +29,8 @@ const epley = (weight: number, reps: number) => (reps > 0 ? weight * (1 + reps /
 export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
   const [selectedExercise, setSelectedExercise] = useState<string>("all");
   const [period, setPeriod] = useState<Period>("all");
+  const [show1RM, setShow1RM] = useState<boolean>(false);
+  const [hoveredLine, setHoveredLine] = useState<string | null>(null);
 
   // Meta dos exercícios
   const allExercisesMeta = useMemo(() => {
