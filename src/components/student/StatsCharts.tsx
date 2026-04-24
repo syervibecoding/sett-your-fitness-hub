@@ -3,9 +3,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, BarChart3, Activity, Trophy } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
-import { format, parseISO } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { TrendingUp, BarChart3, Activity, Trophy, Flame, Gauge } from "lucide-react";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, ComposedChart, Area, Legend, Cell,
+} from "recharts";
+import { format, parseISO, differenceInCalendarDays, subDays } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { BodyMap } from "./BodyMap";
 
 interface StatsChartsProps {
@@ -14,10 +19,16 @@ interface StatsChartsProps {
   todayStr: string;
 }
 
-export function StatsCharts({ allLogs, cycles }: StatsChartsProps) {
-  const [selectedExercise, setSelectedExercise] = useState<string>("all");
+type Period = "7" | "30" | "90" | "all";
 
-  // Flatten exercises with workout/index references
+// Epley 1RM: peso * (1 + reps/30)
+const epley = (weight: number, reps: number) => (reps > 0 ? weight * (1 + reps / 30) : weight);
+
+export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
+  const [selectedExercise, setSelectedExercise] = useState<string>("all");
+  const [period, setPeriod] = useState<Period>("all");
+
+  // Meta dos exercícios
   const allExercisesMeta = useMemo(() => {
     const meta: { workoutId: string; index: number; name: string; muscleGroup: string }[] = [];
     cycles.forEach(c => c.workouts.forEach(w => w.exercises.forEach((ex, idx) => {
@@ -26,90 +37,190 @@ export function StatsCharts({ allLogs, cycles }: StatsChartsProps) {
     return meta;
   }, [cycles]);
 
-  const allExercises = useMemo(() => {
-    return Array.from(new Set(allExercisesMeta.map(m => m.name))).sort();
-  }, [allExercisesMeta]);
+  const allExercises = useMemo(() => Array.from(new Set(allExercisesMeta.map(m => m.name))).sort(), [allExercisesMeta]);
 
-  // Volume by muscle group (for body map) — total tonnage
+  const findMeta = (workoutId: string, idx: number) => allExercisesMeta.find(m => m.workoutId === workoutId && m.index === idx);
+
+  // Filtro de período
+  const periodCutoff = useMemo(() => {
+    if (period === "all") return null;
+    return subDays(parseISO(todayStr), Number(period));
+  }, [period, todayStr]);
+
+  const filteredLogs = useMemo(() => {
+    if (!periodCutoff) return allLogs;
+    return allLogs.filter((l: any) => parseISO(l.session_date) >= periodCutoff);
+  }, [allLogs, periodCutoff]);
+
+  // Volume por grupamento (BodyMap)
   const muscleVolumes = useMemo(() => {
-    const volumes: Record<string, number> = {};
-    allLogs.forEach((l: any) => {
-      const meta = allExercisesMeta.find(m => m.workoutId === l.workout_id && m.index === l.exercise_index);
+    const v: Record<string, number> = {};
+    filteredLogs.forEach((l: any) => {
+      const meta = findMeta(l.workout_id, l.exercise_index);
       if (!meta?.muscleGroup) return;
-      const tonnage = (Number(l.weight) || 0) * (Number(l.reps_done) || 0);
-      if (tonnage > 0) {
-        volumes[meta.muscleGroup] = (volumes[meta.muscleGroup] || 0) + tonnage;
-      }
+      const t = (Number(l.weight) || 0) * (Number(l.reps_done) || 0);
+      if (t > 0) v[meta.muscleGroup] = (v[meta.muscleGroup] || 0) + t;
     });
-    return Object.entries(volumes).map(([muscleGroup, volume]) => ({ muscleGroup, volume }));
-  }, [allLogs, allExercisesMeta]);
+    return Object.entries(v).map(([muscleGroup, volume]) => ({ muscleGroup, volume }));
+  }, [filteredLogs, allExercisesMeta]);
 
-  // Sessions sorted by date
-  const sessionDates = useMemo(() => {
-    return Array.from(new Set(allLogs.map((l: any) => l.session_date))).sort() as string[];
-  }, [allLogs]);
+  const sessionDates = useMemo(
+    () => Array.from(new Set(filteredLogs.map((l: any) => l.session_date))).sort() as string[],
+    [filteredLogs]
+  );
 
-  // Top exercises by sessions count (for "all" mode)
   const topExercises = useMemo(() => {
     const counts: Record<string, Set<string>> = {};
-    allLogs.forEach((l: any) => {
-      const meta = allExercisesMeta.find(m => m.workoutId === l.workout_id && m.index === l.exercise_index);
+    filteredLogs.forEach((l: any) => {
+      const meta = findMeta(l.workout_id, l.exercise_index);
       if (!meta) return;
       if (!counts[meta.name]) counts[meta.name] = new Set();
       counts[meta.name].add(l.session_date);
     });
-    return Object.entries(counts)
-      .sort(([, a], [, b]) => b.size - a.size)
-      .slice(0, 5)
-      .map(([name]) => name);
-  }, [allLogs, allExercisesMeta]);
+    return Object.entries(counts).sort(([, a], [, b]) => b.size - a.size).slice(0, 5).map(([n]) => n);
+  }, [filteredLogs, allExercisesMeta]);
 
-  // Evolution by SESSION (max weight per exercise per date)
+  // Evolução por SESSÃO: top set + 1RM estimado
   const evolutionData = useMemo(() => {
     const exercisesToShow = selectedExercise === "all" ? topExercises : [selectedExercise];
     return sessionDates.map(date => {
       const point: any = { name: format(parseISO(date), "dd/MM"), date };
       exercisesToShow.forEach(exName => {
-        const logsForDate = allLogs.filter((l: any) => {
+        const logs = filteredLogs.filter((l: any) => {
           if (l.session_date !== date) return false;
-          const meta = allExercisesMeta.find(m => m.workoutId === l.workout_id && m.index === l.exercise_index);
+          const meta = findMeta(l.workout_id, l.exercise_index);
           return meta?.name === exName;
         });
-        const maxWeight = logsForDate.reduce((max: number, l: any) => Math.max(max, Number(l.weight) || 0), 0);
-        if (maxWeight > 0) point[exName] = maxWeight;
+        let topW = 0, top1RM = 0;
+        logs.forEach((l: any) => {
+          const w = Number(l.weight) || 0;
+          const r = Number(l.reps_done) || 0;
+          if (w > topW) topW = w;
+          const e = epley(w, r);
+          if (e > top1RM) top1RM = e;
+        });
+        if (topW > 0) {
+          point[exName] = topW;
+          point[`${exName}__1RM`] = Math.round(top1RM * 10) / 10;
+        }
       });
       return point;
-    }).filter(p => Object.keys(p).length > 2); // keep only sessions with data for selected
-  }, [sessionDates, allLogs, allExercisesMeta, selectedExercise, topExercises]);
+    }).filter(p => Object.keys(p).length > 2);
+  }, [sessionDates, filteredLogs, allExercisesMeta, selectedExercise, topExercises]);
 
-  // Volume per SESSION (tonnage)
+  // Volume + Intensidade média por sessão
   const volumeData = useMemo(() => {
     return sessionDates.map(date => {
-      const logsForDate = allLogs.filter((l: any) => l.session_date === date);
-      const total = logsForDate.reduce((sum: number, l: any) => sum + (Number(l.weight) || 0) * (Number(l.reps_done) || 0), 0);
-      return { name: format(parseISO(date), "dd/MM"), total: Math.round(total) };
+      const logs = filteredLogs.filter((l: any) => l.session_date === date);
+      let tonnage = 0, totalReps = 0;
+      logs.forEach((l: any) => {
+        const w = Number(l.weight) || 0;
+        const r = Number(l.reps_done) || 0;
+        tonnage += w * r;
+        totalReps += r;
+      });
+      return {
+        name: format(parseISO(date), "dd/MM"),
+        date,
+        total: Math.round(tonnage),
+        intensity: totalReps > 0 ? Math.round((tonnage / totalReps) * 10) / 10 : 0,
+      };
     });
-  }, [sessionDates, allLogs]);
+  }, [sessionDates, filteredLogs]);
 
-  // PRs
-  const personalRecords = useMemo(() => {
-    const bestByExercise: Record<string, { weight: number; date: string }> = {};
-    allLogs.forEach((l: any) => {
-      const meta = allExercisesMeta.find(m => m.workoutId === l.workout_id && m.index === l.exercise_index);
+  // Distribuição de RPE
+  const rpeDistribution = useMemo(() => {
+    const buckets: Record<string, number> = {};
+    filteredLogs.forEach((l: any) => {
+      const rpe = Number(l.rpe);
+      if (!rpe || rpe < 1) return;
+      const k = String(Math.round(rpe));
+      buckets[k] = (buckets[k] || 0) + 1;
+    });
+    return Object.entries(buckets)
+      .map(([rpe, count]) => ({ rpe: `RPE ${rpe}`, count, raw: Number(rpe) }))
+      .sort((a, b) => a.raw - b.raw);
+  }, [filteredLogs]);
+
+  const avgRpe = useMemo(() => {
+    const vals = filteredLogs.map((l: any) => Number(l.rpe)).filter((v: number) => v > 0);
+    if (!vals.length) return 0;
+    return Math.round((vals.reduce((s: number, v: number) => s + v, 0) / vals.length) * 10) / 10;
+  }, [filteredLogs]);
+
+  // Frequência por grupamento (nº de sessões em que o grupo apareceu)
+  const muscleFrequency = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    filteredLogs.forEach((l: any) => {
+      const meta = findMeta(l.workout_id, l.exercise_index);
+      if (!meta?.muscleGroup) return;
+      if (!map[meta.muscleGroup]) map[meta.muscleGroup] = new Set();
+      map[meta.muscleGroup].add(l.session_date);
+    });
+    return Object.entries(map)
+      .map(([muscle, dates]) => ({ muscle, sessions: dates.size }))
+      .sort((a, b) => b.sessions - a.sessions);
+  }, [filteredLogs, allExercisesMeta]);
+
+  const maxFreq = Math.max(1, ...muscleFrequency.map(m => m.sessions));
+
+  // Comparativo período-a-período (últimos N vs N anteriores)
+  const comparison = useMemo(() => {
+    const days = period === "all" ? 30 : Number(period);
+    const today = parseISO(todayStr);
+    const cutoffA = subDays(today, days);
+    const cutoffB = subDays(today, days * 2);
+
+    let tonnageA = 0, tonnageB = 0;
+    let sessionsA = new Set<string>(), sessionsB = new Set<string>();
+    let prsA = 0, prsB = 0;
+    const bestBefore: Record<string, number> = {};
+    const sortedAll = [...allLogs].sort((a, b) => a.session_date.localeCompare(b.session_date));
+    sortedAll.forEach((l: any) => {
+      const meta = findMeta(l.workout_id, l.exercise_index);
       if (!meta) return;
-      const weight = Number(l.weight) || 0;
-      if (weight > 0) {
-        if (!bestByExercise[meta.name] || weight > bestByExercise[meta.name].weight) {
-          bestByExercise[meta.name] = { weight, date: l.session_date };
-        }
+      const w = Number(l.weight) || 0;
+      const r = Number(l.reps_done) || 0;
+      const t = w * r;
+      const d = parseISO(l.session_date);
+      const isA = d >= cutoffA;
+      const isB = d >= cutoffB && d < cutoffA;
+      if (isA) { tonnageA += t; sessionsA.add(l.session_date); }
+      if (isB) { tonnageB += t; sessionsB.add(l.session_date); }
+      const prev = bestBefore[meta.name] || 0;
+      if (w > prev) {
+        if (isA) prsA++;
+        else if (isB) prsB++;
+        bestBefore[meta.name] = w;
       }
     });
-    return Object.entries(bestByExercise)
-      .map(([exercise, { weight, date }]) => ({ exercise, weight, date }))
-      .sort((a, b) => b.weight - a.weight);
-  }, [allLogs, allExercisesMeta]);
 
-  // Aggregates
+    const pct = (a: number, b: number) => (b === 0 ? (a > 0 ? 100 : 0) : Math.round(((a - b) / b) * 100));
+    return {
+      days,
+      tonnageA: Math.round(tonnageA), tonnageB: Math.round(tonnageB), tonnagePct: pct(tonnageA, tonnageB),
+      sessionsA: sessionsA.size, sessionsB: sessionsB.size, sessionsPct: pct(sessionsA.size, sessionsB.size),
+      prsA, prsB, prsPct: pct(prsA, prsB),
+    };
+  }, [allLogs, allExercisesMeta, period, todayStr]);
+
+  // PRs gerais
+  const personalRecords = useMemo(() => {
+    const best: Record<string, { weight: number; date: string; reps: number; e1rm: number }> = {};
+    filteredLogs.forEach((l: any) => {
+      const meta = findMeta(l.workout_id, l.exercise_index);
+      if (!meta) return;
+      const w = Number(l.weight) || 0;
+      const r = Number(l.reps_done) || 0;
+      if (w <= 0) return;
+      const e = epley(w, r);
+      if (!best[meta.name] || w > best[meta.name].weight) {
+        best[meta.name] = { weight: w, date: l.session_date, reps: r, e1rm: Math.round(e * 10) / 10 };
+      }
+    });
+    return Object.entries(best).map(([exercise, v]) => ({ exercise, ...v })).sort((a, b) => b.weight - a.weight);
+  }, [filteredLogs, allExercisesMeta]);
+
   const totalSessions = sessionDates.length;
   const totalTonnage = useMemo(() => volumeData.reduce((s, v) => s + v.total, 0), [volumeData]);
   const avgTonnage = totalSessions > 0 ? Math.round(totalTonnage / totalSessions) : 0;
@@ -129,142 +240,336 @@ export function StatsCharts({ allLogs, cycles }: StatsChartsProps) {
     );
   }
 
+  const PeriodToggle = () => (
+    <div className="flex items-center gap-1 bg-secondary/30 rounded-lg p-1">
+      {(["7", "30", "90", "all"] as Period[]).map(p => (
+        <Button
+          key={p}
+          size="sm"
+          variant={period === p ? "default" : "ghost"}
+          className="h-7 px-2.5 text-[11px] font-sans"
+          onClick={() => setPeriod(p)}
+        >
+          {p === "all" ? "Tudo" : `${p}d`}
+        </Button>
+      ))}
+    </div>
+  );
+
   return (
-    <Tabs defaultValue="bodymap" className="space-y-4">
-      <TabsList className="grid w-full grid-cols-3">
-        <TabsTrigger value="bodymap" className="font-sans text-xs gap-1">
-          <Activity className="h-3.5 w-3.5" />
-          Body Map
-        </TabsTrigger>
-        <TabsTrigger value="evolucao" className="font-sans text-xs gap-1">
-          <TrendingUp className="h-3.5 w-3.5" />
-          Carga
-        </TabsTrigger>
-        <TabsTrigger value="volume" className="font-sans text-xs gap-1">
-          <BarChart3 className="h-3.5 w-3.5" />
-          Volume
-        </TabsTrigger>
-      </TabsList>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-sans text-muted-foreground uppercase tracking-wider">Período</span>
+        <PeriodToggle />
+      </div>
 
-      {/* Body Map */}
-      <TabsContent value="bodymap">
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-4">Volume por Grupamento</h3>
-            <BodyMap muscleVolumes={muscleVolumes} />
-          </CardContent>
-        </Card>
-      </TabsContent>
+      <Tabs defaultValue="bodymap" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="bodymap" className="font-sans text-[11px] gap-1">
+            <Activity className="h-3.5 w-3.5" />
+            Body Map
+          </TabsTrigger>
+          <TabsTrigger value="evolucao" className="font-sans text-[11px] gap-1">
+            <TrendingUp className="h-3.5 w-3.5" />
+            Carga
+          </TabsTrigger>
+          <TabsTrigger value="volume" className="font-sans text-[11px] gap-1">
+            <BarChart3 className="h-3.5 w-3.5" />
+            Volume
+          </TabsTrigger>
+          <TabsTrigger value="intensidade" className="font-sans text-[11px] gap-1">
+            <Gauge className="h-3.5 w-3.5" />
+            Intensidade
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Load Evolution */}
-      <TabsContent value="evolucao" className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Select value={selectedExercise} onValueChange={setSelectedExercise}>
-            <SelectTrigger className="h-8 text-xs font-sans">
-              <SelectValue placeholder="Todos exercícios" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Top 5 exercícios</SelectItem>
-              {allExercises.map(name => (
-                <SelectItem key={name} value={name}>{name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Body Map + Frequência */}
+        <TabsContent value="bodymap" className="space-y-4">
+          <Card className="bg-card border-border">
+            <CardContent className="p-4">
+              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-4">Volume por Grupamento</h3>
+              <BodyMap muscleVolumes={muscleVolumes} />
+            </CardContent>
+          </Card>
 
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-4">
-              Evolução de Carga (kg) — por sessão
-            </h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={evolutionData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
-                  {filteredExerciseNames.map((name, i) => (
-                    <Line key={name} type="monotone" dataKey={name} stroke={exerciseColors[i % exerciseColors.length]} strokeWidth={2} dot={{ r: 3 }} connectNulls />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* PRs */}
-        {personalRecords.length > 0 && (
           <Card className="bg-card border-border">
             <CardContent className="p-4">
               <div className="flex items-center gap-2 mb-3">
-                <Trophy className="h-4 w-4 text-yellow-500" />
-                <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider">Recordes Pessoais</h3>
+                <Flame className="h-4 w-4 text-orange-500" />
+                <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider">Frequência por Grupamento</h3>
               </div>
-              <div className="space-y-2">
-                {personalRecords.slice(0, 10).map((pr, i) => (
-                  <div key={i} className="flex items-center justify-between text-xs font-sans">
-                    <span className="text-foreground">{pr.exercise}</span>
-                    <Badge variant="outline" className="text-[10px] border-primary/50 text-primary">{pr.weight}kg</Badge>
+              {muscleFrequency.length === 0 ? (
+                <p className="text-xs text-muted-foreground font-sans">Sem dados no período.</p>
+              ) : (
+                <div className="space-y-2">
+                  {muscleFrequency.map(m => {
+                    const pct = (m.sessions / maxFreq) * 100;
+                    return (
+                      <div key={m.muscle} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs font-sans">
+                          <span className="text-foreground">{m.muscle}</span>
+                          <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">
+                            {m.sessions} {m.sessions === 1 ? "sessão" : "sessões"}
+                          </Badge>
+                        </div>
+                        <div className="h-2 bg-secondary/40 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${pct}%`, background: `linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(var(--chart-3)) 100%)` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Carga: top set + 1RM estimado */}
+        <TabsContent value="evolucao" className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Select value={selectedExercise} onValueChange={setSelectedExercise}>
+              <SelectTrigger className="h-8 text-xs font-sans">
+                <SelectValue placeholder="Todos exercícios" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Top 5 exercícios</SelectItem>
+                {allExercises.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Card className="bg-card border-border">
+            <CardContent className="p-4">
+              <div className="flex items-baseline justify-between mb-1">
+                <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider">
+                  Carga (kg) — top set vs 1RM estimado
+                </h3>
+              </div>
+              <p className="text-[10px] text-muted-foreground font-sans mb-3">
+                Linha sólida = peso real. Linha tracejada = 1RM projetado (Epley).
+              </p>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={evolutionData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip
+                      contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                      formatter={(value: any, name: any) => {
+                        const isE1RM = String(name).endsWith("__1RM");
+                        const label = isE1RM ? `${String(name).replace("__1RM", "")} (1RM)` : name;
+                        return [`${value} kg`, label];
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v: any) => String(v).replace("__1RM", " (1RM)")} />
+                    {filteredExerciseNames.map((name, i) => (
+                      <Line
+                        key={name}
+                        type="monotone"
+                        dataKey={name}
+                        stroke={exerciseColors[i % exerciseColors.length]}
+                        strokeWidth={2.5}
+                        dot={{ r: 3 }}
+                        connectNulls
+                      />
+                    ))}
+                    {filteredExerciseNames.map((name, i) => (
+                      <Line
+                        key={`${name}__1RM`}
+                        type="monotone"
+                        dataKey={`${name}__1RM`}
+                        stroke={exerciseColors[i % exerciseColors.length]}
+                        strokeWidth={1.5}
+                        strokeDasharray="4 3"
+                        dot={false}
+                        connectNulls
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {personalRecords.length > 0 && (
+            <Card className="bg-card border-border">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Trophy className="h-4 w-4 text-yellow-500" />
+                  <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider">Recordes Pessoais</h3>
+                </div>
+                <div className="space-y-2">
+                  {personalRecords.slice(0, 10).map((pr, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs font-sans">
+                      <div className="flex flex-col">
+                        <span className="text-foreground">{pr.exercise}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {pr.reps} reps · {format(parseISO(pr.date), "dd MMM", { locale: ptBR })} · 1RM est. {pr.e1rm}kg
+                        </span>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] border-primary/50 text-primary">{pr.weight}kg</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Volume + comparativo */}
+        <TabsContent value="volume" className="space-y-4">
+          <Card className="bg-card border-border">
+            <CardContent className="p-4">
+              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                Tonelagem por Sessão (kg)
+              </h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={volumeData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip
+                      contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                      formatter={(v: any) => [`${Number(v).toLocaleString("pt-BR")} kg`, "Tonelagem"]}
+                    />
+                    <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border">
+            <CardContent className="p-4">
+              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                Comparativo — últimos {comparison.days}d vs {comparison.days}d anteriores
+              </h3>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: "Tonelagem", a: comparison.tonnageA.toLocaleString("pt-BR"), b: comparison.tonnageB.toLocaleString("pt-BR"), pct: comparison.tonnagePct, suffix: "kg" },
+                  { label: "Sessões", a: comparison.sessionsA, b: comparison.sessionsB, pct: comparison.sessionsPct, suffix: "" },
+                  { label: "Novos PRs", a: comparison.prsA, b: comparison.prsB, pct: comparison.prsPct, suffix: "" },
+                ].map((m, i) => (
+                  <div key={i} className="bg-secondary/40 rounded-lg p-3 text-center">
+                    <p className="text-[10px] text-muted-foreground font-sans uppercase mb-1">{m.label}</p>
+                    <p className="text-lg font-bold font-mono text-foreground">{m.a}{m.suffix && ` ${m.suffix}`}</p>
+                    <p className="text-[10px] text-muted-foreground font-mono">vs {m.b}{m.suffix && ` ${m.suffix}`}</p>
+                    <Badge
+                      variant="outline"
+                      className={`mt-1 text-[10px] ${m.pct >= 0 ? "border-green-500/40 text-green-500" : "border-red-500/40 text-red-500"}`}
+                    >
+                      {m.pct >= 0 ? "+" : ""}{m.pct}%
+                    </Badge>
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
-        )}
-      </TabsContent>
 
-      {/* Volume */}
-      <TabsContent value="volume" className="space-y-4">
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-4">
-              Tonelagem por Sessão (kg)
-            </h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={volumeData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
-                  <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="p-4">
+              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-3">Resumo</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-secondary/50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold font-mono text-foreground">{totalSessions}</p>
+                  <p className="text-[10px] text-muted-foreground font-sans uppercase">Sessões</p>
+                </div>
+                <div className="bg-secondary/50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold font-mono text-foreground">{personalRecords.length}</p>
+                  <p className="text-[10px] text-muted-foreground font-sans uppercase">Recordes</p>
+                </div>
+                <div className="bg-secondary/50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold font-mono text-foreground">{totalTonnage.toLocaleString("pt-BR")}</p>
+                  <p className="text-[10px] text-muted-foreground font-sans uppercase">Tonelagem (kg)</p>
+                </div>
+                <div className="bg-secondary/50 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold font-mono text-foreground">{avgTonnage.toLocaleString("pt-BR")}</p>
+                  <p className="text-[10px] text-muted-foreground font-sans uppercase">Média/sessão (kg)</p>
+                </div>
+                {topPR && (
+                  <div className="col-span-2 bg-secondary/50 rounded-lg p-3 text-center">
+                    <p className="text-lg font-bold font-mono text-primary">{topPR.exercise} — {topPR.weight}kg</p>
+                    <p className="text-[10px] text-muted-foreground font-sans uppercase">Maior PR</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-3">Resumo</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-secondary/50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold font-mono text-foreground">{totalSessions}</p>
-                <p className="text-[10px] text-muted-foreground font-sans uppercase">Sessões registradas</p>
+        {/* Intensidade + RPE */}
+        <TabsContent value="intensidade" className="space-y-4">
+          <Card className="bg-card border-border">
+            <CardContent className="p-4">
+              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                Intensidade Média por Sessão
+              </h3>
+              <p className="text-[10px] text-muted-foreground font-sans mb-3">
+                Tonelagem dividida pelo total de repetições (kg/rep). Mostra densidade de carga.
+              </p>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={volumeData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip
+                      contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                      formatter={(v: any, name: any) => [`${v} ${name === "intensity" ? "kg/rep" : "kg"}`, name === "intensity" ? "Intensidade" : "Tonelagem"]}
+                    />
+                    <Area type="monotone" dataKey="intensity" stroke="hsl(var(--chart-2))" fill="hsl(var(--chart-2) / 0.2)" strokeWidth={2} />
+                  </ComposedChart>
+                </ResponsiveContainer>
               </div>
-              <div className="bg-secondary/50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold font-mono text-foreground">{personalRecords.length}</p>
-                <p className="text-[10px] text-muted-foreground font-sans uppercase">Recordes pessoais</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border">
+            <CardContent className="p-4">
+              <div className="flex items-baseline justify-between mb-3">
+                <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider">
+                  Distribuição de RPE
+                </h3>
+                {avgRpe > 0 && (
+                  <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">
+                    Média: {avgRpe}
+                  </Badge>
+                )}
               </div>
-              <div className="bg-secondary/50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold font-mono text-foreground">{totalTonnage.toLocaleString("pt-BR")}</p>
-                <p className="text-[10px] text-muted-foreground font-sans uppercase">Tonelagem total (kg)</p>
-              </div>
-              <div className="bg-secondary/50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-bold font-mono text-foreground">{avgTonnage.toLocaleString("pt-BR")}</p>
-                <p className="text-[10px] text-muted-foreground font-sans uppercase">Média/sessão (kg)</p>
-              </div>
-              {topPR && (
-                <div className="col-span-2 bg-secondary/50 rounded-lg p-3 text-center">
-                  <p className="text-lg font-bold font-mono text-primary">{topPR.exercise} — {topPR.weight}kg</p>
-                  <p className="text-[10px] text-muted-foreground font-sans uppercase">Maior PR</p>
+              {rpeDistribution.length === 0 ? (
+                <p className="text-xs text-muted-foreground font-sans">Nenhum RPE registrado no período.</p>
+              ) : (
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={rpeDistribution}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="rpe" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                        formatter={(v: any) => [`${v} séries`, "Quantidade"]}
+                      />
+                      <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                        {rpeDistribution.map((entry, idx) => {
+                          // verde leve → vermelho intenso conforme RPE sobe
+                          const ratio = Math.min(1, Math.max(0, (entry.raw - 5) / 5));
+                          const hue = 140 - ratio * 140; // 140 (verde) → 0 (vermelho)
+                          return <Cell key={idx} fill={`hsl(${hue}, 70%, 50%)`} />;
+                        })}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               )}
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
