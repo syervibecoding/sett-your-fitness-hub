@@ -1,50 +1,59 @@
 
 
-## Bruna não vê a anamnese da Ludmila
+## Estatísticas do Syer estão fracas — diagnóstico e correção
 
 ### Causa raiz
-As 2 anamneses da Ludmila no banco estão com `company_id = NULL`:
 
-```
-anamnesis e0e5… → company_id: NULL  (submetida 22/04)
-anamnesis 59fc… → company_id: NULL  (submetida 23/04)
-```
+O Syer tem **13 sessões registradas** (24/03 → 20/04) com progressão real de carga (ex: Supino 60→67,5kg; Agachamento 80→87,5kg). Os dados estão ótimos. Os gráficos é que estão errados:
 
-A RLS de `anamnesis` para usuários autenticados exige:
-```sql
-company_id = get_user_company_id(auth.uid())
-```
+**1. BodyMap vazio** — Todos os exercícios dos 3 treinos do Syer estão com `muscle_group = NULL` no JSONB de `workouts.exercises`. O `BodyMap.tsx` depende desse campo para colorir as regiões. Sem ele, nenhum músculo acende. Os nomes dos treinos têm a info ("Peito/Tríceps", "Costas/Bíceps", "Pernas") mas isso não é lido.
 
-`NULL = <uuid>` é **falso**, então a Bruna (admin da empresa `c051e80e…`) não enxerga nenhuma das duas. Você consegue ver porque sua conta tem role `master`, que dá bypass total via policy "Master full access".
-
-A origem do bug está em `src/pages/PublicAnamnesis.tsx` (linhas 121–143): o `payload` enviado pelo formulário público da anamnese **não inclui `company_id`**. Como a rota é anônima e não há trigger no banco para preencher esse campo a partir de `student_id`, ele fica `NULL` para sempre.
+**2. Gráficos "horríveis" — agrupados por ciclo, não por sessão** — `StatsCharts.tsx` (linhas 41-77) faz `cycles.map(c => ...)` retornando um ponto **por ciclo**. O Syer só tem 1 ciclo → "Evolução de Carga" mostra **1 ponto** e "Tonelagem por Ciclo" mostra **1 barra**. Visualmente é uma linha reta sem informação. A progressão sessão-a-sessão (que existe e é o ouro do dado) é jogada fora.
 
 ### Correções
 
-**1. Backfill dos dados existentes (migração)**
-Atualizar todas as anamneses com `company_id IS NULL`, copiando do `students.company_id`:
-```sql
-UPDATE public.anamnesis a
-SET company_id = s.company_id
-FROM public.students s
-WHERE a.student_id = s.id
-  AND a.company_id IS NULL;
-```
+**A. Backfill dos `muscle_group` dos exercícios do Syer (migração)**
 
-**2. Trigger no banco para nunca mais acontecer**
-Espelhar o padrão já usado em `enrollments` (`set_enrollment_company_id`). Criar `set_anamnesis_company_id()` + trigger `BEFORE INSERT OR UPDATE` que, se `NEW.company_id IS NULL`, busca de `students.company_id` via `student_id`. Garante consistência mesmo se outro fluxo esquecer o campo.
+Atualizar o JSONB `workouts.exercises` dos 3 treinos do Syer preenchendo `muscle_group` por nome de exercício, usando lookup na `exercise_library` (ou inferindo do nome quando não houver match):
 
-**3. Hardening do frontend (`PublicAnamnesis.tsx`)**
-Buscar `company_id` do aluno no início do componente (já carrega o student por `studentId`) e incluir no `payload` do insert/update. Defesa em profundidade: o trigger cobre, mas o cliente também envia explicitamente.
+| Exercício | muscle_group |
+|---|---|
+| Supino Reto Barra | Peitoral |
+| Elevação Lateral Halteres | Deltoides |
+| Rosca Direta | Bíceps |
+| Puxada Frontal | Costas |
+| Levantamento Terra | Costas |
+| Agachamento Livre | Quadríceps |
+| Leg Press 45 | Quadríceps |
+
+Migração `UPDATE workouts SET exercises = ...` mirando os 3 workout IDs já identificados.
+
+**B. Trigger preventivo (migração)**
+
+Criar `set_workout_exercise_muscle_group()` BEFORE INSERT/UPDATE em `workouts`: para cada item do array `exercises` que estiver com `muscle_group` vazio/null, buscar de `exercise_library` por nome (case-insensitive). Garante que isso não se repita em treinos futuros, independente do builder.
+
+**C. Reformar `StatsCharts.tsx` para granularidade por sessão**
+
+- **Aba "Carga" (evolução)**: trocar o eixo X de "ciclo" para **data de sessão**. Para cada `session_date` distinto em `allLogs`, plotar o **maior peso** por exercício. Dropdown "Todos exercícios" passa a mostrar os 3-5 com mais sessões. Vai exibir 13 pontos com curva clara de progressão.
+- **Aba "Volume" (tonelagem)**: trocar de "por ciclo" para **por sessão** (barras), mantendo "C{n}" só como agrupamento visual opcional. Adicionar card extra "Tonelagem total acumulada" e "Tonelagem média/sessão".
+- Adicionar fallback: se houver muitas sessões (>20), agrupar por semana (`YYYY-WW`).
+- Resumo (cards inferiores): manter "Sessões registradas" e "PRs", adicionar "Tonelagem total (kg)" e "Maior PR".
+
+**D. Remover aluno duplicado do Syer (migração)**
+
+Existem 2 students "Syer Rodrigues de Souza Filho" (`b7f23db8…` sem dados, `3cb1cfae…` com 145 logs). Apagar o vazio `b7f23db8…` (delete cascata na enrollment órfã).
 
 ### Resultado esperado
-- As duas anamneses já existentes da Ludmila ficam visíveis para a Bruna (e qualquer admin/coordenador/treinador da empresa, conforme RLS).
-- Novas submissões públicas de anamnese sempre nascem com `company_id` correto.
-- Nenhum impacto em outras empresas — backfill é idempotente e usa o `company_id` do próprio aluno.
+
+- BodyMap acende Peitoral, Deltoides, Bíceps, Costas e Quadríceps com cores proporcionais à tonelagem.
+- "Evolução de Carga" vira uma curva ascendente real (24/03 → 20/04) por exercício.
+- "Tonelagem por Sessão" mostra 13 barras ao invés de 1, evidenciando volume crescente.
+- Cards de resumo refletem 13 sessões, ~7 PRs, tonelagem total ~80.000 kg.
+- Próximos treinos cadastrados não terão mais `muscle_group` nulo.
 
 ### Detalhes técnicos
-- Tabelas tocadas: `anamnesis` (UPDATE de backfill + novo trigger).
-- Arquivos tocados: `src/pages/PublicAnamnesis.tsx` (inclusão de `company_id` no payload).
-- RLS não muda — está correta. O bug é de dado faltando, não de policy.
-- Não afeta a policy `"Anon can insert anamnesis"`: o anônimo continua podendo inserir; o trigger preenche o `company_id` antes do INSERT efetivar.
+
+- **DB tocado**: `workouts` (UPDATE backfill + trigger novo), `students`/`enrollments` (DELETE do duplicado).
+- **Arquivos tocados**: `src/components/student/StatsCharts.tsx` (refatoração da agregação por sessão).
+- **Não toca**: `BodyMap.tsx` (já funciona, basta ter `muscle_group`), RLS, demais alunos.
 
