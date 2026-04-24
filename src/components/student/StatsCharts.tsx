@@ -4,6 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { TrendingUp, BarChart3, Activity, Trophy, Flame, Gauge } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -27,6 +29,8 @@ const epley = (weight: number, reps: number) => (reps > 0 ? weight * (1 + reps /
 export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
   const [selectedExercise, setSelectedExercise] = useState<string>("all");
   const [period, setPeriod] = useState<Period>("all");
+  const [show1RM, setShow1RM] = useState<boolean>(false);
+  const [hoveredLine, setHoveredLine] = useState<string | null>(null);
 
   // Meta dos exercícios
   const allExercisesMeta = useMemo(() => {
@@ -329,9 +333,9 @@ export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
 
         {/* Carga: top set + 1RM estimado */}
         <TabsContent value="evolucao" className="space-y-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Select value={selectedExercise} onValueChange={setSelectedExercise}>
-              <SelectTrigger className="h-8 text-xs font-sans">
+              <SelectTrigger className="h-8 text-xs font-sans flex-1 min-w-[180px]">
                 <SelectValue placeholder="Todos exercícios" />
               </SelectTrigger>
               <SelectContent>
@@ -339,57 +343,135 @@ export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
                 {allExercises.map(name => <SelectItem key={name} value={name}>{name}</SelectItem>)}
               </SelectContent>
             </Select>
+            <div className="flex items-center gap-2 bg-secondary/30 rounded-lg px-3 h-8">
+              <Switch id="show-1rm" checked={show1RM} onCheckedChange={setShow1RM} className="scale-75" />
+              <Label htmlFor="show-1rm" className="text-[11px] font-sans cursor-pointer">1RM est.</Label>
+            </div>
           </div>
 
           <Card className="bg-card border-border">
             <CardContent className="p-4">
               <div className="flex items-baseline justify-between mb-1">
                 <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider">
-                  Carga (kg) — top set vs 1RM estimado
+                  {selectedExercise === "all" ? "Carga (kg) — top 5 exercícios" : `Carga (kg) — ${selectedExercise}`}
                 </h3>
               </div>
               <p className="text-[10px] text-muted-foreground font-sans mb-3">
-                Linha sólida = peso real. Linha tracejada = 1RM projetado (Epley).
+                {selectedExercise === "all"
+                  ? "Passe o cursor sobre uma linha para destacá-la. Clique na legenda para isolar."
+                  : "Linha sólida = peso real (top set). " + (show1RM ? "Linha tracejada = 1RM projetado (Epley). Área = potencial." : "Ative \"1RM est.\" para ver projeção de força.")}
               </p>
-              <div className="h-72">
+              <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={evolutionData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <ComposedChart data={evolutionData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                    <defs>
+                      {filteredExerciseNames.map((name, i) => (
+                        <linearGradient key={name} id={`grad-${i}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={exerciseColors[i % exerciseColors.length]} stopOpacity={0.25} />
+                          <stop offset="100%" stopColor={exerciseColors[i % exerciseColors.length]} stopOpacity={0.02} />
+                        </linearGradient>
+                      ))}
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                     <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={40} unit=" kg" />
                     <Tooltip
-                      contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                      formatter={(value: any, name: any) => {
-                        const isE1RM = String(name).endsWith("__1RM");
-                        const label = isE1RM ? `${String(name).replace("__1RM", "")} (1RM)` : name;
-                        return [`${value} kg`, label];
+                      cursor={{ stroke: "hsl(var(--primary))", strokeWidth: 1, strokeDasharray: "3 3" }}
+                      content={({ active, payload, label }: any) => {
+                        if (!active || !payload?.length) return null;
+                        // Agrupa por exercício: { name, top, e1rm, color }
+                        const grouped: Record<string, { top?: number; e1rm?: number; color: string }> = {};
+                        payload.forEach((p: any) => {
+                          const isE = String(p.dataKey).endsWith("__1RM");
+                          const baseName = isE ? String(p.dataKey).replace("__1RM", "") : String(p.dataKey);
+                          if (!grouped[baseName]) grouped[baseName] = { color: p.stroke };
+                          if (isE) grouped[baseName].e1rm = p.value;
+                          else grouped[baseName].top = p.value;
+                        });
+                        const rows = Object.entries(grouped)
+                          .filter(([, v]) => v.top != null || v.e1rm != null)
+                          .sort(([, a], [, b]) => (b.top ?? b.e1rm ?? 0) - (a.top ?? a.e1rm ?? 0));
+                        return (
+                          <div className="rounded-lg border border-border bg-card/95 backdrop-blur px-3 py-2 shadow-xl text-xs font-sans min-w-[200px]">
+                            <p className="font-semibold text-foreground mb-1.5">{label}</p>
+                            <div className="space-y-1">
+                              {rows.map(([name, v]) => (
+                                <div key={name} className="flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="h-2 w-2 rounded-full shrink-0" style={{ background: v.color }} />
+                                    <span className="text-foreground truncate">{name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 font-mono shrink-0">
+                                    {v.top != null && <span className="text-foreground">{v.top}kg</span>}
+                                    {v.e1rm != null && <span className="text-muted-foreground">~{v.e1rm}</span>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            {show1RM && (
+                              <p className="text-[9px] text-muted-foreground mt-1.5 pt-1.5 border-t border-border/50">
+                                kg = top set · ~ = 1RM estimado
+                              </p>
+                            )}
+                          </div>
+                        );
                       }}
                     />
-                    <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v: any) => String(v).replace("__1RM", " (1RM)")} />
-                    {filteredExerciseNames.map((name, i) => (
-                      <Line
-                        key={name}
-                        type="monotone"
-                        dataKey={name}
-                        stroke={exerciseColors[i % exerciseColors.length]}
-                        strokeWidth={2.5}
-                        dot={{ r: 3 }}
-                        connectNulls
-                      />
-                    ))}
-                    {filteredExerciseNames.map((name, i) => (
-                      <Line
-                        key={`${name}__1RM`}
+                    <Legend
+                      wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                      formatter={(v: any) => String(v).replace("__1RM", " (1RM)")}
+                      onMouseEnter={(o: any) => setHoveredLine(String(o.dataKey).replace("__1RM", ""))}
+                      onMouseLeave={() => setHoveredLine(null)}
+                    />
+                    {/* Área entre top set e 1RM apenas quando 1 exercício isolado e 1RM ativo */}
+                    {show1RM && selectedExercise !== "all" && filteredExerciseNames.map((name, i) => (
+                      <Area
+                        key={`area-${name}`}
                         type="monotone"
                         dataKey={`${name}__1RM`}
-                        stroke={exerciseColors[i % exerciseColors.length]}
-                        strokeWidth={1.5}
-                        strokeDasharray="4 3"
-                        dot={false}
+                        stroke="none"
+                        fill={`url(#grad-${i})`}
+                        legendType="none"
                         connectNulls
                       />
                     ))}
-                  </LineChart>
+                    {/* Top set — linhas sólidas */}
+                    {filteredExerciseNames.map((name, i) => {
+                      const dim = hoveredLine && hoveredLine !== name;
+                      return (
+                        <Line
+                          key={name}
+                          type="monotone"
+                          dataKey={name}
+                          stroke={exerciseColors[i % exerciseColors.length]}
+                          strokeWidth={hoveredLine === name ? 3.5 : 2.5}
+                          strokeOpacity={dim ? 0.18 : 1}
+                          dot={{ r: 3, strokeWidth: 1.5, fill: "hsl(var(--background))" }}
+                          activeDot={{ r: 5 }}
+                          connectNulls
+                          isAnimationActive={false}
+                        />
+                      );
+                    })}
+                    {/* 1RM tracejado — só quando ativo */}
+                    {show1RM && filteredExerciseNames.map((name, i) => {
+                      const dim = hoveredLine && hoveredLine !== name;
+                      return (
+                        <Line
+                          key={`${name}__1RM`}
+                          type="monotone"
+                          dataKey={`${name}__1RM`}
+                          stroke={exerciseColors[i % exerciseColors.length]}
+                          strokeWidth={1.5}
+                          strokeOpacity={dim ? 0.12 : 0.7}
+                          strokeDasharray="5 4"
+                          dot={false}
+                          connectNulls
+                          isAnimationActive={false}
+                        />
+                      );
+                    })}
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
