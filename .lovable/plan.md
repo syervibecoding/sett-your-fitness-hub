@@ -1,40 +1,54 @@
-## Coordenador não consegue atribuir treinadores — diagnóstico
+# Correção do 404 para Coordenador e Trainer
 
-### O que verifiquei
+## Causa raiz
 
-- **RLS de `students`**: a policy `Admin company update` (apesar do nome) permite UPDATE para QUALQUER usuário autenticado da mesma `company_id`. Coordenador deveria conseguir.
-- **RLS de `user_roles`**: a policy `Admin reads company member roles` libera leitura para `admin` E `coordinator` da mesma company. OK.
-- **RLS de `profiles`**: `Company profiles readable` libera quem está em `company_members` da mesma company. Os 2 trainers (Thalia, Bárbara) estão registrados corretamente em `company_members` da company da Bruna.
-- **Permissões de módulo**: o coordenador "Matheus" tem registros em `role_permissions` apenas para `appearance`, `plans`, `whatsapp`. Como não há registro para `students`, o `useRolePermissions` cai no default (`students` está incluído) — então a tela abre normalmente.
-- **Rota `/coordinator/students`**: existe e está liberada via `FeatureRoute allowedRoles={["coordinator"]}`.
-- **Logs do Postgres**: sem erros recentes.
+A `AppSidebar` lista, para o coordenador, itens de menu como **Cadastro**, **Anamnese**, **Planos**, **Equipe**, **Financeiro**, **Aparência** e **WhatsApp** apontando para `/coordinator/registration`, `/coordinator/anamnesis`, `/coordinator/plans`, `/coordinator/team`, `/coordinator/financial`, `/coordinator/appearance`, `/coordinator/whatsapp*`.
 
-### Hipótese mais provável
+Porém, em `src/App.tsx`, **essas rotas não existem**. Hoje só estão registradas:
+- `/coordinator`, `/coordinator/students`, `/coordinator/students/:id`
+- `/coordinator/exercises`, `/coordinator/prescriptions`, `/coordinator/agenda`
 
-O coordenador abre a tela e vê alunos, mas o **dropdown de treinadores aparece vazio** ou o `update` em `students.assigned_trainer_id` retorna erro silencioso. Causas possíveis:
+Qualquer clique em um item não mapeado cai no `<Route path="*" element={<NotFound />} />` → tela "404 / Oops! Page not found" (exatamente o print enviado pelo Matheus).
 
-1. **Lista de trainers vazia**: o `loadData` busca `user_roles` SEM filtrar por company. Como a policy filtra por company, deveria vir só os da company dele — mas se o coordenador não tem a role corretamente reconhecida no momento do fetch, pode vir vazio. (Já houve relato de race condition no `useAuth.companyId`.)
-2. **`effectiveCompanyId` nulo no momento do fetch** (companyId ainda carregando) → query roda sem `.eq("company_id", ...)`, mas o `loadData` é re-disparado quando muda. Pode estar OK.
-3. **Toast de erro suprimido** ou usuário não nota a mensagem.
+O mesmo bug afeta o **trainer**: a sidebar lista `/trainer/registration`, `/trainer/anamnesis`, `/trainer/plans`, `/trainer/team`, `/trainer/financial`, `/trainer/appearance`, `/trainer/whatsapp*` — rotas que também não existem.
 
-### Plano de correção (3 mudanças seguras)
+## O que vou fazer
 
-**1. Tornar o carregamento de trainers explícito por company e robusto**
-   - Em `StudentsManager.loadData`, juntar `user_roles` com `company_members` filtrando por `effectiveCompanyId` para garantir que apenas trainers/coordenadores da empresa atual apareçam.
-   - Não disparar `loadData` enquanto `effectiveCompanyId` for `null` (early return), evitando estado vazio.
+### 1. Adicionar as rotas faltantes em `src/App.tsx`
 
-**2. Logar e exibir o erro real do update**
-   - Em `handleAssignTrainer` e `handleChangePlan`, fazer `console.error(error)` e mostrar `error.message` + `error.code` no toast — assim o Matheus me manda o erro exato se persistir.
+Reaproveitar os mesmos componentes de página do admin (eles já são multi-tenant via `effectiveCompanyId` / RLS), envolvidos em `FeatureRoute` com o papel correto e a feature flag correspondente.
 
-**3. Renomear/ajustar policies de `students` (defesa em profundidade — opcional, mas recomendado)**
-   - Hoje `Admin company update/delete/insert` permitem QUALQUER autenticado da company. Isso é permissivo demais para `delete`, mas é exatamente o que faz o coordenador conseguir atribuir trainer. **Não vou mexer agora** para não regredir; só anoto que o nome da policy está enganoso.
+**Rotas novas para `coordinator`:**
+- `/coordinator/registration` → `RegistrationManager` (feature `hasRegistration`)
+- `/coordinator/anamnesis` → `AnamnesisManager` (feature `hasAnamnesis`)
+- `/coordinator/plans` → `PlansManager` (feature `hasPlans`)
+- `/coordinator/team` → `TeamManager` (feature `hasTeam`)
+- `/coordinator/financial` → `FinancialDashboard` (feature `hasFinancial`)
+- `/coordinator/appearance` → `AppearanceSettings` (feature `hasAppearance`)
+- `/coordinator/whatsapp` → `WhatsAppSettings`
+- `/coordinator/whatsapp-chat` → `WhatsAppChat`
+- `/coordinator/whatsapp-crm` → `WhatsAppCRM`
+- `/coordinator/whatsapp-templates` → `WhatsAppTemplates`
+- `/coordinator/whatsapp-automation` → `WhatsAppAutomation`
+- `/coordinator/workout/:cycleId` → `WorkoutBuilder` (necessário para abrir prescrições)
 
-### Detalhes técnicos
+**Rotas novas para `trainer`** (mesma lista, prefixo `/trainer/...`).
 
-- **Arquivo tocado**: `src/pages/admin/StudentsManager.tsx` (função `loadData` + handlers de update).
-- **DB tocado**: nenhum (só leitura para diagnóstico).
-- **Sem migração necessária** a menos que o teste pós-deploy mostre erro RLS — nesse caso adiciono uma policy explícita `Coordinator company update on students for assignment`.
+Cada rota usa `FeatureRoute allowedRoles={["coordinator"]}` (ou `["trainer"]`) com a `requiredFeature` apropriada, mantendo o gating por tier da empresa.
 
-### Próximo passo após implementação
+### 2. Garantir que `FeatureRoute` respeite as permissões granulares
 
-Pedir ao Matheus para tentar atribuir um treinador novamente. Se ainda falhar, ele me manda o texto do toast (que agora terá `code` + `message`) e eu identifico se é RLS, dado faltando ou bug de UI.
+Confirmar que `FeatureRoute` já checa `useRolePermissions().canAccess(...)` para coordenador/trainer (a sidebar já filtra com `canAccess`, mas o ideal é que a rota também bloqueie acesso direto via URL). Se não estiver fazendo, adicionar a checagem para evitar bypass.
+
+### 3. Verificação rápida de RLS
+
+As páginas reusadas (Plans, Team, Financial, WhatsApp, Anamnesis, Registration) já são usadas por admin no mesmo `company_id`. As políticas RLS atuais permitem leitura/escrita por membros da empresa autenticados, então coordenador deve conseguir operar sem alterações de banco. Caso algum endpoint específico tenha policy restrita só a `admin`, ajusto pontualmente — mas isso será verificado durante a implementação e só corrigido se necessário (não vou afrouxar policies sem motivo).
+
+## Arquivos alterados
+
+- `src/App.tsx` — adicionar ~17 novas rotas (coordinator + trainer)
+- `src/components/FeatureRoute.tsx` — (se necessário) reforçar checagem de `canAccess` por módulo
+
+## Resultado esperado
+
+O coordenador Matheus (e qualquer trainer) deixará de cair em 404 ao clicar em Cadastro, Planos, Anamnese, Equipe, Financeiro, Aparência ou WhatsApp na sidebar. Cada página abrirá normalmente, respeitando as permissões definidas em `useRolePermissions` e o tier da empresa.
