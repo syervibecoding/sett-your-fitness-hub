@@ -208,14 +208,22 @@ export default function StudentsManager() {
 
   const handleAssignTrainer = async (studentId: string, trainerId: string) => {
     const { error } = await supabase.from("students").update({ assigned_trainer_id: trainerId }).eq("id", studentId);
-    if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
+    if (error) {
+      console.error("[handleAssignTrainer] update failed:", error);
+      toast({ title: "Erro ao atribuir treinador", description: `${error.message}${error.code ? ` (código ${error.code})` : ""}`, variant: "destructive" });
+      return;
+    }
     toast({ title: "Treinador atribuído!" });
     loadData();
   };
 
   const handleChangePlan = async (studentId: string, planId: string) => {
     const { error } = await supabase.from("students").update({ selected_plan_id: planId }).eq("id", studentId);
-    if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
+    if (error) {
+      console.error("[handleChangePlan] update failed:", error);
+      toast({ title: "Erro ao alterar plano", description: `${error.message}${error.code ? ` (código ${error.code})` : ""}`, variant: "destructive" });
+      return;
+    }
     toast({ title: "Plano atualizado!" });
     loadData();
   };
