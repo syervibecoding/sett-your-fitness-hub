@@ -119,20 +119,43 @@ const App = () => (
 
           {/* Coordinator Routes */}
           <Route path="/coordinator" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasDashboard"><CoordinatorDashboard /></FeatureRoute>} />
-          <Route path="/coordinator/students" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasStudents"><StudentsManager /></FeatureRoute>} />
-          <Route path="/coordinator/students/:id" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasStudents"><StudentDetail /></FeatureRoute>} />
-          <Route path="/coordinator/exercises" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription"><ExerciseLibrary /></FeatureRoute>} />
-          <Route path="/coordinator/prescriptions" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription"><WorkoutPrescriptions /></FeatureRoute>} />
-          <Route path="/coordinator/agenda" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasAgenda"><AdminAgenda /></FeatureRoute>} />
+          <Route path="/coordinator/registration" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasRegistration" requiredModule="registration"><RegistrationManager /></FeatureRoute>} />
+          <Route path="/coordinator/anamnesis" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasAnamnesis" requiredModule="anamnesis"><AnamnesisManager /></FeatureRoute>} />
+          <Route path="/coordinator/plans" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPlans" requiredModule="plans"><PlansManager /></FeatureRoute>} />
+          <Route path="/coordinator/team" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasTeam" requiredModule="team"><TeamManager /></FeatureRoute>} />
+          <Route path="/coordinator/students" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasStudents" requiredModule="students"><StudentsManager /></FeatureRoute>} />
+          <Route path="/coordinator/students/:id" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasStudents" requiredModule="students"><StudentDetail /></FeatureRoute>} />
+          <Route path="/coordinator/agenda" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasAgenda" requiredModule="agenda"><AdminAgenda /></FeatureRoute>} />
+          <Route path="/coordinator/financial" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasFinancial" requiredModule="financial"><FinancialDashboard /></FeatureRoute>} />
+          <Route path="/coordinator/appearance" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasAppearance" requiredModule="appearance"><AppearanceSettings /></FeatureRoute>} />
+          <Route path="/coordinator/exercises" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><ExerciseLibrary /></FeatureRoute>} />
+          <Route path="/coordinator/prescriptions" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutPrescriptions /></FeatureRoute>} />
+          <Route path="/coordinator/workout/:cycleId" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutBuilder /></FeatureRoute>} />
+          <Route path="/coordinator/whatsapp" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasWhatsApp"><WhatsAppSettings /></FeatureRoute>} />
+          <Route path="/coordinator/whatsapp-chat" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasWhatsApp"><WhatsAppChat /></FeatureRoute>} />
+          <Route path="/coordinator/whatsapp-crm" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasWhatsApp"><WhatsAppCRM /></FeatureRoute>} />
+          <Route path="/coordinator/whatsapp-templates" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasWhatsApp"><WhatsAppTemplates /></FeatureRoute>} />
+          <Route path="/coordinator/whatsapp-automation" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasAutomation"><WhatsAppAutomation /></FeatureRoute>} />
 
           {/* Trainer Routes */}
           <Route path="/trainer" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasDashboard"><TrainerDashboard /></FeatureRoute>} />
-          <Route path="/trainer/students" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasStudents"><StudentsManager /></FeatureRoute>} />
-          <Route path="/trainer/students/:id" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasStudents"><StudentDetail /></FeatureRoute>} />
-          <Route path="/trainer/exercises" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription"><ExerciseLibrary /></FeatureRoute>} />
-          <Route path="/trainer/prescriptions" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription"><WorkoutPrescriptions /></FeatureRoute>} />
-          <Route path="/trainer/workout/:cycleId" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription"><WorkoutBuilder /></FeatureRoute>} />
-          <Route path="/trainer/agenda" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasAgenda"><AdminAgenda /></FeatureRoute>} />
+          <Route path="/trainer/registration" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasRegistration" requiredModule="registration"><RegistrationManager /></FeatureRoute>} />
+          <Route path="/trainer/anamnesis" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasAnamnesis" requiredModule="anamnesis"><AnamnesisManager /></FeatureRoute>} />
+          <Route path="/trainer/plans" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPlans" requiredModule="plans"><PlansManager /></FeatureRoute>} />
+          <Route path="/trainer/team" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasTeam" requiredModule="team"><TeamManager /></FeatureRoute>} />
+          <Route path="/trainer/students" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasStudents" requiredModule="students"><StudentsManager /></FeatureRoute>} />
+          <Route path="/trainer/students/:id" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasStudents" requiredModule="students"><StudentDetail /></FeatureRoute>} />
+          <Route path="/trainer/agenda" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasAgenda" requiredModule="agenda"><AdminAgenda /></FeatureRoute>} />
+          <Route path="/trainer/financial" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasFinancial" requiredModule="financial"><FinancialDashboard /></FeatureRoute>} />
+          <Route path="/trainer/appearance" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasAppearance" requiredModule="appearance"><AppearanceSettings /></FeatureRoute>} />
+          <Route path="/trainer/exercises" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><ExerciseLibrary /></FeatureRoute>} />
+          <Route path="/trainer/prescriptions" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutPrescriptions /></FeatureRoute>} />
+          <Route path="/trainer/workout/:cycleId" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutBuilder /></FeatureRoute>} />
+          <Route path="/trainer/whatsapp" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasWhatsApp"><WhatsAppSettings /></FeatureRoute>} />
+          <Route path="/trainer/whatsapp-chat" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasWhatsApp"><WhatsAppChat /></FeatureRoute>} />
+          <Route path="/trainer/whatsapp-crm" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasWhatsApp"><WhatsAppCRM /></FeatureRoute>} />
+          <Route path="/trainer/whatsapp-templates" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasWhatsApp"><WhatsAppTemplates /></FeatureRoute>} />
+          <Route path="/trainer/whatsapp-automation" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasAutomation"><WhatsAppAutomation /></FeatureRoute>} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>
