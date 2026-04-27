@@ -1,59 +1,40 @@
+## Coordenador não consegue atribuir treinadores — diagnóstico
 
+### O que verifiquei
 
-## Estatísticas do Syer estão fracas — diagnóstico e correção
+- **RLS de `students`**: a policy `Admin company update` (apesar do nome) permite UPDATE para QUALQUER usuário autenticado da mesma `company_id`. Coordenador deveria conseguir.
+- **RLS de `user_roles`**: a policy `Admin reads company member roles` libera leitura para `admin` E `coordinator` da mesma company. OK.
+- **RLS de `profiles`**: `Company profiles readable` libera quem está em `company_members` da mesma company. Os 2 trainers (Thalia, Bárbara) estão registrados corretamente em `company_members` da company da Bruna.
+- **Permissões de módulo**: o coordenador "Matheus" tem registros em `role_permissions` apenas para `appearance`, `plans`, `whatsapp`. Como não há registro para `students`, o `useRolePermissions` cai no default (`students` está incluído) — então a tela abre normalmente.
+- **Rota `/coordinator/students`**: existe e está liberada via `FeatureRoute allowedRoles={["coordinator"]}`.
+- **Logs do Postgres**: sem erros recentes.
 
-### Causa raiz
+### Hipótese mais provável
 
-O Syer tem **13 sessões registradas** (24/03 → 20/04) com progressão real de carga (ex: Supino 60→67,5kg; Agachamento 80→87,5kg). Os dados estão ótimos. Os gráficos é que estão errados:
+O coordenador abre a tela e vê alunos, mas o **dropdown de treinadores aparece vazio** ou o `update` em `students.assigned_trainer_id` retorna erro silencioso. Causas possíveis:
 
-**1. BodyMap vazio** — Todos os exercícios dos 3 treinos do Syer estão com `muscle_group = NULL` no JSONB de `workouts.exercises`. O `BodyMap.tsx` depende desse campo para colorir as regiões. Sem ele, nenhum músculo acende. Os nomes dos treinos têm a info ("Peito/Tríceps", "Costas/Bíceps", "Pernas") mas isso não é lido.
+1. **Lista de trainers vazia**: o `loadData` busca `user_roles` SEM filtrar por company. Como a policy filtra por company, deveria vir só os da company dele — mas se o coordenador não tem a role corretamente reconhecida no momento do fetch, pode vir vazio. (Já houve relato de race condition no `useAuth.companyId`.)
+2. **`effectiveCompanyId` nulo no momento do fetch** (companyId ainda carregando) → query roda sem `.eq("company_id", ...)`, mas o `loadData` é re-disparado quando muda. Pode estar OK.
+3. **Toast de erro suprimido** ou usuário não nota a mensagem.
 
-**2. Gráficos "horríveis" — agrupados por ciclo, não por sessão** — `StatsCharts.tsx` (linhas 41-77) faz `cycles.map(c => ...)` retornando um ponto **por ciclo**. O Syer só tem 1 ciclo → "Evolução de Carga" mostra **1 ponto** e "Tonelagem por Ciclo" mostra **1 barra**. Visualmente é uma linha reta sem informação. A progressão sessão-a-sessão (que existe e é o ouro do dado) é jogada fora.
+### Plano de correção (3 mudanças seguras)
 
-### Correções
+**1. Tornar o carregamento de trainers explícito por company e robusto**
+   - Em `StudentsManager.loadData`, juntar `user_roles` com `company_members` filtrando por `effectiveCompanyId` para garantir que apenas trainers/coordenadores da empresa atual apareçam.
+   - Não disparar `loadData` enquanto `effectiveCompanyId` for `null` (early return), evitando estado vazio.
 
-**A. Backfill dos `muscle_group` dos exercícios do Syer (migração)**
+**2. Logar e exibir o erro real do update**
+   - Em `handleAssignTrainer` e `handleChangePlan`, fazer `console.error(error)` e mostrar `error.message` + `error.code` no toast — assim o Matheus me manda o erro exato se persistir.
 
-Atualizar o JSONB `workouts.exercises` dos 3 treinos do Syer preenchendo `muscle_group` por nome de exercício, usando lookup na `exercise_library` (ou inferindo do nome quando não houver match):
-
-| Exercício | muscle_group |
-|---|---|
-| Supino Reto Barra | Peitoral |
-| Elevação Lateral Halteres | Deltoides |
-| Rosca Direta | Bíceps |
-| Puxada Frontal | Costas |
-| Levantamento Terra | Costas |
-| Agachamento Livre | Quadríceps |
-| Leg Press 45 | Quadríceps |
-
-Migração `UPDATE workouts SET exercises = ...` mirando os 3 workout IDs já identificados.
-
-**B. Trigger preventivo (migração)**
-
-Criar `set_workout_exercise_muscle_group()` BEFORE INSERT/UPDATE em `workouts`: para cada item do array `exercises` que estiver com `muscle_group` vazio/null, buscar de `exercise_library` por nome (case-insensitive). Garante que isso não se repita em treinos futuros, independente do builder.
-
-**C. Reformar `StatsCharts.tsx` para granularidade por sessão**
-
-- **Aba "Carga" (evolução)**: trocar o eixo X de "ciclo" para **data de sessão**. Para cada `session_date` distinto em `allLogs`, plotar o **maior peso** por exercício. Dropdown "Todos exercícios" passa a mostrar os 3-5 com mais sessões. Vai exibir 13 pontos com curva clara de progressão.
-- **Aba "Volume" (tonelagem)**: trocar de "por ciclo" para **por sessão** (barras), mantendo "C{n}" só como agrupamento visual opcional. Adicionar card extra "Tonelagem total acumulada" e "Tonelagem média/sessão".
-- Adicionar fallback: se houver muitas sessões (>20), agrupar por semana (`YYYY-WW`).
-- Resumo (cards inferiores): manter "Sessões registradas" e "PRs", adicionar "Tonelagem total (kg)" e "Maior PR".
-
-**D. Remover aluno duplicado do Syer (migração)**
-
-Existem 2 students "Syer Rodrigues de Souza Filho" (`b7f23db8…` sem dados, `3cb1cfae…` com 145 logs). Apagar o vazio `b7f23db8…` (delete cascata na enrollment órfã).
-
-### Resultado esperado
-
-- BodyMap acende Peitoral, Deltoides, Bíceps, Costas e Quadríceps com cores proporcionais à tonelagem.
-- "Evolução de Carga" vira uma curva ascendente real (24/03 → 20/04) por exercício.
-- "Tonelagem por Sessão" mostra 13 barras ao invés de 1, evidenciando volume crescente.
-- Cards de resumo refletem 13 sessões, ~7 PRs, tonelagem total ~80.000 kg.
-- Próximos treinos cadastrados não terão mais `muscle_group` nulo.
+**3. Renomear/ajustar policies de `students` (defesa em profundidade — opcional, mas recomendado)**
+   - Hoje `Admin company update/delete/insert` permitem QUALQUER autenticado da company. Isso é permissivo demais para `delete`, mas é exatamente o que faz o coordenador conseguir atribuir trainer. **Não vou mexer agora** para não regredir; só anoto que o nome da policy está enganoso.
 
 ### Detalhes técnicos
 
-- **DB tocado**: `workouts` (UPDATE backfill + trigger novo), `students`/`enrollments` (DELETE do duplicado).
-- **Arquivos tocados**: `src/components/student/StatsCharts.tsx` (refatoração da agregação por sessão).
-- **Não toca**: `BodyMap.tsx` (já funciona, basta ter `muscle_group`), RLS, demais alunos.
+- **Arquivo tocado**: `src/pages/admin/StudentsManager.tsx` (função `loadData` + handlers de update).
+- **DB tocado**: nenhum (só leitura para diagnóstico).
+- **Sem migração necessária** a menos que o teste pós-deploy mostre erro RLS — nesse caso adiciono uma policy explícita `Coordinator company update on students for assignment`.
 
+### Próximo passo após implementação
+
+Pedir ao Matheus para tentar atribuir um treinador novamente. Se ainda falhar, ele me manda o texto do toast (que agora terá `code` + `message`) e eu identifico se é RLS, dado faltando ou bug de UI.

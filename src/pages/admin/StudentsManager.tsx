@@ -82,26 +82,37 @@ export default function StudentsManager() {
   useEffect(() => { loadData(); }, [effectiveCompanyId]);
 
   const loadData = async () => {
-    // RLS already filters by company, but add explicit filter for defense in depth
-    let studentsQuery = supabase.from("students").select("*").order("full_name");
-    let plansQuery = supabase.from("plans").select("id, name, duration_weeks").eq("is_active", true).order("name");
-    if (effectiveCompanyId) {
-      studentsQuery = studentsQuery.eq("company_id", effectiveCompanyId);
-      plansQuery = plansQuery.eq("company_id", effectiveCompanyId);
-    }
-    const [{ data: studentsData }, { data: plansData }, { data: rolesData }] = await Promise.all([
+    // Don't load until we know which company we're in (avoids empty trainers list on first paint)
+    if (!effectiveCompanyId) return;
+
+    const studentsQuery = supabase.from("students").select("*").eq("company_id", effectiveCompanyId).order("full_name");
+    const plansQuery = supabase.from("plans").select("id, name, duration_weeks").eq("is_active", true).eq("company_id", effectiveCompanyId).order("name");
+    // Restrict trainer/coordinator/admin lookup to the current company via company_members
+    const membersQuery = supabase.from("company_members").select("user_id").eq("company_id", effectiveCompanyId);
+
+    const [{ data: studentsData }, { data: plansData }, { data: membersData }] = await Promise.all([
       studentsQuery,
       plansQuery,
-      supabase.from("user_roles").select("user_id, role").in("role", ["admin", "coordinator", "trainer"]),
+      membersQuery,
     ]);
 
     setPlans(plansData || []);
 
-    // Load trainers
-    if (rolesData && rolesData.length > 0) {
-      const ids = rolesData.map(r => r.user_id);
-      const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").in("user_id", ids);
-      setTrainers((profiles || []).map(p => ({ user_id: p.user_id, full_name: p.full_name || "Sem nome" })));
+    // Load trainers (filtered by company members + relevant roles)
+    const memberIds = (membersData || []).map(m => m.user_id);
+    if (memberIds.length > 0) {
+      const [{ data: rolesData }, { data: profiles }] = await Promise.all([
+        supabase.from("user_roles").select("user_id, role").in("user_id", memberIds).in("role", ["admin", "coordinator", "trainer"]),
+        supabase.from("profiles").select("user_id, full_name").in("user_id", memberIds),
+      ]);
+      const trainerIds = new Set((rolesData || []).map(r => r.user_id));
+      setTrainers(
+        (profiles || [])
+          .filter(p => trainerIds.has(p.user_id))
+          .map(p => ({ user_id: p.user_id, full_name: p.full_name || "Sem nome" }))
+      );
+    } else {
+      setTrainers([]);
     }
 
     // Load enrollments for plan names
@@ -197,14 +208,22 @@ export default function StudentsManager() {
 
   const handleAssignTrainer = async (studentId: string, trainerId: string) => {
     const { error } = await supabase.from("students").update({ assigned_trainer_id: trainerId }).eq("id", studentId);
-    if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
+    if (error) {
+      console.error("[handleAssignTrainer] update failed:", error);
+      toast({ title: "Erro ao atribuir treinador", description: `${error.message}${error.code ? ` (código ${error.code})` : ""}`, variant: "destructive" });
+      return;
+    }
     toast({ title: "Treinador atribuído!" });
     loadData();
   };
 
   const handleChangePlan = async (studentId: string, planId: string) => {
     const { error } = await supabase.from("students").update({ selected_plan_id: planId }).eq("id", studentId);
-    if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
+    if (error) {
+      console.error("[handleChangePlan] update failed:", error);
+      toast({ title: "Erro ao alterar plano", description: `${error.message}${error.code ? ` (código ${error.code})` : ""}`, variant: "destructive" });
+      return;
+    }
     toast({ title: "Plano atualizado!" });
     loadData();
   };
