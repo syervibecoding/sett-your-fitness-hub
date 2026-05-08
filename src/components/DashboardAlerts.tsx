@@ -301,6 +301,29 @@ export function DashboardAlerts({ trainerId }: Props) {
         </Card>
       )}
 
+      {incompleteBilling.length > 0 && (
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-destructive text-lg flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />COBRANÇA INCOMPLETA
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-[200px] overflow-auto">
+              {incompleteBilling.map((b, i) => (
+                <div key={i} className={`${itemClass} bg-destructive/5 border border-destructive/20`} onClick={() => goToStudent(b.student_id)}>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-sans text-foreground truncate">{b.student_name}</p>
+                    <p className="text-xs text-muted-foreground font-sans truncate">Falta: {b.missing.join(", ")}</p>
+                  </div>
+                  <span className="text-xs font-sans font-medium px-2 py-0.5 rounded bg-destructive/20 text-destructive shrink-0 ml-2">Link não funciona</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {birthdays.length > 0 && (
         <Card className="bg-card border-border">
           <CardHeader className="pb-3">
