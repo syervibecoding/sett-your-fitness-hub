@@ -200,29 +200,62 @@ export default function PublicPayment() {
   };
 
   const handleCard = async () => {
+    const cpfDigits = cardForm.cpfCnpj.replace(/\D/g, "");
+    const cepDigits = cardForm.postalCode.replace(/\D/g, "");
+    const phoneDigits = cardForm.phone.replace(/\D/g, "");
+
     if (!cardForm.number || !cardForm.expiryMonth || !cardForm.expiryYear || !cardForm.ccv || !cardForm.holderName) {
-      toast({ title: "Preencha todos os campos do cartão", variant: "destructive" });
+      toast({ title: "Preencha todos os dados do cartão", variant: "destructive" });
       return;
     }
+    if (!cardForm.email || !cpfDigits || !cepDigits || !phoneDigits) {
+      toast({ title: "Preencha email, CPF, CEP e telefone do titular", variant: "destructive" });
+      return;
+    }
+    if (cpfDigits.length !== 11 && cpfDigits.length !== 14) {
+      toast({ title: "CPF inválido", description: "Digite o CPF completo (11 dígitos)", variant: "destructive" });
+      return;
+    }
+    if (cepDigits.length !== 8) {
+      toast({ title: "CEP inválido", description: "Digite o CEP completo (8 dígitos)", variant: "destructive" });
+      return;
+    }
+    if (!cardForm.addressNumber.trim()) {
+      toast({ title: "Número do endereço obrigatório", description: "Necessário para aprovação antifraude", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
     try {
+      // Captura IP real do cliente (requerido por antifraude do Asaas)
+      let remoteIp = "";
+      try {
+        const ipRes = await fetch("https://api.ipify.org?format=json");
+        const ipData = await ipRes.json();
+        remoteIp = ipData.ip || "";
+      } catch {}
+
       const payload: Record<string, any> = {
         studentId,
         value: planValue,
         planId: selectedPlanOptionId,
+        remoteIp: remoteIp || undefined,
         creditCard: {
-          holderName: cardForm.holderName,
+          holderName: cardForm.holderName.trim(),
           number: cardForm.number,
-          expiryMonth: cardForm.expiryMonth,
-          expiryYear: cardForm.expiryYear,
+          expiryMonth: cardForm.expiryMonth.padStart(2, "0"),
+          expiryYear: cardForm.expiryYear.length === 2 ? `20${cardForm.expiryYear}` : cardForm.expiryYear,
           ccv: cardForm.ccv,
         },
         creditCardHolderInfo: {
-          name: cardForm.holderName,
-          email: cardForm.email,
-          cpfCnpj: cardForm.cpfCnpj,
-          postalCode: cardForm.postalCode,
-          phone: cardForm.phone,
+          name: cardForm.holderName.trim(),
+          email: cardForm.email.trim(),
+          cpfCnpj: cpfDigits,
+          postalCode: cepDigits,
+          phone: phoneDigits,
+          addressNumber: cardForm.addressNumber.trim(),
+          address: cardForm.address.trim() || undefined,
+          province: cardForm.province.trim() || undefined,
         },
       };
       if (installments > 1) {
@@ -233,12 +266,19 @@ export default function PublicPayment() {
 
       if (status === "CONFIRMED" || status === "RECEIVED") {
         setStep("success");
+      } else if (status === "PENDING" || status === "AWAITING_RISK_ANALYSIS") {
+        toast({ title: "Pagamento em análise", description: "Você receberá a confirmação em breve." });
+        setStep("success");
       } else {
-        toast({ title: "Pagamento processado", description: `Status: ${status}. Aguarde confirmação.` });
+        toast({ title: "Pagamento processado", description: `Status: ${status}` });
         setStep("success");
       }
     } catch (err: any) {
-      toast({ title: "Erro no pagamento", description: err.message, variant: "destructive" });
+      toast({
+        title: "Pagamento recusado",
+        description: err.message || "Verifique os dados do cartão e tente novamente. Se persistir, tente outro cartão ou Pix.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
