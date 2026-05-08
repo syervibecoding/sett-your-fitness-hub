@@ -63,6 +63,7 @@ export function DashboardAlerts({ trainerId }: Props) {
   const [awaitingTrainer, setAwaitingTrainer] = useState<AwaitingTrainer[]>([]);
   const [awaitingTrainingDate, setAwaitingTrainingDate] = useState<AwaitingTrainingDate[]>([]);
   const [missingEnrollment, setMissingEnrollment] = useState<MissingEnrollment[]>([]);
+  const [incompleteBilling, setIncompleteBilling] = useState<IncompleteBilling[]>([]);
 
   useEffect(() => { loadAlerts(); }, [trainerId, effectiveCompanyId]);
 
