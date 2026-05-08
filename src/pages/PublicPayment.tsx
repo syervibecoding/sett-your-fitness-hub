@@ -582,14 +582,18 @@ export default function PublicPayment() {
                         <Label className="font-sans text-sm">CPF</Label>
                         <Input
                           value={cardForm.cpfCnpj}
-                          onChange={e => setCardForm(f => ({ ...f, cpfCnpj: e.target.value }))}
+                          onChange={e => setCardForm(f => ({ ...f, cpfCnpj: formatCPF(e.target.value) }))}
+                          placeholder="000.000.000-00"
+                          inputMode="numeric"
                         />
                       </div>
                       <div>
                         <Label className="font-sans text-sm">CEP</Label>
                         <Input
                           value={cardForm.postalCode}
-                          onChange={e => setCardForm(f => ({ ...f, postalCode: e.target.value }))}
+                          onChange={e => setCardForm(f => ({ ...f, postalCode: formatCEP(e.target.value) }))}
+                          placeholder="00000-000"
+                          inputMode="numeric"
                         />
                       </div>
                     </div>
@@ -597,11 +601,44 @@ export default function PublicPayment() {
                       <Label className="font-sans text-sm">Telefone</Label>
                       <Input
                         value={cardForm.phone}
-                        onChange={e => setCardForm(f => ({ ...f, phone: e.target.value }))}
+                        onChange={e => setCardForm(f => ({ ...f, phone: formatPhone(e.target.value) }))}
+                        placeholder="(00) 00000-0000"
+                        inputMode="tel"
                       />
                     </div>
+                    <div className="grid grid-cols-[1fr_100px] gap-3">
+                      <div>
+                        <Label className="font-sans text-sm">Endereço (rua)</Label>
+                        <Input
+                          value={cardForm.address}
+                          onChange={e => setCardForm(f => ({ ...f, address: e.target.value }))}
+                          placeholder="Rua / Avenida"
+                        />
+                      </div>
+                      <div>
+                        <Label className="font-sans text-sm">Número *</Label>
+                        <Input
+                          value={cardForm.addressNumber}
+                          onChange={e => setCardForm(f => ({ ...f, addressNumber: e.target.value }))}
+                          placeholder="123"
+                          inputMode="numeric"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="font-sans text-sm">Bairro</Label>
+                      <Input
+                        value={cardForm.province}
+                        onChange={e => setCardForm(f => ({ ...f, province: e.target.value }))}
+                        placeholder="Bairro"
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground font-sans">
+                      * Número do endereço é obrigatório para aprovação antifraude do cartão.
+                    </p>
                   </div>
                 </div>
+              </div>
               </div>
 
               <Button className="w-full h-12 text-lg" onClick={handleCard} disabled={loading}>
