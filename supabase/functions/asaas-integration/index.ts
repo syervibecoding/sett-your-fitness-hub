@@ -261,10 +261,12 @@ async function createCardPayment(body: any) {
       email: creditCardHolderInfo.email,
       cpfCnpj: creditCardHolderInfo.cpfCnpj?.replace(/\D/g, ""),
       postalCode: creditCardHolderInfo.postalCode?.replace(/\D/g, ""),
-      addressNumber: creditCardHolderInfo.addressNumber || "0",
+      addressNumber: (creditCardHolderInfo.addressNumber || "").toString().trim() || undefined,
+      address: creditCardHolderInfo.address || undefined,
+      province: creditCardHolderInfo.province || undefined,
       phone: creditCardHolderInfo.phone?.replace(/\D/g, "") || undefined,
     },
-    remoteIp: remoteIp || "0.0.0.0",
+    remoteIp: remoteIp || req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || undefined,
   };
 
   if (installmentCount && installmentCount > 1) {
