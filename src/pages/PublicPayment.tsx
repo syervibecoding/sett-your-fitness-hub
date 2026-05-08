@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, Copy, CreditCard, QrCode, Loader2, Check } from "lucide-react";
 import bnLogo from "@/assets/bn-logo.png";
+import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
