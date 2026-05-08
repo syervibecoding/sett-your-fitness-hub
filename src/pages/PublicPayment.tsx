@@ -639,7 +639,6 @@ export default function PublicPayment() {
                   </div>
                 </div>
               </div>
-              </div>
 
               <Button className="w-full h-12 text-lg" onClick={handleCard} disabled={loading}>
                 {loading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <CreditCard className="h-5 w-5 mr-2" />}
