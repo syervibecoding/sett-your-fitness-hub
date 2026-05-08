@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Cake, Dumbbell, UserCheck, CalendarDays } from "lucide-react";
+import { Cake, Dumbbell, UserCheck, CalendarDays, AlertTriangle } from "lucide-react";
 import { differenceInDays, setYear } from "date-fns";
 
 interface Birthday {
