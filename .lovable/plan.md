@@ -1,54 +1,47 @@
-# Correção do 404 para Coordenador e Trainer
+# Por que o Matheus continua vendo 404 em /cadastro
 
-## Causa raiz
+Verifiquei o código atual e a rota `/coordinator/registration` **já existe** em `src/App.tsx` (linha 122), apontando para `RegistrationManager`, com `FeatureRoute allowedRoles={["coordinator"]}`, `requiredFeature="hasRegistration"` e `requiredModule="registration"`. A `AppSidebar` aponta para a mesma URL. Logo, em `localhost`/preview a página abre normalmente.
 
-A `AppSidebar` lista, para o coordenador, itens de menu como **Cadastro**, **Anamnese**, **Planos**, **Equipe**, **Financeiro**, **Aparência** e **WhatsApp** apontando para `/coordinator/registration`, `/coordinator/anamnesis`, `/coordinator/plans`, `/coordinator/team`, `/coordinator/financial`, `/coordinator/appearance`, `/coordinator/whatsapp*`.
+A tela 404 que o Matheus enviou (print branco "Oops! Page not found") é renderizada por `src/pages/NotFound.tsx` — ou seja, ele caiu no catch‑all `path="*"`. Isso só pode acontecer em três cenários:
 
-Porém, em `src/App.tsx`, **essas rotas não existem**. Hoje só estão registradas:
-- `/coordinator`, `/coordinator/students`, `/coordinator/students/:id`
-- `/coordinator/exercises`, `/coordinator/prescriptions`, `/coordinator/agenda`
+1. **O app publicado em `settapp.lovable.app` está desatualizado.** As rotas de coordenador/trainer foram adicionadas há poucas mensagens, mas o build publicado ainda é o antigo (sem essas rotas). Quando o Matheus clica em "Cadastro", a URL `/coordinator/registration` não existe no bundle dele e cai no `NotFound`. Esta é a hipótese mais provável.
+2. **Cache do navegador / PWA do Matheus** servindo o `index.html` antigo. Mesmo após republicar, ele precisa dar um hard refresh (Ctrl+Shift+R) ou limpar o cache.
+3. **Matheus está acessando uma URL diferente** da esperada (ex.: `/cadastro` direto, que é a rota pública e exige slug; sem slug abre o `PublicRegistration` em modo genérico — não dá 404, mas pode confundir). Vale confirmar exatamente qual URL aparece na barra dele.
 
-Qualquer clique em um item não mapeado cai no `<Route path="*" element={<NotFound />} />` → tela "404 / Oops! Page not found" (exatamente o print enviado pelo Matheus).
+# O que vou fazer
 
-O mesmo bug afeta o **trainer**: a sidebar lista `/trainer/registration`, `/trainer/anamnesis`, `/trainer/plans`, `/trainer/team`, `/trainer/financial`, `/trainer/appearance`, `/trainer/whatsapp*` — rotas que também não existem.
+### 1. Pedir republicação
 
-## O que vou fazer
+A correção das rotas só chega para o Matheus quando o app for publicado novamente. Vou orientar a clicar em **Publish** no Lovable para gerar o novo build em `settapp.lovable.app`. Em seguida, pedir ao Matheus um **hard refresh** (Ctrl+Shift+R no desktop / fechar e reabrir o app no celular).
 
-### 1. Adicionar as rotas faltantes em `src/App.tsx`
+### 2. Melhorar a página 404 (defensivo)
 
-Reaproveitar os mesmos componentes de página do admin (eles já são multi-tenant via `effectiveCompanyId` / RLS), envolvidos em `FeatureRoute` com o papel correto e a feature flag correspondente.
+Hoje `NotFound.tsx` mostra só "404 / Oops! Page not found / Return to Home" em inglês e sem contexto. Vou:
 
-**Rotas novas para `coordinator`:**
-- `/coordinator/registration` → `RegistrationManager` (feature `hasRegistration`)
-- `/coordinator/anamnesis` → `AnamnesisManager` (feature `hasAnamnesis`)
-- `/coordinator/plans` → `PlansManager` (feature `hasPlans`)
-- `/coordinator/team` → `TeamManager` (feature `hasTeam`)
-- `/coordinator/financial` → `FinancialDashboard` (feature `hasFinancial`)
-- `/coordinator/appearance` → `AppearanceSettings` (feature `hasAppearance`)
-- `/coordinator/whatsapp` → `WhatsAppSettings`
-- `/coordinator/whatsapp-chat` → `WhatsAppChat`
-- `/coordinator/whatsapp-crm` → `WhatsAppCRM`
-- `/coordinator/whatsapp-templates` → `WhatsAppTemplates`
-- `/coordinator/whatsapp-automation` → `WhatsAppAutomation`
-- `/coordinator/workout/:cycleId` → `WorkoutBuilder` (necessário para abrir prescrições)
+- Traduzir para português ("Página não encontrada").
+- Logar `location.pathname` + `role` no console para facilitar diagnóstico futuro.
+- Trocar o link "Return to Home" por um botão que leva ao dashboard correto do papel (coordinator → `/coordinator`, trainer → `/trainer`, admin → `/admin`, master → `/master`, student → `/aluno`).
+- Aplicar o design system (cores semânticas, Bebas no título).
 
-**Rotas novas para `trainer`** (mesma lista, prefixo `/trainer/...`).
+Isso não resolve o 404 em si, mas evita que, num próximo bug de rota, o usuário fique perdido — ele cai num botão que volta ao painel correto.
 
-Cada rota usa `FeatureRoute allowedRoles={["coordinator"]}` (ou `["trainer"]`) com a `requiredFeature` apropriada, mantendo o gating por tier da empresa.
+### 3. Verificação rápida no preview
 
-### 2. Garantir que `FeatureRoute` respeite as permissões granulares
+Antes de finalizar, vou abrir o preview, simular acesso a `/coordinator/registration` (com a sessão de master "viewing" uma empresa, se necessário) e confirmar que renderiza o `RegistrationManager` sem cair no `NotFound`.
 
-Confirmar que `FeatureRoute` já checa `useRolePermissions().canAccess(...)` para coordenador/trainer (a sidebar já filtra com `canAccess`, mas o ideal é que a rota também bloqueie acesso direto via URL). Se não estiver fazendo, adicionar a checagem para evitar bypass.
+# Arquivos alterados
 
-### 3. Verificação rápida de RLS
+- `src/pages/NotFound.tsx` — refatorar para PT‑BR, design system e redirecionamento por papel.
 
-As páginas reusadas (Plans, Team, Financial, WhatsApp, Anamnesis, Registration) já são usadas por admin no mesmo `company_id`. As políticas RLS atuais permitem leitura/escrita por membros da empresa autenticados, então coordenador deve conseguir operar sem alterações de banco. Caso algum endpoint específico tenha policy restrita só a `admin`, ajusto pontualmente — mas isso será verificado durante a implementação e só corrigido se necessário (não vou afrouxar policies sem motivo).
+# Resultado esperado
 
-## Arquivos alterados
+Depois de publicar, o Matheus passa a abrir `/coordinator/registration` normalmente. Caso ainda caia em 404 (por cache), o novo `NotFound` mostra mensagem clara em português e um botão "Voltar ao painel" que respeita o papel dele.
 
-- `src/App.tsx` — adicionar ~17 novas rotas (coordinator + trainer)
-- `src/components/FeatureRoute.tsx` — (se necessário) reforçar checagem de `canAccess` por módulo
+# Pergunta antes de implementar
 
-## Resultado esperado
+Você consegue confirmar duas coisas com o Matheus?
 
-O coordenador Matheus (e qualquer trainer) deixará de cair em 404 ao clicar em Cadastro, Planos, Anamnese, Equipe, Financeiro, Aparência ou WhatsApp na sidebar. Cada página abrirá normalmente, respeitando as permissões definidas em `useRolePermissions` e o tier da empresa.
+1. Qual URL aparece na barra do navegador dele quando dá o 404? (precisa ser exatamente `/coordinator/registration`)
+2. Ele está usando o `settapp.lovable.app` (publicado) ou o link de preview do Lovable?
+
+Se for o `settapp.lovable.app`, basta **republicar** que o problema some — não precisa nem do passo 2 acima. Mas vou fazer o passo 2 mesmo assim como melhoria defensiva.
