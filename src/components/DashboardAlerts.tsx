@@ -41,6 +41,12 @@ interface MissingEnrollment {
   student_id: string;
 }
 
+interface IncompleteBilling {
+  student_name: string;
+  student_id: string;
+  missing: string[];
+}
+
 interface Props {
   trainerId?: string;
 }
