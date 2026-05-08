@@ -266,7 +266,7 @@ async function createCardPayment(body: any) {
       province: creditCardHolderInfo.province || undefined,
       phone: creditCardHolderInfo.phone?.replace(/\D/g, "") || undefined,
     },
-    remoteIp: remoteIp || req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || undefined,
+    remoteIp: remoteIp || undefined,
   };
 
   if (installmentCount && installmentCount > 1) {
