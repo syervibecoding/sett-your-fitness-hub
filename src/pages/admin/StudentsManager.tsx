@@ -165,6 +165,26 @@ export default function StudentsManager() {
 
   const handleSave = async () => {
     if (!form.full_name.trim()) return;
+
+    // Validação de dados de cobrança (necessários para o link de pagamento funcionar)
+    const cpfDigits = form.cpf.replace(/\D/g, "");
+    const cepDigits = form.cep.replace(/\D/g, "");
+    const phoneDigits = (form.whatsapp || form.phone).replace(/\D/g, "");
+    const billingIssues: string[] = [];
+    if (cpfDigits.length !== 11) billingIssues.push("CPF (11 dígitos)");
+    if (cepDigits.length !== 8) billingIssues.push("CEP (8 dígitos)");
+    if (phoneDigits.length < 10) billingIssues.push("WhatsApp/Telefone");
+    if (!form.address.trim()) billingIssues.push("Rua");
+    if (!form.address_number.trim()) billingIssues.push("Número");
+    if (!form.neighborhood.trim()) billingIssues.push("Bairro");
+
+    if (billingIssues.length > 0) {
+      const proceed = window.confirm(
+        `Atenção: o link de cobrança (Pix/Cartão) não vai funcionar para este aluno enquanto faltarem:\n\n• ${billingIssues.join("\n• ")}\n\nDeseja salvar mesmo assim?`
+      );
+      if (!proceed) return;
+    }
+
     const payload = {
       full_name: form.full_name.trim(), email: form.email.trim() || null,
       phone: form.phone.trim() || null, status: form.status, notes: form.notes.trim() || null,

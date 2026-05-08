@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Cake, Dumbbell, UserCheck, CalendarDays } from "lucide-react";
+import { Cake, Dumbbell, UserCheck, CalendarDays, AlertTriangle } from "lucide-react";
 import { differenceInDays, setYear } from "date-fns";
 
 interface Birthday {
@@ -41,6 +41,12 @@ interface MissingEnrollment {
   student_id: string;
 }
 
+interface IncompleteBilling {
+  student_name: string;
+  student_id: string;
+  missing: string[];
+}
+
 interface Props {
   trainerId?: string;
 }
@@ -57,6 +63,7 @@ export function DashboardAlerts({ trainerId }: Props) {
   const [awaitingTrainer, setAwaitingTrainer] = useState<AwaitingTrainer[]>([]);
   const [awaitingTrainingDate, setAwaitingTrainingDate] = useState<AwaitingTrainingDate[]>([]);
   const [missingEnrollment, setMissingEnrollment] = useState<MissingEnrollment[]>([]);
+  const [incompleteBilling, setIncompleteBilling] = useState<IncompleteBilling[]>([]);
 
   useEffect(() => { loadAlerts(); }, [trainerId, effectiveCompanyId]);
 
@@ -196,9 +203,35 @@ export function DashboardAlerts({ trainerId }: Props) {
         setMissingWorkouts(sorted);
       }
     }
+
+    // Incomplete billing data (only on company-wide views, not trainer-scoped)
+    if (!trainerId) {
+      let billingQuery = supabase.from("students")
+        .select("id, full_name, cpf, cep, phone, whatsapp, address, address_number, neighborhood")
+        .in("status", ["active", "pending"]);
+      if (effectiveCompanyId) billingQuery = billingQuery.eq("company_id", effectiveCompanyId);
+      const { data: billingStudents } = await billingQuery;
+      const flagged: IncompleteBilling[] = [];
+      (billingStudents || []).forEach((s: any) => {
+        const cpfDigits = (s.cpf || "").replace(/\D/g, "");
+        const cepDigits = (s.cep || "").replace(/\D/g, "");
+        const phoneDigits = (s.whatsapp || s.phone || "").replace(/\D/g, "");
+        const missing: string[] = [];
+        if (cpfDigits.length !== 11) missing.push("CPF");
+        if (cepDigits.length !== 8) missing.push("CEP");
+        if (phoneDigits.length < 10) missing.push("WhatsApp");
+        if (!s.address) missing.push("Rua");
+        if (!s.address_number) missing.push("Número");
+        if (!s.neighborhood) missing.push("Bairro");
+        if (missing.length > 0) flagged.push({ student_name: s.full_name, student_id: s.id, missing });
+      });
+      setIncompleteBilling(flagged.sort((a, b) => b.missing.length - a.missing.length));
+    } else {
+      setIncompleteBilling([]);
+    }
   };
 
-  const hasContent = birthdays.length > 0 || missingWorkouts.length > 0 || awaitingTrainer.length > 0 || awaitingTrainingDate.length > 0 || missingEnrollment.length > 0;
+  const hasContent = birthdays.length > 0 || missingWorkouts.length > 0 || awaitingTrainer.length > 0 || awaitingTrainingDate.length > 0 || missingEnrollment.length > 0 || incompleteBilling.length > 0;
   if (!hasContent) return null;
 
   const itemClass = "flex items-center justify-between p-2 rounded-lg cursor-pointer hover:brightness-110 transition-all";
@@ -261,6 +294,29 @@ export function DashboardAlerts({ trainerId }: Props) {
                 <div key={i} className={`${itemClass} bg-destructive/5 border border-destructive/20`} onClick={() => goToStudent(m.student_id)}>
                   <p className="text-sm font-sans text-foreground">{m.student_name}</p>
                   <span className="text-xs font-sans font-medium px-2 py-0.5 rounded bg-destructive/20 text-destructive">Pendente</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {incompleteBilling.length > 0 && (
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-destructive text-lg flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />COBRANÇA INCOMPLETA
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-[200px] overflow-auto">
+              {incompleteBilling.map((b, i) => (
+                <div key={i} className={`${itemClass} bg-destructive/5 border border-destructive/20`} onClick={() => goToStudent(b.student_id)}>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-sans text-foreground truncate">{b.student_name}</p>
+                    <p className="text-xs text-muted-foreground font-sans truncate">Falta: {b.missing.join(", ")}</p>
+                  </div>
+                  <span className="text-xs font-sans font-medium px-2 py-0.5 rounded bg-destructive/20 text-destructive shrink-0 ml-2">Link não funciona</span>
                 </div>
               ))}
             </div>
