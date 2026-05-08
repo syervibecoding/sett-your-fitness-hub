@@ -79,6 +79,9 @@ export default function PublicPayment() {
     cpfCnpj: "",
     postalCode: "",
     phone: "",
+    address: "",
+    addressNumber: "",
+    province: "",
   });
 
   const [planValue, setPlanValue] = useState(0);
