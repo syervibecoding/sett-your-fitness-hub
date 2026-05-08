@@ -25,8 +25,12 @@ async function asaasFetch(path: string, options: RequestInit = {}) {
   });
   const data = await res.json();
   if (!res.ok) {
-    console.error("Asaas API error:", JSON.stringify(data));
-    throw new Error(data.errors?.[0]?.description || "Erro na API do Asaas");
+    console.error("Asaas API error:", res.status, JSON.stringify(data));
+    const firstErr = data.errors?.[0];
+    const msg = firstErr
+      ? `${firstErr.description || "Erro"}${firstErr.code ? ` (${firstErr.code})` : ""}`
+      : data.message || `Erro na API do Asaas (HTTP ${res.status})`;
+    throw new Error(msg);
   }
   return data;
 }
@@ -257,10 +261,12 @@ async function createCardPayment(body: any) {
       email: creditCardHolderInfo.email,
       cpfCnpj: creditCardHolderInfo.cpfCnpj?.replace(/\D/g, ""),
       postalCode: creditCardHolderInfo.postalCode?.replace(/\D/g, ""),
-      addressNumber: creditCardHolderInfo.addressNumber || "0",
+      addressNumber: (creditCardHolderInfo.addressNumber || "").toString().trim() || undefined,
+      address: creditCardHolderInfo.address || undefined,
+      province: creditCardHolderInfo.province || undefined,
       phone: creditCardHolderInfo.phone?.replace(/\D/g, "") || undefined,
     },
-    remoteIp: remoteIp || "0.0.0.0",
+    remoteIp: remoteIp || undefined,
   };
 
   if (installmentCount && installmentCount > 1) {

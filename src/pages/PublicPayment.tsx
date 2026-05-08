@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, Copy, CreditCard, QrCode, Loader2, Check } from "lucide-react";
 import bnLogo from "@/assets/bn-logo.png";
+import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -78,6 +79,9 @@ export default function PublicPayment() {
     cpfCnpj: "",
     postalCode: "",
     phone: "",
+    address: "",
+    addressNumber: "",
+    province: "",
   });
 
   const [planValue, setPlanValue] = useState(0);
@@ -91,7 +95,7 @@ export default function PublicPayment() {
     const loadStudent = async () => {
       const { data, error } = await supabase
         .from("students")
-        .select("full_name, email, cpf, cep, phone, whatsapp, selected_plan_id")
+        .select("full_name, email, cpf, cep, phone, whatsapp, selected_plan_id, address, address_number, neighborhood")
         .eq("id", studentId)
         .single();
 
@@ -101,9 +105,12 @@ export default function PublicPayment() {
         ...prev,
         holderName: data.full_name || "",
         email: data.email || "",
-        cpfCnpj: data.cpf || "",
-        postalCode: data.cep || "",
-        phone: data.whatsapp || data.phone || "",
+        cpfCnpj: formatCPF(data.cpf || ""),
+        postalCode: formatCEP(data.cep || ""),
+        phone: formatPhone(data.whatsapp || data.phone || ""),
+        address: data.address || "",
+        addressNumber: data.address_number || "",
+        province: data.neighborhood || "",
       }));
 
       // Pre-select plan if student has one
@@ -193,29 +200,62 @@ export default function PublicPayment() {
   };
 
   const handleCard = async () => {
+    const cpfDigits = cardForm.cpfCnpj.replace(/\D/g, "");
+    const cepDigits = cardForm.postalCode.replace(/\D/g, "");
+    const phoneDigits = cardForm.phone.replace(/\D/g, "");
+
     if (!cardForm.number || !cardForm.expiryMonth || !cardForm.expiryYear || !cardForm.ccv || !cardForm.holderName) {
-      toast({ title: "Preencha todos os campos do cartão", variant: "destructive" });
+      toast({ title: "Preencha todos os dados do cartão", variant: "destructive" });
       return;
     }
+    if (!cardForm.email || !cpfDigits || !cepDigits || !phoneDigits) {
+      toast({ title: "Preencha email, CPF, CEP e telefone do titular", variant: "destructive" });
+      return;
+    }
+    if (cpfDigits.length !== 11 && cpfDigits.length !== 14) {
+      toast({ title: "CPF inválido", description: "Digite o CPF completo (11 dígitos)", variant: "destructive" });
+      return;
+    }
+    if (cepDigits.length !== 8) {
+      toast({ title: "CEP inválido", description: "Digite o CEP completo (8 dígitos)", variant: "destructive" });
+      return;
+    }
+    if (!cardForm.addressNumber.trim()) {
+      toast({ title: "Número do endereço obrigatório", description: "Necessário para aprovação antifraude", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
     try {
+      // Captura IP real do cliente (requerido por antifraude do Asaas)
+      let remoteIp = "";
+      try {
+        const ipRes = await fetch("https://api.ipify.org?format=json");
+        const ipData = await ipRes.json();
+        remoteIp = ipData.ip || "";
+      } catch {}
+
       const payload: Record<string, any> = {
         studentId,
         value: planValue,
         planId: selectedPlanOptionId,
+        remoteIp: remoteIp || undefined,
         creditCard: {
-          holderName: cardForm.holderName,
+          holderName: cardForm.holderName.trim(),
           number: cardForm.number,
-          expiryMonth: cardForm.expiryMonth,
-          expiryYear: cardForm.expiryYear,
+          expiryMonth: cardForm.expiryMonth.padStart(2, "0"),
+          expiryYear: cardForm.expiryYear.length === 2 ? `20${cardForm.expiryYear}` : cardForm.expiryYear,
           ccv: cardForm.ccv,
         },
         creditCardHolderInfo: {
-          name: cardForm.holderName,
-          email: cardForm.email,
-          cpfCnpj: cardForm.cpfCnpj,
-          postalCode: cardForm.postalCode,
-          phone: cardForm.phone,
+          name: cardForm.holderName.trim(),
+          email: cardForm.email.trim(),
+          cpfCnpj: cpfDigits,
+          postalCode: cepDigits,
+          phone: phoneDigits,
+          addressNumber: cardForm.addressNumber.trim(),
+          address: cardForm.address.trim() || undefined,
+          province: cardForm.province.trim() || undefined,
         },
       };
       if (installments > 1) {
@@ -226,12 +266,19 @@ export default function PublicPayment() {
 
       if (status === "CONFIRMED" || status === "RECEIVED") {
         setStep("success");
+      } else if (status === "PENDING" || status === "AWAITING_RISK_ANALYSIS") {
+        toast({ title: "Pagamento em análise", description: "Você receberá a confirmação em breve." });
+        setStep("success");
       } else {
-        toast({ title: "Pagamento processado", description: `Status: ${status}. Aguarde confirmação.` });
+        toast({ title: "Pagamento processado", description: `Status: ${status}` });
         setStep("success");
       }
     } catch (err: any) {
-      toast({ title: "Erro no pagamento", description: err.message, variant: "destructive" });
+      toast({
+        title: "Pagamento recusado",
+        description: err.message || "Verifique os dados do cartão e tente novamente. Se persistir, tente outro cartão ou Pix.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -535,14 +582,18 @@ export default function PublicPayment() {
                         <Label className="font-sans text-sm">CPF</Label>
                         <Input
                           value={cardForm.cpfCnpj}
-                          onChange={e => setCardForm(f => ({ ...f, cpfCnpj: e.target.value }))}
+                          onChange={e => setCardForm(f => ({ ...f, cpfCnpj: formatCPF(e.target.value) }))}
+                          placeholder="000.000.000-00"
+                          inputMode="numeric"
                         />
                       </div>
                       <div>
                         <Label className="font-sans text-sm">CEP</Label>
                         <Input
                           value={cardForm.postalCode}
-                          onChange={e => setCardForm(f => ({ ...f, postalCode: e.target.value }))}
+                          onChange={e => setCardForm(f => ({ ...f, postalCode: formatCEP(e.target.value) }))}
+                          placeholder="00000-000"
+                          inputMode="numeric"
                         />
                       </div>
                     </div>
@@ -550,9 +601,41 @@ export default function PublicPayment() {
                       <Label className="font-sans text-sm">Telefone</Label>
                       <Input
                         value={cardForm.phone}
-                        onChange={e => setCardForm(f => ({ ...f, phone: e.target.value }))}
+                        onChange={e => setCardForm(f => ({ ...f, phone: formatPhone(e.target.value) }))}
+                        placeholder="(00) 00000-0000"
+                        inputMode="tel"
                       />
                     </div>
+                    <div className="grid grid-cols-[1fr_100px] gap-3">
+                      <div>
+                        <Label className="font-sans text-sm">Endereço (rua)</Label>
+                        <Input
+                          value={cardForm.address}
+                          onChange={e => setCardForm(f => ({ ...f, address: e.target.value }))}
+                          placeholder="Rua / Avenida"
+                        />
+                      </div>
+                      <div>
+                        <Label className="font-sans text-sm">Número *</Label>
+                        <Input
+                          value={cardForm.addressNumber}
+                          onChange={e => setCardForm(f => ({ ...f, addressNumber: e.target.value }))}
+                          placeholder="123"
+                          inputMode="numeric"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="font-sans text-sm">Bairro</Label>
+                      <Input
+                        value={cardForm.province}
+                        onChange={e => setCardForm(f => ({ ...f, province: e.target.value }))}
+                        placeholder="Bairro"
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground font-sans">
+                      * Número do endereço é obrigatório para aprovação antifraude do cartão.
+                    </p>
                   </div>
                 </div>
               </div>
