@@ -203,9 +203,35 @@ export function DashboardAlerts({ trainerId }: Props) {
         setMissingWorkouts(sorted);
       }
     }
+
+    // Incomplete billing data (only on company-wide views, not trainer-scoped)
+    if (!trainerId) {
+      let billingQuery = supabase.from("students")
+        .select("id, full_name, cpf, cep, phone, whatsapp, address, address_number, neighborhood")
+        .in("status", ["active", "pending"]);
+      if (effectiveCompanyId) billingQuery = billingQuery.eq("company_id", effectiveCompanyId);
+      const { data: billingStudents } = await billingQuery;
+      const flagged: IncompleteBilling[] = [];
+      (billingStudents || []).forEach((s: any) => {
+        const cpfDigits = (s.cpf || "").replace(/\D/g, "");
+        const cepDigits = (s.cep || "").replace(/\D/g, "");
+        const phoneDigits = (s.whatsapp || s.phone || "").replace(/\D/g, "");
+        const missing: string[] = [];
+        if (cpfDigits.length !== 11) missing.push("CPF");
+        if (cepDigits.length !== 8) missing.push("CEP");
+        if (phoneDigits.length < 10) missing.push("WhatsApp");
+        if (!s.address) missing.push("Rua");
+        if (!s.address_number) missing.push("Número");
+        if (!s.neighborhood) missing.push("Bairro");
+        if (missing.length > 0) flagged.push({ student_name: s.full_name, student_id: s.id, missing });
+      });
+      setIncompleteBilling(flagged.sort((a, b) => b.missing.length - a.missing.length));
+    } else {
+      setIncompleteBilling([]);
+    }
   };
 
-  const hasContent = birthdays.length > 0 || missingWorkouts.length > 0 || awaitingTrainer.length > 0 || awaitingTrainingDate.length > 0 || missingEnrollment.length > 0;
+  const hasContent = birthdays.length > 0 || missingWorkouts.length > 0 || awaitingTrainer.length > 0 || awaitingTrainingDate.length > 0 || missingEnrollment.length > 0 || incompleteBilling.length > 0;
   if (!hasContent) return null;
 
   const itemClass = "flex items-center justify-between p-2 rounded-lg cursor-pointer hover:brightness-110 transition-all";
