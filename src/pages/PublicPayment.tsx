@@ -95,7 +95,7 @@ export default function PublicPayment() {
     const loadStudent = async () => {
       const { data, error } = await supabase
         .from("students")
-        .select("full_name, email, cpf, cep, phone, whatsapp, selected_plan_id")
+        .select("full_name, email, cpf, cep, phone, whatsapp, selected_plan_id, address, address_number, neighborhood")
         .eq("id", studentId)
         .single();
 
@@ -105,9 +105,12 @@ export default function PublicPayment() {
         ...prev,
         holderName: data.full_name || "",
         email: data.email || "",
-        cpfCnpj: data.cpf || "",
-        postalCode: data.cep || "",
-        phone: data.whatsapp || data.phone || "",
+        cpfCnpj: formatCPF(data.cpf || ""),
+        postalCode: formatCEP(data.cep || ""),
+        phone: formatPhone(data.whatsapp || data.phone || ""),
+        address: data.address || "",
+        addressNumber: data.address_number || "",
+        province: data.neighborhood || "",
       }));
 
       // Pre-select plan if student has one
