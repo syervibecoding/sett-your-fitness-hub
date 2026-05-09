@@ -425,18 +425,20 @@ export default function WhatsAppChat() {
     }
   }, [messages, mediaFallbacks, failedMediaFetches]);
 
-  // Realtime
+  // Realtime - canal privado por empresa (compatível com policy de realtime.messages)
   useEffect(() => {
-    const channel = supabase.channel("whatsapp-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "whatsapp_messages" }, (payload) => {
+    if (!effectiveCompanyId) return;
+    const channel = supabase
+      .channel(`company:${effectiveCompanyId}`, { config: { private: true } })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "whatsapp_messages", filter: `company_id=eq.${effectiveCompanyId}` }, (payload) => {
         const newMsg = payload.new as Message & { chat_id: string };
         if (newMsg.chat_id === selectedChatId) setMessages((prev) => [...prev, newMsg]);
         loadChats();
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "whatsapp_chats" }, () => { loadChats(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "whatsapp_chats", filter: `company_id=eq.${effectiveCompanyId}` }, () => { loadChats(); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [selectedChatId, loadChats]);
+  }, [selectedChatId, loadChats, effectiveCompanyId]);
 
   const handleSend = async () => {
     if (!newMessage.trim() || !selectedChatId) return;
