@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, lazy, Suspense } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -34,9 +34,21 @@ function safeFormatDate(value: string | null | undefined, fmt: string, opts?: Pa
   }
 }
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
-import { WorkoutAnalysis } from "@/components/trainer/WorkoutAnalysis";
-import { TrainerWeeklyBar } from "@/components/trainer/TrainerWeeklyBar";
-import { BodyMap } from "@/components/student/BodyMap";
+// Heavy children loaded only when their tab is opened (chunk size win)
+const WorkoutAnalysis = lazy(() => import("@/components/trainer/WorkoutAnalysis").then(m => ({ default: m.WorkoutAnalysis })));
+const TrainerWeeklyBar = lazy(() => import("@/components/trainer/TrainerWeeklyBar").then(m => ({ default: m.TrainerWeeklyBar })));
+const BodyMap = lazy(() => import("@/components/student/BodyMap").then(m => ({ default: m.BodyMap })));
+
+const TabFallback = () => (
+  <div className="flex items-center justify-center py-12">
+    <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+  </div>
+);
+const InlineFallback = () => (
+  <div className="flex items-center justify-center py-6">
+    <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 
 interface Student {
   id: string;
@@ -906,7 +918,7 @@ export default function StudentDetail() {
 
               {/* Right: WeeklyBar + quick summary */}
               <div className="space-y-4">
-                <TrainerWeeklyBar studentId={id!} />
+                <Suspense fallback={<InlineFallback />}><TrainerWeeklyBar studentId={id!} /></Suspense>
                 {enrollments.length === 0 && (
                   <Card className="bg-card border-border">
                     <CardContent className="py-8 text-center">
@@ -1205,25 +1217,27 @@ export default function StudentDetail() {
 
                           {/* BodyMap por treino */}
                           {cycleWorkouts.length > 0 && (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2 border-t border-border/50">
-                              {cycleWorkouts.map((w: any) => {
-                                const exercises = (w.exercises as any[]) || [];
-                                const muscleVolumes = exercises.reduce((acc: any[], ex: any) => {
-                                  const mg = ex.muscle_group || "Outro";
-                                  const sets = parseInt(ex.sets) || 0;
-                                  const existing = acc.find((a: any) => a.muscleGroup === mg);
-                                  if (existing) existing.volume += sets;
-                                  else acc.push({ muscleGroup: mg, volume: sets });
-                                  return acc;
-                                }, []);
-                                return (
-                                  <div key={w.id} className="space-y-2">
-                                    <p className="text-xs font-sans font-medium text-muted-foreground">{w.title || `Treino ${w.name}`}</p>
-                                    <BodyMap muscleVolumes={muscleVolumes} />
-                                  </div>
-                                );
-                              })}
-                            </div>
+                            <Suspense fallback={<InlineFallback />}>
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2 border-t border-border/50">
+                                {cycleWorkouts.map((w: any) => {
+                                  const exercises = (w.exercises as any[]) || [];
+                                  const muscleVolumes = exercises.reduce((acc: any[], ex: any) => {
+                                    const mg = ex.muscle_group || "Outro";
+                                    const sets = parseInt(ex.sets) || 0;
+                                    const existing = acc.find((a: any) => a.muscleGroup === mg);
+                                    if (existing) existing.volume += sets;
+                                    else acc.push({ muscleGroup: mg, volume: sets });
+                                    return acc;
+                                  }, []);
+                                  return (
+                                    <div key={w.id} className="space-y-2">
+                                      <p className="text-xs font-sans font-medium text-muted-foreground">{w.title || `Treino ${w.name}`}</p>
+                                      <BodyMap muscleVolumes={muscleVolumes} />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </Suspense>
                           )}
                         </CardContent>
                       </Card>
@@ -1236,8 +1250,10 @@ export default function StudentDetail() {
 
           {/* ===== ANÁLISES ===== */}
           <TabsContent value="analytics" className="space-y-4">
-            <TrainerWeeklyBar studentId={id!} />
-            <WorkoutAnalysis studentId={id!} />
+            <Suspense fallback={<TabFallback />}>
+              <TrainerWeeklyBar studentId={id!} />
+              <WorkoutAnalysis studentId={id!} />
+            </Suspense>
           </TabsContent>
 
           {/* ===== ANAMNESE ===== */}
