@@ -1,47 +1,80 @@
-# Por que o Matheus continua vendo 404 em /cadastro
+## Diagnóstico de performance
 
-Verifiquei o código atual e a rota `/coordinator/registration` **já existe** em `src/App.tsx` (linha 122), apontando para `RegistrationManager`, com `FeatureRoute allowedRoles={["coordinator"]}`, `requiredFeature="hasRegistration"` e `requiredModule="registration"`. A `AppSidebar` aponta para a mesma URL. Logo, em `localhost`/preview a página abre normalmente.
+Fiz uma varredura na plataforma. As rotas **já são lazy-loaded** (bom!), mas existem vários pontos que estão pesando bastante na navegação e no carregamento inicial. Os principais ofensores:
 
-A tela 404 que o Matheus enviou (print branco "Oops! Page not found") é renderizada por `src/pages/NotFound.tsx` — ou seja, ele caiu no catch‑all `path="*"`. Isso só pode acontecer em três cenários:
+### 1. React Query sem cache configurado
+`src/App.tsx` cria `new QueryClient()` sem `staleTime`/`gcTime`. Resultado: a cada troca de aba, tudo é refazendo do zero (refetch on focus, on mount). Para um SaaS com Supabase, isso é a maior causa de lentidão percebida.
 
-1. **O app publicado em `settapp.lovable.app` está desatualizado.** As rotas de coordenador/trainer foram adicionadas há poucas mensagens, mas o build publicado ainda é o antigo (sem essas rotas). Quando o Matheus clica em "Cadastro", a URL `/coordinator/registration` não existe no bundle dele e cai no `NotFound`. Esta é a hipótese mais provável.
-2. **Cache do navegador / PWA do Matheus** servindo o `index.html` antigo. Mesmo após republicar, ele precisa dar um hard refresh (Ctrl+Shift+R) ou limpar o cache.
-3. **Matheus está acessando uma URL diferente** da esperada (ex.: `/cadastro` direto, que é a rota pública e exige slug; sem slug abre o `PublicRegistration` em modo genérico — não dá 404, mas pode confundir). Vale confirmar exatamente qual URL aparece na barra dele.
+### 2. Dashboard e Alertas não usam React Query
+- `AdminDashboard.tsx` e `DashboardAlerts.tsx` usam `useState + useEffect` puros, fazendo **15–20 queries em paralelo** toda vez que se entra em `/admin`. Sem cache, sem deduplicação, sem `enabled`.
+- Várias dessas queries poderiam virar uma única RPC ou usar `count: exact, head: true` agregado.
 
-# O que vou fazer
+### 3. Bundles gigantes em algumas páginas
+Tamanho dos arquivos críticos:
+```
+StudentDetail.tsx ........ 97 KB / 1630 linhas
+WhatsAppChat.tsx ......... 62 KB
+TeamManager.tsx .......... 51 KB
+FinancialDashboard.tsx ... 37 KB
+WorkoutBuilder.tsx ....... 31 KB
+StudentPortal.tsx ........ 31 KB
+ExerciseLibrary.tsx ...... 25 KB
+```
+Como cada um vira um chunk único, a primeira visita à página congela enquanto baixa/parseia. Quebrar em sub-componentes lazy (abas, modais, gráficos) reduz drasticamente o tempo até interativo.
 
-### 1. Pedir republicação
+### 4. Dependência morta no bundle
+`three` (~600 KB) está em `package.json` mas **não é importada em nenhum lugar do `src/`**. Mesmo lazy, infla o `node_modules` e o tree-shake do Vite. Pode ser removida.
 
-A correção das rotas só chega para o Matheus quando o app for publicado novamente. Vou orientar a clicar em **Publish** no Lovable para gerar o novo build em `settapp.lovable.app`. Em seguida, pedir ao Matheus um **hard refresh** (Ctrl+Shift+R no desktop / fechar e reabrir o app no celular).
+### 5. Recharts carregado em rotas leves
+`recharts` (~300 KB) é importado direto no topo de `AdminDashboard` e `FinancialDashboard`. Como esses dashboards são a página inicial do admin, o gráfico entra no chunk crítico. Lazy-loading apenas dos gráficos melhora muito o TTI.
 
-### 2. Melhorar a página 404 (defensivo)
+### 6. Fontes Google bloqueantes
+`src/index.css` faz `@import` de Bebas Neue + Inter com 5 pesos. O `@import` em CSS é **render-blocking** e serial. Mover para `<link rel="preconnect">` + `<link>` no `index.html` (com `display=swap`) e reduzir para 2–3 pesos do Inter melhora o FCP.
 
-Hoje `NotFound.tsx` mostra só "404 / Oops! Page not found / Return to Home" em inglês e sem contexto. Vou:
+### 7. Realtime do WhatsApp em rotas pesadas
+A subscription do `realtime.messages` em `WhatsAppChat.tsx` re-renderiza a árvore inteira (sem `useMemo`/`React.memo` nas listas de chats/mensagens). Para lojas com muitos contatos, vira lag visível.
 
-- Traduzir para português ("Página não encontrada").
-- Logar `location.pathname` + `role` no console para facilitar diagnóstico futuro.
-- Trocar o link "Return to Home" por um botão que leva ao dashboard correto do papel (coordinator → `/coordinator`, trainer → `/trainer`, admin → `/admin`, master → `/master`, student → `/aluno`).
-- Aplicar o design system (cores semânticas, Bebas no título).
+### 8. Queries N+1 em `DashboardAlerts`
+Há trechos que fazem uma query por aluno/ciclo dentro de loops. Em empresas com muitos alunos isso explode.
 
-Isso não resolve o 404 em si, mas evita que, num próximo bug de rota, o usuário fique perdido — ele cai num botão que volta ao painel correto.
+---
 
-### 3. Verificação rápida no preview
+## Plano de otimização (em ordem de impacto / esforço)
 
-Antes de finalizar, vou abrir o preview, simular acesso a `/coordinator/registration` (com a sessão de master "viewing" uma empresa, se necessário) e confirmar que renderiza o `RegistrationManager` sem cair no `NotFound`.
+### Fase 1 — Ganhos rápidos (alto impacto, baixo risco)
+1. **Configurar `QueryClient`** com `staleTime: 60_000`, `gcTime: 5*60_000`, `refetchOnWindowFocus: false`. Reduz drasticamente refetches.
+2. **Remover dependência `three`** não usada (`bun remove three`).
+3. **Mover fontes do `@import` CSS para `<link>` no `index.html`** com `preconnect` e reduzir pesos do Inter para 400/500/600.
+4. **Lazy-load gráficos do Recharts** (`AdminDashboard`, `FinancialDashboard`, `StatsCharts`) com `React.lazy` + `Suspense` interno.
+5. **Adicionar `manualChunks` no `vite.config.ts`** separando: `react-vendor`, `radix`, `recharts`, `xyflow`, `supabase`. Isso permite cache de longo prazo entre deploys.
 
-# Arquivos alterados
+### Fase 2 — Refatorar dashboard inicial (impacto direto no que o usuário sente em `/admin`)
+6. **Migrar `AdminDashboard` e `DashboardAlerts` para `useQuery`** com `queryKey` por `companyId`. Compartilha cache entre componentes irmãos e elimina refetches.
+7. **Consolidar contagens** (`students` ativos/pendentes/inativos) numa única RPC `dashboard_counts(company_id)` no Supabase. 1 round-trip em vez de 4–6.
+8. **Adicionar índices** se faltarem em `enrollments(status, expires_at)`, `training_cycles(enrollment_id, status)`, `payments(student_id, status)` — verifico no plano de execução.
 
-- `src/pages/NotFound.tsx` — refatorar para PT‑BR, design system e redirecionamento por papel.
+### Fase 3 — Quebrar páginas gigantes
+9. **`StudentDetail.tsx` (97 KB)**: separar cada aba (Treinos, Pagamentos, Anamnese, Histórico) em arquivos próprios e carregar com lazy quando a aba é aberta.
+10. **`WhatsAppChat.tsx`**: extrair `MessageList`, `ChatList`, `MessageComposer` em componentes memoizados (`React.memo`) com `useMemo` para filtros. Virtualizar a lista de mensagens se >100 itens (pode ser feito numa fase posterior).
+11. **`TeamManager`, `FinancialDashboard`, `WorkoutBuilder`**: extrair modais/dialogs grandes em arquivos lazy.
 
-# Resultado esperado
+### Fase 4 — Polimento
+12. Adicionar `<link rel="prefetch">` para as 3 rotas mais visitadas a partir do dashboard.
+13. Habilitar `vite build --minify=esbuild` (padrão) e revisar `target: 'es2020'` para reduzir polyfills.
+14. Auditar `useEffect` que fazem fetch sem `AbortController` — em rotas com troca rápida estão gerando race conditions e setState em componentes desmontados.
 
-Depois de publicar, o Matheus passa a abrir `/coordinator/registration` normalmente. Caso ainda caia em 404 (por cache), o novo `NotFound` mostra mensagem clara em português e um botão "Voltar ao painel" que respeita o papel dele.
+---
 
-# Pergunta antes de implementar
+## Detalhes técnicos (para referência)
 
-Você consegue confirmar duas coisas com o Matheus?
+- **Onde os refetches acontecem hoje**: qualquer `useQuery` sem `staleTime` é considerado "stale" imediatamente, então um simples blur/focus na janela dispara nova requisição.
+- **Tamanho estimado do bundle inicial atual**: ~700–900 KB (sem incluir chunks lazy). Após as otimizações da Fase 1, esperado ~400–500 KB.
+- **Métricas para validar antes/depois**: posso rodar `browser--performance_profile` em `/admin` antes de começar e depois de cada fase para comparar Web Vitals (LCP, INP) e número de long tasks.
 
-1. Qual URL aparece na barra do navegador dele quando dá o 404? (precisa ser exatamente `/coordinator/registration`)
-2. Ele está usando o `settapp.lovable.app` (publicado) ou o link de preview do Lovable?
+---
 
-Se for o `settapp.lovable.app`, basta **republicar** que o problema some — não precisa nem do passo 2 acima. Mas vou fazer o passo 2 mesmo assim como melhoria defensiva.
+## Como tocar isso
+
+Sugiro implementar **Fase 1 inteira de uma vez** (são edits cirúrgicos, baixo risco, melhora perceptível imediata), e depois decidirmos se atacamos Fase 2 e 3 — essas mexem em código de negócio e merecem ser feitas com mais calma, página por página.
+
+Quer que eu comece pela Fase 1?

@@ -42,7 +42,16 @@ const PublicPayment = lazy(() => import("./pages/PublicPayment"));
 const StudentWorkout = lazy(() => import("./pages/student/StudentWorkout"));
 const StudentPortal = lazy(() => import("./pages/student/StudentPortal"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
