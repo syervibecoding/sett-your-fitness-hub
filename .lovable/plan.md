@@ -1,80 +1,108 @@
-## Diagnóstico de performance
+## Objetivo
 
-Fiz uma varredura na plataforma. As rotas **já são lazy-loaded** (bom!), mas existem vários pontos que estão pesando bastante na navegação e no carregamento inicial. Os principais ofensores:
+Garantir que cada empresa só veja e altere SEUS dados. Hoje a plataforma roda só com a BN Performance, mas existem várias políticas e fluxos amadores que vazam ou permitem cruzar empresas. Antes de abrir para novos clientes, precisamos fechar todas as brechas abaixo.
 
-### 1. React Query sem cache configurado
-`src/App.tsx` cria `new QueryClient()` sem `staleTime`/`gcTime`. Resultado: a cada troca de aba, tudo é refazendo do zero (refetch on focus, on mount). Para um SaaS com Supabase, isso é a maior causa de lentidão percebida.
+---
 
-### 2. Dashboard e Alertas não usam React Query
-- `AdminDashboard.tsx` e `DashboardAlerts.tsx` usam `useState + useEffect` puros, fazendo **15–20 queries em paralelo** toda vez que se entra em `/admin`. Sem cache, sem deduplicação, sem `enabled`.
-- Várias dessas queries poderiam virar uma única RPC ou usar `count: exact, head: true` agregado.
+## Achados críticos da auditoria
 
-### 3. Bundles gigantes em algumas páginas
-Tamanho dos arquivos críticos:
+### 1. Políticas RLS abertas para o público (anon) — vazamento e adulteração global
+
+Hoje o papel `anon` (qualquer pessoa com a chave pública, ou seja, qualquer visitante) consegue:
+
+| Tabela | Política | Impacto |
+|---|---|---|
+| `students` | `SELECT using true` | Lê **CPF, telefone, e-mail, endereço, foto** de TODOS os alunos de TODAS as empresas |
+| `students` | `UPDATE using true` | Pode **alterar qualquer aluno** de qualquer empresa |
+| `students` | `INSERT with check true` | Pode **criar alunos** em qualquer empresa (spam/lead falso) |
+| `enrollments` | `SELECT using true` | Lê matrículas, planos, status financeiro de TODAS as empresas |
+| `companies` | `SELECT using true` | Lê **stripe_customer_id, stripe_subscription_id, slug, tier** de todas as empresas concorrentes |
+| `anamnesis` | `INSERT with check true` | Pode injetar anamnese em qualquer `student_id` |
+| `platform_settings` | `SELECT using true` | Lê configurações de marca de todas (aceitável só para o login público) |
+
+Causa raiz: as páginas `PublicRegistration`, `PublicAnamnesis` e `PublicPayment` chamam o Supabase com a chave anon e foram destravadas com `true` para "funcionar". Isso é uma falha grave de multi-tenant.
+
+### 2. Edge function `manage-team-member` aceita `company_id` do body
+
+O caller pode mandar `company_id` no payload e cair em outra empresa. A função usa `targetCompanyId = callerCompany?.company_id || requestCompanyId`. Um admin com `company_members` removido (ou master mal configurado) pode injetar membros em empresas alheias.
+
+### 3. `exercise_library` e `form_fields` — admin de uma empresa altera dados globais
+
+- `exercise_library`: políticas de UPDATE/DELETE permitem qualquer admin alterar/deletar exercícios `is_global = true`. Um cliente novo pode apagar a biblioteca compartilhada usada por todos.
+- `form_fields`: UPDATE/DELETE permitem mexer em rows com `company_id IS NULL` (templates globais).
+
+### 4. Master view via localStorage
+
+`MasterContext` guarda `viewing_company` em `localStorage` e o frontend filtra por esse `effectiveCompanyId`. Isso não é privilege escalation (o RLS dá acesso ao master de qualquer forma), mas precisa de fallback claro: se o master não escolheu empresa, certas telas não devem listar dados misturados de várias empresas como se fossem de uma só.
+
+### 5. Pontos OK que vamos confirmar
+
+- `whatsapp_chats`, `whatsapp_messages`, `whatsapp_instances`, `whatsapp_labels`, `workouts`, `workout_sessions`, `workout_logs`, `payments`, `plans`, `student_evaluations`, `training_cycles` → políticas escopadas por `company_id` ou via `students`. OK.
+- Triggers `set_anamnesis_company_id`, `set_enrollment_company_id`, `log_trainer_assignment_change` → garantem `company_id` mesmo se o cliente não mandar. OK.
+- `useAuth` busca `company_members` corretamente.
+
+---
+
+## Plano de correção
+
+### Fase A — Fechar o acesso anon (migration de RLS)
+
+1. **Remover** todas as policies anon listadas acima (`Anon can read students`, `Anon can update students`, `Anon can insert students`, `Anon can read enrollments`, `Anon can read companies`, `Anon can insert anamnesis`).
+2. **Manter apenas o estritamente necessário** para as páginas públicas:
+   - `plans`: manter `SELECT` anon mas **filtrar por `is_active=true AND company_id = (slug recebido)`** via uma view ou função `get_public_plans(company_slug)`.
+   - `form_fields`: idem (`is_active=true` por empresa).
+   - `platform_settings`: idem por empresa (não global).
+3. **Criar 3 edge functions públicas** que substituem o acesso direto do anon:
+   - `public-registration` — recebe `{ company_slug, ...dados }`, valida slug, cria `students` + `enrollments` com `company_id` correto usando service role.
+   - `public-anamnesis` — recebe `{ student_id, token, ...dados }`, valida que o student existe e (idealmente) um token de uso único antes de inserir.
+   - `public-payment-link` — devolve só os campos necessários para o checkout, sem expor `stripe_customer_id`.
+4. Atualizar `PublicRegistration.tsx`, `PublicAnamnesis.tsx`, `PublicPayment.tsx` para chamar as novas edge functions em vez de `supabase.from(...)` com anon.
+
+### Fase B — Endurecer recursos globais
+
+5. `exercise_library`: separar policy "modifica próprio" (`company_id = get_user_company_id`) da "modifica global" (`is_global = true AND has_role(master)`). Admin de empresa só insere/edita os seus.
+6. `form_fields`: idem — só master mexe em `company_id IS NULL`.
+
+### Fase C — Edge functions
+
+7. `manage-team-member`: ignorar `company_id` do body. Sempre usar `callerCompany?.company_id` para admins; só master pode passar `company_id` explícito (verificar com `has_role(master)`).
+8. Revisar `asaas-webhook` e `whatsapp-webhook` — já filtram por `company_id` derivado do recurso (instance/plan), parecem OK; só adicionar logs e validações defensivas.
+
+### Fase D — Frontend / UX do master
+
+9. Quando master não selecionou empresa (`viewingCompany == null`):
+   - Em telas operacionais (Students, Workouts, WhatsApp, Financial), mostrar um aviso "Selecione uma empresa para operar" em vez de listar tudo.
+   - Em telas de visão consolidada (Master Dashboard), agregar por empresa explicitamente.
+10. Garantir que toda query nas páginas `admin/*` use `effectiveCompanyId` (já existe na maioria; precisa varredura final em `WhatsAppCRM`, `WhatsAppAutomation`, `AdminAgenda`).
+
+### Fase E — Verificação
+
+11. Rodar Supabase linter e auditar com 2 contas de teste (Empresa A admin e Empresa B admin) cada tela operacional.
+12. Adicionar testes de RLS rápidos via SQL (`SET ROLE authenticated; SET request.jwt.claims = ...`) para students, enrollments, payments, whatsapp_messages, workouts.
+
+---
+
+## Notas técnicas (resumo)
+
+```text
+Risco              | Onde                                    | Severidade
+-------------------|-----------------------------------------|------------
+PII vazada (anon)  | RLS students/enrollments/companies      | Crítica
+Adulteração anon   | RLS students UPDATE/INSERT              | Crítica
+Cross-tenant write | manage-team-member (body company_id)    | Alta
+Recursos globais   | exercise_library / form_fields          | Média
+Master sem escopo  | MasterContext + telas operacionais      | Média
 ```
-StudentDetail.tsx ........ 97 KB / 1630 linhas
-WhatsAppChat.tsx ......... 62 KB
-TeamManager.tsx .......... 51 KB
-FinancialDashboard.tsx ... 37 KB
-WorkoutBuilder.tsx ....... 31 KB
-StudentPortal.tsx ........ 31 KB
-ExerciseLibrary.tsx ...... 25 KB
-```
-Como cada um vira um chunk único, a primeira visita à página congela enquanto baixa/parseia. Quebrar em sub-componentes lazy (abas, modais, gráficos) reduz drasticamente o tempo até interativo.
 
-### 4. Dependência morta no bundle
-`three` (~600 KB) está em `package.json` mas **não é importada em nenhum lugar do `src/`**. Mesmo lazy, infla o `node_modules` e o tree-shake do Vite. Pode ser removida.
-
-### 5. Recharts carregado em rotas leves
-`recharts` (~300 KB) é importado direto no topo de `AdminDashboard` e `FinancialDashboard`. Como esses dashboards são a página inicial do admin, o gráfico entra no chunk crítico. Lazy-loading apenas dos gráficos melhora muito o TTI.
-
-### 6. Fontes Google bloqueantes
-`src/index.css` faz `@import` de Bebas Neue + Inter com 5 pesos. O `@import` em CSS é **render-blocking** e serial. Mover para `<link rel="preconnect">` + `<link>` no `index.html` (com `display=swap`) e reduzir para 2–3 pesos do Inter melhora o FCP.
-
-### 7. Realtime do WhatsApp em rotas pesadas
-A subscription do `realtime.messages` em `WhatsAppChat.tsx` re-renderiza a árvore inteira (sem `useMemo`/`React.memo` nas listas de chats/mensagens). Para lojas com muitos contatos, vira lag visível.
-
-### 8. Queries N+1 em `DashboardAlerts`
-Há trechos que fazem uma query por aluno/ciclo dentro de loops. Em empresas com muitos alunos isso explode.
+A Fase A sozinha já elimina o vetor mais grave (qualquer pessoa lendo/alterando alunos de qualquer empresa via chave anon pública).
 
 ---
 
-## Plano de otimização (em ordem de impacto / esforço)
+## Como vamos executar
 
-### Fase 1 — Ganhos rápidos (alto impacto, baixo risco)
-1. **Configurar `QueryClient`** com `staleTime: 60_000`, `gcTime: 5*60_000`, `refetchOnWindowFocus: false`. Reduz drasticamente refetches.
-2. **Remover dependência `three`** não usada (`bun remove three`).
-3. **Mover fontes do `@import` CSS para `<link>` no `index.html`** com `preconnect` e reduzir pesos do Inter para 400/500/600.
-4. **Lazy-load gráficos do Recharts** (`AdminDashboard`, `FinancialDashboard`, `StatsCharts`) com `React.lazy` + `Suspense` interno.
-5. **Adicionar `manualChunks` no `vite.config.ts`** separando: `react-vendor`, `radix`, `recharts`, `xyflow`, `supabase`. Isso permite cache de longo prazo entre deploys.
+Sugiro implementar em 2 entregas:
 
-### Fase 2 — Refatorar dashboard inicial (impacto direto no que o usuário sente em `/admin`)
-6. **Migrar `AdminDashboard` e `DashboardAlerts` para `useQuery`** com `queryKey` por `companyId`. Compartilha cache entre componentes irmãos e elimina refetches.
-7. **Consolidar contagens** (`students` ativos/pendentes/inativos) numa única RPC `dashboard_counts(company_id)` no Supabase. 1 round-trip em vez de 4–6.
-8. **Adicionar índices** se faltarem em `enrollments(status, expires_at)`, `training_cycles(enrollment_id, status)`, `payments(student_id, status)` — verifico no plano de execução.
+1. **Entrega 1 — Fase A + C7** (fecha o vazamento crítico e protege a criação de membros). Inclui as 3 edge functions públicas e migração RLS.
+2. **Entrega 2 — Fases B, D, E** (recursos globais, UX do master, verificação final).
 
-### Fase 3 — Quebrar páginas gigantes
-9. **`StudentDetail.tsx` (97 KB)**: separar cada aba (Treinos, Pagamentos, Anamnese, Histórico) em arquivos próprios e carregar com lazy quando a aba é aberta.
-10. **`WhatsAppChat.tsx`**: extrair `MessageList`, `ChatList`, `MessageComposer` em componentes memoizados (`React.memo`) com `useMemo` para filtros. Virtualizar a lista de mensagens se >100 itens (pode ser feito numa fase posterior).
-11. **`TeamManager`, `FinancialDashboard`, `WorkoutBuilder`**: extrair modais/dialogs grandes em arquivos lazy.
-
-### Fase 4 — Polimento
-12. Adicionar `<link rel="prefetch">` para as 3 rotas mais visitadas a partir do dashboard.
-13. Habilitar `vite build --minify=esbuild` (padrão) e revisar `target: 'es2020'` para reduzir polyfills.
-14. Auditar `useEffect` que fazem fetch sem `AbortController` — em rotas com troca rápida estão gerando race conditions e setState em componentes desmontados.
-
----
-
-## Detalhes técnicos (para referência)
-
-- **Onde os refetches acontecem hoje**: qualquer `useQuery` sem `staleTime` é considerado "stale" imediatamente, então um simples blur/focus na janela dispara nova requisição.
-- **Tamanho estimado do bundle inicial atual**: ~700–900 KB (sem incluir chunks lazy). Após as otimizações da Fase 1, esperado ~400–500 KB.
-- **Métricas para validar antes/depois**: posso rodar `browser--performance_profile` em `/admin` antes de começar e depois de cada fase para comparar Web Vitals (LCP, INP) e número de long tasks.
-
----
-
-## Como tocar isso
-
-Sugiro implementar **Fase 1 inteira de uma vez** (são edits cirúrgicos, baixo risco, melhora perceptível imediata), e depois decidirmos se atacamos Fase 2 e 3 — essas mexem em código de negócio e merecem ser feitas com mais calma, página por página.
-
-Quer que eu comece pela Fase 1?
+Posso começar pela Entrega 1 assim que aprovar.
