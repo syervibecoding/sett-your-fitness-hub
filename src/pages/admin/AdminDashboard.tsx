@@ -1,13 +1,13 @@
-import { useEffect, useState, useCallback } from "react";
+import { lazy, Suspense } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, ClipboardList, AlertTriangle, TrendingUp, RefreshCw, Dumbbell, Clock, UserX, Timer } from "lucide-react";
+import { Users, TrendingUp, RefreshCw, Clock, UserX, Timer } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { AppLayout } from "@/components/AppLayout";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
 import { useMaster } from "@/contexts/MasterContext";
 import { useAuth } from "@/hooks/useAuth";
-import { lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 
 const LazyChart = lazy(() => import("recharts").then(mod => ({
@@ -27,145 +27,146 @@ const LazyChart = lazy(() => import("recharts").then(mod => ({
   )
 })));
 
+interface DashboardData {
+  stats: { totalStudents: number; pendingStudents: number; inactiveStudents: number; trainers: number };
+  planChart: { name: string; count: number }[];
+  expiringContracts: any[];
+  cycleCountdowns: any[];
+  trainerMap: Record<string, string>;
+}
+
+async function fetchDashboardData(effectiveCompanyId: string | null | undefined): Promise<DashboardData> {
+  // Advance expired cycles before loading dashboard data
+  await supabase.rpc("advance_training_cycles");
+  const thirtyDaysFromNow = format(addDays(new Date(), 30), "yyyy-MM-dd");
+
+  let studentQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "active");
+  let pendingQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "pending");
+  let inactiveQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "inactive");
+  let enrollQuery = supabase.from("enrollments").select("plan_id, plans(name)");
+  let expiringQuery = supabase.from("enrollments").select("*, trainer_id, students(full_name, status), plans(name)")
+    .eq("status", "active").lte("end_date", thirtyDaysFromNow)
+    .order("end_date", { ascending: true });
+
+  if (effectiveCompanyId) {
+    studentQuery = studentQuery.eq("company_id", effectiveCompanyId);
+    pendingQuery = pendingQuery.eq("company_id", effectiveCompanyId);
+    inactiveQuery = inactiveQuery.eq("company_id", effectiveCompanyId);
+    enrollQuery = enrollQuery.eq("company_id", effectiveCompanyId);
+    expiringQuery = expiringQuery.eq("company_id", effectiveCompanyId);
+  }
+
+  // Trainer count + cycle enrollments in parallel with the others
+  let cycleEnrollQuery = supabase.from("enrollments")
+    .select("id, student_id, training_start_date, trainer_id, students(full_name, assigned_trainer_id)")
+    .in("status", ["active", "awaiting_training"]) as any;
+  if (effectiveCompanyId) cycleEnrollQuery = cycleEnrollQuery.eq("company_id", effectiveCompanyId);
+
+  const trainerCountPromise = (async () => {
+    if (effectiveCompanyId) {
+      const { data: members } = await supabase.from("company_members").select("user_id").eq("company_id", effectiveCompanyId);
+      if (!members || members.length === 0) return 0;
+      const { count } = await supabase.from("user_roles").select("*", { count: "exact", head: true })
+        .eq("role", "trainer").in("user_id", members.map(m => m.user_id));
+      return count || 0;
+    }
+    const { count } = await supabase.from("user_roles").select("*", { count: "exact", head: true }).eq("role", "trainer");
+    return count || 0;
+  })();
+
+  const [studentRes, pendingRes, inactiveRes, enrollRes, expiringRes, activeEnrollsRes, trainerCount] = await Promise.all([
+    studentQuery,
+    pendingQuery,
+    inactiveQuery,
+    enrollQuery,
+    expiringQuery,
+    cycleEnrollQuery,
+    trainerCountPromise,
+  ]);
+
+  const stats = {
+    totalStudents: studentRes.count || 0,
+    pendingStudents: pendingRes.count || 0,
+    inactiveStudents: inactiveRes.count || 0,
+    trainers: trainerCount,
+  };
+
+  const planCounts: Record<string, { name: string; count: number }> = {};
+  (enrollRes.data || []).forEach((e: any) => {
+    const name = e.plans?.name || "Sem plano";
+    if (!planCounts[name]) planCounts[name] = { name, count: 0 };
+    planCounts[name].count++;
+  });
+  const planChart = Object.values(planCounts).sort((a, b) => b.count - a.count);
+
+  const expiringContracts = (expiringRes.data || []).filter((e: any) => {
+    const s = e.students?.status;
+    return s === "active" || s === "pending";
+  });
+
+  // Cycle countdowns
+  const activeEnrolls = (activeEnrollsRes as any)?.data || [];
+  const countdowns: any[] = [];
+  const enrollsWithDate = activeEnrolls.filter((e: any) => e.training_start_date);
+  if (enrollsWithDate.length > 0) {
+    const enrollIds = enrollsWithDate.map((e: any) => e.id);
+    const enrollInfoMap: Record<string, { name: string; trainer_id: string | null; student_id: string }> = {};
+    enrollsWithDate.forEach((e: any) => {
+      enrollInfoMap[e.id] = {
+        name: e.students?.full_name || "—",
+        trainer_id: e.students?.assigned_trainer_id || e.trainer_id,
+        student_id: e.student_id,
+      };
+    });
+    const { data: activeCycles } = await supabase.from("training_cycles").select("*").in("enrollment_id", enrollIds).eq("status", "active");
+    (activeCycles || []).forEach((c: any) => {
+      const info = enrollInfoMap[c.enrollment_id];
+      const daysLeft = Math.ceil((new Date(c.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      countdowns.push({
+        student_name: info?.name || "—",
+        student_id: info?.student_id,
+        cycle_number: c.cycle_number,
+        end_date: c.end_date,
+        days_left: daysLeft,
+        trainer_id: info?.trainer_id,
+      });
+    });
+  }
+  countdowns.sort((a, b) => a.days_left - b.days_left);
+
+  // Resolve trainer names once
+  const allTrainerIds = new Set<string>();
+  expiringContracts.forEach((e: any) => { if (e.trainer_id) allTrainerIds.add(e.trainer_id); });
+  countdowns.forEach((m: any) => { if (m.trainer_id) allTrainerIds.add(m.trainer_id); });
+  let trainerMap: Record<string, string> = {};
+  if (allTrainerIds.size > 0) {
+    const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").in("user_id", Array.from(allTrainerIds));
+    (profiles || []).forEach((p: any) => { trainerMap[p.user_id] = p.full_name || ""; });
+  }
+
+  return { stats, planChart, expiringContracts, cycleCountdowns: countdowns, trainerMap };
+}
+
+const chartColors = ["hsl(220, 70%, 25%)", "hsl(220, 60%, 35%)", "hsl(220, 50%, 45%)", "hsl(220, 40%, 55%)"];
+
 export default function AdminDashboard() {
   const { role, companyId } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
   const navigate = useNavigate();
   const routePrefix = role === "master" && isViewingCompany ? "admin" : role;
-  const [stats, setStats] = useState({ totalStudents: 0, pendingStudents: 0, inactiveStudents: 0, trainers: 0 });
-  const [planChart, setPlanChart] = useState<{ name: string; count: number }[]>([]);
-  const [expiringContracts, setExpiringContracts] = useState<any[]>([]);
-  const [cycleCountdowns, setCycleCountdowns] = useState<any[]>([]);
-  const [trainerMap, setTrainerMap] = useState<Record<string, string>>({});
-
-  // For admin/coordinator/trainer: use their own companyId. For master impersonating: use viewingCompany.id. Master without impersonating: null (sees all via RLS).
   const effectiveCompanyId = role === "master" ? (isViewingCompany ? viewingCompany?.id : null) : companyId;
 
-  useEffect(() => { loadData(); }, [effectiveCompanyId]);
+  const { data } = useQuery({
+    queryKey: ["admin-dashboard", effectiveCompanyId ?? "all"],
+    queryFn: () => fetchDashboardData(effectiveCompanyId),
+    staleTime: 60_000,
+  });
 
-  // Refresh data when tab becomes visible (user navigates back)
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") loadData();
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [effectiveCompanyId]);
-
-  const loadData = async () => {
-    // Advance expired cycles before loading dashboard data
-    await supabase.rpc("advance_training_cycles");
-    const thirtyDaysFromNow = format(addDays(new Date(), 30), "yyyy-MM-dd");
-
-    // Build queries with optional company filter
-    let studentQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "active");
-    let pendingQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "pending");
-    let inactiveQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "inactive");
-    let enrollQuery = supabase.from("enrollments").select("plan_id, plans(name)");
-    let expiringQuery = supabase.from("enrollments").select("*, trainer_id, students(full_name, status), plans(name)")
-      .eq("status", "active").lte("end_date", thirtyDaysFromNow)
-      .order("end_date", { ascending: true });
-
-    if (effectiveCompanyId) {
-      studentQuery = studentQuery.eq("company_id", effectiveCompanyId);
-      pendingQuery = pendingQuery.eq("company_id", effectiveCompanyId);
-      inactiveQuery = inactiveQuery.eq("company_id", effectiveCompanyId);
-      enrollQuery = enrollQuery.eq("company_id", effectiveCompanyId);
-      expiringQuery = expiringQuery.eq("company_id", effectiveCompanyId);
-    }
-
-    // Count trainers by cross-referencing company_members with user_roles
-    let trainerCount = 0;
-    if (effectiveCompanyId) {
-      const { data: members } = await supabase.from("company_members").select("user_id").eq("company_id", effectiveCompanyId);
-      if (members && members.length > 0) {
-        const { count } = await supabase.from("user_roles").select("*", { count: "exact", head: true })
-          .eq("role", "trainer").in("user_id", members.map(m => m.user_id));
-        trainerCount = count || 0;
-      }
-    } else {
-      const { count } = await supabase.from("user_roles").select("*", { count: "exact", head: true }).eq("role", "trainer");
-      trainerCount = count || 0;
-    }
-
-    const [studentRes, pendingRes, inactiveRes, enrollRes, expiringRes] = await Promise.all([
-      studentQuery,
-      pendingQuery,
-      inactiveQuery,
-      enrollQuery,
-      expiringQuery,
-    ]);
-
-    setStats({
-      totalStudents: studentRes.count || 0,
-      pendingStudents: pendingRes.count || 0,
-      inactiveStudents: inactiveRes.count || 0,
-      trainers: trainerCount,
-    });
-
-    if (enrollRes.data) {
-      const planCounts: Record<string, { name: string; count: number }> = {};
-      enrollRes.data.forEach((e: any) => {
-        const name = e.plans?.name || "Sem plano";
-        if (!planCounts[name]) planCounts[name] = { name, count: 0 };
-        planCounts[name].count++;
-      });
-      setPlanChart(Object.values(planCounts).sort((a, b) => b.count - a.count));
-    }
-
-    // Filter out inactive/cancelled students from expiring contracts
-    const filteredExpiring = (expiringRes.data || []).filter((e: any) => {
-      const studentStatus = e.students?.status;
-      return studentStatus === "active" || studentStatus === "pending";
-    });
-    setExpiringContracts(filteredExpiring);
-
-    // Cycle countdowns: for each active enrollment, find the current active cycle and show days remaining
-    let cycleEnrollQuery = supabase.from("enrollments").select("id, student_id, training_start_date, trainer_id, students(full_name, assigned_trainer_id)").in("status", ["active", "awaiting_training"]) as any;
-    if (effectiveCompanyId) cycleEnrollQuery = cycleEnrollQuery.eq("company_id", effectiveCompanyId);
-    const { data: activeEnrolls } = await cycleEnrollQuery;
-    const countdowns: any[] = [];
-    if (activeEnrolls && activeEnrolls.length > 0) {
-      const enrollsWithDate = activeEnrolls.filter((e: any) => e.training_start_date);
-      if (enrollsWithDate.length > 0) {
-        const enrollIds = enrollsWithDate.map((e: any) => e.id);
-        const enrollInfoMap: Record<string, { name: string; trainer_id: string | null; student_id: string }> = {};
-        enrollsWithDate.forEach((e: any) => { enrollInfoMap[e.id] = { name: e.students?.full_name || "—", trainer_id: e.students?.assigned_trainer_id || e.trainer_id, student_id: e.student_id }; });
-        const { data: activeCycles } = await supabase.from("training_cycles").select("*").in("enrollment_id", enrollIds).eq("status", "active");
-        if (activeCycles && activeCycles.length > 0) {
-          activeCycles.forEach((c: any) => {
-            const info = enrollInfoMap[c.enrollment_id];
-            const daysLeft = Math.ceil((new Date(c.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-            countdowns.push({
-              student_name: info?.name || "—",
-              student_id: info?.student_id,
-              cycle_number: c.cycle_number,
-              end_date: c.end_date,
-              days_left: daysLeft,
-              trainer_id: info?.trainer_id,
-            });
-          });
-        }
-      }
-    }
-    countdowns.sort((a, b) => a.days_left - b.days_left);
-    setCycleCountdowns(countdowns);
-
-    // Fetch trainer names for both sections
-    const allTrainerIds = new Set<string>();
-    (expiringRes.data || []).forEach((e: any) => { if (e.trainer_id) allTrainerIds.add(e.trainer_id); });
-    countdowns.forEach((m: any) => { if (m.trainer_id) allTrainerIds.add(m.trainer_id); });
-    if (allTrainerIds.size > 0) {
-      const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").in("user_id", Array.from(allTrainerIds));
-      const tMap: Record<string, string> = {};
-      (profiles || []).forEach((p: any) => { tMap[p.user_id] = p.full_name || ""; });
-      setTrainerMap(tMap);
-    } else {
-      setTrainerMap({});
-    }
-  };
-
-  const chartColors = ["hsl(220, 70%, 25%)", "hsl(220, 60%, 35%)", "hsl(220, 50%, 45%)", "hsl(220, 40%, 55%)"];
+  const stats = data?.stats ?? { totalStudents: 0, pendingStudents: 0, inactiveStudents: 0, trainers: 0 };
+  const planChart = data?.planChart ?? [];
+  const expiringContracts = data?.expiringContracts ?? [];
+  const cycleCountdowns = data?.cycleCountdowns ?? [];
+  const trainerMap = data?.trainerMap ?? {};
 
   return (
     <AppLayout>
@@ -267,7 +268,6 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Countdown de troca de treino */}
         <Card className="bg-card border-border">
           <CardHeader>
             <CardTitle className="text-primary text-xl flex items-center gap-2">
