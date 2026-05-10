@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
@@ -7,48 +7,166 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Cake, Dumbbell, UserCheck, CalendarDays, AlertTriangle } from "lucide-react";
 import { differenceInDays, setYear } from "date-fns";
 
-interface Birthday {
-  full_name: string;
-  birth_date: string;
-  daysUntil: number;
-  student_id: string;
-}
+interface Birthday { full_name: string; birth_date: string; daysUntil: number; student_id: string; }
+interface MissingWorkout { student_name: string; student_id: string; cycle_number: number; cycle_id: string; start_date: string; end_date: string; trainer_name?: string; }
+interface AwaitingTrainingDate { student_name: string; student_id: string; enrollment_id: string; trainer_name?: string; }
+interface AwaitingTrainer { student_name: string; student_id: string; }
+interface MissingEnrollment { student_name: string; student_id: string; }
+interface IncompleteBilling { student_name: string; student_id: string; missing: string[]; }
 
-interface MissingWorkout {
-  student_name: string;
-  student_id: string;
-  cycle_number: number;
-  cycle_id: string;
-  start_date: string;
-  end_date: string;
-  trainer_name?: string;
-}
-
-interface AwaitingTrainingDate {
-  student_name: string;
-  student_id: string;
-  enrollment_id: string;
-  trainer_name?: string;
-}
-
-interface AwaitingTrainer {
-  student_name: string;
-  student_id: string;
-}
-
-interface MissingEnrollment {
-  student_name: string;
-  student_id: string;
-}
-
-interface IncompleteBilling {
-  student_name: string;
-  student_id: string;
-  missing: string[];
+interface AlertsData {
+  birthdays: Birthday[];
+  missingWorkouts: MissingWorkout[];
+  awaitingTrainer: AwaitingTrainer[];
+  awaitingTrainingDate: AwaitingTrainingDate[];
+  missingEnrollment: MissingEnrollment[];
+  incompleteBilling: IncompleteBilling[];
 }
 
 interface Props {
   trainerId?: string;
+}
+
+async function fetchAlerts(
+  trainerId: string | undefined,
+  effectiveCompanyId: string | null | undefined,
+): Promise<AlertsData> {
+  const today = new Date();
+  const addCompanyFilter = (query: any) => {
+    if (effectiveCompanyId) return query.eq("company_id", effectiveCompanyId);
+    return query;
+  };
+
+  const queries: any[] = [
+    addCompanyFilter(supabase.from("students").select("id, full_name, birth_date, assigned_trainer_id, status")
+      .not("birth_date", "is", null).eq("status", "active")),
+  ];
+
+  if (!trainerId) {
+    queries.push(addCompanyFilter(supabase.from("students").select("id, full_name, assigned_trainer_id")
+      .in("status", ["active", "pending"]).is("assigned_trainer_id", null)));
+    queries.push(addCompanyFilter(supabase.from("enrollments").select("id, student_id, trainer_id, students(full_name)")
+      .in("status", ["active", "awaiting_training"]).is("training_start_date", null)));
+    queries.push(addCompanyFilter(supabase.from("students").select("id, full_name").eq("status", "active")));
+    queries.push(supabase.from("enrollments").select("student_id").in("status", ["active", "awaiting_training"]));
+  }
+
+  let enrollQuery = supabase.from("enrollments").select("id, student_id, trainer_id, students(full_name)")
+    .eq("status", "active") as any;
+  if (trainerId) enrollQuery = enrollQuery.eq("trainer_id", trainerId);
+  if (effectiveCompanyId) enrollQuery = enrollQuery.eq("company_id", effectiveCompanyId);
+  queries.push(enrollQuery);
+
+  const results = await Promise.all(queries);
+
+  const allTrainerIds = new Set<string>();
+  const collectTrainerIds = (data: any[]) => {
+    data?.forEach((e: any) => { if (e.trainer_id) allTrainerIds.add(e.trainer_id); });
+  };
+  if (!trainerId) collectTrainerIds(results[2]?.data || []);
+  collectTrainerIds(results[trainerId ? 1 : 5]?.data || []);
+
+  let trainerMap: Record<string, string> = {};
+  if (allTrainerIds.size > 0) {
+    const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").in("user_id", Array.from(allTrainerIds));
+    (profiles || []).forEach((p: any) => { trainerMap[p.user_id] = p.full_name || "—"; });
+  }
+
+  // Birthdays
+  const birthdays: Birthday[] = [];
+  (results[0].data || []).forEach((s: any) => {
+    if (!s.birth_date) return;
+    const bd = new Date(s.birth_date);
+    const thisYear = setYear(bd, today.getFullYear());
+    let diff = differenceInDays(thisYear, today);
+    if (diff < 0) {
+      const nextYear = setYear(bd, today.getFullYear() + 1);
+      diff = differenceInDays(nextYear, today);
+    }
+    if (diff <= 30) birthdays.push({ full_name: s.full_name, birth_date: s.birth_date, daysUntil: diff, student_id: s.id });
+  });
+  birthdays.sort((a, b) => a.daysUntil - b.daysUntil);
+
+  let awaitingTrainer: AwaitingTrainer[] = [];
+  let awaitingTrainingDate: AwaitingTrainingDate[] = [];
+  let missingEnrollment: MissingEnrollment[] = [];
+  let nextIdx: number;
+
+  if (!trainerId) {
+    awaitingTrainer = (results[1].data || []).map((s: any) => ({ student_name: s.full_name, student_id: s.id }));
+    awaitingTrainingDate = (results[2].data || []).map((e: any) => ({
+      student_name: e.students?.full_name || "—", student_id: e.student_id, enrollment_id: e.id,
+      trainer_name: e.trainer_id ? trainerMap[e.trainer_id] : undefined,
+    }));
+    const activeStudents = results[3].data || [];
+    const enrolledIds = new Set((results[4].data || []).map((e: any) => e.student_id));
+    missingEnrollment = activeStudents.filter((s: any) => !enrolledIds.has(s.id))
+      .map((s: any) => ({ student_name: s.full_name, student_id: s.id }));
+    nextIdx = 5;
+  } else {
+    nextIdx = 1;
+  }
+
+  // Cycle alerts
+  let missingWorkouts: MissingWorkout[] = [];
+  const enrollments = results[nextIdx].data;
+  if (enrollments && enrollments.length > 0) {
+    const enrollIds = enrollments.map((e: any) => e.id);
+    const enrollMap: Record<string, { name: string; student_id: string; trainer_name?: string }> = {};
+    enrollments.forEach((e: any) => {
+      enrollMap[e.id] = { name: e.students?.full_name || "—", student_id: e.student_id, trainer_name: e.trainer_id ? trainerMap[e.trainer_id] : undefined };
+    });
+
+    const { data: allCycles } = await supabase.from("training_cycles").select("*")
+      .in("enrollment_id", enrollIds).in("status", ["active"]);
+    const activeCycleIds: string[] = (allCycles || []).map((c: any) => c.id);
+
+    if (activeCycleIds.length > 0) {
+      const { data: workouts } = await supabase.from("workouts").select("cycle_id").in("cycle_id", activeCycleIds);
+      const cyclesWithWorkout = new Set((workouts || []).map((w: any) => w.cycle_id));
+      const missing: MissingWorkout[] = [];
+      (allCycles || []).forEach((c: any) => {
+        if (!cyclesWithWorkout.has(c.id)) {
+          const info = enrollMap[c.enrollment_id];
+          missing.push({ student_name: info?.name || "—", student_id: info?.student_id || "", cycle_number: c.cycle_number, cycle_id: c.id, start_date: c.start_date, end_date: c.end_date, trainer_name: info?.trainer_name });
+        }
+      });
+      const firstPerStudent = new Map<string, MissingWorkout>();
+      missing.forEach((m) => {
+        const existing = firstPerStudent.get(m.student_name);
+        if (!existing || m.cycle_number < existing.cycle_number) firstPerStudent.set(m.student_name, m);
+      });
+      missingWorkouts = Array.from(firstPerStudent.values())
+        .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+    }
+  }
+
+  // Incomplete billing
+  let incompleteBilling: IncompleteBilling[] = [];
+  if (!trainerId) {
+    let billingQuery = supabase.from("students")
+      .select("id, full_name, cpf, cep, phone, whatsapp, address, address_number, neighborhood")
+      .in("status", ["active", "pending"]);
+    if (effectiveCompanyId) billingQuery = billingQuery.eq("company_id", effectiveCompanyId);
+    const { data: billingStudents } = await billingQuery;
+    const flagged: IncompleteBilling[] = [];
+    (billingStudents || []).forEach((s: any) => {
+      const cpfDigits = (s.cpf || "").replace(/\D/g, "");
+      const cepDigits = (s.cep || "").replace(/\D/g, "");
+      const phoneDigits = (s.whatsapp || s.phone || "").replace(/\D/g, "");
+      const missing: string[] = [];
+      if (cpfDigits.length !== 11) missing.push("CPF");
+      if (cepDigits.length !== 8) missing.push("CEP");
+      if (phoneDigits.length < 10) missing.push("WhatsApp");
+      if (!s.address) missing.push("Rua");
+      if (!s.address_number) missing.push("Número");
+      if (!s.neighborhood) missing.push("Bairro");
+      if (missing.length > 0) flagged.push({ student_name: s.full_name, student_id: s.id, missing });
+    });
+    incompleteBilling = flagged.sort((a, b) => b.missing.length - a.missing.length);
+  }
+
+  return { birthdays, missingWorkouts, awaitingTrainer, awaitingTrainingDate, missingEnrollment, incompleteBilling };
 }
 
 export function DashboardAlerts({ trainerId }: Props) {
@@ -58,178 +176,20 @@ export function DashboardAlerts({ trainerId }: Props) {
   const effectiveCompanyId = role === "master" ? (isViewingCompany ? viewingCompany?.id : null) : companyId;
   const routePrefix = role === "master" && isViewingCompany ? "admin" : role;
 
-  const [birthdays, setBirthdays] = useState<Birthday[]>([]);
-  const [missingWorkouts, setMissingWorkouts] = useState<MissingWorkout[]>([]);
-  const [awaitingTrainer, setAwaitingTrainer] = useState<AwaitingTrainer[]>([]);
-  const [awaitingTrainingDate, setAwaitingTrainingDate] = useState<AwaitingTrainingDate[]>([]);
-  const [missingEnrollment, setMissingEnrollment] = useState<MissingEnrollment[]>([]);
-  const [incompleteBilling, setIncompleteBilling] = useState<IncompleteBilling[]>([]);
+  const { data } = useQuery({
+    queryKey: ["dashboard-alerts", trainerId ?? "all", effectiveCompanyId ?? "all"],
+    queryFn: () => fetchAlerts(trainerId, effectiveCompanyId),
+    staleTime: 60_000,
+  });
 
-  useEffect(() => { loadAlerts(); }, [trainerId, effectiveCompanyId]);
+  const birthdays = data?.birthdays ?? [];
+  const missingWorkouts = data?.missingWorkouts ?? [];
+  const awaitingTrainer = data?.awaitingTrainer ?? [];
+  const awaitingTrainingDate = data?.awaitingTrainingDate ?? [];
+  const missingEnrollment = data?.missingEnrollment ?? [];
+  const incompleteBilling = data?.incompleteBilling ?? [];
 
-  const goToStudent = (studentId: string) => {
-    navigate(`/${routePrefix}/students/${studentId}`);
-  };
-
-  const loadAlerts = async () => {
-    const today = new Date();
-
-    const addCompanyFilter = (query: any) => {
-      if (effectiveCompanyId) return query.eq("company_id", effectiveCompanyId);
-      return query;
-    };
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const queries: any[] = [
-      // 0: Students with birthdays
-      addCompanyFilter(supabase.from("students").select("id, full_name, birth_date, assigned_trainer_id, status")
-        .not("birth_date", "is", null).eq("status", "active")),
-    ];
-
-    if (!trainerId) {
-      // 1: Awaiting trainer
-      queries.push(addCompanyFilter(supabase.from("students").select("id, full_name, assigned_trainer_id")
-        .in("status", ["active", "pending"]).is("assigned_trainer_id", null)));
-      // 2: Awaiting training date
-      queries.push(addCompanyFilter(supabase.from("enrollments").select("id, student_id, trainer_id, students(full_name)")
-        .in("status", ["active", "awaiting_training"]).is("training_start_date", null)));
-      // 3: Active students
-      queries.push(addCompanyFilter(supabase.from("students").select("id, full_name").eq("status", "active")));
-      // 4: All enrollments for missing enrollment check
-      queries.push(supabase.from("enrollments").select("student_id").in("status", ["active", "awaiting_training"]));
-    }
-
-    // 5/1: Active enrollments for cycles
-    let enrollQuery = supabase.from("enrollments").select("id, student_id, trainer_id, students(full_name)")
-      .eq("status", "active") as any;
-    if (trainerId) enrollQuery = enrollQuery.eq("trainer_id", trainerId);
-    if (effectiveCompanyId) enrollQuery = enrollQuery.eq("company_id", effectiveCompanyId);
-    queries.push(enrollQuery);
-
-    const results = await Promise.all(queries);
-
-    // Collect all trainer_ids from enrollments to resolve names
-    const allTrainerIds = new Set<string>();
-    const collectTrainerIds = (data: any[]) => {
-      data?.forEach((e: any) => { if (e.trainer_id) allTrainerIds.add(e.trainer_id); });
-    };
-
-    if (!trainerId) {
-      collectTrainerIds(results[2]?.data || []);
-    }
-    collectTrainerIds(results[trainerId ? 1 : 5]?.data || []);
-
-    // Fetch trainer names from profiles
-    let trainerMap: Record<string, string> = {};
-    if (allTrainerIds.size > 0) {
-      const { data: profiles } = await supabase.from("profiles")
-        .select("user_id, full_name")
-        .in("user_id", Array.from(allTrainerIds));
-      (profiles || []).forEach((p: any) => { trainerMap[p.user_id] = p.full_name || "—"; });
-    }
-
-    // Process birthdays (index 0)
-    const students = results[0].data;
-    if (students) {
-      const upcoming: Birthday[] = [];
-      students.forEach((s: any) => {
-        if (!s.birth_date) return;
-        const bd = new Date(s.birth_date);
-        const thisYear = setYear(bd, today.getFullYear());
-        let diff = differenceInDays(thisYear, today);
-        if (diff < 0) {
-          const nextYear = setYear(bd, today.getFullYear() + 1);
-          diff = differenceInDays(nextYear, today);
-        }
-        if (diff <= 30) upcoming.push({ full_name: s.full_name, birth_date: s.birth_date, daysUntil: diff, student_id: s.id });
-      });
-      setBirthdays(upcoming.sort((a, b) => a.daysUntil - b.daysUntil));
-    }
-
-    let nextIdx: number;
-    if (!trainerId) {
-      // Awaiting trainer (index 1)
-      setAwaitingTrainer((results[1].data || []).map((s: any) => ({ student_name: s.full_name, student_id: s.id })));
-      // Awaiting training date (index 2)
-      setAwaitingTrainingDate((results[2].data || []).map((e: any) => ({
-        student_name: e.students?.full_name || "—", student_id: e.student_id, enrollment_id: e.id,
-        trainer_name: e.trainer_id ? trainerMap[e.trainer_id] : undefined,
-      })));
-      // Missing enrollment (index 3 + 4)
-      const activeStudents = results[3].data || [];
-      const enrolledIds = new Set((results[4].data || []).map((e: any) => e.student_id));
-      setMissingEnrollment(activeStudents.filter((s: any) => !enrolledIds.has(s.id))
-        .map((s: any) => ({ student_name: s.full_name, student_id: s.id })));
-      nextIdx = 5;
-    } else {
-      setAwaitingTrainingDate([]);
-      setMissingEnrollment([]);
-      nextIdx = 1;
-    }
-
-    // Cycle alerts
-    const enrollments = results[nextIdx].data;
-    if (enrollments && enrollments.length > 0) {
-      const enrollIds = enrollments.map((e: any) => e.id);
-      const enrollMap: Record<string, { name: string; student_id: string; trainer_name?: string }> = {};
-      enrollments.forEach((e: any) => { enrollMap[e.id] = { name: e.students?.full_name || "—", student_id: e.student_id, trainer_name: e.trainer_id ? trainerMap[e.trainer_id] : undefined }; });
-
-      const { data: allCycles } = await supabase
-        .from("training_cycles").select("*")
-        .in("enrollment_id", enrollIds).in("status", ["active"]);
-
-      const activeCycleIds: string[] = [];
-      (allCycles || []).forEach((c: any) => { activeCycleIds.push(c.id); });
-
-      if (activeCycleIds.length > 0) {
-        const { data: workouts } = await supabase.from("workouts").select("cycle_id").in("cycle_id", activeCycleIds);
-        const cyclesWithWorkout = new Set((workouts || []).map((w: any) => w.cycle_id));
-        const missing: MissingWorkout[] = [];
-        (allCycles || []).forEach((c: any) => {
-          if (!cyclesWithWorkout.has(c.id)) {
-            const info = enrollMap[c.enrollment_id];
-            missing.push({ student_name: info?.name || "—", student_id: info?.student_id || "", cycle_number: c.cycle_number, cycle_id: c.id, start_date: c.start_date, end_date: c.end_date, trainer_name: info?.trainer_name });
-          }
-        });
-        const firstPerStudent = new Map<string, MissingWorkout>();
-        missing.forEach((m) => {
-          const existing = firstPerStudent.get(m.student_name);
-          if (!existing || m.cycle_number < existing.cycle_number) {
-            firstPerStudent.set(m.student_name, m);
-          }
-        });
-        const sorted = Array.from(firstPerStudent.values())
-          .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
-        setMissingWorkouts(sorted);
-      }
-    }
-
-    // Incomplete billing data (only on company-wide views, not trainer-scoped)
-    if (!trainerId) {
-      let billingQuery = supabase.from("students")
-        .select("id, full_name, cpf, cep, phone, whatsapp, address, address_number, neighborhood")
-        .in("status", ["active", "pending"]);
-      if (effectiveCompanyId) billingQuery = billingQuery.eq("company_id", effectiveCompanyId);
-      const { data: billingStudents } = await billingQuery;
-      const flagged: IncompleteBilling[] = [];
-      (billingStudents || []).forEach((s: any) => {
-        const cpfDigits = (s.cpf || "").replace(/\D/g, "");
-        const cepDigits = (s.cep || "").replace(/\D/g, "");
-        const phoneDigits = (s.whatsapp || s.phone || "").replace(/\D/g, "");
-        const missing: string[] = [];
-        if (cpfDigits.length !== 11) missing.push("CPF");
-        if (cepDigits.length !== 8) missing.push("CEP");
-        if (phoneDigits.length < 10) missing.push("WhatsApp");
-        if (!s.address) missing.push("Rua");
-        if (!s.address_number) missing.push("Número");
-        if (!s.neighborhood) missing.push("Bairro");
-        if (missing.length > 0) flagged.push({ student_name: s.full_name, student_id: s.id, missing });
-      });
-      setIncompleteBilling(flagged.sort((a, b) => b.missing.length - a.missing.length));
-    } else {
-      setIncompleteBilling([]);
-    }
-  };
+  const goToStudent = (studentId: string) => navigate(`/${routePrefix}/students/${studentId}`);
 
   const hasContent = birthdays.length > 0 || missingWorkouts.length > 0 || awaitingTrainer.length > 0 || awaitingTrainingDate.length > 0 || missingEnrollment.length > 0 || incompleteBilling.length > 0;
   if (!hasContent) return null;
