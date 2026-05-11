@@ -240,6 +240,13 @@ Deno.serve(async (req) => {
         });
       }
 
+      if (!(await assertSameCompany(user_id))) {
+        return new Response(JSON.stringify({ error: "Forbidden: target user is not in your company" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const { error: updateError } = await adminClient.auth.admin.updateUserById(user_id, { email });
       if (updateError) {
         return new Response(JSON.stringify({ error: updateError.message }), {
