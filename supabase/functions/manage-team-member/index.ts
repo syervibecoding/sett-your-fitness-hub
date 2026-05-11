@@ -59,6 +59,40 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { action } = body;
 
+    const isMaster = roles.includes("master");
+    const isAdmin = roles.includes("admin");
+
+    // Resolve caller's company once. Admins are ALWAYS scoped to their own company —
+    // body.company_id is ignored for admins. Only master may target another company.
+    const { data: callerCompany } = await adminClient
+      .from("company_members")
+      .select("company_id")
+      .eq("user_id", callerId)
+      .limit(1)
+      .maybeSingle();
+
+    const callerCompanyId: string | null = callerCompany?.company_id ?? null;
+
+    const resolveTargetCompanyId = (requestCompanyId?: string | null): string | null => {
+      if (isMaster) return requestCompanyId ?? callerCompanyId ?? null;
+      // admin (or any non-master): always their own company, never trust body
+      return callerCompanyId;
+    };
+
+    // Helper: ensure a target user belongs to the caller's company (admins only).
+    // Master bypasses. Returns true if allowed.
+    const assertSameCompany = async (targetUserId: string): Promise<boolean> => {
+      if (isMaster) return true;
+      if (!callerCompanyId) return false;
+      const { data: m } = await adminClient
+        .from("company_members")
+        .select("company_id")
+        .eq("user_id", targetUserId)
+        .eq("company_id", callerCompanyId)
+        .maybeSingle();
+      return !!m;
+    };
+
     if (action === "create") {
       const { full_name, email, password, role, company_id: requestCompanyId } = body;
 
@@ -132,26 +166,24 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Add to company_members using the caller's company or the provided company_id
-      const { data: callerCompany } = await adminClient
+      // Resolve target company: admins forced to their own company; master may pass one.
+      const targetCompanyId = resolveTargetCompanyId(requestCompanyId);
+
+      if (!targetCompanyId) {
+        return new Response(JSON.stringify({ error: "Não foi possível determinar a empresa de destino" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { error: memberError } = await adminClient
         .from("company_members")
-        .select("company_id")
-        .eq("user_id", callerId)
-        .limit(1)
-        .single();
-
-      const targetCompanyId = callerCompany?.company_id || requestCompanyId;
-
-      if (targetCompanyId) {
-        const { error: memberError } = await adminClient
-          .from("company_members")
-          .upsert(
-            { user_id: userId, company_id: targetCompanyId },
-            { onConflict: "user_id" }
-          );
-        if (memberError) {
-          console.error("company_members upsert error:", memberError.message);
-        }
+        .upsert(
+          { user_id: userId, company_id: targetCompanyId },
+          { onConflict: "user_id" }
+        );
+      if (memberError) {
+        console.error("company_members upsert error:", memberError.message);
       }
 
       return new Response(JSON.stringify({ success: true, user_id: userId }), {
@@ -172,6 +204,13 @@ Deno.serve(async (req) => {
       if (new_password.length < 6) {
         return new Response(JSON.stringify({ error: "Password must be at least 6 characters" }), {
           status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!(await assertSameCompany(user_id))) {
+        return new Response(JSON.stringify({ error: "Forbidden: target user is not in your company" }), {
+          status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -201,6 +240,13 @@ Deno.serve(async (req) => {
         });
       }
 
+      if (!(await assertSameCompany(user_id))) {
+        return new Response(JSON.stringify({ error: "Forbidden: target user is not in your company" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const { error: updateError } = await adminClient.auth.admin.updateUserById(user_id, { email });
       if (updateError) {
         return new Response(JSON.stringify({ error: updateError.message }), {
@@ -223,8 +269,25 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Restrict admins to user_ids inside their own company. Master sees all.
+      let allowedUids = user_ids.slice(0, 100) as string[];
+      if (!isMaster) {
+        if (!callerCompanyId) {
+          return new Response(JSON.stringify({ emails: [] }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const { data: members } = await adminClient
+          .from("company_members")
+          .select("user_id")
+          .eq("company_id", callerCompanyId)
+          .in("user_id", allowedUids);
+        const allowed = new Set((members ?? []).map((m: any) => m.user_id));
+        allowedUids = allowedUids.filter((u) => allowed.has(u));
+      }
+
       const results: { user_id: string; email: string }[] = [];
-      for (const uid of user_ids.slice(0, 100)) {
+      for (const uid of allowedUids) {
         const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(uid);
         if (!userError && userData?.user?.email) {
           results.push({ user_id: uid, email: userData.user.email });
