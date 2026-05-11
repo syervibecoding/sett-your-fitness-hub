@@ -269,8 +269,25 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Restrict admins to user_ids inside their own company. Master sees all.
+      let allowedUids = user_ids.slice(0, 100) as string[];
+      if (!isMaster) {
+        if (!callerCompanyId) {
+          return new Response(JSON.stringify({ emails: [] }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const { data: members } = await adminClient
+          .from("company_members")
+          .select("user_id")
+          .eq("company_id", callerCompanyId)
+          .in("user_id", allowedUids);
+        const allowed = new Set((members ?? []).map((m: any) => m.user_id));
+        allowedUids = allowedUids.filter((u) => allowed.has(u));
+      }
+
       const results: { user_id: string; email: string }[] = [];
-      for (const uid of user_ids.slice(0, 100)) {
+      for (const uid of allowedUids) {
         const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(uid);
         if (!userError && userData?.user?.email) {
           results.push({ user_id: uid, email: userData.user.email });
