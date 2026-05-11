@@ -166,26 +166,24 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Add to company_members using the caller's company or the provided company_id
-      const { data: callerCompany } = await adminClient
+      // Resolve target company: admins forced to their own company; master may pass one.
+      const targetCompanyId = resolveTargetCompanyId(requestCompanyId);
+
+      if (!targetCompanyId) {
+        return new Response(JSON.stringify({ error: "Não foi possível determinar a empresa de destino" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { error: memberError } = await adminClient
         .from("company_members")
-        .select("company_id")
-        .eq("user_id", callerId)
-        .limit(1)
-        .single();
-
-      const targetCompanyId = callerCompany?.company_id || requestCompanyId;
-
-      if (targetCompanyId) {
-        const { error: memberError } = await adminClient
-          .from("company_members")
-          .upsert(
-            { user_id: userId, company_id: targetCompanyId },
-            { onConflict: "user_id" }
-          );
-        if (memberError) {
-          console.error("company_members upsert error:", memberError.message);
-        }
+        .upsert(
+          { user_id: userId, company_id: targetCompanyId },
+          { onConflict: "user_id" }
+        );
+      if (memberError) {
+        console.error("company_members upsert error:", memberError.message);
       }
 
       return new Response(JSON.stringify({ success: true, user_id: userId }), {
