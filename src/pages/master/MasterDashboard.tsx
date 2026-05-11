@@ -41,6 +41,7 @@ export default function MasterDashboard() {
   const [storageInfo, setStorageInfo] = useState<StorageInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { viewingCompany, exitCompanyView } = useMaster();
 
   useEffect(() => {
     const fetchData = async () => {
