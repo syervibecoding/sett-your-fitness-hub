@@ -59,6 +59,40 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { action } = body;
 
+    const isMaster = roles.includes("master");
+    const isAdmin = roles.includes("admin");
+
+    // Resolve caller's company once. Admins are ALWAYS scoped to their own company —
+    // body.company_id is ignored for admins. Only master may target another company.
+    const { data: callerCompany } = await adminClient
+      .from("company_members")
+      .select("company_id")
+      .eq("user_id", callerId)
+      .limit(1)
+      .maybeSingle();
+
+    const callerCompanyId: string | null = callerCompany?.company_id ?? null;
+
+    const resolveTargetCompanyId = (requestCompanyId?: string | null): string | null => {
+      if (isMaster) return requestCompanyId ?? callerCompanyId ?? null;
+      // admin (or any non-master): always their own company, never trust body
+      return callerCompanyId;
+    };
+
+    // Helper: ensure a target user belongs to the caller's company (admins only).
+    // Master bypasses. Returns true if allowed.
+    const assertSameCompany = async (targetUserId: string): Promise<boolean> => {
+      if (isMaster) return true;
+      if (!callerCompanyId) return false;
+      const { data: m } = await adminClient
+        .from("company_members")
+        .select("company_id")
+        .eq("user_id", targetUserId)
+        .eq("company_id", callerCompanyId)
+        .maybeSingle();
+      return !!m;
+    };
+
     if (action === "create") {
       const { full_name, email, password, role, company_id: requestCompanyId } = body;
 
