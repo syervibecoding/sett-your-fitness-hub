@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, DollarSign, Activity, HardDrive } from "lucide-react";
+import { Building2, Users, DollarSign, Activity, HardDrive, Info, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
+import { useMaster } from "@/contexts/MasterContext";
 
 interface CompanyRow {
   id: string;
