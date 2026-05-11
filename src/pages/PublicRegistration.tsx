@@ -132,7 +132,7 @@ export default function PublicRegistration() {
         headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
         body: JSON.stringify({
           action: "create-customer",
-          studentId: data.id,
+          studentId: newStudentId,
           name: fullName,
           email: email || undefined,
           cpfCnpj: cpf.replace(/\D/g, ""),
@@ -150,7 +150,7 @@ export default function PublicRegistration() {
     }
 
     setSaving(false);
-    setStudentId(data.id);
+    setStudentId(newStudentId);
     setDone(true);
   };
 
