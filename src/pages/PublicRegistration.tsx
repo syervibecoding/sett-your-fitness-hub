@@ -52,59 +52,19 @@ export default function PublicRegistration() {
   const [email, setEmail] = useState("");
   const [selectedPlanId, setSelectedPlanId] = useState("");
 
-  // Resolve company from slug and load branding + plans
+  // Resolve company + branding + plans via public edge function (no anon RLS).
   useEffect(() => {
     const init = async () => {
-      let resolvedCompanyId: string | null = null;
-
-      if (slug) {
-        const { data: company } = await supabase
-          .from("companies")
-          .select("id")
-          .eq("slug", slug)
-          .eq("is_active", true)
-          .single();
-        if (company) {
-          resolvedCompanyId = company.id;
-          setCompanyId(company.id);
-        }
+      const { data, error } = await supabase.functions.invoke("public-registration", {
+        body: { action: "context", slug: slug ?? null },
+      });
+      if (error || !data?.company) return;
+      setCompanyId(data.company.id);
+      if (data.branding) {
+        setBranding(data.branding);
+        applyTheme(data.branding);
       }
-
-      // Fallback: if no slug or slug not found, use first active company
-      if (!resolvedCompanyId) {
-        const { data: fallbackCompany } = await supabase
-          .from("companies")
-          .select("id")
-          .eq("is_active", true)
-          .order("created_at", { ascending: true })
-          .limit(1)
-          .single();
-        if (fallbackCompany) {
-          resolvedCompanyId = fallbackCompany.id;
-          setCompanyId(fallbackCompany.id);
-        }
-      }
-
-      // Load company branding
-      if (resolvedCompanyId) {
-        const { data: settings } = await supabase
-          .from("platform_settings")
-          .select("logo_url, platform_title, primary_color, background_color, card_color, text_color")
-          .eq("company_id", resolvedCompanyId)
-          .single();
-        if (settings) {
-          setBranding(settings);
-          applyTheme(settings);
-        }
-      }
-
-      // Load plans filtered by company
-      let plansQuery = supabase.from("plans").select("id, name, description, duration_weeks").eq("is_active", true).order("name");
-      if (resolvedCompanyId) {
-        plansQuery = plansQuery.eq("company_id", resolvedCompanyId);
-      }
-      const { data: plansData } = await plansQuery;
-      setPlans(plansData || []);
+      setPlans(data.plans || []);
     };
     init();
   }, [slug]);
@@ -136,29 +96,34 @@ export default function PublicRegistration() {
       return;
     }
     setSaving(true);
-    const { data, error } = await supabase.from("students").insert({
-      full_name: fullName,
-      birth_date: birthDate,
-      email,
-      phone: whatsapp,
-      cpf: cpf.replace(/\D/g, ""),
-      cep: cep.replace(/\D/g, ""),
-      address,
-      address_number: addressNumber,
-      neighborhood,
-      city,
-      state,
-      whatsapp: whatsapp.replace(/\D/g, ""),
-      selected_plan_id: selectedPlanId,
-      status: "pending",
-      company_id: companyId,
-    }).select("id").single();
+    const { data, error } = await supabase.functions.invoke("public-registration", {
+      body: {
+        action: "register",
+        companyId,
+        student: {
+          full_name: fullName,
+          birth_date: birthDate,
+          email,
+          phone: whatsapp,
+          cpf: cpf.replace(/\D/g, ""),
+          cep: cep.replace(/\D/g, ""),
+          address,
+          address_number: addressNumber,
+          neighborhood,
+          city,
+          state,
+          whatsapp: whatsapp.replace(/\D/g, ""),
+          selected_plan_id: selectedPlanId,
+        },
+      },
+    });
 
-    if (error) {
+    if (error || !data?.studentId) {
       setSaving(false);
-      toast({ title: "Erro ao salvar cadastro", description: error.message, variant: "destructive" });
+      toast({ title: "Erro ao salvar cadastro", description: error?.message || data?.error || "Falha ao cadastrar", variant: "destructive" });
       return;
     }
+    const newStudentId = data.studentId;
 
     // Create Asaas customer
     try {
@@ -167,7 +132,7 @@ export default function PublicRegistration() {
         headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
         body: JSON.stringify({
           action: "create-customer",
-          studentId: data.id,
+          studentId: newStudentId,
           name: fullName,
           email: email || undefined,
           cpfCnpj: cpf.replace(/\D/g, ""),
@@ -185,7 +150,7 @@ export default function PublicRegistration() {
     }
 
     setSaving(false);
-    setStudentId(data.id);
+    setStudentId(newStudentId);
     setDone(true);
   };
 

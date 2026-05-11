@@ -74,31 +74,17 @@ export default function PublicAnamnesis() {
 
   useEffect(() => {
     if (!studentId) { setNotFound(true); return; }
-    
     const init = async () => {
-      // Load student and resolve company
-      const { data: student, error } = await supabase
-        .from("students")
-        .select("full_name, company_id")
-        .eq("id", studentId)
-        .single();
-      
-      if (error || !student) { setNotFound(true); return; }
-      setStudentName(student.full_name);
-      setCompanyId(student.company_id ?? null);
-
-      // Load company branding
-      if (student.company_id) {
-        const { data: settings } = await supabase
-          .from("platform_settings")
-          .select("logo_url, platform_title, primary_color, background_color, card_color, text_color")
-          .eq("company_id", student.company_id)
-          .single();
-        if (settings) {
-          if (settings.logo_url) setLogoSrc(settings.logo_url);
-          setTitleText(settings.platform_title || "ANAMNESE");
-          applyTheme(settings);
-        }
+      const { data, error } = await supabase.functions.invoke("public-anamnesis", {
+        body: { action: "context", studentId },
+      });
+      if (error || !data?.student) { setNotFound(true); return; }
+      setStudentName(data.student.full_name);
+      setCompanyId(null); // backend handles company scoping
+      if (data.branding) {
+        if (data.branding.logo_url) setLogoSrc(data.branding.logo_url);
+        setTitleText(data.branding.platform_title || "ANAMNESE");
+        applyTheme(data.branding);
       }
     };
     init();
@@ -120,50 +106,36 @@ export default function PublicAnamnesis() {
     const allModalities = [...modalities, ...(modalityOther ? [modalityOther] : [])];
     const allEquipment = [...equipment, ...(equipmentOther ? [equipmentOther] : [])];
 
-    const payload = {
-      student_id: studentId!,
-      company_id: companyId,
-      modalities: allModalities,
-      training_days: trainingDays,
-      available_days: availableDays ? parseInt(availableDays) : null,
-      session_duration: sessionDuration,
-      training_location: trainingLocation,
-      available_equipment: allEquipment,
-      goals,
-      diseases,
-      injuries,
-      current_pain: currentPain,
-      nutrition,
-      profession,
-      sleep_hours: sleepHours,
-      restorative_sleep: restorativeSleep === "sim",
-      aware_of_trilogy: awareOfTrilogy === "sim",
-      feel_in_3_months: feelIn3Months,
-      biggest_obstacle: biggestObstacle,
-      extra_comments: extraComments || null,
-      authorizes_plan: authorizesPlan === "sim",
-      commits_communication: commitsCommunication === "sim",
-    };
-
-    // Check if anamnesis already exists for this student — upsert (always keep latest)
-    const { data: existing } = await supabase
-      .from("anamnesis").select("id, version").eq("student_id", studentId!)
-      .order("version", { ascending: false }).limit(1).maybeSingle();
-
-    let error;
-    if (existing) {
-      ({ error } = await supabase.from("anamnesis").update({
-        ...payload,
-        version: (existing.version || 1) + 1,
-        updated_at: new Date().toISOString(),
-      } as any).eq("id", existing.id));
-    } else {
-      ({ error } = await supabase.from("anamnesis").insert(payload as any));
-    }
+    const { data, error } = await supabase.functions.invoke("public-anamnesis", {
+      body: {
+        action: "submit",
+        studentId: studentId!,
+        modalities: allModalities,
+        training_days: trainingDays,
+        available_days: availableDays ? parseInt(availableDays) : null,
+        session_duration: sessionDuration,
+        training_location: trainingLocation,
+        available_equipment: allEquipment,
+        goals,
+        diseases,
+        injuries,
+        current_pain: currentPain,
+        nutrition,
+        profession,
+        sleep_hours: sleepHours,
+        restorative_sleep: restorativeSleep === "sim",
+        aware_of_trilogy: awareOfTrilogy === "sim",
+        feel_in_3_months: feelIn3Months,
+        biggest_obstacle: biggestObstacle,
+        extra_comments: extraComments || null,
+        authorizes_plan: authorizesPlan === "sim",
+        commits_communication: commitsCommunication === "sim",
+      },
+    });
 
     setSaving(false);
-    if (error) {
-      toast({ title: "Erro ao salvar anamnese", description: error.message, variant: "destructive" });
+    if (error || data?.error) {
+      toast({ title: "Erro ao salvar anamnese", description: error?.message || data?.error, variant: "destructive" });
       return;
     }
 

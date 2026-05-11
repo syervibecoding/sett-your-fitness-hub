@@ -92,56 +92,32 @@ export default function PublicPayment() {
   useEffect(() => {
     if (!studentId) { setNotFound(true); return; }
 
-    const loadStudent = async () => {
-      const { data, error } = await supabase
-        .from("students")
-        .select("full_name, email, cpf, cep, phone, whatsapp, selected_plan_id, address, address_number, neighborhood")
-        .eq("id", studentId)
-        .single();
-
-      if (error || !data) { setNotFound(true); return; }
-      setStudent(data);
+    const loadAll = async () => {
+      setLoadingPlans(true);
+      const { data, error } = await supabase.functions.invoke("public-payment-context", {
+        body: { action: "context", studentId },
+      });
+      if (error || !data?.student) { setNotFound(true); setLoadingPlans(false); return; }
+      const s = data.student;
+      setStudent(s);
       setCardForm(prev => ({
         ...prev,
-        holderName: data.full_name || "",
-        email: data.email || "",
-        cpfCnpj: formatCPF(data.cpf || ""),
-        postalCode: formatCEP(data.cep || ""),
-        phone: formatPhone(data.whatsapp || data.phone || ""),
-        address: data.address || "",
-        addressNumber: data.address_number || "",
-        province: data.neighborhood || "",
+        holderName: s.full_name || "",
+        email: s.email || "",
+        cpfCnpj: formatCPF(s.cpf || ""),
+        postalCode: formatCEP(s.cep || ""),
+        phone: formatPhone(s.whatsapp || s.phone || ""),
+        address: s.address || "",
+        addressNumber: s.address_number || "",
+        province: s.neighborhood || "",
       }));
-
-      // Pre-select plan if student has one
-      if (data.selected_plan_id) {
-        setSelectedPlanOptionId(data.selected_plan_id);
-      }
-
-      // Check if student has active enrollment (renewal)
-      const { data: enrollment } = await supabase
-        .from("enrollments")
-        .select("id")
-        .eq("student_id", studentId)
-        .eq("status", "active")
-        .maybeSingle();
-
-      setIsRenewal(!!enrollment);
-    };
-
-    const loadPlans = async () => {
-      setLoadingPlans(true);
-      const { data: plans } = await supabase
-        .from("plans")
-        .select("id, name, price, duration_weeks, description")
-        .eq("is_active", true)
-        .order("price");
-      setAvailablePlans((plans as PlanOption[]) || []);
+      if (s.selected_plan_id) setSelectedPlanOptionId(s.selected_plan_id);
+      setIsRenewal(!!data.isRenewal);
+      setAvailablePlans((data.plans as PlanOption[]) || []);
       setLoadingPlans(false);
     };
 
-    loadStudent();
-    loadPlans();
+    loadAll();
 
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
@@ -156,12 +132,10 @@ export default function PublicPayment() {
     setInstallments(1);
     setStep("choose");
 
-    // Update student's selected_plan_id for renewal logic
     if (studentId) {
-      await supabase
-        .from("students")
-        .update({ selected_plan_id: plan.id })
-        .eq("id", studentId);
+      await supabase.functions.invoke("public-payment-context", {
+        body: { action: "select-plan", studentId, planId: plan.id },
+      });
     }
   };
 
