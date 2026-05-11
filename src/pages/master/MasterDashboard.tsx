@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, DollarSign, Activity, HardDrive } from "lucide-react";
+import { Building2, Users, DollarSign, Activity, HardDrive, Info, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
+import { useMaster } from "@/contexts/MasterContext";
 
 interface CompanyRow {
   id: string;
@@ -40,6 +41,7 @@ export default function MasterDashboard() {
   const [storageInfo, setStorageInfo] = useState<StorageInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { viewingCompany, exitCompanyView } = useMaster();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -98,6 +100,46 @@ export default function MasterDashboard() {
       <div className="p-6 space-y-6">
         <h1 className="text-3xl font-bold text-foreground">Painel Master</h1>
         <p className="text-muted-foreground font-sans">Visão global de todas as instâncias da plataforma.</p>
+
+        {viewingCompany ? (
+          <Card className="border-primary/40 bg-primary/5">
+            <CardContent className="flex items-center justify-between gap-4 py-4">
+              <div className="flex items-start gap-3">
+                <Building2 className="h-5 w-5 text-primary mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Visualizando como: <span className="text-primary">{viewingCompany.name}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground font-sans">
+                    Ao acessar áreas administrativas, você verá apenas dados desta empresa. Saia do contexto para voltar à visão global.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={exitCompanyView}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-background border border-border rounded-md hover:bg-muted transition-colors"
+              >
+                <LogOut className="h-4 w-4" /> Sair do contexto
+              </button>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-dashed border-muted-foreground/30 bg-muted/30">
+            <CardContent className="flex items-start gap-3 py-4">
+              <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">Nenhuma empresa selecionada</p>
+                <p className="text-xs text-muted-foreground font-sans">
+                  Para acessar áreas operacionais (admin, coordenação ou treinador), entre no contexto de uma empresa em{" "}
+                  <button onClick={() => navigate("/master/companies")} className="text-primary hover:underline">
+                    Empresas
+                  </button>
+                  . As métricas abaixo permanecem globais.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">

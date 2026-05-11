@@ -31,11 +31,34 @@ export function FeatureRoute({ children, allowedRoles, requiredFeature, required
   }
 
   const isMaster = role === "master";
-  const isViewingCompany = isMaster && localStorage.getItem("master_viewing_company");
+  const isViewingCompany = isMaster && !!localStorage.getItem("master_viewing_company");
   const isAdminRoute = location.pathname.startsWith("/admin");
+  const isCoordinatorRoute = location.pathname.startsWith("/coordinator");
+  const isTrainerRoute = location.pathname.startsWith("/trainer");
+  const isCompanyScopedRoute = isAdminRoute || isCoordinatorRoute || isTrainerRoute;
 
   if (isMaster && isAdminRoute && isViewingCompany) {
     return <>{children}</>;
+  }
+
+  // Master accessing a company-scoped route without selecting a company → fallback
+  if (isMaster && isCompanyScopedRoute && !isViewingCompany) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-6">
+        <div className="text-center space-y-4 max-w-md">
+          <h2 className="text-2xl text-primary">Nenhuma empresa selecionada</h2>
+          <p className="text-muted-foreground font-sans">
+            Como master, você precisa entrar no contexto de uma empresa para acessar esta área. Volte ao painel master e selecione uma empresa para visualizar.
+          </p>
+          <button
+            onClick={() => (window.location.href = "/master")}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+          >
+            Ir para o painel master
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // Check role access
