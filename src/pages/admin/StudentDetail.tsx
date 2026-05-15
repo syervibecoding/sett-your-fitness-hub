@@ -282,23 +282,19 @@ export default function StudentDetail() {
     }
     setActivatingAccess(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/activate-student-access`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-        body: JSON.stringify({ student_id: student.id }),
+      const { data, error } = await supabase.functions.invoke("activate-student-access", {
+        body: { student_id: student.id },
       });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({ title: "Erro", description: data.error || "Falha ao ativar acesso", variant: "destructive" });
+      if (error) {
+        const msg = (data as any)?.error || error.message || "Falha ao ativar acesso";
+        toast({ title: "Erro", description: msg, variant: "destructive" });
+      } else if ((data as any)?.error) {
+        toast({ title: "Erro", description: (data as any).error, variant: "destructive" });
       } else {
-        toast({ title: "Acesso ativado!", description: `Senha temporária: ${data.temp_password}. Compartilhe com o aluno.` });
+        toast({ title: "Acesso ativado!", description: `Senha temporária: ${(data as any)?.temp_password}. Compartilhe com o aluno.` });
       }
-    } catch {
-      toast({ title: "Erro ao ativar acesso", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Erro ao ativar acesso", description: err?.message, variant: "destructive" });
     }
     setActivatingAccess(false);
   };
