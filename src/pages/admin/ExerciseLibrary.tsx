@@ -235,6 +235,7 @@ export default function ExerciseLibrary() {
     // Save muscle targets
     if (exerciseId) {
       await saveMuscleTargets(exerciseId);
+      await saveCompanyVolumes(exerciseId);
     }
 
     setUploading(false);
