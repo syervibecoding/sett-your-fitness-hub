@@ -253,6 +253,36 @@ export default function ExerciseLibrary() {
     loadExercises();
   };
 
+  const loadCompanyVolumes = async (exerciseId: string) => {
+    if (!effectiveCompanyId) { setCompanyVolumes({}); return; }
+    const { data } = await (supabase as any)
+      .from("company_exercise_volumes")
+      .select("muscle_group_id, volume_percentage")
+      .eq("company_id", effectiveCompanyId)
+      .eq("exercise_id", exerciseId);
+    const map: Record<string, number> = {};
+    (data || []).forEach((row: any) => { map[row.muscle_group_id] = Number(row.volume_percentage); });
+    setCompanyVolumes(map);
+  };
+
+  const saveCompanyVolumes = async (exerciseId: string) => {
+    if (!effectiveCompanyId) return;
+    const rows = Object.entries(companyVolumes)
+      .filter(([mgId]) => allSelectedIds.includes(mgId))
+      .map(([mgId, pct]) => ({
+        company_id: effectiveCompanyId,
+        exercise_id: exerciseId,
+        muscle_group_id: mgId,
+        role: primaryMuscleIds.includes(mgId) ? "primary" : "secondary",
+        volume_percentage: pct,
+      }));
+    if (rows.length > 0) {
+      await (supabase as any)
+        .from("company_exercise_volumes")
+        .upsert(rows, { onConflict: "company_id,exercise_id,muscle_group_id" });
+    }
+  };
+
   const openEdit = async (ex: Exercise) => {
     setEditing(ex);
     setForm({
@@ -262,6 +292,7 @@ export default function ExerciseLibrary() {
     });
     setVideoFile(null);
     await loadMuscleTargets(ex.id);
+    await loadCompanyVolumes(ex.id);
     setOpen(true);
   };
 
@@ -271,6 +302,7 @@ export default function ExerciseLibrary() {
     setVideoFile(null);
     setPrimaryMuscleIds([]);
     setSecondaryMuscleIds([]);
+    setCompanyVolumes({});
     setForm({ name: "", description: "", muscle_group: "geral", video_url: "", is_global: false });
   };
 
