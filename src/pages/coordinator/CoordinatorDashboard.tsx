@@ -210,6 +210,12 @@ export default function CoordinatorDashboard() {
         {/* Alerts */}
         <DashboardAlerts />
 
+        {/* Renovação e Troca de Treino */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <RenewalsAndCyclesPanel effectiveCompanyId={companyId} routePrefix="coordinator" renewalsOnly />
+          <RenewalsAndCyclesPanel effectiveCompanyId={companyId} routePrefix="coordinator" cyclesOnly />
+        </div>
+
         {/* Student List */}
         <Card className="bg-card border-border">
           <CardHeader>
