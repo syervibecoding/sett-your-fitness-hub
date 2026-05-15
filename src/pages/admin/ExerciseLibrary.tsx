@@ -599,6 +599,48 @@ export default function ExerciseLibrary() {
               </div>
             )}
 
+            {/* Per-company volume override (only when editing and scoped to a company) */}
+            {editing && effectiveCompanyId && allSelectedIds.length > 0 && (
+              <div className="space-y-2 p-3 rounded-lg bg-secondary/50 border border-border">
+                <Label className="font-sans text-sm font-semibold">Volume desta empresa (%)</Label>
+                <p className="text-xs text-muted-foreground font-sans">
+                  Personalize o percentual de volume contado para esta empresa. Em branco usa o padrão (100% primário / 50% secundário).
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {allSelectedIds.map((mgId) => {
+                    const mg = muscleGroups.find((m) => m.id === mgId);
+                    const isPrimary = primaryMuscleIds.includes(mgId);
+                    const def = isPrimary ? 100 : 50;
+                    return (
+                      <div key={mgId} className="flex items-center gap-2">
+                        <Label className="text-xs flex-1 truncate font-sans">
+                          <span className="text-muted-foreground mr-1">{isPrimary ? "P" : "S"}</span>
+                          {mg?.name || "—"}
+                        </Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={200}
+                          step={1}
+                          value={companyVolumes[mgId] ?? ""}
+                          placeholder={String(def)}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setCompanyVolumes((prev) => {
+                              const next = { ...prev };
+                              if (v === "") delete next[mgId];
+                              else next[mgId] = Number(v);
+                              return next;
+                            });
+                          }}
+                          className="bg-secondary border-border h-8 w-20 text-xs"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {/* Video upload */}
             <div className="space-y-2">
               <Label className="font-sans">Upload de Vídeo</Label>
