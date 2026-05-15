@@ -43,7 +43,7 @@ const useMuscleGroups = (effectiveCompanyId: string | null | undefined) => {
   const [groups, setGroups] = useState<MuscleGroup[]>([]);
   useEffect(() => {
     const load = async () => {
-      const { data } = await (supabase as any).from("muscle_groups").select("id, name").order("sort_order");
+      const { data } = await (supabase as any).from("muscle_groups").select("id, name").order("name");
       setGroups((data as MuscleGroup[]) || []);
     };
     load();
