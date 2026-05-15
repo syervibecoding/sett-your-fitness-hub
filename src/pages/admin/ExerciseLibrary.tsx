@@ -43,7 +43,7 @@ const useMuscleGroups = (effectiveCompanyId: string | null | undefined) => {
   const [groups, setGroups] = useState<MuscleGroup[]>([]);
   useEffect(() => {
     const load = async () => {
-      const { data } = await (supabase as any).from("muscle_groups").select("id, name").order("sort_order");
+      const { data } = await (supabase as any).from("muscle_groups").select("id, name").order("name");
       setGroups((data as MuscleGroup[]) || []);
     };
     load();
@@ -82,6 +82,11 @@ export default function ExerciseLibrary() {
   const [primaryMuscleIds, setPrimaryMuscleIds] = useState<string[]>([]);
   const [secondaryMuscleIds, setSecondaryMuscleIds] = useState<string[]>([]);
 
+  // Map exercise_id -> targets (with effective % considering company override)
+  const [targetsByExercise, setTargetsByExercise] = useState<Record<string, MuscleTarget[]>>({});
+  // Per-company volume overrides for the editing exercise: muscle_group_id -> volume_percentage
+  const [companyVolumes, setCompanyVolumes] = useState<Record<string, number>>({});
+
   const isMaster = role === "master";
 
   useEffect(() => { loadExercises(); }, [effectiveCompanyId]);
@@ -93,7 +98,46 @@ export default function ExerciseLibrary() {
       .order("muscle_group")
       .order("name");
     if (error) console.error(error);
-    setExercises((data as Exercise[]) || []);
+    const list = (data as Exercise[]) || [];
+    setExercises(list);
+
+    // Load muscle targets for all exercises in one query
+    const ids = list.map((e) => e.id);
+    if (ids.length === 0) {
+      setTargetsByExercise({});
+      return;
+    }
+    const { data: targets } = await (supabase as any)
+      .from("exercise_muscle_targets")
+      .select("exercise_id, muscle_group_id, role, volume_percentage")
+      .in("exercise_id", ids);
+
+    // Apply company overrides if scoped to a company
+    let overrides: Record<string, Record<string, number>> = {};
+    if (effectiveCompanyId) {
+      const { data: ovs } = await (supabase as any)
+        .from("company_exercise_volumes")
+        .select("exercise_id, muscle_group_id, volume_percentage")
+        .eq("company_id", effectiveCompanyId)
+        .in("exercise_id", ids);
+      (ovs || []).forEach((o: any) => {
+        if (!overrides[o.exercise_id]) overrides[o.exercise_id] = {};
+        overrides[o.exercise_id][o.muscle_group_id] = Number(o.volume_percentage);
+      });
+    }
+
+    const map: Record<string, MuscleTarget[]> = {};
+    (targets || []).forEach((t: any) => {
+      const ov = overrides[t.exercise_id]?.[t.muscle_group_id];
+      const eff: MuscleTarget = {
+        muscle_group_id: t.muscle_group_id,
+        role: t.role,
+        volume_percentage: ov != null ? ov : Number(t.volume_percentage),
+      };
+      if (!map[t.exercise_id]) map[t.exercise_id] = [];
+      map[t.exercise_id].push(eff);
+    });
+    setTargetsByExercise(map);
   };
 
   const getStoragePublicUrl = (path: string) => {
@@ -191,6 +235,7 @@ export default function ExerciseLibrary() {
     // Save muscle targets
     if (exerciseId) {
       await saveMuscleTargets(exerciseId);
+      await saveCompanyVolumes(exerciseId);
     }
 
     setUploading(false);
@@ -209,6 +254,36 @@ export default function ExerciseLibrary() {
     loadExercises();
   };
 
+  const loadCompanyVolumes = async (exerciseId: string) => {
+    if (!effectiveCompanyId) { setCompanyVolumes({}); return; }
+    const { data } = await (supabase as any)
+      .from("company_exercise_volumes")
+      .select("muscle_group_id, volume_percentage")
+      .eq("company_id", effectiveCompanyId)
+      .eq("exercise_id", exerciseId);
+    const map: Record<string, number> = {};
+    (data || []).forEach((row: any) => { map[row.muscle_group_id] = Number(row.volume_percentage); });
+    setCompanyVolumes(map);
+  };
+
+  const saveCompanyVolumes = async (exerciseId: string) => {
+    if (!effectiveCompanyId) return;
+    const rows = Object.entries(companyVolumes)
+      .filter(([mgId]) => allSelectedIds.includes(mgId))
+      .map(([mgId, pct]) => ({
+        company_id: effectiveCompanyId,
+        exercise_id: exerciseId,
+        muscle_group_id: mgId,
+        role: primaryMuscleIds.includes(mgId) ? "primary" : "secondary",
+        volume_percentage: pct,
+      }));
+    if (rows.length > 0) {
+      await (supabase as any)
+        .from("company_exercise_volumes")
+        .upsert(rows, { onConflict: "company_id,exercise_id,muscle_group_id" });
+    }
+  };
+
   const openEdit = async (ex: Exercise) => {
     setEditing(ex);
     setForm({
@@ -218,6 +293,7 @@ export default function ExerciseLibrary() {
     });
     setVideoFile(null);
     await loadMuscleTargets(ex.id);
+    await loadCompanyVolumes(ex.id);
     setOpen(true);
   };
 
@@ -227,6 +303,7 @@ export default function ExerciseLibrary() {
     setVideoFile(null);
     setPrimaryMuscleIds([]);
     setSecondaryMuscleIds([]);
+    setCompanyVolumes({});
     setForm({ name: "", description: "", muscle_group: "geral", video_url: "", is_global: false });
   };
 
@@ -353,7 +430,7 @@ export default function ExerciseLibrary() {
                         </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline" className="capitalize text-xs">{ex.muscle_group}</Badge>
                       {ex.is_global && (
                         <Badge variant="secondary" className="text-xs">
@@ -366,6 +443,26 @@ export default function ExerciseLibrary() {
                         </Badge>
                       )}
                     </div>
+                    {(targetsByExercise[ex.id]?.length ?? 0) > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {targetsByExercise[ex.id]
+                          .slice()
+                          .sort((a, b) => (a.role === b.role ? 0 : a.role === "primary" ? -1 : 1))
+                          .map((t, i) => {
+                            const mgName = muscleGroups.find((m) => m.id === t.muscle_group_id)?.name || "—";
+                            const isPrimary = t.role === "primary";
+                            return (
+                              <Badge
+                                key={`${t.muscle_group_id}-${i}`}
+                                variant={isPrimary ? "default" : "outline"}
+                                className="text-[10px] font-sans"
+                              >
+                                {isPrimary ? "P" : "S"} · {mgName} · {Math.round(t.volume_percentage)}%
+                              </Badge>
+                            );
+                          })}
+                      </div>
+                    )}
                     {(ex.video_path || ex.video_url) && (
                       <Button
                         variant="outline" size="sm"
@@ -502,6 +599,48 @@ export default function ExerciseLibrary() {
               </div>
             )}
 
+            {/* Per-company volume override (only when editing and scoped to a company) */}
+            {editing && effectiveCompanyId && allSelectedIds.length > 0 && (
+              <div className="space-y-2 p-3 rounded-lg bg-secondary/50 border border-border">
+                <Label className="font-sans text-sm font-semibold">Volume desta empresa (%)</Label>
+                <p className="text-xs text-muted-foreground font-sans">
+                  Personalize o percentual de volume contado para esta empresa. Em branco usa o padrão (100% primário / 50% secundário).
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {allSelectedIds.map((mgId) => {
+                    const mg = muscleGroups.find((m) => m.id === mgId);
+                    const isPrimary = primaryMuscleIds.includes(mgId);
+                    const def = isPrimary ? 100 : 50;
+                    return (
+                      <div key={mgId} className="flex items-center gap-2">
+                        <Label className="text-xs flex-1 truncate font-sans">
+                          <span className="text-muted-foreground mr-1">{isPrimary ? "P" : "S"}</span>
+                          {mg?.name || "—"}
+                        </Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={200}
+                          step={1}
+                          value={companyVolumes[mgId] ?? ""}
+                          placeholder={String(def)}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setCompanyVolumes((prev) => {
+                              const next = { ...prev };
+                              if (v === "") delete next[mgId];
+                              else next[mgId] = Number(v);
+                              return next;
+                            });
+                          }}
+                          className="bg-secondary border-border h-8 w-20 text-xs"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {/* Video upload */}
             <div className="space-y-2">
               <Label className="font-sans">Upload de Vídeo</Label>

@@ -104,8 +104,8 @@ Deno.serve(async (req) => {
     });
 
     if (createError) {
-      if (createError.message.includes("already been registered")) {
-        // User already exists - find and link
+      console.error("createUser error", createError);
+      if (createError.message?.includes("already been registered") || createError.message?.includes("already registered")) {
         const { data: { users } } = await adminClient.auth.admin.listUsers();
         const existingUser = users?.find((u: any) => u.email === student.email);
         if (!existingUser) {
@@ -126,32 +126,28 @@ Deno.serve(async (req) => {
     }
 
     // Assign student role
-    await adminClient
+    const { error: roleError } = await adminClient
       .from("user_roles")
       .upsert({ user_id: userId, role: "student" }, { onConflict: "user_id,role" });
+    if (roleError) console.error("user_roles upsert error", roleError);
 
     // Link student record to user
-    await adminClient
+    const { error: linkError } = await adminClient
       .from("students")
       .update({ user_id: userId })
       .eq("id", student_id);
+    if (linkError) console.error("students update error", linkError);
 
     // Add to company_members if student has company_id
     if (student.company_id) {
-      await adminClient
+      const { error: cmError } = await adminClient
         .from("company_members")
         .upsert(
           { user_id: userId, company_id: student.company_id },
           { onConflict: "user_id" }
         );
+      if (cmError) console.error("company_members upsert error", cmError);
     }
-
-    // Send password reset email so student can set their own password
-    // We use the admin API to generate the recovery link
-    const { data: linkData } = await adminClient.auth.admin.generateLink({
-      type: "recovery",
-      email: student.email,
-    });
 
     return new Response(JSON.stringify({ 
       success: true, 
@@ -162,7 +158,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    console.error("activate-student-access fatal", err);
+    return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

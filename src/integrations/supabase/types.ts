@@ -400,6 +400,39 @@ export type Database = {
         }
         Relationships: []
       }
+      company_exercise_volumes: {
+        Row: {
+          company_id: string
+          created_at: string
+          exercise_id: string
+          id: string
+          muscle_group_id: string
+          role: string
+          updated_at: string
+          volume_percentage: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          exercise_id: string
+          id?: string
+          muscle_group_id: string
+          role?: string
+          updated_at?: string
+          volume_percentage?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          exercise_id?: string
+          id?: string
+          muscle_group_id?: string
+          role?: string
+          updated_at?: string
+          volume_percentage?: number
+        }
+        Relationships: []
+      }
       company_members: {
         Row: {
           company_id: string
