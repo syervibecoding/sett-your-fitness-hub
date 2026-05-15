@@ -13,6 +13,7 @@ import { addWeeks, format } from "date-fns";
 import { AppLayout } from "@/components/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
+import { RenewalsAndCyclesPanel } from "@/components/dashboard/RenewalsAndCyclesPanel";
 
 interface Student {
   id: string;
@@ -208,6 +209,12 @@ export default function CoordinatorDashboard() {
 
         {/* Alerts */}
         <DashboardAlerts />
+
+        {/* Renovação e Troca de Treino */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <RenewalsAndCyclesPanel effectiveCompanyId={companyId} routePrefix="coordinator" renewalsOnly />
+          <RenewalsAndCyclesPanel effectiveCompanyId={companyId} routePrefix="coordinator" cyclesOnly />
+        </div>
 
         {/* Student List */}
         <Card className="bg-card border-border">
