@@ -82,6 +82,11 @@ export default function ExerciseLibrary() {
   const [primaryMuscleIds, setPrimaryMuscleIds] = useState<string[]>([]);
   const [secondaryMuscleIds, setSecondaryMuscleIds] = useState<string[]>([]);
 
+  // Map exercise_id -> targets (with effective % considering company override)
+  const [targetsByExercise, setTargetsByExercise] = useState<Record<string, MuscleTarget[]>>({});
+  // Per-company volume overrides for the editing exercise: muscle_group_id -> volume_percentage
+  const [companyVolumes, setCompanyVolumes] = useState<Record<string, number>>({});
+
   const isMaster = role === "master";
 
   useEffect(() => { loadExercises(); }, [effectiveCompanyId]);
@@ -93,7 +98,46 @@ export default function ExerciseLibrary() {
       .order("muscle_group")
       .order("name");
     if (error) console.error(error);
-    setExercises((data as Exercise[]) || []);
+    const list = (data as Exercise[]) || [];
+    setExercises(list);
+
+    // Load muscle targets for all exercises in one query
+    const ids = list.map((e) => e.id);
+    if (ids.length === 0) {
+      setTargetsByExercise({});
+      return;
+    }
+    const { data: targets } = await (supabase as any)
+      .from("exercise_muscle_targets")
+      .select("exercise_id, muscle_group_id, role, volume_percentage")
+      .in("exercise_id", ids);
+
+    // Apply company overrides if scoped to a company
+    let overrides: Record<string, Record<string, number>> = {};
+    if (effectiveCompanyId) {
+      const { data: ovs } = await (supabase as any)
+        .from("company_exercise_volumes")
+        .select("exercise_id, muscle_group_id, volume_percentage")
+        .eq("company_id", effectiveCompanyId)
+        .in("exercise_id", ids);
+      (ovs || []).forEach((o: any) => {
+        if (!overrides[o.exercise_id]) overrides[o.exercise_id] = {};
+        overrides[o.exercise_id][o.muscle_group_id] = Number(o.volume_percentage);
+      });
+    }
+
+    const map: Record<string, MuscleTarget[]> = {};
+    (targets || []).forEach((t: any) => {
+      const ov = overrides[t.exercise_id]?.[t.muscle_group_id];
+      const eff: MuscleTarget = {
+        muscle_group_id: t.muscle_group_id,
+        role: t.role,
+        volume_percentage: ov != null ? ov : Number(t.volume_percentage),
+      };
+      if (!map[t.exercise_id]) map[t.exercise_id] = [];
+      map[t.exercise_id].push(eff);
+    });
+    setTargetsByExercise(map);
   };
 
   const getStoragePublicUrl = (path: string) => {
