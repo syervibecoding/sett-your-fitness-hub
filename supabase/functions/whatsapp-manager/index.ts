@@ -323,6 +323,7 @@ Deno.serve(async (req) => {
       if (chatId) {
         await adminClient.from("whatsapp_messages").insert({
           chat_id: chatId,
+          company_id: resolvedCompanyId,
           content,
           source: "outgoing",
           type: "text",
@@ -414,6 +415,7 @@ Deno.serve(async (req) => {
       if (chatId) {
         await adminClient.from("whatsapp_messages").insert({
           chat_id: chatId,
+          company_id: resolvedCompanyId,
           content: caption || defaultContent,
           source: "outgoing",
           type: dbType,
