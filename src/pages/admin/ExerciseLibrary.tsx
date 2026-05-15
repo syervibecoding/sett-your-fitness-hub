@@ -430,7 +430,7 @@ export default function ExerciseLibrary() {
                         </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline" className="capitalize text-xs">{ex.muscle_group}</Badge>
                       {ex.is_global && (
                         <Badge variant="secondary" className="text-xs">
@@ -443,6 +443,26 @@ export default function ExerciseLibrary() {
                         </Badge>
                       )}
                     </div>
+                    {(targetsByExercise[ex.id]?.length ?? 0) > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {targetsByExercise[ex.id]
+                          .slice()
+                          .sort((a, b) => (a.role === b.role ? 0 : a.role === "primary" ? -1 : 1))
+                          .map((t, i) => {
+                            const mgName = muscleGroups.find((m) => m.id === t.muscle_group_id)?.name || "—";
+                            const isPrimary = t.role === "primary";
+                            return (
+                              <Badge
+                                key={`${t.muscle_group_id}-${i}`}
+                                variant={isPrimary ? "default" : "outline"}
+                                className="text-[10px] font-sans"
+                              >
+                                {isPrimary ? "P" : "S"} · {mgName} · {Math.round(t.volume_percentage)}%
+                              </Badge>
+                            );
+                          })}
+                      </div>
+                    )}
                     {(ex.video_path || ex.video_url) && (
                       <Button
                         variant="outline" size="sm"
