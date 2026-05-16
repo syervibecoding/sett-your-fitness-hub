@@ -527,10 +527,12 @@ export default function WhatsAppChat() {
     setSendingAttachment(true);
     try {
       const ext = file.name.split(".").pop() || "bin";
-      const filePath = `${selectedChatId}/${Date.now()}.${ext}`;
+      const filePath = `${effectiveCompanyId}/${selectedChatId}/${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage.from("whatsapp-media").upload(filePath, file);
       if (uploadError) throw new Error("Erro ao fazer upload: " + uploadError.message);
-      const { data: urlData } = supabase.storage.from("whatsapp-media").getPublicUrl(filePath);
+      const { data: signed } = await supabase.storage.from("whatsapp-media").createSignedUrl(filePath, 60 * 60 * 24 * 7);
+      const mediaUrl = signed?.signedUrl;
+      if (!mediaUrl) throw new Error("Erro ao gerar URL da mídia");
       let mediatype: string | undefined;
       if (file.type.startsWith("image/")) mediatype = "image";
       else if (file.type.startsWith("video/")) mediatype = "video";
@@ -541,7 +543,7 @@ export default function WhatsAppChat() {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-manager`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-        body: JSON.stringify({ action: "send-media", companyId: effectiveCompanyId, remoteJid: chat.remote_jid, mediaUrl: urlData.publicUrl, chatId: selectedChatId, mediatype, mimeType: file.type, fileName: file.name, caption: "" }),
+        body: JSON.stringify({ action: "send-media", companyId: effectiveCompanyId, remoteJid: chat.remote_jid, mediaUrl, chatId: selectedChatId, mediatype, mimeType: file.type, fileName: file.name, caption: "" }),
       });
       if (!res.ok) throw new Error("Erro ao enviar mídia");
       toast.success("Mídia enviada!");
@@ -592,16 +594,18 @@ export default function WhatsAppChat() {
 
     setSendingAttachment(true);
     try {
-      const filePath = `${selectedChatId}/${Date.now()}.webm`;
+      const filePath = `${effectiveCompanyId}/${selectedChatId}/${Date.now()}.webm`;
       const { error: uploadError } = await supabase.storage.from("whatsapp-media").upload(filePath, blob, { contentType: "audio/webm" });
       if (uploadError) throw new Error("Erro ao fazer upload: " + uploadError.message);
-      const { data: urlData } = supabase.storage.from("whatsapp-media").getPublicUrl(filePath);
+      const { data: signed } = await supabase.storage.from("whatsapp-media").createSignedUrl(filePath, 60 * 60 * 24 * 7);
+      const mediaUrl = signed?.signedUrl;
+      if (!mediaUrl) throw new Error("Erro ao gerar URL do áudio");
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { toast.error("Sessão expirada"); return; }
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-manager`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-        body: JSON.stringify({ action: "send-media", companyId: effectiveCompanyId, remoteJid: chat.remote_jid, mediaUrl: urlData.publicUrl, chatId: selectedChatId, mediatype: "audio", mimeType: "audio/webm", fileName: `audio-${Date.now()}.webm`, caption: "" }),
+        body: JSON.stringify({ action: "send-media", companyId: effectiveCompanyId, remoteJid: chat.remote_jid, mediaUrl, chatId: selectedChatId, mediatype: "audio", mimeType: "audio/webm", fileName: `audio-${Date.now()}.webm`, caption: "" }),
       });
       if (!res.ok) throw new Error("Erro ao enviar áudio");
       toast.success("Áudio enviado!");
