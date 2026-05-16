@@ -527,10 +527,12 @@ export default function WhatsAppChat() {
     setSendingAttachment(true);
     try {
       const ext = file.name.split(".").pop() || "bin";
-      const filePath = `${selectedChatId}/${Date.now()}.${ext}`;
+      const filePath = `${effectiveCompanyId}/${selectedChatId}/${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage.from("whatsapp-media").upload(filePath, file);
       if (uploadError) throw new Error("Erro ao fazer upload: " + uploadError.message);
-      const { data: urlData } = supabase.storage.from("whatsapp-media").getPublicUrl(filePath);
+      const { data: signed } = await supabase.storage.from("whatsapp-media").createSignedUrl(filePath, 60 * 60 * 24 * 7);
+      const mediaUrl = signed?.signedUrl;
+      if (!mediaUrl) throw new Error("Erro ao gerar URL da mídia");
       let mediatype: string | undefined;
       if (file.type.startsWith("image/")) mediatype = "image";
       else if (file.type.startsWith("video/")) mediatype = "video";
