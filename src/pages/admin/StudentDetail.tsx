@@ -648,9 +648,11 @@ export default function StudentDetail() {
   // ---- EVALUATIONS ----
   const handleFileUpload = async (file: File, type: "photo" | "audio") => {
     if (!id || !session?.user?.id) return;
+    const cid = student?.company_id;
+    if (!cid) { toast({ title: "Aluno sem empresa", variant: "destructive" }); return; }
     setUploading(true);
     const ext = file.name.split(".").pop();
-    const path = `${id}/${Date.now()}.${ext}`;
+    const path = `${cid}/${id}/${Date.now()}.${ext}`;
 
     const { error: uploadError } = await supabase.storage.from("evaluations").upload(path, file);
     if (uploadError) {
