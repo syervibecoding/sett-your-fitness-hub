@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle } from "lucide-react";
-import bnLogo from "@/assets/bn-logo.png";
+import { Logo } from "@/components/Logo";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 import { applyTheme } from "@/contexts/ThemeContext";
 
