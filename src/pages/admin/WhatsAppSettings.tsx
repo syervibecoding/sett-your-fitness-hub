@@ -144,6 +144,7 @@ export default function WhatsAppSettings() {
       await invoke("disconnect");
       setState("disconnected");
       setQrcode(null);
+      qrIssuedAtRef.current = null;
       setPhone(null);
       stopPolling();
       toast.success("WhatsApp desconectado");
