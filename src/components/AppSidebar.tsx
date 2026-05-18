@@ -26,7 +26,7 @@ import { useRolePermissions, type PermissionModule } from "@/hooks/useRolePermis
 import { useTheme } from "@/contexts/ThemeContext";
 import { useMaster } from "@/contexts/MasterContext";
 import { useLocation, useNavigate } from "react-router-dom";
-import bnLogo from "@/assets/bn-logo.png";
+import { Logo } from "@/components/Logo";
 import {
   Sidebar,
   SidebarContent,
