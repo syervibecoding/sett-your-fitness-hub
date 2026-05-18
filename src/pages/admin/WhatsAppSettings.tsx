@@ -20,6 +20,7 @@ export default function WhatsAppSettings() {
   const [botStatus, setBotStatus] = useState<BotStatus>({ loading: true, enabled: false, source: "none" });
   const [disablingBot, setDisablingBot] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const qrIssuedAtRef = useRef<number | null>(null);
 
   const { role, companyId } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
