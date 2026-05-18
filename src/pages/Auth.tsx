@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -7,10 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import bnLogo from "@/assets/bn-logo.png";
+import { Logo } from "@/components/Logo";
 
 export default function Auth() {
   const { user, loading: authLoading } = useAuth();
+  const [searchParams] = useSearchParams();
+  const as = searchParams.get("as");
+  const isStudent = as === "student";
+  const isTrainer = as === "trainer";
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
