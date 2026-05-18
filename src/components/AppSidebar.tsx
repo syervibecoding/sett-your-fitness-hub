@@ -211,19 +211,20 @@ export function AppSidebar() {
       : role || "...";
 
   return (
-    <Sidebar className="border-r border-border">
-      <div className="p-4 flex items-center gap-3 border-b border-border">
-        <img src={logoSrc} alt={title} className="h-10 w-10 object-contain" />
-        <div className="flex-1 min-w-0">
-          <h2 className="text-primary text-lg leading-none tracking-wider truncate">{title}</h2>
-          <p className="text-muted-foreground text-xs font-sans mt-0.5 truncate">{roleLabel}</p>
+    <Sidebar className="border-r border-line">
+      <div className="p-5 flex items-center gap-3 border-b border-line">
+        <div className="flex items-baseline gap-2 flex-1 min-w-0">
+          <span className="font-display text-2xl text-navy leading-none">Set</span>
+          <span className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground truncate">
+            {roleLabel}
+          </span>
         </div>
         {showAdminView && (
           <Button
             variant="ghost"
             size="icon"
             onClick={handleExitCompanyView}
-            className="shrink-0"
+            className="shrink-0 h-7 w-7"
             title="Voltar ao painel Master"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -233,8 +234,8 @@ export function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-muted-foreground font-sans text-xs uppercase tracking-widest">
-            Menu
+          <SidebarGroupLabel className="text-muted-foreground font-mono text-[10px] uppercase tracking-[0.2em] px-3 mt-2">
+            — Menu
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -244,8 +245,8 @@ export function AppSidebar() {
                     <NavLink
                       to={item.url}
                       end={item.url.split("/").length <= 2}
-                      className="hover:bg-muted/50 text-sidebar-foreground font-sans"
-                      activeClassName="bg-primary/10 text-primary font-medium"
+                      className="hover:bg-paper text-sidebar-foreground border-l-2 border-transparent rounded-none"
+                      activeClassName="bg-paper text-navy font-medium border-l-2 border-navy"
                     >
                       <item.icon className="mr-2 h-4 w-4" />
                       <span>{item.title}</span>
@@ -324,13 +325,13 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-border p-4">
-        <p className="text-xs text-muted-foreground font-sans truncate mb-2">
+      <SidebarFooter className="border-t border-line p-4">
+        <p className="text-[10px] font-mono text-muted-foreground truncate mb-2">
           {user?.email}
         </p>
         <button
           onClick={signOut}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors font-sans w-full"
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors w-full"
         >
           <LogOut className="h-4 w-4" />
           Sair

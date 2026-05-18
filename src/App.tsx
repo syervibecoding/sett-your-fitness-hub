@@ -41,6 +41,7 @@ const PublicAnamnesis = lazy(() => import("./pages/PublicAnamnesis"));
 const PublicPayment = lazy(() => import("./pages/PublicPayment"));
 const StudentWorkout = lazy(() => import("./pages/student/StudentWorkout"));
 const StudentPortal = lazy(() => import("./pages/student/StudentPortal"));
+const Landing = lazy(() => import("./pages/Landing"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,10 +60,10 @@ const PageLoader = () => (
   </div>
 );
 
-function RoleRedirect() {
+function RootRoute() {
   const { user, role, loading } = useAuth();
   if (loading) return <PageLoader />;
-  if (!user) return <Navigate to="/auth" replace />;
+  if (!user) return <Landing />;
   if (role === "master") return <Navigate to="/master" replace />;
   if (role === "admin") return <Navigate to="/admin" replace />;
   if (role === "coordinator") return <Navigate to="/coordinator" replace />;
@@ -71,8 +72,8 @@ function RoleRedirect() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="text-center space-y-4">
-        <h2 className="text-2xl text-primary">AGUARDANDO LIBERAÇÃO</h2>
-        <p className="text-muted-foreground font-sans">Sua conta ainda não possui um papel atribuído.</p>
+        <h2 className="font-display text-3xl text-navy italic">Aguardando liberação</h2>
+        <p className="text-muted-foreground">Sua conta ainda não possui um papel atribuído.</p>
       </div>
     </div>
   );
@@ -99,7 +100,7 @@ const App = () => (
           <Route path="/pagamento/:studentId" element={<PublicPayment />} />
           <Route path="/aluno/treino/:studentId" element={<StudentWorkout />} />
           <Route path="/aluno" element={<ProtectedRoute allowedRoles={["student"]}><StudentPortal /></ProtectedRoute>} />
-          <Route path="/" element={<RoleRedirect />} />
+          <Route path="/" element={<RootRoute />} />
 
           {/* Master Routes */}
           <Route path="/master" element={<ProtectedRoute allowedRoles={["master"]}><MasterDashboard /></ProtectedRoute>} />
