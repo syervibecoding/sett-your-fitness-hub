@@ -26,7 +26,7 @@ import { useRolePermissions, type PermissionModule } from "@/hooks/useRolePermis
 import { useTheme } from "@/contexts/ThemeContext";
 import { useMaster } from "@/contexts/MasterContext";
 import { useLocation, useNavigate } from "react-router-dom";
-import bnLogo from "@/assets/bn-logo.png";
+import { Logo } from "@/components/Logo";
 import {
   Sidebar,
   SidebarContent,
@@ -139,8 +139,7 @@ export function AppSidebar() {
   const { viewingCompany, isViewingCompany, exitCompanyView } = useMaster();
   const location = useLocation();
   const navigate = useNavigate();
-  const logoSrc = settings?.logo_url || bnLogo;
-  const title = settings?.platform_title || "BN PERFORMANCE";
+  const title = settings?.platform_title || "Set Training App";
 
   const isMaster = role === "master";
   const isAdmin = role === "admin";
@@ -213,11 +212,8 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r border-line">
       <div className="p-5 flex items-center gap-3 border-b border-line">
-        <div className="flex items-baseline gap-2 flex-1 min-w-0">
-          <span className="font-display text-2xl text-navy leading-none">Set</span>
-          <span className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground truncate">
-            {roleLabel}
-          </span>
+        <div className="flex-1 min-w-0">
+          <Logo size="md" sublabel={roleLabel} />
         </div>
         {showAdminView && (
           <Button

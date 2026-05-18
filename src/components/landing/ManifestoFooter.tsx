@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { Logo } from "@/components/Logo";
+
 
 export function ManifestoFooter() {
   return (
@@ -17,11 +19,8 @@ export function ManifestoFooter() {
 
         <div className="mt-20 pt-10 border-t border-paper/15 flex flex-col md:flex-row md:items-end md:justify-between gap-8">
           <div>
-            <div className="flex items-baseline gap-2 mb-3">
-              <span className="font-display text-3xl leading-none">Set</span>
-              <span className="font-mono text-[10px] tracking-[0.2em] uppercase text-paper/50">
-                Training App
-              </span>
+            <div className="mb-3">
+              <Logo variant="inverted" size="lg" sublabel="Training App" />
             </div>
             <p className="font-mono text-xs text-paper/50 max-w-md">
               A plataforma onde o treino vira dado. Construído para o treinador sério.
