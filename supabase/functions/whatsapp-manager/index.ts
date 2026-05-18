@@ -37,17 +37,27 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { data: hasRole } = await adminClient.rpc("has_role", { _user_id: userId, _role: "admin" });
+    const { data: hasAdmin } = await adminClient.rpc("has_role", { _user_id: userId, _role: "admin" });
     const { data: hasMaster } = await adminClient.rpc("has_role", { _user_id: userId, _role: "master" });
-    if (!hasRole && !hasMaster) {
-      // Also allow coordinators and trainers for chat
-      const { data: hasCoord } = await adminClient.rpc("has_role", { _user_id: userId, _role: "coordinator" });
-      const { data: hasTrainer } = await adminClient.rpc("has_role", { _user_id: userId, _role: "trainer" });
-      if (!hasCoord && !hasTrainer) return json({ error: "Forbidden" }, 403);
-    }
+    const { data: hasCoord } = await adminClient.rpc("has_role", { _user_id: userId, _role: "coordinator" });
+    const { data: hasTrainer } = await adminClient.rpc("has_role", { _user_id: userId, _role: "trainer" });
+
+    const isPrivileged = !!(hasAdmin || hasMaster);
+    const canChat = isPrivileged || !!hasCoord || !!hasTrainer;
+    if (!canChat) return json({ error: "Forbidden" }, 403);
 
     const body = await req.json();
     const { action, companyId: bodyCompanyId } = body;
+
+    // Restrict instance/admin actions to admin/master only
+    const adminOnlyActions = new Set([
+      "init-connection", "restart-connection", "disconnect", "check-status",
+      "refresh-qr", "disable-external-bot", "fetch-bot-settings",
+    ]);
+    if (adminOnlyActions.has(action) && !isPrivileged) {
+      return json({ error: "Forbidden" }, 403);
+    }
+
     const evoUrl = Deno.env.get("EVOLUTION_API_URL")!;
     const evoKey = Deno.env.get("EVOLUTION_API_KEY") || "";
 
@@ -73,7 +83,7 @@ Deno.serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    const instanceName = instanceRow?.instance_name || `company-${resolvedCompanyId.substring(0, 8)}`;
+    const instanceName = instanceRow?.instance_name || `company-${resolvedCompanyId}`;
 
     // ─── Helper: create fresh instance ───
     const createFreshInstance = async () => {
