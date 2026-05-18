@@ -58,7 +58,20 @@ export default function WhatsAppSettings() {
       setPhone(data.phone || null);
       if (data.status === "connected") {
         setQrcode(null);
+        qrIssuedAtRef.current = null;
         stopPolling();
+        return;
+      }
+      // Auto-refresh QR if it's been waiting too long (~25s)
+      if (data.status === "waiting_qr" && qrIssuedAtRef.current && Date.now() - qrIssuedAtRef.current > 25000) {
+        try {
+          const refreshed = await invoke("refresh-qr");
+          if (refreshed?.qrcode) {
+            setQrcode(refreshed.qrcode);
+            qrIssuedAtRef.current = Date.now();
+          }
+          if (refreshed?.status) setState(refreshed.status as ConnectionState);
+        } catch { /* silent */ }
       }
     } catch {
       // silent
