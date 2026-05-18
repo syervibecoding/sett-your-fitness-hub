@@ -240,10 +240,41 @@ Deno.serve(async (req) => {
       );
 
       // Small delay to let Evolution clean up
-      // Increased delay to give Evolution API time to clean up
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, 1000));
 
       return await createFreshInstance();
+    }
+
+    // ─── REFRESH QR (re-fetch a new QR for an existing waiting instance) ───
+    if (action === "refresh-qr") {
+      try {
+        const connectRes = await fetch(`${evoUrl}/instance/connect/${instanceName}`, { headers: evoHeaders });
+        if (!connectRes.ok) {
+          // instance probably gone — recreate
+          return await createFreshInstance();
+        }
+        const connectData = await connectRes.json();
+        const qr = connectData?.base64 || connectData?.qrcode?.base64 || null;
+        const state = connectData?.instance?.state || "waiting_qr";
+
+        if (state !== "open" && !qr) {
+          await destroyInstance();
+          return await createFreshInstance();
+        }
+
+        await adminClient.from("whatsapp_instances").upsert({
+          instance_name: instanceName,
+          company_id: resolvedCompanyId,
+          status: state === "open" ? "connected" : "waiting_qr",
+          qrcode: qr,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "instance_name" });
+
+        return json({ status: state === "open" ? "connected" : "waiting_qr", qrcode: qr });
+      } catch (err) {
+        console.error("[refresh-qr] error:", err);
+        return json({ error: "Failed to refresh QR" }, 502);
+      }
     }
 
     // ─── CHECK STATUS ───
