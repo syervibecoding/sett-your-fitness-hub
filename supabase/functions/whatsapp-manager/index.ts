@@ -37,17 +37,27 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { data: hasRole } = await adminClient.rpc("has_role", { _user_id: userId, _role: "admin" });
+    const { data: hasAdmin } = await adminClient.rpc("has_role", { _user_id: userId, _role: "admin" });
     const { data: hasMaster } = await adminClient.rpc("has_role", { _user_id: userId, _role: "master" });
-    if (!hasRole && !hasMaster) {
-      // Also allow coordinators and trainers for chat
-      const { data: hasCoord } = await adminClient.rpc("has_role", { _user_id: userId, _role: "coordinator" });
-      const { data: hasTrainer } = await adminClient.rpc("has_role", { _user_id: userId, _role: "trainer" });
-      if (!hasCoord && !hasTrainer) return json({ error: "Forbidden" }, 403);
-    }
+    const { data: hasCoord } = await adminClient.rpc("has_role", { _user_id: userId, _role: "coordinator" });
+    const { data: hasTrainer } = await adminClient.rpc("has_role", { _user_id: userId, _role: "trainer" });
+
+    const isPrivileged = !!(hasAdmin || hasMaster);
+    const canChat = isPrivileged || !!hasCoord || !!hasTrainer;
+    if (!canChat) return json({ error: "Forbidden" }, 403);
 
     const body = await req.json();
     const { action, companyId: bodyCompanyId } = body;
+
+    // Restrict instance/admin actions to admin/master only
+    const adminOnlyActions = new Set([
+      "init-connection", "restart-connection", "disconnect", "check-status",
+      "refresh-qr", "disable-external-bot", "fetch-bot-settings",
+    ]);
+    if (adminOnlyActions.has(action) && !isPrivileged) {
+      return json({ error: "Forbidden" }, 403);
+    }
+
     const evoUrl = Deno.env.get("EVOLUTION_API_URL")!;
     const evoKey = Deno.env.get("EVOLUTION_API_KEY") || "";
 
@@ -73,7 +83,7 @@ Deno.serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    const instanceName = instanceRow?.instance_name || `company-${resolvedCompanyId.substring(0, 8)}`;
+    const instanceName = instanceRow?.instance_name || `company-${resolvedCompanyId}`;
 
     // ─── Helper: create fresh instance ───
     const createFreshInstance = async () => {
@@ -230,10 +240,41 @@ Deno.serve(async (req) => {
       );
 
       // Small delay to let Evolution clean up
-      // Increased delay to give Evolution API time to clean up
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, 1000));
 
       return await createFreshInstance();
+    }
+
+    // ─── REFRESH QR (re-fetch a new QR for an existing waiting instance) ───
+    if (action === "refresh-qr") {
+      try {
+        const connectRes = await fetch(`${evoUrl}/instance/connect/${instanceName}`, { headers: evoHeaders });
+        if (!connectRes.ok) {
+          // instance probably gone — recreate
+          return await createFreshInstance();
+        }
+        const connectData = await connectRes.json();
+        const qr = connectData?.base64 || connectData?.qrcode?.base64 || null;
+        const state = connectData?.instance?.state || "waiting_qr";
+
+        if (state !== "open" && !qr) {
+          await destroyInstance();
+          return await createFreshInstance();
+        }
+
+        await adminClient.from("whatsapp_instances").upsert({
+          instance_name: instanceName,
+          company_id: resolvedCompanyId,
+          status: state === "open" ? "connected" : "waiting_qr",
+          qrcode: qr,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "instance_name" });
+
+        return json({ status: state === "open" ? "connected" : "waiting_qr", qrcode: qr });
+      } catch (err) {
+        console.error("[refresh-qr] error:", err);
+        return json({ error: "Failed to refresh QR" }, 502);
+      }
     }
 
     // ─── CHECK STATUS ───
@@ -327,9 +368,11 @@ Deno.serve(async (req) => {
           content,
           source: "outgoing",
           type: "text",
+          is_from_me: true,
           sender_id: userId,
           message_id_external: sendData?.key?.id || null,
           origin: "panel_manual",
+          timestamp: new Date().toISOString(),
         });
 
         // Update last_message_at and last_sender_id
@@ -419,11 +462,13 @@ Deno.serve(async (req) => {
           content: caption || defaultContent,
           source: "outgoing",
           type: dbType,
+          is_from_me: true,
           sender_id: userId,
           message_id_external: sendData?.key?.id || null,
           media_url: mediaUrl,
           media_type: dbMediaType,
           origin: "panel_manual",
+          timestamp: new Date().toISOString(),
         });
 
         await adminClient.from("whatsapp_chats").update({

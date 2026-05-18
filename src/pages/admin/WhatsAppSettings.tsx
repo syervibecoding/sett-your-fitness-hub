@@ -20,6 +20,7 @@ export default function WhatsAppSettings() {
   const [botStatus, setBotStatus] = useState<BotStatus>({ loading: true, enabled: false, source: "none" });
   const [disablingBot, setDisablingBot] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const qrIssuedAtRef = useRef<number | null>(null);
 
   const { role, companyId } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
@@ -57,7 +58,20 @@ export default function WhatsAppSettings() {
       setPhone(data.phone || null);
       if (data.status === "connected") {
         setQrcode(null);
+        qrIssuedAtRef.current = null;
         stopPolling();
+        return;
+      }
+      // Auto-refresh QR if it's been waiting too long (~25s)
+      if (data.status === "waiting_qr" && qrIssuedAtRef.current && Date.now() - qrIssuedAtRef.current > 25000) {
+        try {
+          const refreshed = await invoke("refresh-qr");
+          if (refreshed?.qrcode) {
+            setQrcode(refreshed.qrcode);
+            qrIssuedAtRef.current = Date.now();
+          }
+          if (refreshed?.status) setState(refreshed.status as ConnectionState);
+        } catch { /* silent */ }
       }
     } catch {
       // silent
@@ -111,6 +125,7 @@ export default function WhatsAppSettings() {
       setState(data.status as ConnectionState);
       if (data.qrcode) {
         setQrcode(data.qrcode);
+        qrIssuedAtRef.current = Date.now();
         startPolling();
       }
       if (data.status === "connected") {
@@ -129,6 +144,7 @@ export default function WhatsAppSettings() {
       await invoke("disconnect");
       setState("disconnected");
       setQrcode(null);
+      qrIssuedAtRef.current = null;
       setPhone(null);
       stopPolling();
       toast.success("WhatsApp desconectado");
@@ -147,6 +163,7 @@ export default function WhatsAppSettings() {
       setState(data.status as ConnectionState);
       if (data.qrcode) {
         setQrcode(data.qrcode);
+        qrIssuedAtRef.current = Date.now();
         startPolling();
       }
       toast.success("Instância recriada, escaneie o novo QR Code");
