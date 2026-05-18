@@ -213,11 +213,8 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r border-line">
       <div className="p-5 flex items-center gap-3 border-b border-line">
-        <div className="flex items-baseline gap-2 flex-1 min-w-0">
-          <span className="font-display text-2xl text-navy leading-none">Set</span>
-          <span className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground truncate">
-            {roleLabel}
-          </span>
+        <div className="flex-1 min-w-0">
+          <Logo size="md" sublabel={roleLabel} />
         </div>
         {showAdminView && (
           <Button
