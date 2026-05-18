@@ -69,8 +69,8 @@ export default function PublicRegistration() {
     init();
   }, [slug]);
 
-  const logoSrc = branding?.logo_url || bnLogo;
-  const titleText = branding?.platform_title || "BN PERFORMANCE";
+  const logoSrc = branding?.logo_url || null;
+  const titleText = branding?.platform_title || "Set Training App";
 
   const handleSubmit = async () => {
     const missing: string[] = [];
