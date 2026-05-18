@@ -45,7 +45,7 @@ export default function PublicAnamnesis() {
   const [studentName, setStudentName] = useState("");
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [logoSrc, setLogoSrc] = useState<string>(bnLogo);
+  const [logoSrc, setLogoSrc] = useState<string | null>(null);
   const [titleText, setTitleText] = useState("ANAMNESE");
 
   // Fields
