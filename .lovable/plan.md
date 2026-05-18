@@ -1,62 +1,63 @@
-## Problemas identificados
+## Visão geral
 
-1. **Grupos musculares não carregam** — a query `muscle_groups?order=sort_order.asc` retorna **400** (`column "sort_order" does not exist`). Como o dropdown de grupos fica vazio, o cadastro/edição de exercícios não consegue mostrar nem salvar primário/secundário, e o card só exibe o texto legado `ex.muscle_group` (um único grupo).
+Construir a landing page do Set Training App em `/` baseada no manual de marca (Paper-first, paleta Navy + Ink restrita, tipografia Fraunces + Inter + JetBrains Mono, tom editorial e técnico). No mesmo passe, migrar os tokens globais e o chrome do app (Sidebar + Topbar) para a nova identidade — modo light como padrão.
 
-2. **Cards de exercícios só mostram um grupo** — o componente nunca consulta `exercise_muscle_targets` na listagem; só aparece a badge legada.
+## Decisões de marca aplicadas
 
-3. **Sem coluna de volume por empresa** — hoje `exercise_muscle_targets.volume_percentage` é global. Precisa existir um override por empresa (ex.: BN pode dizer que Agachamento conta 70% Quadríceps / 30% Glúteo, e outra empresa 60/40).
+| Token | Valor |
+|---|---|
+| Set Navy (primary) | `#1D2D5C` → HSL `223 53% 27%` |
+| Set Ink (foreground) | `#0A0A0A` → HSL `0 0% 4%` |
+| Paper (background) | `#FAFAF7` → HSL `60 19% 98%` |
+| Paper Warm (card/muted) | `#F2F0EA` → HSL `47 21% 93%` |
+| Line (border) | `#D8D6CE` → HSL `45 12% 83%` |
+| Muted (text secundário) | `#6B6A66` → HSL `45 2% 41%` |
+| Ink Soft (dark surface) | `#1A1A1A` → HSL `0 0% 10%` |
+| Display | Fraunces (200/300/400 italic) via Google Fonts |
+| Sans | Inter (400/500/600/700) — substitui Calibri por web safety |
+| Mono | JetBrains Mono (400/500/600) |
+| Radius | `0.25rem` (mais editorial/sóbrio que o atual 0.5rem) |
 
-4. **Treinador não consegue clicar em "Ativar Acesso"** — a edge `activate-student-access` já permite role `trainer`, então o erro é runtime. Preciso instrumentar e validar pelos logs.
+Acentos italic Fraunces em palavras-chave (manifesto: "ciência", "verdade", "compromisso", "prova"). Régua tipográfica modular com `font-feature-settings: "ss01"` para opentype no Fraunces.
 
-## Plano
+## Mudanças
 
-### 1. Corrigir ordenação de `muscle_groups`
-Em `src/pages/admin/ExerciseLibrary.tsx` (e qualquer outro lugar que use `sort_order` em muscle_groups) trocar para `.order("name")`. Sem migration — o schema não tem `sort_order`.
+### 1. Sistema de design (tokens)
+- **`src/index.css`**: substituir todas as variáveis HSL para a nova paleta (light default). Remover dark forçado. Atualizar `body` para `font-family: 'Inter'`, criar utilitários `.font-display` (Fraunces), `.font-mono-data` (JetBrains). Adicionar `--paper-warm`, `--ink-soft`, `--line` como tokens semânticos extras. Ajustar `--radius` para `0.25rem`. Atualizar scrollbar para tons paper/line.
+- **`tailwind.config.ts`**: adicionar `fontFamily: { display: ['Fraunces'], sans: ['Inter'], mono: ['JetBrains Mono'] }` e expor `paper-warm`, `ink-soft`, `line`, `navy`, `ink` como cores semânticas. Adicionar utilities para letter-spacing editorial.
+- **`index.html`**: trocar preload de fontes — remover Bebas Neue, adicionar Fraunces (com itálicos), Inter, JetBrains Mono. Atualizar `<title>` e meta description com posicionamento do manual ("A plataforma onde o treino vira dado").
 
-### 2. Mostrar primário/secundário nos cards
-Em `ExerciseLibrary.tsx`, na carga inicial buscar `exercise_muscle_targets` de todos os exercícios listados em uma única query (`in("exercise_id", ids)`) e indexar por `exercise_id`. Renderizar:
-- badges `Primário: <nome> (xx%)` 
-- badges `Secundário: <nome> (xx%)`
-Mantém a badge legada como fallback quando o exercício ainda não tem targets.
+### 2. Landing page (nova)
+- **`src/components/landing/`** (novos):
+  - `LandingNav.tsx` — nav fina sticky com wordmark "SET" + link "Acessar" → `/auth`.
+  - `Hero.tsx` — Headline "Treino é *ciência*. O resto é planilha." (italic Fraunces), eyebrow `— MANIFESTO / 01`, sub-copy técnica, dois CTAs (Começar / Ver planos). Métrica em JetBrains Mono ao lado direito ("Volume + 14% · ciclo 03").
+  - `Differentials.tsx` — 3 colunas: Matriz de Volume Biomecânico, Log Real de Carga, Sobrecarga Progressiva Auditável. Cada uma com número 01/02/03 em mono, título em sans bold, descrição.
+  - `Pricing.tsx` — 3 cards (Básico R$49,90 / Intermediário R$400 / Avançado R$799). Card do meio com borda Navy mais espessa. Lista de features por tier. CTA por card.
+  - `ManifestoFooter.tsx` — bloco escuro (Ink) com "Volume é *verdade*. Carga é *compromisso*. Progressão é *prova*." em Fraunces italic large. Wordmark + links secundários + copyright.
+- **`src/pages/Landing.tsx`** — compõe as seções acima.
+- **`src/App.tsx`**: criar `RootRoute` — se `loading` mostra loader, se `user` faz o redirect por role (lógica atual de `RoleRedirect`), se não, renderiza `<Landing />`. Substituir `<Route path="/" element={<RoleRedirect />} />`.
+- **`src/pages/Index.tsx`** — deletar (não usado).
 
-### 3. Volume por empresa (nova tabela)
-Migration criando:
+### 3. Redesign do chrome interno
+- **`src/components/AppSidebar.tsx`**: aplicar paleta nova — Paper Warm como fundo, divisores Line, item ativo com barra esquerda Navy 2px + fundo Paper, label em Inter 500, ícones lucide em Ink 70%. Wordmark "SET" no topo em Fraunces. Group labels em JetBrains Mono uppercase 11px tracking-wider muted.
+- **`src/components/AppLayout.tsx`**: topbar mais alto (56px), border-bottom Line, breadcrumb mono opcional, espaçamento generoso (px-8 py-6 no main).
+- **`src/components/ui/button.tsx`** (variants): ajustar `default` para Navy sólido com hover Navy 90%, `outline` com border Line + texto Ink, adicionar variant `editorial` (texto + seta unicode, sem fundo).
+- **`src/components/ui/card.tsx`**: card com `bg-paper-warm` e `border-line`, sem sombra.
 
-```text
-company_exercise_volumes
-├─ id uuid pk
-├─ company_id uuid not null
-├─ exercise_id uuid not null
-├─ muscle_group_id uuid not null
-├─ role text ('primary'|'secondary')
-├─ volume_percentage numeric not null
-├─ created_at / updated_at
-└─ UNIQUE(company_id, exercise_id, muscle_group_id)
-```
+### 4. Atualização de memória
+Atualizar `mem://index.md` Core: trocar "Dark theme default. Primary 220 70% 45%. Bebas Neue headings, Inter body." por "Light/Paper default (#FAFAF7). Set Navy primary (#1D2D5C, HSL 223 53% 27%). Fraunces display italic, Inter body, JetBrains Mono para dados. Tom editorial e técnico — sem motivacional."
 
-RLS company-scoped (mesmo padrão de `exercise_muscle_targets`):
-- SELECT: `company_id = get_user_company_id(auth.uid())` ou master
-- INSERT/UPDATE/DELETE: admin/coordinator/trainer da mesma empresa, ou master
+## Fora de escopo (não vou mexer)
 
-No editor de exercício (`ExerciseLibrary`), abaixo da seleção de primário/secundário, adicionar uma seção **"Volume desta empresa"** que carrega `company_exercise_volumes` da empresa atual e permite editar a % por grupo. Salvar via upsert com `onConflict: "company_id,exercise_id,muscle_group_id"`.
+- Layout interno de páginas (StudentsManager, WorkoutBuilder, Dashboard…) — apenas herdam novos tokens.
+- Auth/login UI além da aplicação automática dos tokens.
+- Conteúdo de pricing além dos 3 tiers já citados (sem features por tier validadas com você — vou usar a descrição resumida do project knowledge).
+- Dark mode toggle — fica para depois (o ThemeContext continua, mas default vira light).
 
-Na listagem do card, se houver override da empresa atual, exibir esse % no lugar do default.
+## Referência
 
-### 4. Diagnosticar "Ativar Acesso" do treinador
-- Checar `supabase--edge_function_logs activate-student-access` para ver o erro real quando trainer chama.
-- Se for falha de CORS/preflight, alinhar headers; se for `auth.admin.generateLink`/`createUser` retornando algo, propagar mensagem real (hoje muitos paths devolvem `data.error` truncado).
-- Adicionar logs `console.error` na função e tratamento que devolva a mensagem original ao toast.
-- Como mitigação imediata: trocar o `fetch` em `StudentDetail.tsx` por `supabase.functions.invoke("activate-student-access", { body: ... })` para garantir auth/headers consistentes.
+O repo `taste-skill` que você citou usa estética editorial parecida (serif + mono + paleta restrita); vou seguir o espírito (mucha typography, pouca cor, animações sutis) sem copiar componentes.
 
-## Detalhes técnicos
+## Verificação
 
-- Arquivos editados: `src/pages/admin/ExerciseLibrary.tsx`, `src/pages/admin/StudentDetail.tsx`, `supabase/functions/activate-student-access/index.ts`.
-- Migration nova: `company_exercise_volumes` + policies + trigger `update_updated_at_column`.
-- Sem alteração na tabela `muscle_groups` (mantemos ordenação por nome).
-- Sem mudança em `exercise_muscle_targets` — ela continua sendo o "padrão global" do exercício; o override fica em `company_exercise_volumes`.
-
-## Validação
-
-1. Recarregar `/master/exercises`: dropdown de grupos volta a aparecer; cards mostram primário/secundário com %.
-2. Editar um exercício como admin BN: definir volume próprio; ao reabrir, valores persistem; outro admin de outra empresa não vê esses valores.
-3. Treinador BN abre ficha de aluno e clica em "Ativar Acesso" → senha temporária aparece no toast (ou erro real e legível).
+Depois de aplicar: navegar para `/` (deslogado), conferir hero/diferenciais/pricing/footer; entrar no `/admin` logado e conferir sidebar/topbar com nova paleta. Checar console de erros e ajustar contraste se algum token quebrar.
