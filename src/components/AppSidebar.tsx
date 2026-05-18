@@ -139,8 +139,7 @@ export function AppSidebar() {
   const { viewingCompany, isViewingCompany, exitCompanyView } = useMaster();
   const location = useLocation();
   const navigate = useNavigate();
-  const logoSrc = settings?.logo_url || bnLogo;
-  const title = settings?.platform_title || "BN PERFORMANCE";
+  const title = settings?.platform_title || "Set Training App";
 
   const isMaster = role === "master";
   const isAdmin = role === "admin";
