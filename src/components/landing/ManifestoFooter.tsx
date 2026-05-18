@@ -28,8 +28,11 @@ export function ManifestoFooter() {
           </div>
 
           <div className="flex flex-wrap gap-x-8 gap-y-3 font-mono text-xs uppercase tracking-wider">
-            <Link to="/auth" className="text-paper/70 hover:text-paper transition-colors">
-              Acessar
+            <Link to="/auth?as=student" className="text-paper/70 hover:text-paper transition-colors">
+              Sou Aluno
+            </Link>
+            <Link to="/auth?as=trainer" className="text-paper/70 hover:text-paper transition-colors">
+              Sou Treinador
             </Link>
             <a href="#planos" className="text-paper/70 hover:text-paper transition-colors">
               Planos
