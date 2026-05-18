@@ -368,9 +368,11 @@ Deno.serve(async (req) => {
           content,
           source: "outgoing",
           type: "text",
+          is_from_me: true,
           sender_id: userId,
           message_id_external: sendData?.key?.id || null,
           origin: "panel_manual",
+          timestamp: new Date().toISOString(),
         });
 
         // Update last_message_at and last_sender_id
