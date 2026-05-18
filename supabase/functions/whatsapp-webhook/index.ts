@@ -267,13 +267,31 @@ Deno.serve(async (req) => {
     // ─── CONNECTION UPDATE ───
     if (event === "CONNECTION_UPDATE" || body.event === "connection.update") {
       const state = body.data?.state || body.state;
-      const instanceName = body.instance || body.data?.instance || "bn-performance";
+      const instanceName = body.instance || body.data?.instance;
+      if (!instanceName) {
+        console.error("[webhook] CONNECTION_UPDATE missing instance, body:", JSON.stringify(body));
+        return new Response(JSON.stringify({ error: "Missing instance" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       const mappedStatus = state === "open" ? "connected" : state === "close" ? "disconnected" : "waiting_qr";
 
-      await adminClient.from("whatsapp_instances").upsert(
-        { instance_name: instanceName, status: mappedStatus, updated_at: new Date().toISOString() },
-        { onConflict: "instance_name" }
-      );
+      const connectedPhone = state === "open"
+        ? (body.data?.wuid || body.data?.owner || body.sender || body.data?.instance?.owner || null)
+        : null;
+
+      const patch: Record<string, unknown> = {
+        instance_name: instanceName,
+        status: mappedStatus,
+        updated_at: new Date().toISOString(),
+      };
+      if (state === "open") {
+        patch.qrcode = null;
+        if (connectedPhone) patch.connected_phone = connectedPhone;
+      } else if (state === "close") {
+        patch.qrcode = null;
+        patch.connected_phone = null;
+      }
+
+      await adminClient.from("whatsapp_instances").upsert(patch, { onConflict: "instance_name" });
 
       return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -281,7 +299,11 @@ Deno.serve(async (req) => {
     // ─── MESSAGES UPSERT ───
     if (event === "MESSAGES_UPSERT" || event === "messages.upsert") {
       const messages = body.data || [];
-      const instanceName = body.instance || "bn-performance";
+      const instanceName = body.instance;
+      if (!instanceName) {
+        console.error("[webhook] MESSAGES_UPSERT missing instance, body:", JSON.stringify(body));
+        return new Response(JSON.stringify({ error: "Missing instance" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
 
       const { data: instance } = await adminClient.from("whatsapp_instances").select("id, company_id").eq("instance_name", instanceName).single();
       if (!instance) {
