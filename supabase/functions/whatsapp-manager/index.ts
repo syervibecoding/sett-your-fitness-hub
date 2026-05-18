@@ -462,11 +462,13 @@ Deno.serve(async (req) => {
           content: caption || defaultContent,
           source: "outgoing",
           type: dbType,
+          is_from_me: true,
           sender_id: userId,
           message_id_external: sendData?.key?.id || null,
           media_url: mediaUrl,
           media_type: dbMediaType,
           origin: "panel_manual",
+          timestamp: new Date().toISOString(),
         });
 
         await adminClient.from("whatsapp_chats").update({
