@@ -15,11 +15,11 @@ interface PlatformSettings {
 }
 
 const DEFAULTS: Omit<PlatformSettings, "id" | "company_id"> = {
-  primary_color: "#1d4ed8",
-  background_color: "#121212",
-  card_color: "#1a1a1a",
-  text_color: "#ebebeb",
-  platform_title: "BN PERFORMANCE",
+  primary_color: "#1D2D5C",
+  background_color: "#FAFAF7",
+  card_color: "#F2F0EA",
+  text_color: "#0A0A0A",
+  platform_title: "Set Training App",
   logo_url: null,
 };
 
@@ -92,36 +92,55 @@ export function applyTheme(settings: { primary_color: string; background_color: 
   const primary = hexToHSL(settings.primary_color);
   const card = hexToHSL(settings.card_color);
 
-  const mutedBg = adjustLightness(settings.background_color, 0.03);
-  const mutedFg = adjustLightness(settings.text_color, -0.25);
-  const border = adjustLightness(settings.background_color, 0.06);
-  const sidebarBg = adjustLightness(settings.background_color, -0.02);
-  const sidebarAccent = adjustLightness(settings.background_color, 0.05);
+  // Detect light vs dark surface to derive sensible neutrals in either direction.
+  const isLight = (() => {
+    const hex = settings.background_color.replace("#", "");
+    const r = parseInt(hex.substring(0, 2), 16) / 255;
+    const g = parseInt(hex.substring(2, 4), 16) / 255;
+    const b = parseInt(hex.substring(4, 6), 16) / 255;
+    return (Math.max(r, g, b) + Math.min(r, g, b)) / 2 > 0.5;
+  })();
+
+  const sign = isLight ? -1 : 1;
+  const mutedBg = adjustLightness(settings.background_color, sign * 0.03);
+  const mutedFg = adjustLightness(settings.text_color, sign * -0.35);
+  const border = adjustLightness(settings.background_color, sign * 0.08);
+  const sidebarBg = adjustLightness(settings.background_color, sign * 0.04);
+  const sidebarAccent = adjustLightness(settings.background_color, sign * 0.06);
 
   root.style.setProperty("--background", bg);
   root.style.setProperty("--foreground", fg);
   root.style.setProperty("--primary", primary);
-  root.style.setProperty("--primary-foreground", "0 0% 100%");
+  root.style.setProperty("--primary-foreground", isLight ? "60 19% 98%" : "0 0% 100%");
   root.style.setProperty("--card", card);
   root.style.setProperty("--card-foreground", fg);
-  root.style.setProperty("--popover", card);
+  root.style.setProperty("--popover", isLight ? bg : card);
   root.style.setProperty("--popover-foreground", fg);
-  root.style.setProperty("--secondary", adjustLightness(settings.background_color, 0.05));
-  root.style.setProperty("--secondary-foreground", adjustLightness(settings.text_color, -0.05));
+  root.style.setProperty("--secondary", card);
+  root.style.setProperty("--secondary-foreground", fg);
   root.style.setProperty("--muted", mutedBg);
   root.style.setProperty("--muted-foreground", mutedFg);
   root.style.setProperty("--accent", primary);
-  root.style.setProperty("--accent-foreground", "0 0% 100%");
+  root.style.setProperty("--accent-foreground", isLight ? "60 19% 98%" : "0 0% 100%");
   root.style.setProperty("--border", border);
   root.style.setProperty("--input", border);
   root.style.setProperty("--ring", primary);
-  root.style.setProperty("--sidebar-background", sidebarBg);
-  root.style.setProperty("--sidebar-foreground", adjustLightness(settings.text_color, -0.05));
+
+  // Extra brand tokens (Paper / Navy / Ink) used by landing + chrome
+  root.style.setProperty("--paper", bg);
+  root.style.setProperty("--paper-warm", card);
+  root.style.setProperty("--line", border);
+  root.style.setProperty("--ink", fg);
+  root.style.setProperty("--ink-soft", adjustLightness(settings.text_color, isLight ? 0.06 : -0.06));
+  root.style.setProperty("--navy", primary);
+
+  root.style.setProperty("--sidebar-background", card);
+  root.style.setProperty("--sidebar-foreground", fg);
   root.style.setProperty("--sidebar-primary", primary);
-  root.style.setProperty("--sidebar-primary-foreground", "0 0% 100%");
+  root.style.setProperty("--sidebar-primary-foreground", isLight ? "60 19% 98%" : "0 0% 100%");
   root.style.setProperty("--sidebar-accent", sidebarAccent);
-  root.style.setProperty("--sidebar-accent-foreground", adjustLightness(settings.text_color, -0.05));
-  root.style.setProperty("--sidebar-border", adjustLightness(settings.background_color, 0.04));
+  root.style.setProperty("--sidebar-accent-foreground", fg);
+  root.style.setProperty("--sidebar-border", border);
   root.style.setProperty("--sidebar-ring", primary);
 }
 
