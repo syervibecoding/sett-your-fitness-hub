@@ -19,16 +19,24 @@ export function Hero() {
           </p>
           <div className="mt-10 flex flex-wrap items-center gap-4">
             <Link
-              to="/auth"
+              to="/auth?as=trainer"
+              aria-label="Acessar como treinador"
               className="inline-flex items-center gap-2 bg-navy text-paper font-medium px-6 py-3 hover:bg-navy/90 transition-colors"
             >
-              Começar agora <span aria-hidden>→</span>
+              Sou Treinador <span aria-hidden>→</span>
+            </Link>
+            <Link
+              to="/auth?as=student"
+              aria-label="Acessar como aluno"
+              className="inline-flex items-center gap-2 border border-foreground px-6 py-3 font-medium hover:bg-foreground hover:text-paper transition-colors"
+            >
+              Sou Aluno
             </Link>
             <a
               href="#planos"
-              className="inline-flex items-center gap-2 border border-foreground px-6 py-3 font-medium hover:bg-foreground hover:text-paper transition-colors"
+              className="font-mono text-xs tracking-wider uppercase text-muted-foreground hover:text-foreground transition-colors px-2"
             >
-              Ver planos
+              Ver planos ↓
             </a>
           </div>
         </div>

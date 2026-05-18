@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle } from "lucide-react";
-import bnLogo from "@/assets/bn-logo.png";
+import { Logo } from "@/components/Logo";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 import { applyTheme } from "@/contexts/ThemeContext";
 
@@ -69,8 +69,8 @@ export default function PublicRegistration() {
     init();
   }, [slug]);
 
-  const logoSrc = branding?.logo_url || bnLogo;
-  const titleText = branding?.platform_title || "BN PERFORMANCE";
+  const logoSrc = branding?.logo_url || null;
+  const titleText = branding?.platform_title || "Set Training App";
 
   const handleSubmit = async () => {
     const missing: string[] = [];
@@ -180,7 +180,11 @@ export default function PublicRegistration() {
     <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="text-center space-y-3">
-          <img src={logoSrc} alt={titleText} className="h-16 mx-auto" />
+          {logoSrc ? (
+            <img src={logoSrc} alt={titleText} className="h-16 mx-auto" />
+          ) : (
+            <div className="flex justify-center"><Logo size="lg" sublabel="Training App" /></div>
+          )}
           <h1 className="text-4xl text-primary">CADASTRO {titleText}</h1>
           <p className="text-sm text-muted-foreground font-sans">Dados Pessoais</p>
         </div>

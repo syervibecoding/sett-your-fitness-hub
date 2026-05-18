@@ -102,7 +102,7 @@ export function Pricing() {
               </ul>
 
               <Link
-                to="/auth"
+                to="/auth?as=trainer"
                 className={`block text-center py-3 font-medium transition-colors ${
                   tier.featured
                     ? "bg-navy text-paper hover:bg-navy/90"
