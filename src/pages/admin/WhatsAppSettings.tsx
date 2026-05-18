@@ -162,6 +162,7 @@ export default function WhatsAppSettings() {
       setState(data.status as ConnectionState);
       if (data.qrcode) {
         setQrcode(data.qrcode);
+        qrIssuedAtRef.current = Date.now();
         startPolling();
       }
       toast.success("Instância recriada, escaneie o novo QR Code");
