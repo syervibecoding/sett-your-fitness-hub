@@ -180,7 +180,11 @@ export default function PublicRegistration() {
     <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="text-center space-y-3">
-          <img src={logoSrc} alt={titleText} className="h-16 mx-auto" />
+          {logoSrc ? (
+            <img src={logoSrc} alt={titleText} className="h-16 mx-auto" />
+          ) : (
+            <div className="flex justify-center"><Logo size="lg" sublabel="Training App" /></div>
+          )}
           <h1 className="text-4xl text-primary">CADASTRO {titleText}</h1>
           <p className="text-sm text-muted-foreground font-sans">Dados Pessoais</p>
         </div>
