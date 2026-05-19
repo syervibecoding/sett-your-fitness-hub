@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { UserPlus, Search, Pencil, Trash2, Phone, Mail, Eye, Play } from "lucide-react";
+import { UserPlus, Search, Pencil, Trash2, Phone, Mail, Eye, Play, Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AppLayout } from "@/components/AppLayout";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -278,7 +278,29 @@ export default function StudentsManager() {
             <h1 className="text-4xl text-primary">ALUNOS</h1>
             <p className="text-muted-foreground font-sans">Gerencie alunos, atribua treinadores e inicie matrículas</p>
           </div>
-          <Button onClick={openCreate}><UserPlus className="h-4 w-4 mr-2" />Novo Aluno</Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                if (!effectiveCompanyId) return;
+                const { data } = await supabase.from("companies").select("slug").eq("id", effectiveCompanyId).maybeSingle();
+                const slug = data?.slug;
+                const link = slug
+                  ? `${window.location.origin}/inscricao/${slug}`
+                  : `${window.location.origin}/inscricao`;
+                try { await navigator.clipboard.writeText(link); } catch {
+                  const ta = document.createElement("textarea");
+                  ta.value = link; ta.style.position = "fixed"; ta.style.left = "-9999px";
+                  document.body.appendChild(ta); ta.focus(); ta.select();
+                  document.execCommand("copy"); document.body.removeChild(ta);
+                }
+                toast({ title: "Link de cadastro copiado!", description: link });
+              }}
+            >
+              <Copy className="h-4 w-4 mr-2" />Link de Cadastro
+            </Button>
+            <Button onClick={openCreate}><UserPlus className="h-4 w-4 mr-2" />Novo Aluno</Button>
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">

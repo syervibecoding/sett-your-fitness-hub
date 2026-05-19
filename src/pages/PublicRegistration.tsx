@@ -5,20 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 import { applyTheme } from "@/contexts/ThemeContext";
-
-interface Plan {
-  id: string;
-  name: string;
-  description: string | null;
-  duration_weeks: number;
-}
 
 interface CompanyBranding {
   logo_url: string | null;
@@ -32,10 +23,8 @@ interface CompanyBranding {
 export default function PublicRegistration() {
   const { slug } = useParams<{ slug?: string }>();
   const { toast } = useToast();
-  const [plans, setPlans] = useState<Plan[]>([]);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
-  const [studentId, setStudentId] = useState("");
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [branding, setBranding] = useState<CompanyBranding | null>(null);
 
@@ -50,9 +39,9 @@ export default function PublicRegistration() {
   const [state, setState] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [email, setEmail] = useState("");
-  const [selectedPlanId, setSelectedPlanId] = useState("");
 
-  // Resolve company + branding + plans via public edge function (no anon RLS).
+  // Resolve company + branding via public edge function (no anon RLS).
+  // NOTE: Plano e pagamento foram desacoplados — agora vivem apenas em /pagamento/:studentId.
   useEffect(() => {
     const init = async () => {
       const { data, error } = await supabase.functions.invoke("public-registration", {
@@ -64,7 +53,6 @@ export default function PublicRegistration() {
         setBranding(data.branding);
         applyTheme(data.branding);
       }
-      setPlans(data.plans || []);
     };
     init();
   }, [slug]);
@@ -85,7 +73,6 @@ export default function PublicRegistration() {
     if (!state) missing.push("Estado");
     if (!whatsapp) missing.push("WhatsApp");
     if (!email) missing.push("Email");
-    if (!selectedPlanId) missing.push("Plano");
 
     if (missing.length > 0) {
       toast({ title: "Campos obrigatórios", description: `Preencha: ${missing.join(", ")}`, variant: "destructive" });
@@ -113,7 +100,7 @@ export default function PublicRegistration() {
           city,
           state,
           whatsapp: whatsapp.replace(/\D/g, ""),
-          selected_plan_id: selectedPlanId,
+          // selected_plan_id propositalmente omitido — pagamento é fluxo separado.
         },
       },
     });
@@ -123,34 +110,8 @@ export default function PublicRegistration() {
       toast({ title: "Erro ao salvar cadastro", description: error?.message || data?.error || "Falha ao cadastrar", variant: "destructive" });
       return;
     }
-    const newStudentId = data.studentId;
-
-    // Create Asaas customer
-    try {
-      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/asaas-integration`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-        body: JSON.stringify({
-          action: "create-customer",
-          studentId: newStudentId,
-          name: fullName,
-          email: email || undefined,
-          cpfCnpj: cpf.replace(/\D/g, ""),
-          mobilePhone: whatsapp.replace(/\D/g, ""),
-          postalCode: cep.replace(/\D/g, ""),
-          address,
-          addressNumber,
-          province: neighborhood,
-          cityName: city,
-          state,
-        }),
-      });
-    } catch (err) {
-      console.error("Erro ao criar cliente Asaas:", err);
-    }
 
     setSaving(false);
-    setStudentId(newStudentId);
     setDone(true);
   };
 
@@ -160,16 +121,11 @@ export default function PublicRegistration() {
         <Card className="max-w-md w-full bg-card border-border text-center">
           <CardContent className="pt-8 pb-8 space-y-4">
             <CheckCircle className="h-16 w-16 text-primary mx-auto" />
-            <h2 className="text-3xl text-primary">CADASTRO COMPLETO!</h2>
+            <h2 className="text-3xl text-primary">CADASTRO RECEBIDO!</h2>
             <p className="text-muted-foreground font-sans">
-              Agora finalize sua inscrição realizando o pagamento:
+              Seus dados foram registrados com sucesso. Em breve seu treinador
+              entrará em contato com o link para escolher o plano e finalizar o pagamento.
             </p>
-            <Button
-              className="w-full"
-              onClick={() => window.location.href = `${window.location.origin}/pagamento/${studentId}`}
-            >
-              Ir para Pagamento →
-            </Button>
           </CardContent>
         </Card>
       </div>
@@ -241,19 +197,6 @@ export default function PublicRegistration() {
             <div className="space-y-2">
               <Label className="font-sans">Email *</Label>
               <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" />
-            </div>
-            <div className="space-y-2">
-              <Label className="font-sans">Plano *</Label>
-              <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
-                <SelectTrigger><SelectValue placeholder="Selecione um plano" /></SelectTrigger>
-                <SelectContent>
-                  {plans.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name} ({p.duration_weeks} semanas)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
             <Button className="w-full" onClick={handleSubmit} disabled={saving}>
               {saving ? "Salvando..." : "Finalizar Cadastro"}

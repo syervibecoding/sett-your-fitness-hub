@@ -944,9 +944,9 @@ export default function StudentDetail() {
                       document.body.appendChild(ta); ta.focus(); ta.select();
                       document.execCommand("copy"); document.body.removeChild(ta);
                     }
-                    toast({ title: "Link de renovação copiado!" });
+                    toast({ title: "Link de pagamento copiado!" });
                   }}>
-                    <Copy className="h-4 w-4 mr-1" />Link Renovação
+                    <Copy className="h-4 w-4 mr-1" />Link de Pagamento
                   </Button>
                   <Button size="sm" onClick={openEnrollDialog}><Plus className="h-4 w-4 mr-1" />Nova Matrícula</Button>
                 </div>
