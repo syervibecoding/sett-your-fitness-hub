@@ -221,6 +221,38 @@ export function DashboardAlerts({ trainerId }: Props) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {pendingActions.length > 0 && (
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-primary text-lg flex items-center gap-2">
+              <Bell className="h-5 w-5" />AÇÕES PENDENTES
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-[240px] overflow-auto">
+              {pendingActions.map((a: any) => {
+                const sev = a.severity === "warning" ? "warning" : a.severity === "error" ? "destructive" : "primary";
+                return (
+                  <div key={a.id} className={`flex items-start justify-between gap-2 p-2 rounded-lg bg-${sev}/5 border border-${sev}/20`}>
+                    <button
+                      type="button"
+                      className="flex-1 text-left min-w-0"
+                      onClick={() => a.action_url ? navigate(a.action_url) : a.student_id && goToStudent(a.student_id)}
+                    >
+                      <p className="text-sm font-sans text-foreground font-medium truncate">{a.title}</p>
+                      {a.message && <p className="text-xs text-muted-foreground font-sans line-clamp-2">{a.message}</p>}
+                    </button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={(e) => { e.stopPropagation(); resolveAlert(a.id); }}>
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {awaitingTrainingDate.length > 0 && (
         <Card className="bg-card border-border">
           <CardHeader className="pb-3">
