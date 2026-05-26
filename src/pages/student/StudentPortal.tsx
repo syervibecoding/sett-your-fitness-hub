@@ -773,6 +773,17 @@ export default function StudentPortal() {
             sessions={workoutSessions}
           />
         )}
+
+        {/* ATIVIDADES VIEW */}
+        {activeView === "atividades" && studentId && companyId && (
+          <ExternalActivitiesList studentId={studentId} companyId={companyId} />
+        )}
+
+        {/* AVISOS VIEW */}
+        {activeView === "avisos" && studentId && companyId && (
+          <AnnouncementsFeed studentId={studentId} companyId={companyId} />
+        )}
+
       </div>
 
       {/* Video Modal */}
