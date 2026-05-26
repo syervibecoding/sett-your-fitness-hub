@@ -20,6 +20,12 @@ import { WeeklyBar } from "@/components/student/WeeklyBar";
 import { StudentHome } from "@/components/student/StudentHome";
 import { StudentCalendar } from "@/components/student/StudentCalendar";
 import { StudentHistory } from "@/components/student/StudentHistory";
+import { PostWorkoutFeedback } from "@/components/student/PostWorkoutFeedback";
+import { WorkoutHeader } from "@/components/student/WorkoutHeader";
+import { WeeklyGoalEditor } from "@/components/student/WeeklyGoalEditor";
+import { CycleFeedbackBanner } from "@/components/student/CycleFeedbackBanner";
+import { calculateStreak } from "@/lib/streakCalculator";
+
 
 type ActiveView = "home" | "treino" | "stats" | "calendario" | "historico";
 
@@ -86,11 +92,15 @@ export default function StudentPortal() {
   const [extraSets, setExtraSets] = useState<Record<number, number>>({});
   const [companyWhatsapp, setCompanyWhatsapp] = useState<string | null>(null);
   const [workoutSessions, setWorkoutSessions] = useState<any[]>([]);
+  const [weeklyGoal, setWeeklyGoal] = useState<number>(3);
+  const [activeEnrollmentId, setActiveEnrollmentId] = useState<string | null>(null);
+  const [pendingFeedbackSessionId, setPendingFeedbackSessionId] = useState<string | null>(null);
 
   const selectedWorkout = selectedCycle?.workouts.find(w => w.id === selectedWorkoutId) || selectedCycle?.workouts[0] || null;
   const todayStr = new Date().toISOString().split("T")[0];
 
   const session = useWorkoutSession(studentId, companyId);
+
   const { activeRest, startRest, clearRest } = useRestTimer();
 
   useEffect(() => {
@@ -100,7 +110,7 @@ export default function StudentPortal() {
   const loadStudentData = async () => {
     const { data: student } = await supabase
       .from("students")
-      .select("id, full_name, company_id")
+      .select("id, full_name, company_id, weekly_workout_goal")
       .eq("user_id", user!.id)
       .maybeSingle();
 
@@ -108,6 +118,8 @@ export default function StudentPortal() {
     setStudentId(student.id);
     setStudentName(student.full_name);
     setCompanyId(student.company_id);
+    setWeeklyGoal((student as any).weekly_workout_goal || 3);
+
 
     if (student.company_id) {
       const { data: waInstance } = await supabase
@@ -132,11 +144,13 @@ export default function StudentPortal() {
       .maybeSingle();
 
     if (enrollment) {
+      setActiveEnrollmentId(enrollment.id);
       setEnrollmentInfo({
         plan_name: (enrollment.plans as any)?.name || "Plano",
         start_date: enrollment.start_date,
         end_date: enrollment.end_date,
       });
+
 
       const { data: cyclesData } = await supabase
         .from("training_cycles")
@@ -397,8 +411,10 @@ export default function StudentPortal() {
       previousBestWeights[`ex-${idx}`] = maxW;
     });
 
-    await session.finishSession(logs, selectedWorkout.exercises, previousBestWeights);
+    const result = await session.finishSession(logs, selectedWorkout.exercises, previousBestWeights);
+    if (result?.id) setPendingFeedbackSessionId(result.id);
   };
+
 
   const handleAbandonSession = async () => {
     await session.abandonSession();
@@ -448,6 +464,12 @@ export default function StudentPortal() {
     const dates = new Set(allLogs.map((l: any) => l.session_date));
     return dates.size;
   }, [allLogs]);
+
+  const streak = useMemo(() => {
+    const dates = Array.from(new Set(allLogs.map((l: any) => l.session_date).filter(Boolean)));
+    return calculateStreak(dates, weeklyGoal);
+  }, [allLogs, weeklyGoal]);
+
 
   const handleNavigate = (view: ActiveView) => {
     setActiveView(view);
@@ -515,6 +537,18 @@ export default function StudentPortal() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6">
+        {/* Cycle renewal banner (above any view) */}
+        {studentId && companyId && enrollmentInfo && (
+          <div className="mb-4">
+            <CycleFeedbackBanner
+              studentId={studentId}
+              companyId={companyId}
+              enrollmentId={activeEnrollmentId}
+              enrollmentEndDate={enrollmentInfo.end_date}
+            />
+          </div>
+        )}
+
         {/* HOME VIEW */}
         {activeView === "home" && (
           <StudentHome
@@ -528,9 +562,13 @@ export default function StudentPortal() {
             trainedDays={trainedDays}
             currentDayOfWeek={new Date().getDay()}
             totalSessions={totalSessions}
+            weeklyGoal={weeklyGoal}
+            streak={streak}
+            goalEditor={studentId ? <WeeklyGoalEditor studentId={studentId} currentGoal={weeklyGoal} onSaved={setWeeklyGoal} /> : null}
             onNavigate={handleNavigate}
           />
         )}
+
 
         {/* TREINO VIEW */}
         {activeView === "treino" && (
@@ -576,13 +614,25 @@ export default function StudentPortal() {
 
                 {selectedCycle.workouts.length > 0 ? (
                   <div className="space-y-3">
+                    {selectedWorkout && (
+                      <WorkoutHeader
+                        cycleNumber={selectedCycle.cycle_number}
+                        cycleStartDate={selectedCycle.start_date}
+                        cycleEndDate={selectedCycle.end_date}
+                        workoutTitle={selectedWorkout.title}
+                        workoutDescription={selectedWorkout.description}
+                      />
+                    )}
                     {trainedDays.size > 0 && (
                       <WeeklyBar
                         trainedDays={trainedDays}
                         currentDayOfWeek={new Date().getDay()}
                         weeklySessionCount={weeklySessionCount}
+                        weeklyGoal={weeklyGoal}
+                        streak={streak}
                       />
                     )}
+
 
                     {selectedCycle.workouts.length > 1 && (
                       <div className="flex gap-2 overflow-x-auto pb-1">
@@ -736,8 +786,19 @@ export default function StudentPortal() {
         </DialogContent>
       </Dialog>
 
-      {/* Workout Summary Modal */}
-      {session.summary && (
+      {/* Post-workout feedback (shows before summary) */}
+      {pendingFeedbackSessionId && studentId && companyId && (
+        <PostWorkoutFeedback
+          open={!!pendingFeedbackSessionId}
+          onClose={() => setPendingFeedbackSessionId(null)}
+          studentId={studentId}
+          companyId={companyId}
+          workoutSessionId={pendingFeedbackSessionId}
+        />
+      )}
+
+      {/* Workout Summary Modal (gated by feedback step) */}
+      {session.summary && !pendingFeedbackSessionId && (
         <WorkoutSummary
           open={!!session.summary}
           onClose={session.clearSummary}
@@ -750,6 +811,7 @@ export default function StudentPortal() {
           whatsappNumber={companyWhatsapp}
         />
       )}
+
     </div>
   );
 }

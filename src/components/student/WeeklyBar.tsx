@@ -15,9 +15,15 @@ interface WeeklyBarProps {
   trainedDays: Set<number>;
   currentDayOfWeek: number;
   weeklySessionCount?: number;
+  weeklyGoal?: number;
+  streak?: number;
+  goalEditor?: React.ReactNode;
 }
 
-export function WeeklyBar({ trainedDays, currentDayOfWeek, weeklySessionCount }: WeeklyBarProps) {
+export function WeeklyBar({ trainedDays, currentDayOfWeek, weeklySessionCount, weeklyGoal, streak, goalEditor }: WeeklyBarProps) {
+  const done = weeklySessionCount ?? trainedDays.size;
+  const goalReached = weeklyGoal !== undefined && done >= weeklyGoal;
+
   return (
     <div className="space-y-2">
       <div className="flex gap-1.5 justify-between">
@@ -49,11 +55,22 @@ export function WeeklyBar({ trainedDays, currentDayOfWeek, weeklySessionCount }:
           );
         })}
       </div>
-      {weeklySessionCount !== undefined && (
-        <p className="text-xs text-muted-foreground text-center font-sans">
-          {weeklySessionCount} {weeklySessionCount === 1 ? "sessão" : "sessões"} esta semana
-        </p>
-      )}
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground font-sans">
+        <div className="flex items-center gap-2">
+          {weeklyGoal !== undefined ? (
+            <span className={cn("font-medium", goalReached && "text-primary")}>
+              {done}/{weeklyGoal} treinos esta semana
+            </span>
+          ) : (
+            <span>{done} {done === 1 ? "sessão" : "sessões"} esta semana</span>
+          )}
+          {streak !== undefined && streak > 0 && (
+            <span className="inline-flex items-center gap-0.5">🔥 <span className="font-mono">{streak}</span> sem.</span>
+          )}
+        </div>
+        {goalEditor}
+      </div>
     </div>
   );
 }
+

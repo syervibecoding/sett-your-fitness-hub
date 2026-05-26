@@ -462,6 +462,45 @@ export type Database = {
           },
         ]
       }
+      cycle_feedback: {
+        Row: {
+          company_id: string
+          created_at: string
+          enrollment_id: string | null
+          id: string
+          rating: number | null
+          read_at: string | null
+          renewal_intent: string | null
+          student_id: string
+          what_to_improve: string | null
+          what_worked: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          enrollment_id?: string | null
+          id?: string
+          rating?: number | null
+          read_at?: string | null
+          renewal_intent?: string | null
+          student_id: string
+          what_to_improve?: string | null
+          what_worked?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          enrollment_id?: string | null
+          id?: string
+          rating?: number | null
+          read_at?: string | null
+          renewal_intent?: string | null
+          student_id?: string
+          what_to_improve?: string | null
+          what_worked?: string | null
+        }
+        Relationships: []
+      }
       enrollments: {
         Row: {
           company_id: string | null
@@ -1215,6 +1254,7 @@ export type Database = {
           status: string | null
           updated_at: string
           user_id: string | null
+          weekly_workout_goal: number
           whatsapp: string | null
           zip_code: string | null
         }
@@ -1245,6 +1285,7 @@ export type Database = {
           status?: string | null
           updated_at?: string
           user_id?: string | null
+          weekly_workout_goal?: number
           whatsapp?: string | null
           zip_code?: string | null
         }
@@ -1275,6 +1316,7 @@ export type Database = {
           status?: string | null
           updated_at?: string
           user_id?: string | null
+          weekly_workout_goal?: number
           whatsapp?: string | null
           zip_code?: string | null
         }
@@ -1665,6 +1707,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      workout_feedback: {
+        Row: {
+          company_id: string
+          created_at: string
+          difficulty: number | null
+          energy: number | null
+          id: string
+          notes: string | null
+          pain_areas: Json | null
+          read_at: string | null
+          student_id: string
+          workout_session_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          difficulty?: number | null
+          energy?: number | null
+          id?: string
+          notes?: string | null
+          pain_areas?: Json | null
+          read_at?: string | null
+          student_id: string
+          workout_session_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          difficulty?: number | null
+          energy?: number | null
+          id?: string
+          notes?: string | null
+          pain_areas?: Json | null
+          read_at?: string | null
+          student_id?: string
+          workout_session_id?: string | null
+        }
+        Relationships: []
       }
       workout_logs: {
         Row: {
