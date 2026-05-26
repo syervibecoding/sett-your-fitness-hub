@@ -26,7 +26,7 @@ interface Announcement {
 export default function Announcements() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { effectiveCompanyId } = useMaster();
+  const { viewingCompany } = useMaster();
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [items, setItems] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,14 +35,15 @@ export default function Announcements() {
 
   useEffect(() => {
     (async () => {
-      if (effectiveCompanyId) {
-        setCompanyId(effectiveCompanyId);
+      if (viewingCompany?.id) {
+        setCompanyId(viewingCompany.id);
         return;
       }
       const { data } = await supabase.from("company_members").select("company_id").eq("user_id", user!.id).maybeSingle();
       setCompanyId(data?.company_id || null);
     })();
-  }, [user, effectiveCompanyId]);
+  }, [user, viewingCompany]);
+
 
   useEffect(() => {
     if (companyId) load();
