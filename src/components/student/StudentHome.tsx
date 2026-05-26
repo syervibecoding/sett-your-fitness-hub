@@ -26,6 +26,9 @@ interface StudentHomeProps {
   trainedDays: Set<number>;
   currentDayOfWeek: number;
   totalSessions: number;
+  weeklyGoal: number;
+  streak: number;
+  goalEditor?: React.ReactNode;
   onNavigate: (view: "treino" | "stats" | "calendario" | "historico") => void;
 }
 
@@ -40,6 +43,9 @@ export function StudentHome({
   trainedDays,
   currentDayOfWeek,
   totalSessions,
+  weeklyGoal,
+  streak,
+  goalEditor,
   onNavigate,
 }: StudentHomeProps) {
   const firstName = studentName.split(" ")[0];
@@ -89,7 +95,11 @@ export function StudentHome({
         trainedDays={trainedDays}
         currentDayOfWeek={currentDayOfWeek}
         weeklySessionCount={weeklySessionCount}
+        weeklyGoal={weeklyGoal}
+        streak={streak}
+        goalEditor={goalEditor}
       />
+
 
       {/* Navigation grid */}
       <div className="grid grid-cols-2 gap-3">
