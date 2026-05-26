@@ -465,6 +465,12 @@ export default function StudentPortal() {
     return dates.size;
   }, [allLogs]);
 
+  const streak = useMemo(() => {
+    const dates = Array.from(new Set(allLogs.map((l: any) => l.session_date).filter(Boolean)));
+    return calculateStreak(dates, weeklyGoal);
+  }, [allLogs, weeklyGoal]);
+
+
   const handleNavigate = (view: ActiveView) => {
     setActiveView(view);
   };
@@ -531,6 +537,18 @@ export default function StudentPortal() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6">
+        {/* Cycle renewal banner (above any view) */}
+        {studentId && companyId && enrollmentInfo && (
+          <div className="mb-4">
+            <CycleFeedbackBanner
+              studentId={studentId}
+              companyId={companyId}
+              enrollmentId={activeEnrollmentId}
+              enrollmentEndDate={enrollmentInfo.end_date}
+            />
+          </div>
+        )}
+
         {/* HOME VIEW */}
         {activeView === "home" && (
           <StudentHome
@@ -544,9 +562,13 @@ export default function StudentPortal() {
             trainedDays={trainedDays}
             currentDayOfWeek={new Date().getDay()}
             totalSessions={totalSessions}
+            weeklyGoal={weeklyGoal}
+            streak={streak}
+            goalEditor={studentId ? <WeeklyGoalEditor studentId={studentId} currentGoal={weeklyGoal} onSaved={setWeeklyGoal} /> : null}
             onNavigate={handleNavigate}
           />
         )}
+
 
         {/* TREINO VIEW */}
         {activeView === "treino" && (
