@@ -81,19 +81,37 @@ export function ExternalActivityForm({ open, onClose, studentId, companyId, exis
       notes: notes.trim() || null,
     };
 
-    const { error } = existing
-      ? await supabase.from("external_activities").update(payload).eq("id", existing.id)
-      : await supabase.from("external_activities").insert(payload);
+    const { data: saved, error } = existing
+      ? await supabase.from("external_activities").update(payload).eq("id", existing.id).select("id").maybeSingle()
+      : await supabase.from("external_activities").insert(payload).select("id").maybeSingle();
 
     setSaving(false);
     if (error) {
       toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
       return;
     }
+
+    // Gamification: award XP only on new activities; check achievements either way.
+    try {
+      if (!existing && saved?.id) {
+        await supabase.rpc("award_xp", {
+          _student_id: studentId,
+          _event_type: "external_activity",
+          _xp_amount: 30,
+          _source_id: saved.id,
+          _notes: activityType,
+        });
+      }
+      await supabase.rpc("check_and_unlock_achievements", { _student_id: studentId });
+    } catch (e) {
+      console.warn("XP/achievements grant failed", e);
+    }
+
     toast({ title: existing ? "Atividade atualizada" : "Atividade registrada" });
     onSaved?.();
     onClose();
   };
+
 
   return (
     <Dialog open={open} onOpenChange={onClose}>

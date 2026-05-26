@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      achievements: {
+        Row: {
+          code: string
+          company_id: string | null
+          created_at: string
+          criteria_type: string
+          criteria_value: number
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean
+          title: string
+          updated_at: string
+          xp_reward: number
+        }
+        Insert: {
+          code: string
+          company_id?: string | null
+          created_at?: string
+          criteria_type: string
+          criteria_value?: number
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          title: string
+          updated_at?: string
+          xp_reward?: number
+        }
+        Update: {
+          code?: string
+          company_id?: string | null
+          created_at?: string
+          criteria_type?: string
+          criteria_value?: number
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          title?: string
+          updated_at?: string
+          xp_reward?: number
+        }
+        Relationships: []
+      }
       anamnesis: {
         Row: {
           additional_notes: string | null
@@ -1244,6 +1289,30 @@ export type Database = {
           },
         ]
       }
+      student_achievements: {
+        Row: {
+          achievement_id: string
+          company_id: string
+          earned_at: string
+          id: string
+          student_id: string
+        }
+        Insert: {
+          achievement_id: string
+          company_id: string
+          earned_at?: string
+          id?: string
+          student_id: string
+        }
+        Update: {
+          achievement_id?: string
+          company_id?: string
+          earned_at?: string
+          id?: string
+          student_id?: string
+        }
+        Relationships: []
+      }
       student_categories: {
         Row: {
           color: string | null
@@ -2083,12 +2152,67 @@ export type Database = {
           },
         ]
       }
+      xp_events: {
+        Row: {
+          company_id: string
+          created_at: string
+          event_type: string
+          id: string
+          notes: string | null
+          source_id: string | null
+          student_id: string
+          xp_amount: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          event_type: string
+          id?: string
+          notes?: string | null
+          source_id?: string | null
+          student_id: string
+          xp_amount: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          notes?: string | null
+          source_id?: string | null
+          student_id?: string
+          xp_amount?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       advance_training_cycles: { Args: never; Returns: undefined }
+      award_xp: {
+        Args: {
+          _event_type: string
+          _notes?: string
+          _source_id?: string
+          _student_id: string
+          _xp_amount: number
+        }
+        Returns: string
+      }
+      check_and_unlock_achievements: {
+        Args: { _student_id: string }
+        Returns: number
+      }
+      get_student_rank: {
+        Args: { _student_id: string }
+        Returns: {
+          rank_position: number
+          total_students: number
+          xp: number
+        }[]
+      }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
