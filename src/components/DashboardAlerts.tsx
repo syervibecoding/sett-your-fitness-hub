@@ -231,9 +231,13 @@ export function DashboardAlerts({ trainerId }: Props) {
           <CardContent>
             <div className="space-y-2 max-h-[240px] overflow-auto">
               {pendingActions.map((a: any) => {
-                const sev = a.severity === "warning" ? "warning" : a.severity === "error" ? "destructive" : "primary";
+                const tone = a.severity === "warning"
+                  ? "bg-warning/5 border-warning/20"
+                  : a.severity === "error"
+                  ? "bg-destructive/5 border-destructive/20"
+                  : "bg-primary/5 border-primary/20";
                 return (
-                  <div key={a.id} className={`flex items-start justify-between gap-2 p-2 rounded-lg bg-${sev}/5 border border-${sev}/20`}>
+                  <div key={a.id} className={`flex items-start justify-between gap-2 p-2 rounded-lg border ${tone}`}>
                     <button
                       type="button"
                       className="flex-1 text-left min-w-0"
