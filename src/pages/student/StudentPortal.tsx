@@ -511,7 +511,10 @@ export default function StudentPortal() {
     stats: "ESTATÍSTICAS",
     calendario: "CALENDÁRIO",
     historico: "HISTÓRICO",
+    atividades: "ATIVIDADES",
+    avisos: "AVISOS",
   };
+
 
   return (
     <div className="min-h-screen bg-background">
