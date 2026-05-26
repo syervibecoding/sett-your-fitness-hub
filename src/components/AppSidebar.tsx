@@ -81,7 +81,9 @@ const managementItems = [
   { title: "Equipe", url: "/admin/team", icon: Users },
   { title: "Agenda", url: "/admin/agenda", icon: CalendarDays },
   { title: "Aparência", url: "/admin/appearance", icon: Palette },
+  { title: "Mural", url: "/admin/announcements", icon: Megaphone },
 ];
+
 
 const financialItem = { title: "Financeiro", url: "/admin/financial", icon: DollarSign };
 
