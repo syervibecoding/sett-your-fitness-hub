@@ -614,13 +614,25 @@ export default function StudentPortal() {
 
                 {selectedCycle.workouts.length > 0 ? (
                   <div className="space-y-3">
+                    {selectedWorkout && (
+                      <WorkoutHeader
+                        cycleNumber={selectedCycle.cycle_number}
+                        cycleStartDate={selectedCycle.start_date}
+                        cycleEndDate={selectedCycle.end_date}
+                        workoutTitle={selectedWorkout.title}
+                        workoutDescription={selectedWorkout.description}
+                      />
+                    )}
                     {trainedDays.size > 0 && (
                       <WeeklyBar
                         trainedDays={trainedDays}
                         currentDayOfWeek={new Date().getDay()}
                         weeklySessionCount={weeklySessionCount}
+                        weeklyGoal={weeklyGoal}
+                        streak={streak}
                       />
                     )}
+
 
                     {selectedCycle.workouts.length > 1 && (
                       <div className="flex gap-2 overflow-x-auto pb-1">
@@ -774,8 +786,19 @@ export default function StudentPortal() {
         </DialogContent>
       </Dialog>
 
-      {/* Workout Summary Modal */}
-      {session.summary && (
+      {/* Post-workout feedback (shows before summary) */}
+      {pendingFeedbackSessionId && studentId && companyId && (
+        <PostWorkoutFeedback
+          open={!!pendingFeedbackSessionId}
+          onClose={() => setPendingFeedbackSessionId(null)}
+          studentId={studentId}
+          companyId={companyId}
+          workoutSessionId={pendingFeedbackSessionId}
+        />
+      )}
+
+      {/* Workout Summary Modal (gated by feedback step) */}
+      {session.summary && !pendingFeedbackSessionId && (
         <WorkoutSummary
           open={!!session.summary}
           onClose={session.clearSummary}
@@ -788,6 +811,7 @@ export default function StudentPortal() {
           whatsappNumber={companyWhatsapp}
         />
       )}
+
     </div>
   );
 }
