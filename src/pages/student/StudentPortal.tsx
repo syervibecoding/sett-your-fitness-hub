@@ -20,6 +20,12 @@ import { WeeklyBar } from "@/components/student/WeeklyBar";
 import { StudentHome } from "@/components/student/StudentHome";
 import { StudentCalendar } from "@/components/student/StudentCalendar";
 import { StudentHistory } from "@/components/student/StudentHistory";
+import { PostWorkoutFeedback } from "@/components/student/PostWorkoutFeedback";
+import { WorkoutHeader } from "@/components/student/WorkoutHeader";
+import { WeeklyGoalEditor } from "@/components/student/WeeklyGoalEditor";
+import { CycleFeedbackBanner } from "@/components/student/CycleFeedbackBanner";
+import { calculateStreak } from "@/lib/streakCalculator";
+
 
 type ActiveView = "home" | "treino" | "stats" | "calendario" | "historico";
 
