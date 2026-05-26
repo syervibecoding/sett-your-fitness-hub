@@ -12,6 +12,7 @@ import { AnnouncementEditor } from "@/components/admin/AnnouncementEditor";
 import { useToast } from "@/hooks/use-toast";
 import { useMaster } from "@/contexts/MasterContext";
 
+
 interface Announcement {
   id: string;
   title: string;
