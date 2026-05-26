@@ -1,10 +1,11 @@
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Cake, Dumbbell, UserCheck, CalendarDays, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Cake, Dumbbell, UserCheck, CalendarDays, AlertTriangle, Bell, Check } from "lucide-react";
 import { differenceInDays, setYear } from "date-fns";
 
 interface Birthday { full_name: string; birth_date: string; daysUntil: number; student_id: string; }
@@ -170,9 +171,10 @@ async function fetchAlerts(
 }
 
 export function DashboardAlerts({ trainerId }: Props) {
-  const { role, companyId } = useAuth();
+  const { role, companyId, user } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const effectiveCompanyId = role === "master" ? (isViewingCompany ? viewingCompany?.id : null) : companyId;
   const routePrefix = role === "master" && isViewingCompany ? "admin" : role;
 
@@ -181,6 +183,27 @@ export function DashboardAlerts({ trainerId }: Props) {
     queryFn: () => fetchAlerts(trainerId, effectiveCompanyId),
     staleTime: 60_000,
   });
+
+  const { data: pendingActions = [] } = useQuery({
+    queryKey: ["admin-alerts", effectiveCompanyId ?? "all", user?.id ?? "anon"],
+    queryFn: async () => {
+      let q = supabase.from("admin_alerts" as any)
+        .select("id, type, severity, title, message, action_url, created_at, target_role, target_user_id, student_id")
+        .is("resolved_at", null)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (effectiveCompanyId) q = q.eq("company_id", effectiveCompanyId);
+      const { data } = await q;
+      return (data as any[]) || [];
+    },
+    staleTime: 30_000,
+    enabled: !!user?.id,
+  });
+
+  const resolveAlert = async (id: string) => {
+    await supabase.from("admin_alerts" as any).update({ resolved_at: new Date().toISOString(), resolved_by: user?.id }).eq("id", id);
+    queryClient.invalidateQueries({ queryKey: ["admin-alerts"] });
+  };
 
   const birthdays = data?.birthdays ?? [];
   const missingWorkouts = data?.missingWorkouts ?? [];
@@ -191,13 +214,49 @@ export function DashboardAlerts({ trainerId }: Props) {
 
   const goToStudent = (studentId: string) => navigate(`/${routePrefix}/students/${studentId}`);
 
-  const hasContent = birthdays.length > 0 || missingWorkouts.length > 0 || awaitingTrainer.length > 0 || awaitingTrainingDate.length > 0 || missingEnrollment.length > 0 || incompleteBilling.length > 0;
+  const hasContent = pendingActions.length > 0 || birthdays.length > 0 || missingWorkouts.length > 0 || awaitingTrainer.length > 0 || awaitingTrainingDate.length > 0 || missingEnrollment.length > 0 || incompleteBilling.length > 0;
   if (!hasContent) return null;
 
   const itemClass = "flex items-center justify-between p-2 rounded-lg cursor-pointer hover:brightness-110 transition-all";
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {pendingActions.length > 0 && (
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-primary text-lg flex items-center gap-2">
+              <Bell className="h-5 w-5" />AÇÕES PENDENTES
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-[240px] overflow-auto">
+              {pendingActions.map((a: any) => {
+                const tone = a.severity === "warning"
+                  ? "bg-warning/5 border-warning/20"
+                  : a.severity === "error"
+                  ? "bg-destructive/5 border-destructive/20"
+                  : "bg-primary/5 border-primary/20";
+                return (
+                  <div key={a.id} className={`flex items-start justify-between gap-2 p-2 rounded-lg border ${tone}`}>
+                    <button
+                      type="button"
+                      className="flex-1 text-left min-w-0"
+                      onClick={() => a.action_url ? navigate(a.action_url) : a.student_id && goToStudent(a.student_id)}
+                    >
+                      <p className="text-sm font-sans text-foreground font-medium truncate">{a.title}</p>
+                      {a.message && <p className="text-xs text-muted-foreground font-sans line-clamp-2">{a.message}</p>}
+                    </button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={(e) => { e.stopPropagation(); resolveAlert(a.id); }}>
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {awaitingTrainingDate.length > 0 && (
         <Card className="bg-card border-border">
           <CardHeader className="pb-3">

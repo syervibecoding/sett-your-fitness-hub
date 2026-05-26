@@ -59,6 +59,57 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_alerts: {
+        Row: {
+          action_url: string | null
+          company_id: string
+          created_at: string
+          enrollment_id: string | null
+          id: string
+          message: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          student_id: string | null
+          target_role: string | null
+          target_user_id: string | null
+          title: string
+          type: string
+        }
+        Insert: {
+          action_url?: string | null
+          company_id: string
+          created_at?: string
+          enrollment_id?: string | null
+          id?: string
+          message?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          student_id?: string | null
+          target_role?: string | null
+          target_user_id?: string | null
+          title: string
+          type: string
+        }
+        Update: {
+          action_url?: string | null
+          company_id?: string
+          created_at?: string
+          enrollment_id?: string | null
+          id?: string
+          message?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          student_id?: string | null
+          target_role?: string | null
+          target_user_id?: string | null
+          title?: string
+          type?: string
+        }
+        Relationships: []
+      }
       anamnesis: {
         Row: {
           additional_notes: string | null
