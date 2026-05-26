@@ -110,7 +110,7 @@ export default function StudentPortal() {
   const loadStudentData = async () => {
     const { data: student } = await supabase
       .from("students")
-      .select("id, full_name, company_id")
+      .select("id, full_name, company_id, weekly_workout_goal")
       .eq("user_id", user!.id)
       .maybeSingle();
 
@@ -118,6 +118,8 @@ export default function StudentPortal() {
     setStudentId(student.id);
     setStudentName(student.full_name);
     setCompanyId(student.company_id);
+    setWeeklyGoal((student as any).weekly_workout_goal || 3);
+
 
     if (student.company_id) {
       const { data: waInstance } = await supabase
