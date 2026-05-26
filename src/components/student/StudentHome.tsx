@@ -29,7 +29,7 @@ interface StudentHomeProps {
   weeklyGoal: number;
   streak: number;
   goalEditor?: React.ReactNode;
-  onNavigate: (view: "treino" | "stats" | "calendario" | "historico") => void;
+  onNavigate: (view: "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos") => void;
 }
 
 export function StudentHome({
