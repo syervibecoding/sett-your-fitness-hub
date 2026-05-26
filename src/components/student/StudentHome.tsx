@@ -29,8 +29,10 @@ interface StudentHomeProps {
   weeklyGoal: number;
   streak: number;
   goalEditor?: React.ReactNode;
+  achievementsPanel?: React.ReactNode;
   onNavigate: (view: "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos") => void;
 }
+
 
 export function StudentHome({
   studentName,
@@ -46,7 +48,9 @@ export function StudentHome({
   weeklyGoal,
   streak,
   goalEditor,
+  achievementsPanel,
   onNavigate,
+
 }: StudentHomeProps) {
   const firstName = studentName.split(" ")[0];
 
@@ -99,6 +103,10 @@ export function StudentHome({
         streak={streak}
         goalEditor={goalEditor}
       />
+
+      {achievementsPanel}
+
+
 
 
       {/* Navigation grid */}

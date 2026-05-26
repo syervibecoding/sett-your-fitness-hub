@@ -572,8 +572,10 @@ export default function StudentPortal() {
             weeklyGoal={weeklyGoal}
             streak={streak}
             goalEditor={studentId ? <WeeklyGoalEditor studentId={studentId} currentGoal={weeklyGoal} onSaved={setWeeklyGoal} /> : null}
+            achievementsPanel={studentId ? <AchievementsPanel studentId={studentId} /> : null}
             onNavigate={handleNavigate}
           />
+
         )}
 
 
