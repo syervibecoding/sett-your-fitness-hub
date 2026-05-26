@@ -194,6 +194,81 @@ export type Database = {
           },
         ]
       }
+      announcement_reads: {
+        Row: {
+          announcement_id: string
+          id: string
+          read_at: string
+          student_id: string
+        }
+        Insert: {
+          announcement_id: string
+          id?: string
+          read_at?: string
+          student_id: string
+        }
+        Update: {
+          announcement_id?: string
+          id?: string
+          read_at?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_reads_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcement_reads_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcements: {
+        Row: {
+          author_id: string | null
+          body: string
+          company_id: string
+          created_at: string
+          id: string
+          image_url: string | null
+          pinned: boolean
+          published_at: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author_id?: string | null
+          body: string
+          company_id: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          pinned?: boolean
+          published_at?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          pinned?: boolean
+          published_at?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       automation_flow_edges: {
         Row: {
           created_at: string
@@ -690,6 +765,56 @@ export type Database = {
             columns: ["muscle_group_id"]
             isOneToOne: false
             referencedRelation: "muscle_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      external_activities: {
+        Row: {
+          activity_date: string
+          activity_type: string
+          company_id: string
+          created_at: string
+          distance_km: number | null
+          duration_minutes: number | null
+          id: string
+          intensity: number | null
+          notes: string | null
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          activity_date?: string
+          activity_type: string
+          company_id: string
+          created_at?: string
+          distance_km?: number | null
+          duration_minutes?: number | null
+          id?: string
+          intensity?: number | null
+          notes?: string | null
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          activity_date?: string
+          activity_type?: string
+          company_id?: string
+          created_at?: string
+          distance_km?: number | null
+          duration_minutes?: number | null
+          id?: string
+          intensity?: number | null
+          notes?: string | null
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_activities_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
