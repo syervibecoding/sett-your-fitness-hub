@@ -1,10 +1,11 @@
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Cake, Dumbbell, UserCheck, CalendarDays, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Cake, Dumbbell, UserCheck, CalendarDays, AlertTriangle, Bell, Check } from "lucide-react";
 import { differenceInDays, setYear } from "date-fns";
 
 interface Birthday { full_name: string; birth_date: string; daysUntil: number; student_id: string; }
