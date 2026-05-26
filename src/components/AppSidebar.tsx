@@ -18,6 +18,8 @@ import {
   ArrowLeft,
   BookOpen,
   ClipboardCheck,
+  Megaphone,
+
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
@@ -79,7 +81,9 @@ const managementItems = [
   { title: "Equipe", url: "/admin/team", icon: Users },
   { title: "Agenda", url: "/admin/agenda", icon: CalendarDays },
   { title: "Aparência", url: "/admin/appearance", icon: Palette },
+  { title: "Mural", url: "/admin/announcements", icon: Megaphone },
 ];
+
 
 const financialItem = { title: "Financeiro", url: "/admin/financial", icon: DollarSign };
 

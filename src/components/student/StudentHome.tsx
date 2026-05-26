@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Dumbbell, BarChart3, CalendarDays, History } from "lucide-react";
+import { Dumbbell, BarChart3, CalendarDays, History, Activity, Megaphone } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { WeeklyBar } from "./WeeklyBar";
@@ -29,7 +29,7 @@ interface StudentHomeProps {
   weeklyGoal: number;
   streak: number;
   goalEditor?: React.ReactNode;
-  onNavigate: (view: "treino" | "stats" | "calendario" | "historico") => void;
+  onNavigate: (view: "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos") => void;
 }
 
 export function StudentHome({
@@ -166,7 +166,37 @@ export function StudentHome({
             </CardContent>
           </Card>
         </button>
-      </div>
+
+        {/* Atividades externas */}
+        <button onClick={() => onNavigate("atividades")} className="text-left">
+          <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
+            <CardContent className="p-5 flex flex-col gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Activity className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-bold text-foreground font-sans text-sm">Atividades</h3>
+                <p className="text-xs text-muted-foreground font-sans mt-0.5">Corrida, natação e mais</p>
+              </div>
+            </CardContent>
+          </Card>
+        </button>
+
+        {/* Avisos */}
+        <button onClick={() => onNavigate("avisos")} className="text-left">
+          <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
+            <CardContent className="p-5 flex flex-col gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Megaphone className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-bold text-foreground font-sans text-sm">Avisos</h3>
+                <p className="text-xs text-muted-foreground font-sans mt-0.5">Mural do treinador</p>
+              </div>
+            </CardContent>
+          </Card>
+        </button>
+
     </div>
   );
 }

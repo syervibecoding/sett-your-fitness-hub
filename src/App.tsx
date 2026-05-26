@@ -31,6 +31,8 @@ const AppearanceSettings = lazy(() => import("./pages/admin/AppearanceSettings")
 const ExerciseLibrary = lazy(() => import("./pages/admin/ExerciseLibrary"));
 const WorkoutBuilder = lazy(() => import("./pages/admin/WorkoutBuilder"));
 const WorkoutPrescriptions = lazy(() => import("./pages/admin/WorkoutPrescriptions"));
+const Announcements = lazy(() => import("./pages/admin/Announcements"));
+
 const CoordinatorDashboard = lazy(() => import("./pages/coordinator/CoordinatorDashboard"));
 const TrainerDashboard = lazy(() => import("./pages/trainer/TrainerDashboard"));
 const MasterDashboard = lazy(() => import("./pages/master/MasterDashboard"));
@@ -126,6 +128,9 @@ const App = () => (
           <Route path="/admin/exercises" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><ExerciseLibrary /></FeatureRoute>} />
           <Route path="/admin/prescriptions" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><WorkoutPrescriptions /></FeatureRoute>} />
           <Route path="/admin/workout/:cycleId" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><WorkoutBuilder /></FeatureRoute>} />
+          <Route path="/admin/announcements" element={<ProtectedRoute allowedRoles={["admin"]}><Announcements /></ProtectedRoute>} />
+          <Route path="/coordinator/announcements" element={<ProtectedRoute allowedRoles={["coordinator"]}><Announcements /></ProtectedRoute>} />
+
 
           {/* Coordinator Routes */}
           <Route path="/coordinator" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasDashboard"><CoordinatorDashboard /></FeatureRoute>} />
