@@ -23,6 +23,8 @@ import { StudentHistory } from "@/components/student/StudentHistory";
 import { PostWorkoutFeedback } from "@/components/student/PostWorkoutFeedback";
 import { WorkoutHeader } from "@/components/student/WorkoutHeader";
 import { WeeklyGoalEditor } from "@/components/student/WeeklyGoalEditor";
+import { AchievementsPanel } from "@/components/student/AchievementsPanel";
+
 import { CycleFeedbackBanner } from "@/components/student/CycleFeedbackBanner";
 import { calculateStreak } from "@/lib/streakCalculator";
 import { ExternalActivitiesList } from "@/components/student/ExternalActivitiesList";
