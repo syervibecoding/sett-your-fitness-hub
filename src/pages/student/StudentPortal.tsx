@@ -25,9 +25,13 @@ import { WorkoutHeader } from "@/components/student/WorkoutHeader";
 import { WeeklyGoalEditor } from "@/components/student/WeeklyGoalEditor";
 import { CycleFeedbackBanner } from "@/components/student/CycleFeedbackBanner";
 import { calculateStreak } from "@/lib/streakCalculator";
+import { ExternalActivitiesList } from "@/components/student/ExternalActivitiesList";
+import { AnnouncementsFeed } from "@/components/student/AnnouncementsFeed";
+import { Megaphone, Activity } from "lucide-react";
 
 
-type ActiveView = "home" | "treino" | "stats" | "calendario" | "historico";
+type ActiveView = "home" | "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos";
+
 
 interface WorkoutExercise {
   exercise_id: string;
