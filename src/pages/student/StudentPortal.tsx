@@ -144,11 +144,13 @@ export default function StudentPortal() {
       .maybeSingle();
 
     if (enrollment) {
+      setActiveEnrollmentId(enrollment.id);
       setEnrollmentInfo({
         plan_name: (enrollment.plans as any)?.name || "Plano",
         start_date: enrollment.start_date,
         end_date: enrollment.end_date,
       });
+
 
       const { data: cyclesData } = await supabase
         .from("training_cycles")
@@ -409,8 +411,10 @@ export default function StudentPortal() {
       previousBestWeights[`ex-${idx}`] = maxW;
     });
 
-    await session.finishSession(logs, selectedWorkout.exercises, previousBestWeights);
+    const result = await session.finishSession(logs, selectedWorkout.exercises, previousBestWeights);
+    if (result?.id) setPendingFeedbackSessionId(result.id);
   };
+
 
   const handleAbandonSession = async () => {
     await session.abandonSession();
