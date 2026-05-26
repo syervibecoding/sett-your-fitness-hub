@@ -196,7 +196,8 @@ export function StudentHome({
             </CardContent>
           </Card>
         </button>
-
+      </div>
     </div>
+
   );
 }
