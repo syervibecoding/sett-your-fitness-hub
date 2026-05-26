@@ -128,6 +128,9 @@ const App = () => (
           <Route path="/admin/exercises" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><ExerciseLibrary /></FeatureRoute>} />
           <Route path="/admin/prescriptions" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><WorkoutPrescriptions /></FeatureRoute>} />
           <Route path="/admin/workout/:cycleId" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><WorkoutBuilder /></FeatureRoute>} />
+          <Route path="/admin/announcements" element={<ProtectedRoute allowedRoles={["admin"]}><Announcements /></ProtectedRoute>} />
+          <Route path="/coordinator/announcements" element={<ProtectedRoute allowedRoles={["coordinator"]}><Announcements /></ProtectedRoute>} />
+
 
           {/* Coordinator Routes */}
           <Route path="/coordinator" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasDashboard"><CoordinatorDashboard /></FeatureRoute>} />
