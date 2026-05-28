@@ -1,85 +1,40 @@
-# Onda 3 — Atividades externas + Mural de comunicação
+## Objetivo
 
-Escopo confirmado: itens #1 e #2. Integração Strava fica fora (avaliamos depois).
+Tornar a navegação entre páginas mais leve e fluida, replicando o padrão do projeto Party Planner Hub: um fade + slide curto em cada troca de rota, mais um indicador animado na sidebar que desliza entre os itens ativos.
 
----
+## O que será feito
 
-## 1. Atividades externas manuais
+### 1. Instalar `framer-motion`
+Única dependência nova. Já é usada no projeto de referência.
 
-Aluno registra atividades fora da musculação (corrida, natação, bike, caminhada, yoga, etc). Aparecem no calendário, contam para a meta semanal e ficam visíveis ao treinador.
+### 2. Criar `src/components/RouteTransition.tsx`
+Wrapper baseado em `AnimatePresence` (mode `wait`) + `motion.div`, com `key={location.pathname}`. Respeita `useReducedMotion`. Animação curta (180ms, easing `[0.22, 1, 0.36, 1]`): opacidade 0→1 + translateY 6→0 na entrada, e 0→-4 na saída. Igual ao Party Planner Hub.
 
-### Banco
-Nova tabela `external_activities`:
-- `student_id`, `company_id`
-- `activity_type` (text: 'corrida','natacao','bike','caminhada','yoga','outro')
-- `activity_date` (date)
-- `duration_minutes` (int, opcional)
-- `distance_km` (numeric, opcional)
-- `intensity` (smallint 1-5, opcional)
-- `notes` (text)
-- `created_at`
+### 3. Envolver o conteúdo das rotas em `AppLayout.tsx`
+O `RouteTransition` entra dentro do `<div className="flex-1 overflow-auto …">` envolvendo `{children}`. Assim toda página renderizada dentro do layout autenticado ganha a transição, sem precisar mexer em cada página.
 
-RLS: aluno lê/insere/edita/apaga as próprias; equipe da empresa lê tudo da empresa; master full access.
+### 4. Adicionar transição também onde não há AppLayout
+- `StudentPortal` (mobile) — embrulhar o conteúdo interno entre as views (`treino`/`stats`/`calendario`/etc.) com um `AnimatePresence` por `activeView`, para que a troca entre seções do portal do aluno também fique suave.
+- Páginas públicas (`Landing`, `Auth`, `PublicRegistration`, etc.) ficam de fora — não precisam.
 
-### Frontend
-- **Novo:** `src/components/student/ExternalActivityForm.tsx` — modal com tipo (chips), data, duração, distância (só se aplicável), intensidade, notas.
-- **Novo:** `src/components/student/ExternalActivitiesList.tsx` — lista no `StudentHome` com editar/apagar.
-- **Editar:** `StudentCalendar.tsx` — marcar dias com atividade externa com ícone/cor distinta da musculação (badge dupla quando tem os dois).
-- **Editar:** `WeeklyBar.tsx` — a meta semanal passa a contar musculação + externas (somatório). Toggle visual para diferenciar.
-- **Editar:** `StudentHome.tsx` — botão "Registrar atividade externa".
-- **Editar:** `src/components/admin/StudentFeedbackTab.tsx` ou novo tab "Atividades" em `StudentDetail.tsx` — treinador vê as externas cronologicamente.
+### 5. Indicador ativo animado na sidebar (`AppSidebar.tsx`)
+Adicionar um `motion.span` com `layoutId="sidebar-active"` posicionado absoluto atrás do item ativo (background). Quando o usuário troca de rota, o framer-motion desliza esse pill entre os itens com spring (`stiffness: 380, damping: 32`), exatamente como no Party Planner Hub. O texto/ícone continuam com `transition-colors` do Tailwind.
 
----
-
-## 2. Mural de comunicação
-
-Admin/coordenador publica posts; todos os alunos da empresa veem no portal.
-
-### Banco
-Nova tabela `announcements`:
-- `company_id`, `author_id` (uuid → auth.users)
-- `title` (text)
-- `body` (text)
-- `image_url` (text, opcional)
-- `pinned` (boolean default false)
-- `published_at` (timestamptz default now)
-- `created_at`, `updated_at`
-
-Nova tabela `announcement_reads` (para badge "novo"):
-- `announcement_id`, `student_id`, `read_at`
-- UNIQUE(announcement_id, student_id)
-
-RLS:
-- `announcements`: equipe da empresa (admin/coordenador) cria/edita/apaga; alunos da empresa só leem.
-- `announcement_reads`: aluno gerencia os próprios reads.
-
-Bucket de storage: reutilizar `platform-assets` com prefixo `announcements/{company_id}/`.
-
-### Frontend — Admin
-- **Novo:** `src/pages/admin/Announcements.tsx` — lista + criar/editar/apagar + fixar.
-- **Novo:** `src/components/admin/AnnouncementEditor.tsx` — form com título, corpo (textarea), upload de imagem opcional, toggle fixar.
-- **Editar:** menu lateral admin — adicionar item "Mural".
-
-### Frontend — Aluno
-- **Novo:** `src/components/student/AnnouncementsFeed.tsx` — feed cronológico (fixados no topo), badge "novo" para não lidos, marca como lido ao expandir.
-- **Editar:** `StudentPortal.tsx` — adicionar tab/seção "Avisos" com contador de não lidos.
-
----
-
-## Tier gating
-Atividades externas: liberado para todos os tiers (sem custo de infra).
-Mural: liberado para todos os tiers.
-
----
-
-## Ordem de execução
-1. Migration (2 tabelas + 1 tabela auxiliar + RLS)
-2. Atividades externas (form, lista, integração com calendário/weekly bar, tab admin)
-3. Mural (página admin + editor, feed aluno)
+### 6. Melhorar o `PageLoader` do Suspense
+Trocar o spinner por um fade-in sutil para que a primeira carga de chunks lazy não pareça um "flash". Pequeno ajuste estético.
 
 ## Detalhes técnicos
-- Activity type guardado como text livre validado no front (sem enum no DB para facilitar adicionar novos depois).
-- Distance só editável quando type ∈ {corrida, bike, caminhada, natacao}.
-- Weekly goal counter passa de `count(workout_sessions where status='completed' this week)` para `count(distinct date) onde houve workout OU external_activity`.
-- Mural sem comentários/likes nesta fase (foi descartado pela Bruna como "não usaria").
-- Reads tracking via upsert client-side ao abrir o post.
+
+- Sem mudanças de roteamento, sem mudar lógica de auth, sem mexer em dados.
+- `AnimatePresence mode="wait"` garante que a página de saída termina antes da entrada começar — evita sobreposição visual.
+- `initial={false}` no `AnimatePresence` raiz da sidebar evita animação no primeiro render.
+- Tudo respeita `prefers-reduced-motion` via `useReducedMotion()`.
+
+## Arquivos afetados
+
+- `package.json` — adiciona `framer-motion`
+- `src/components/RouteTransition.tsx` — novo
+- `src/components/AppLayout.tsx` — envolve `children` com `RouteTransition`
+- `src/components/AppSidebar.tsx` — adiciona `motion.span` com `layoutId` no item ativo
+- `src/pages/student/StudentPortal.tsx` — `AnimatePresence` entre as sub-views
+- `src/App.tsx` — `PageLoader` com fade
