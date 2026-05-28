@@ -94,17 +94,17 @@ const App = () => (
         <ThemeProvider>
         <MasterProvider>
         <ErrorBoundary>
-        <Suspense fallback={<PageLoader />}>
-        <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/inscricao/:slug" element={<PublicRegistration />} />
-          <Route path="/cadastro/:slug" element={<PublicRegistration />} />
-          <Route path="/inscricao" element={<PublicRegistration />} />
-          <Route path="/cadastro" element={<PublicRegistration />} />
-          <Route path="/anamnese/:studentId" element={<PublicAnamnesis />} />
-          <Route path="/pagamento/:studentId" element={<PublicPayment />} />
-          <Route path="/aluno/treino/:studentId" element={<StudentWorkout />} />
-          <Route path="/aluno" element={<ProtectedRoute allowedRoles={["student"]}><StudentPortal /></ProtectedRoute>} />
+          <Route path="/auth" element={<RouteTransition><Auth /></RouteTransition>} />
+          <Route path="/inscricao/:slug" element={<RouteTransition><PublicRegistration /></RouteTransition>} />
+          <Route path="/cadastro/:slug" element={<RouteTransition><PublicRegistration /></RouteTransition>} />
+          <Route path="/inscricao" element={<RouteTransition><PublicRegistration /></RouteTransition>} />
+          <Route path="/cadastro" element={<RouteTransition><PublicRegistration /></RouteTransition>} />
+          <Route path="/anamnese/:studentId" element={<RouteTransition><PublicAnamnesis /></RouteTransition>} />
+          <Route path="/pagamento/:studentId" element={<RouteTransition><PublicPayment /></RouteTransition>} />
+          <Route path="/aluno/treino/:studentId" element={<RouteTransition><StudentWorkout /></RouteTransition>} />
+          <Route path="/aluno" element={<ProtectedRoute allowedRoles={["student"]}><RouteTransition><StudentPortal /></RouteTransition></ProtectedRoute>} />
+          <Route path="/" element={<RouteTransition><RootRoute /></RouteTransition>} />
+
           <Route path="/" element={<RootRoute />} />
 
           {/* Master Routes */}
