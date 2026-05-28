@@ -21,6 +21,7 @@ import {
   Megaphone,
 
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanyFeatures } from "@/hooks/useCompanyFeatures";
@@ -239,21 +240,35 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end={item.url.split("/").length <= 2}
-                      className="hover:bg-paper text-sidebar-foreground border-l-2 border-transparent rounded-none"
-                      activeClassName="bg-paper text-navy font-medium border-l-2 border-navy"
-                    >
-                      <item.icon className="mr-2 h-4 w-4" />
-                      <span>{item.title}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {items.map((item) => {
+                const isRoot = item.url.split("/").length <= 2;
+                const isActive = isRoot
+                  ? location.pathname === item.url
+                  : location.pathname === item.url || location.pathname.startsWith(item.url + "/");
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to={item.url}
+                        end={isRoot}
+                        className="relative hover:bg-paper/60 text-sidebar-foreground border-l-2 border-transparent rounded-none"
+                        activeClassName="text-navy font-medium border-l-2 border-navy"
+                      >
+                        {isActive && (
+                          <motion.span
+                            layoutId="sidebar-active"
+                            className="absolute inset-0 bg-paper -z-0"
+                            transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                          />
+                        )}
+                        <item.icon className="mr-2 h-4 w-4 relative z-10" />
+                        <span className="relative z-10">{item.title}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+
 
               {/* Exercícios collapsible */}
               {showExercises && canAccessExercises && (

@@ -30,6 +30,7 @@ import { calculateStreak } from "@/lib/streakCalculator";
 import { ExternalActivitiesList } from "@/components/student/ExternalActivitiesList";
 import { AnnouncementsFeed } from "@/components/student/AnnouncementsFeed";
 import { Megaphone, Activity } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 
 
 type ActiveView = "home" | "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos";
@@ -558,6 +559,14 @@ export default function StudentPortal() {
           </div>
         )}
 
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={activeView}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          >
         {/* HOME VIEW */}
         {activeView === "home" && (
           <StudentHome
@@ -787,6 +796,10 @@ export default function StudentPortal() {
         {activeView === "avisos" && studentId && companyId && (
           <AnnouncementsFeed studentId={studentId} companyId={companyId} />
         )}
+          </motion.div>
+        </AnimatePresence>
+
+
 
       </div>
 
