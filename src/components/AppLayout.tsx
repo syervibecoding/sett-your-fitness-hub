@@ -1,5 +1,6 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { RouteTransition } from "@/components/RouteTransition";
 
 export function AppLayout({ children, noPadding = false }: { children: React.ReactNode; noPadding?: boolean }) {
   return (
@@ -14,7 +15,7 @@ export function AppLayout({ children, noPadding = false }: { children: React.Rea
             </span>
           </header>
           <div className={`flex-1 overflow-auto ${noPadding ? "" : "p-6 md:p-8"}`}>
-            {children}
+            <RouteTransition>{children}</RouteTransition>
           </div>
         </main>
       </div>

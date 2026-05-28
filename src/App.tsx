@@ -57,10 +57,11 @@ const queryClient = new QueryClient({
 });
 
 const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center bg-background">
+  <div className="min-h-screen flex items-center justify-center bg-background animate-fade-in">
     <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
   </div>
 );
+
 
 function RootRoute() {
   const { user, role, loading } = useAuth();
