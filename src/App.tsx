@@ -10,6 +10,8 @@ import { MasterProvider } from "@/contexts/MasterContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { FeatureRoute } from "@/components/FeatureRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { RouteTransition } from "@/components/RouteTransition";
+
 
 // Lazy load all pages
 const Auth = lazy(() => import("./pages/Auth"));
@@ -94,16 +96,17 @@ const App = () => (
         <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/inscricao/:slug" element={<PublicRegistration />} />
-          <Route path="/cadastro/:slug" element={<PublicRegistration />} />
-          <Route path="/inscricao" element={<PublicRegistration />} />
-          <Route path="/cadastro" element={<PublicRegistration />} />
-          <Route path="/anamnese/:studentId" element={<PublicAnamnesis />} />
-          <Route path="/pagamento/:studentId" element={<PublicPayment />} />
-          <Route path="/aluno/treino/:studentId" element={<StudentWorkout />} />
-          <Route path="/aluno" element={<ProtectedRoute allowedRoles={["student"]}><StudentPortal /></ProtectedRoute>} />
-          <Route path="/" element={<RootRoute />} />
+          <Route path="/auth" element={<RouteTransition><Auth /></RouteTransition>} />
+          <Route path="/inscricao/:slug" element={<RouteTransition><PublicRegistration /></RouteTransition>} />
+          <Route path="/cadastro/:slug" element={<RouteTransition><PublicRegistration /></RouteTransition>} />
+          <Route path="/inscricao" element={<RouteTransition><PublicRegistration /></RouteTransition>} />
+          <Route path="/cadastro" element={<RouteTransition><PublicRegistration /></RouteTransition>} />
+          <Route path="/anamnese/:studentId" element={<RouteTransition><PublicAnamnesis /></RouteTransition>} />
+          <Route path="/pagamento/:studentId" element={<RouteTransition><PublicPayment /></RouteTransition>} />
+          <Route path="/aluno/treino/:studentId" element={<RouteTransition><StudentWorkout /></RouteTransition>} />
+          <Route path="/aluno" element={<ProtectedRoute allowedRoles={["student"]}><RouteTransition><StudentPortal /></RouteTransition></ProtectedRoute>} />
+          <Route path="/" element={<RouteTransition><RootRoute /></RouteTransition>} />
+
 
           {/* Master Routes */}
           <Route path="/master" element={<ProtectedRoute allowedRoles={["master"]}><MasterDashboard /></ProtectedRoute>} />
@@ -173,7 +176,7 @@ const App = () => (
           <Route path="/trainer/whatsapp-templates" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasWhatsApp"><WhatsAppTemplates /></FeatureRoute>} />
           <Route path="/trainer/whatsapp-automation" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasAutomation"><WhatsAppAutomation /></FeatureRoute>} />
 
-          <Route path="*" element={<NotFound />} />
+          <Route path="*" element={<RouteTransition><NotFound /></RouteTransition>} />
         </Routes>
         </Suspense>
         </ErrorBoundary>
