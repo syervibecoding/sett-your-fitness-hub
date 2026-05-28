@@ -10,6 +10,8 @@ import { MasterProvider } from "@/contexts/MasterContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { FeatureRoute } from "@/components/FeatureRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { RouteTransition } from "@/components/RouteTransition";
+
 
 // Lazy load all pages
 const Auth = lazy(() => import("./pages/Auth"));
