@@ -176,7 +176,7 @@ const App = () => (
           <Route path="/trainer/whatsapp-templates" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasWhatsApp"><WhatsAppTemplates /></FeatureRoute>} />
           <Route path="/trainer/whatsapp-automation" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasAutomation"><WhatsAppAutomation /></FeatureRoute>} />
 
-          <Route path="*" element={<NotFound />} />
+          <Route path="*" element={<RouteTransition><NotFound /></RouteTransition>} />
         </Routes>
         </Suspense>
         </ErrorBoundary>
