@@ -19,3 +19,13 @@ export function RouteTransition({ children }: { children: React.ReactNode }) {
     </AnimatePresence>
   );
 }
+
+/**
+ * Wraps <Routes> at the app root so every route — including public pages
+ * (Landing, Auth, PublicRegistration, etc.) and pages that don't use AppLayout —
+ * gets the same fade+slide transition.
+ */
+export function AnimatedRoutesWrapper({ children }: { children: React.ReactNode }) {
+  return <RouteTransition>{children}</RouteTransition>;
+}
+
