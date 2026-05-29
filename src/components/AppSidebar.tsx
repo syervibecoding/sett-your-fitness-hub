@@ -144,6 +144,7 @@ export function AppSidebar() {
   const { viewingCompany, isViewingCompany, exitCompanyView } = useMaster();
   const location = useLocation();
   const navigate = useNavigate();
+  const prefersReducedMotion = useReducedMotion();
   const title = settings?.platform_title || "Set Training App";
 
   const isMaster = role === "master";
