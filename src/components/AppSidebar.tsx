@@ -21,7 +21,7 @@ import {
   Megaphone,
 
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanyFeatures } from "@/hooks/useCompanyFeatures";
