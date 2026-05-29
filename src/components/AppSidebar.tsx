@@ -21,7 +21,7 @@ import {
   Megaphone,
 
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanyFeatures } from "@/hooks/useCompanyFeatures";
@@ -144,6 +144,7 @@ export function AppSidebar() {
   const { viewingCompany, isViewingCompany, exitCompanyView } = useMaster();
   const location = useLocation();
   const navigate = useNavigate();
+  const prefersReducedMotion = useReducedMotion();
   const title = settings?.platform_title || "Set Training App";
 
   const isMaster = role === "master";
@@ -251,14 +252,18 @@ export function AppSidebar() {
                       <NavLink
                         to={item.url}
                         end={isRoot}
-                        className="relative hover:bg-paper/60 text-sidebar-foreground border-l-2 border-transparent rounded-none"
-                        activeClassName="text-navy font-medium border-l-2 border-navy"
+                        className="relative hover:bg-paper/60 text-sidebar-foreground rounded-none overflow-hidden"
+                        activeClassName="text-navy font-medium"
                       >
                         {isActive && (
                           <motion.span
                             layoutId="sidebar-active"
-                            className="absolute inset-0 bg-paper -z-0"
-                            transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                            className="absolute inset-0 bg-navy/[0.07] border-l-2 border-navy -z-0"
+                            transition={
+                              prefersReducedMotion
+                                ? { duration: 0 }
+                                : { type: "spring", stiffness: 500, damping: 40, mass: 0.6 }
+                            }
                           />
                         )}
                         <item.icon className="mr-2 h-4 w-4 relative z-10" />
