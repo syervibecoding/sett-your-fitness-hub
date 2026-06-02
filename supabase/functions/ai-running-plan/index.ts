@@ -226,6 +226,18 @@ Retorne EXATAMENTE este JSON sem texto adicional, sem markdown:
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  if (!ANTHROPIC_API_KEY) {
+    return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY não configurada. Adicione o segredo para usar a IA." }), {
+      status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const claims = await requireUser(req);
+  if (!claims) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const {
@@ -245,7 +257,11 @@ serve(async (req) => {
       equipment,        // esteira, rua, piscina, bicicleta outdoor/indoor
       diet_type,        // "emagrecimento" | "hipertrofia" | "performance"
       assessment_context, // JSON da avaliação funcional BN (se houver)
+      strength_plan_context, // { days_per_week, workouts:[{day,focus,has_heavy_legs}] }
+      anamnese_id,
+      bundle_id,
     } = await req.json();
+
 
     // Monta contexto do atleta
     const athleteContext = `
