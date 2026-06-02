@@ -279,6 +279,18 @@ Equipamentos: ${clean(equipment || "academia completa")}
 Restrições/Lesões: ${clean(restrictions || "nenhuma")}
 Observações adicionais: ${clean(notes || "")}
 
+INTEGRAÇÃO COM CORRIDA (anti-interferência):
+${running_days_context
+  ? `O atleta TAMBÉM tem ${running_days_context.days_per_week} dias/semana de ${running_days_context.sport}.
+     REGRAS OBRIGATÓRIAS DE ANTI-INTERFERÊNCIA:
+     1. NÃO agendar treino pesado de MMII (agachamento, terra, afundo) no mesmo dia nem no dia ANTERIOR a corridas longas
+     2. Semana de deload da musculação = semana 4 de cada bloco (sincronizada com a corrida)
+     3. Volume de MMII reduzido em 20% vs atleta sem corrida
+     4. Preferir RIR 2-3 em todos os exercícios (preservar recuperação aeróbica)
+     5. Separar força de MMII por no mínimo 6h de qualquer corrida Z4/Z5`
+  : "Sem plano de corrida — prescrever sem restrições de anti-interferência"}
+
+
 AVALIAÇÃO FUNCIONAL BN (PRIORIDADE MÁXIMA — adapte TODOS os exercícios):
 ${assessment_context ? JSON.stringify(assessment_context) : "Sem avaliação funcional disponível — presumir boa mobilidade, aplicar protocolo padrão"}
 
