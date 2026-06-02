@@ -19,6 +19,9 @@ import {
   BookOpen,
   ClipboardCheck,
   Megaphone,
+  Sparkles,
+  Activity,
+
 
 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
