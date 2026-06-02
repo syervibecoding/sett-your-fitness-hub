@@ -94,7 +94,13 @@ async function fetchAlerts(
   let nextIdx: number;
 
   if (!trainerId) {
-    awaitingTrainer = (results[1].data || []).map((s: any) => ({ student_name: s.full_name, student_id: s.id }));
+    // Alunos que já têm treinador na matrícula (ativa/aguardando) — não devem aparecer como "sem treinador"
+    const studentsWithEnrollmentTrainer = new Set(
+      (results[4].data || []).filter((e: any) => e.trainer_id).map((e: any) => e.student_id)
+    );
+    awaitingTrainer = (results[1].data || [])
+      .filter((s: any) => !studentsWithEnrollmentTrainer.has(s.id))
+      .map((s: any) => ({ student_name: s.full_name, student_id: s.id }));
     awaitingTrainingDate = (results[2].data || []).map((e: any) => ({
       student_name: e.students?.full_name || "—", student_id: e.student_id, enrollment_id: e.id,
       trainer_name: e.trainer_id ? trainerMap[e.trainer_id] : undefined,
