@@ -1056,8 +1056,20 @@ export default function StudentDetail() {
                                             className="h-5 text-[10px] px-2 text-success border-success/30 hover:bg-success/10"
                                             onClick={async () => {
                                               if (!session?.user?.id) return;
+                                              // Idempotente: se o ciclo já tem treino, apenas recarrega (evita erro/duplicidade)
+                                              const { data: existing } = await supabase
+                                                .from("workouts")
+                                                .select("id")
+                                                .eq("cycle_id", c.id)
+                                                .limit(1);
+                                              if (existing && existing.length > 0) {
+                                                toast({ title: "Esse ciclo já possui treino." });
+                                                if (id) loadData(id);
+                                                return;
+                                              }
                                               const { error } = await supabase.from("workouts").insert({
                                                 cycle_id: c.id,
+                                                company_id: student?.company_id,
                                                 title: `Treino Ciclo ${c.cycle_number}`,
                                                 created_by: session.user.id,
                                                 exercises: [],
