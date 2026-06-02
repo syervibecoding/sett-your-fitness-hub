@@ -34,6 +34,8 @@ const ExerciseLibrary = lazy(() => import("./pages/admin/ExerciseLibrary"));
 const WorkoutBuilder = lazy(() => import("./pages/admin/WorkoutBuilder"));
 const WorkoutPrescriptions = lazy(() => import("./pages/admin/WorkoutPrescriptions"));
 const Announcements = lazy(() => import("./pages/admin/Announcements"));
+const UnifiedPrescriber = lazy(() => import("./pages/admin/UnifiedPrescriber"));
+const FunctionalAssessment = lazy(() => import("./pages/admin/FunctionalAssessment"));
 
 const CoordinatorDashboard = lazy(() => import("./pages/coordinator/CoordinatorDashboard"));
 const TrainerDashboard = lazy(() => import("./pages/trainer/TrainerDashboard"));
