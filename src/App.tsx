@@ -185,6 +185,7 @@ const App = () => (
           <Route path="/trainer/whatsapp-crm" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasWhatsApp"><WhatsAppCRM /></FeatureRoute>} />
           <Route path="/trainer/whatsapp-templates" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasWhatsApp"><WhatsAppTemplates /></FeatureRoute>} />
           <Route path="/trainer/whatsapp-automation" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasAutomation"><WhatsAppAutomation /></FeatureRoute>} />
+          </Route>
 
           <Route path="*" element={<RouteTransition><NotFound /></RouteTransition>} />
         </Routes>
