@@ -308,6 +308,22 @@ export function AppSidebar() {
                             </NavLink>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/prescricao`}>
+                            <NavLink to={`${exercisePrefix}/prescricao`} end>
+                              <Sparkles className="h-4 w-4" />
+                              <span>Prescrição IA</span>
+                            </NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/avaliacao`}>
+                            <NavLink to={`${exercisePrefix}/avaliacao`} end>
+                              <Activity className="h-4 w-4" />
+                              <span>Avaliação Funcional</span>
+                            </NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
                       </SidebarMenuSub>
                     </CollapsibleContent>
                   </SidebarMenuItem>
