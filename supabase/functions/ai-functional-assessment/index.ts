@@ -345,12 +345,14 @@ Analise todas as imagens acima e retorne o JSON conforme instruído.
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-opus-4-6",   // Usa Opus para análise visual complexa
+        model: MODEL,
         max_tokens: 4096,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: imageContent }],
       }),
     });
+
+    if (!aiResponse.ok) return aiErrorResponse(aiResponse.status);
 
     const aiData = await aiResponse.json();
     const rawText = aiData.content?.[0]?.text ?? "";
