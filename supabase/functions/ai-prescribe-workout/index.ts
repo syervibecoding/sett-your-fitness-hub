@@ -311,12 +311,14 @@ INSTRUÇÕES:
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
+        model: MODEL,
         max_tokens: 8000,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: clean(athleteContext) }],
       }),
     });
+
+    if (!aiResponse.ok) return aiErrorResponse(aiResponse.status);
 
     const aiData = await aiResponse.json();
     const rawText = aiData.content?.[0]?.text ?? "";
@@ -331,43 +333,22 @@ INSTRUÇÕES:
       );
     }
 
-    // Salva o ciclo com os treinos
-    const cycleId = crypto.randomUUID();
-    await supabase.from("training_cycles").insert({
-      id: cycleId,
+    // Salva o plano de força gerado pela IA (JSON, desacoplado da execução)
+    const planId = crypto.randomUUID();
+    await supabase.from("ai_strength_plans").insert({
+      id: planId,
       company_id, student_id,
-      name: planJson.cycle_name,
+      cycle_name: planJson.cycle_name,
       objective: planJson.objective,
       duration_weeks: planJson.duration_weeks,
-      status: "active",
-      notes: planJson.biomechanical_notes,
+      biomechanical_notes: planJson.biomechanical_notes,
+      plan: planJson,
+      anamnese_id: anamnese_id ?? null,
+      bundle_id: bundle_id ?? null,
     });
 
-    for (let i = 0; i < (planJson.workouts || []).length; i++) {
-      const w = planJson.workouts[i];
-      const workoutId = crypto.randomUUID();
-      await supabase.from("workouts").insert({
-        id: workoutId, cycle_id: cycleId, company_id,
-        name: w.name, day_of_week: w.day_of_week,
-        sort_order: i, notes: w.notes,
-      });
-      for (let j = 0; j < (w.exercises || []).length; j++) {
-        const ex = w.exercises[j];
-        await supabase.from("workout_exercises").insert({
-          workout_id: workoutId,
-          exercise_name: ex.exercise_name,
-          muscle_group: ex.muscle_group,
-          sets: ex.sets,
-          reps: ex.reps,
-          rest_seconds: ex.rest_seconds,
-          exercise_order: j,
-          notes: `${ex.cues || ""} | Fase: ${ex.phase} | Tempo: ${ex.tempo || "-"} | RIR: ${ex.rir || "-"} | ${ex.biomechanical_note || ""}`,
-        });
-      }
-    }
-
     return new Response(
-      JSON.stringify({ id: cycleId, plan: planJson }),
+      JSON.stringify({ id: planId, plan: planJson }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
