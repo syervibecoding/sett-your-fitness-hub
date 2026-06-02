@@ -285,6 +285,23 @@ Dieta atual: ${clean(diet_type || "não informado")}
 AVALIAÇÃO FUNCIONAL BN (se disponível):
 ${assessment_context ? JSON.stringify(assessment_context) : "Sem avaliação funcional — não incluir orientações baseadas em avaliação postural"}
 
+INTEGRAÇÃO COM MUSCULAÇÃO (sincronização de periodização):
+${strength_plan_context
+  ? `O atleta tem ${strength_plan_context.days_per_week} dias/semana de musculação.
+     Dias com treino pesado de MMII: ${
+       (strength_plan_context.workouts || [])
+         .filter((w: any) => w.has_heavy_legs)
+         .map((w: any) => `Dia ${w.day} (${w.focus})`)
+         .join(", ") || "não identificados"
+     }
+     REGRAS OBRIGATÓRIAS DE SINCRONIZAÇÃO:
+     1. NÃO colocar corrida Z4/Z5 nos dias de treino pesado de MMII nem no dia seguinte
+     2. Corrida Z1/Z2 pode ocorrer no mesmo dia da musculação APENAS após o treino de força e com 6h de intervalo
+     3. Semana de deload da corrida na mesma semana do deload da musculação (semana 4)
+     4. Preferir corridas longas Z2 nos dias de descanso da musculação`
+  : "Sem plano de musculação — prescrever sem restrições de sincronização"}
+
+
 INSTRUÇÕES:
 1. Calcule as zonas de FC usando Karvonen
 2. Verifique as linhas vermelhas (TSB e EVA) ANTES de prescrever
