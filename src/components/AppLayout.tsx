@@ -1,8 +1,21 @@
+import { Suspense } from "react";
+import { Outlet, useLocation } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { RouteTransition } from "@/components/RouteTransition";
 
-export function AppLayout({ children, noPadding = false }: { children: React.ReactNode; noPadding?: boolean }) {
+const ContentLoader = () => (
+  <div className="flex items-center justify-center py-24">
+    <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+  </div>
+);
+
+export function AppLayout() {
+  const location = useLocation();
+  const noPadding =
+    location.pathname.includes("/whatsapp-chat") ||
+    location.pathname.includes("/whatsapp-automation");
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-paper">
@@ -15,7 +28,11 @@ export function AppLayout({ children, noPadding = false }: { children: React.Rea
             </span>
           </header>
           <div className={`flex-1 overflow-auto ${noPadding ? "" : "p-6 md:p-8"}`}>
-            <RouteTransition>{children}</RouteTransition>
+            <Suspense fallback={<ContentLoader />}>
+              <RouteTransition>
+                <Outlet />
+              </RouteTransition>
+            </Suspense>
           </div>
         </main>
       </div>
