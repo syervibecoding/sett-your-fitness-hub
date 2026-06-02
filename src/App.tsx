@@ -134,6 +134,8 @@ const App = () => (
           <Route path="/admin/exercises" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><ExerciseLibrary /></FeatureRoute>} />
           <Route path="/admin/prescriptions" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><WorkoutPrescriptions /></FeatureRoute>} />
           <Route path="/admin/workout/:cycleId" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><WorkoutBuilder /></FeatureRoute>} />
+          <Route path="/admin/prescricao" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><UnifiedPrescriber /></FeatureRoute>} />
+          <Route path="/admin/avaliacao" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><FunctionalAssessment /></FeatureRoute>} />
           <Route path="/admin/announcements" element={<ProtectedRoute allowedRoles={["admin"]}><Announcements /></ProtectedRoute>} />
           <Route path="/coordinator/announcements" element={<ProtectedRoute allowedRoles={["coordinator"]}><Announcements /></ProtectedRoute>} />
 
