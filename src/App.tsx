@@ -11,6 +11,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { FeatureRoute } from "@/components/FeatureRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RouteTransition } from "@/components/RouteTransition";
+import { AppLayout } from "@/components/AppLayout";
 
 
 // Lazy load all pages
