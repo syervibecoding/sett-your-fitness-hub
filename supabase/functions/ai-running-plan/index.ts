@@ -319,12 +319,14 @@ INSTRUÇÕES:
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",  // Sonnet para prescrição — equilíbrio custo/qualidade
+        model: MODEL,
         max_tokens: 8000,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: clean(athleteContext) }],
       }),
     });
+
+    if (!aiResponse.ok) return aiErrorResponse(aiResponse.status);
 
     const aiData = await aiResponse.json();
     const rawText = aiData.content?.[0]?.text ?? "";
@@ -359,6 +361,8 @@ INSTRUÇÕES:
       nutrition_alert: planJson.nutrition_alert,
       duration_weeks: planJson.duration_weeks,
       model: planJson.model,
+      anamnese_id: anamnese_id ?? null,
+      bundle_id: bundle_id ?? null,
     });
 
     return new Response(
@@ -374,31 +378,4 @@ INSTRUÇÕES:
     );
   }
 });
-
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  PARTE 2 — SQL (tabela running_plans atualizada)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
--- Adicionar colunas que faltam na tabela running_plans
-ALTER TABLE running_plans
-  ADD COLUMN IF NOT EXISTS fc_zones JSONB,
-  ADD COLUMN IF NOT EXISTS safety_check JSONB,
-  ADD COLUMN IF NOT EXISTS model TEXT,
-  ADD COLUMN IF NOT EXISTS duration_weeks INT,
-  ADD COLUMN IF NOT EXISTS complementary_strength JSONB,
-  ADD COLUMN IF NOT EXISTS nutrition_alert TEXT,
-  ADD COLUMN IF NOT EXISTS warnings TEXT[];
-
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  PARTE 3 — DEPLOY
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  supabase functions deploy ai-running-plan --no-verify-jwt
-
-================================================================================
-  PRÓXIMO: Aguardando documentos de metodologia de
-  - Musculação (prescrição de força)
-  - Dieta/Nutrição
 ================================================================================
