@@ -1,40 +1,37 @@
-## Objetivo
+# Correção dos dois bugs
 
-Tornar a navegação entre páginas mais leve e fluida, replicando o padrão do projeto Party Planner Hub: um fade + slide curto em cada troca de rota, mais um indicador animado na sidebar que desliza entre os itens ativos.
+## Bug 1 — Aluno aparece "sem treinador" / "sem treino" no dashboard, mas no perfil tem
 
-## O que será feito
+### Causa
+- O card **AÇÕES PENDENTES** (tabela `admin_alerts`) cria um alerta **"Montar treino"** quando um treinador é atribuído, mas **esse alerta nunca é baixado** quando o treino é de fato montado — não existe nenhum lugar no código nem no banco que o resolva. Resultado: o aluno fica eternamente listado como pendente.
+- O alerta **"Atribuir treinador"** só é resolvido quando o treinador é gravado na *matrícula* (`enrollments.trainer_id`). Mas o perfil do aluno também considera o treinador gravado direto no aluno (`students.assigned_trainer_id`). Quando o treinador está só num dos dois campos, o dashboard e o perfil divergem.
+- A lista calculada **"AGUARDANDO TREINADOR"** olha apenas `students.assigned_trainer_id IS NULL`, ignorando o treinador da matrícula.
 
-### 1. Instalar `framer-motion`
-Única dependência nova. Já é usada no projeto de referência.
+### Correção
+1. **Migração no banco:**
+   - Criar um gatilho em `workouts` (após inserir) que **resolve automaticamente** os alertas `build_workout` ("Montar treino") da matrícula correspondente.
+   - Criar um gatilho em `students` (ao alterar `assigned_trainer_id`) que **resolve** os alertas `assign_trainer` em aberto desse aluno.
+   - **Backfill** (limpeza dos dados já existentes): marcar como resolvidos os alertas `build_workout` cujos ciclos já têm treino, e os `assign_trainer` de alunos que já têm treinador (na matrícula ou no aluno).
+2. **`src/components/DashboardAlerts.tsx`:** ajustar a lista "AGUARDANDO TREINADOR" para considerar o aluno *com treinador* quando ele tem treinador na matrícula **ou** no campo do aluno, evitando o falso "Sem treinador".
 
-### 2. Criar `src/components/RouteTransition.tsx`
-Wrapper baseado em `AnimatePresence` (mode `wait`) + `motion.div`, com `key={location.pathname}`. Respeita `useReducedMotion`. Animação curta (180ms, easing `[0.22, 1, 0.36, 1]`): opacidade 0→1 + translateY 6→0 na entrada, e 0→-4 na saída. Igual ao Party Planner Hub.
+## Bug 2 — Erro ao clicar em "Feito" no perfil/treino do aluno
 
-### 3. Envolver o conteúdo das rotas em `AppLayout.tsx`
-O `RouteTransition` entra dentro do `<div className="flex-1 overflow-auto …">` envolvendo `{children}`. Assim toda página renderizada dentro do layout autenticado ganha a transição, sem precisar mexer em cada página.
+### Causa
+O botão **"Feito"** (perfil do aluno → ciclo sem treino) insere um treino vazio em `workouts` para marcar o ciclo como prescrito, mas:
+- **não envia o `company_id`** do aluno na inserção;
+- **não é idempotente** — se o ciclo já tiver treino (programa já atribuído), a ação ainda é disparada e pode falhar/duplicar, exatamente o cenário que você descreveu ("não estavam precisando fazer isso").
 
-### 4. Adicionar transição também onde não há AppLayout
-- `StudentPortal` (mobile) — embrulhar o conteúdo interno entre as views (`treino`/`stats`/`calendario`/etc.) com um `AnimatePresence` por `activeView`, para que a troca entre seções do portal do aluno também fique suave.
-- Páginas públicas (`Landing`, `Auth`, `PublicRegistration`, etc.) ficam de fora — não precisam.
+### Correção (`src/pages/admin/StudentDetail.tsx`)
+- Incluir `company_id: student.company_id` na inserção do treino.
+- Antes de inserir, **reverificar se o ciclo já tem treino**; se já tiver, apenas recarregar os dados (sem inserir, sem erro).
+- Manter/melhorar a mensagem de erro (toast) para casos legítimos de falha.
 
-### 5. Indicador ativo animado na sidebar (`AppSidebar.tsx`)
-Adicionar um `motion.span` com `layoutId="sidebar-active"` posicionado absoluto atrás do item ativo (background). Quando o usuário troca de rota, o framer-motion desliza esse pill entre os itens com spring (`stiffness: 380, damping: 32`), exatamente como no Party Planner Hub. O texto/ícone continuam com `transition-colors` do Tailwind.
-
-### 6. Melhorar o `PageLoader` do Suspense
-Trocar o spinner por um fade-in sutil para que a primeira carga de chunks lazy não pareça um "flash". Pequeno ajuste estético.
+## Verificação
+- Recarregar o dashboard e confirmar que alunos com treinador/treino somem dos cards de pendência.
+- No perfil de um aluno com ciclo já prescrito, confirmar que "Feito" não gera erro.
+- Conferir o build e o console sem erros.
 
 ## Detalhes técnicos
-
-- Sem mudanças de roteamento, sem mudar lógica de auth, sem mexer em dados.
-- `AnimatePresence mode="wait"` garante que a página de saída termina antes da entrada começar — evita sobreposição visual.
-- `initial={false}` no `AnimatePresence` raiz da sidebar evita animação no primeiro render.
-- Tudo respeita `prefers-reduced-motion` via `useReducedMotion()`.
-
-## Arquivos afetados
-
-- `package.json` — adiciona `framer-motion`
-- `src/components/RouteTransition.tsx` — novo
-- `src/components/AppLayout.tsx` — envolve `children` com `RouteTransition`
-- `src/components/AppSidebar.tsx` — adiciona `motion.span` com `layoutId` no item ativo
-- `src/pages/student/StudentPortal.tsx` — `AnimatePresence` entre as sub-views
-- `src/App.tsx` — `PageLoader` com fade
+- Tabelas envolvidas: `admin_alerts`, `workouts`, `students`, `enrollments`, `training_cycles`.
+- Os gatilhos usam `SECURITY DEFINER` e `search_path = public`, seguindo o padrão dos gatilhos já existentes no projeto.
+- Nenhuma alteração em RLS é necessária; apenas resolução automática de alertas e ajuste de leitura no frontend.
