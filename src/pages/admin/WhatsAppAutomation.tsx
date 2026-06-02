@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { AppLayout } from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,7 +109,7 @@ export default function WhatsAppAutomation() {
   const selectedFlow = flows.find(f => f.id === selectedFlowId);
 
   return (
-    <AppLayout noPadding>
+    <>
       <div className="flex flex-col h-[calc(100vh-3.5rem)]">
         <div className="flex items-center justify-between px-4 pt-3 pb-2">
           <div>
@@ -210,6 +209,6 @@ export default function WhatsAppAutomation() {
           </div>
         </div>
       </div>
-    </AppLayout>
+    </>
   );
 }

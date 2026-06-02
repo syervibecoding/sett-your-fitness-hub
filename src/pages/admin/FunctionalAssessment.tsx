@@ -6,7 +6,6 @@
 // ============================================================================
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,7 +106,7 @@ export default function FunctionalAssessment() {
   const json = result?.assessment_json;
 
   return (
-    <AppLayout>
+    <>
       <div className="max-w-3xl mx-auto space-y-5">
         <div>
           <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">Avaliação</p>
@@ -251,6 +250,6 @@ export default function FunctionalAssessment() {
           </>
         )}
       </div>
-    </AppLayout>
+    </>
   );
 }

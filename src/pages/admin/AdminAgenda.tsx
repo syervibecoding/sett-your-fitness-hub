@@ -5,7 +5,6 @@ import { useMaster } from "@/contexts/MasterContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AppLayout } from "@/components/AppLayout";
 import { CalendarDays, RefreshCw, ClipboardList, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, isToday, isBefore } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -143,7 +142,7 @@ export default function AdminAgenda() {
   };
 
   return (
-    <AppLayout>
+    <>
       <div className="space-y-6">
         <div>
           <h1 className="text-4xl text-primary">AGENDA</h1>
@@ -270,6 +269,6 @@ export default function AdminAgenda() {
           </Card>
         </div>
       </div>
-    </AppLayout>
+    </>
   );
 }

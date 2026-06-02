@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -188,7 +187,7 @@ export default function WhatsAppSettings() {
   };
 
   return (
-    <AppLayout>
+    <>
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-primary tracking-wide">WhatsApp</h1>
@@ -364,6 +363,6 @@ export default function WhatsAppSettings() {
         </Card>
         )}
       </div>
-    </AppLayout>
+    </>
   );
 }

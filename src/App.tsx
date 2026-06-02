@@ -11,6 +11,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { FeatureRoute } from "@/components/FeatureRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RouteTransition } from "@/components/RouteTransition";
+import { AppLayout } from "@/components/AppLayout";
 
 
 // Lazy load all pages
@@ -109,7 +110,8 @@ const App = () => (
           <Route path="/aluno" element={<ProtectedRoute allowedRoles={["student"]}><RouteTransition><StudentPortal /></RouteTransition></ProtectedRoute>} />
           <Route path="/" element={<RouteTransition><RootRoute /></RouteTransition>} />
 
-
+          {/* Persistent dashboard shell (sidebar + header) */}
+          <Route element={<AppLayout />}>
           {/* Master Routes */}
           <Route path="/master" element={<ProtectedRoute allowedRoles={["master"]}><MasterDashboard /></ProtectedRoute>} />
           <Route path="/master/companies" element={<ProtectedRoute allowedRoles={["master"]}><CompaniesManager /></ProtectedRoute>} />
@@ -183,6 +185,7 @@ const App = () => (
           <Route path="/trainer/whatsapp-crm" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasWhatsApp"><WhatsAppCRM /></FeatureRoute>} />
           <Route path="/trainer/whatsapp-templates" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasWhatsApp"><WhatsAppTemplates /></FeatureRoute>} />
           <Route path="/trainer/whatsapp-automation" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasAutomation"><WhatsAppAutomation /></FeatureRoute>} />
+          </Route>
 
           <Route path="*" element={<RouteTransition><NotFound /></RouteTransition>} />
         </Routes>

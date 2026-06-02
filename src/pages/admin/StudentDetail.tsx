@@ -2,7 +2,6 @@ import { useEffect, useState, useRef, lazy, Suspense } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -757,29 +756,29 @@ export default function StudentDetail() {
 
   if (loading) {
     return (
-      <AppLayout>
+      <>
         <div className="min-h-[60vh] flex items-center justify-center">
           <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
-      </AppLayout>
+      </>
     );
   }
 
   if (!student) {
     return (
-      <AppLayout>
+      <>
         <div className="text-center py-20">
           <p className="text-muted-foreground font-sans">Aluno não encontrado</p>
           <Button variant="outline" className="mt-4" onClick={() => navigate("/admin/students")}>
             <ArrowLeft className="h-4 w-4 mr-2" />Voltar
           </Button>
         </div>
-      </AppLayout>
+      </>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       <div className="space-y-4">
         {/* Compact Header */}
         <div className="flex flex-wrap items-center gap-3">
@@ -1660,6 +1659,6 @@ export default function StudentDetail() {
           </DialogContent>
         </Dialog>
       </div>
-    </AppLayout>
+    </>
   );
 }

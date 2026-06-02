@@ -1,60 +1,52 @@
-# Prescrição Inteligente com IA (Set Training)
+# Transições de página suaves (master e demais painéis)
 
-Trazer do repositório `sett-your-fitness-hub` as features de IA escolhidas: **Musculação**, **Corrida/Cardio**, **Avaliação Funcional (prescritora e avaliadora)** e o **Prescritor Integrado com anti-interferência**. Sem nutrição. Provedor: **Anthropic direto** (sua escolha).
+## Problema
+Hoje **cada página** (`/master`, `/admin/...`, `/coordinator/...`, `/trainer/...`) renderiza o próprio `<AppLayout>` (sidebar + cabeçalho) por dentro. Como o layout está dentro da página carregada via `lazy()`, toda navegação:
 
-## Contexto importante (por que adaptar, não copiar)
+1. Mostra um **spinner de tela cheia** (`PageLoader`) enquanto o novo arquivo carrega.
+2. **Desmonta e remonta a sidebar inteira**, causando o "piscar"/recarregamento que você sente como master.
 
-O repo evoluiu com um schema diferente do seu. Não dá para copiar as edge functions/migrations como estão:
+O `RouteTransition` não resolve porque o shell inteiro está sendo destruído a cada clique.
 
-- Lá `training_cycles` não tem `enrollment_id`; no seu projeto ele é **NOT NULL** e há triggers (`generate_training_cycles`, `resolve_build_workout_alert`) que dependem do vínculo com `enrollments`.
-- Lá os exercícios usam tabela `workout_exercises`; no seu projeto ficam em `workouts.exercises` (jsonb).
-- `students` usa `full_name` (no repo é `name`) e não tem `weight_kg`/`height_cm`.
-- As tabelas `running_plans`, `functional_assessments`, `student_anamneses`, `prescription_bundles` não existem aqui.
+## Solução
+Tornar o shell (sidebar + cabeçalho) **persistente**. Ele monta uma vez e só a área de conteúdo troca, com um spinner pequeno apenas dentro do conteúdo (não na tela toda).
 
-**Decisão de arquitetura:** os planos gerados pela IA serão salvos em **tabelas novas, baseadas em JSON e desacopladas** do fluxo de execução atual do aluno. Assim nada quebra. Publicar o treino de musculação no portal do aluno (convertendo para `training_cycles`/`workouts`) fica como evolução futura.
+```text
+Antes:  [clique] -> tela branca + spinner cheio -> sidebar remonta -> página
+Depois: [clique] -> sidebar fica parada -> só o conteúdo faz fade/troca
+```
 
-## Banco de dados (migration)
+## Mudanças
 
-Criar tabelas novas (todas com GRANTs + RLS company-scoped, padrão do projeto):
+### 1. `AppLayout` vira shell de rota persistente
+- `AppLayout` passa a renderizar `<Outlet />` (do React Router) em vez de receber `children`.
+- O `<Suspense>` das páginas lazy é movido para **dentro** da área de conteúdo, com fallback discreto (spinner pequeno centralizado na área, sem `min-h-screen`).
+- O `RouteTransition` permanece envolvendo só o conteúdo (keyed por pathname).
+- Suporte a `noPadding` por página passa a ser controlado pela própria página (wrapper interno) ou por uma rota; manter o comportamento atual para WhatsApp Chat e Automação.
 
-- `student_anamneses` — anamnese única por aluno (objetivo, nível, dias força/cardio, esporte, FC, lesões, etc.).
-- `functional_assessments` — `queixa_principal`, `historico_lesoes`, `modalidade`, `nivel`, `ai_raw_response`, `report_text`, `assessment_json` (jsonb), `status`.
-- `running_plans` — `plan_name`, `sport`, `goal`, `weeks` (jsonb), `fc_zones`, `safety_check`, `general_tips`, `warnings` (text[]), `complementary_strength` (jsonb), `nutrition_alert`, `duration_weeks`, `model`, `anamnese_id`, `bundle_id`.
-- `ai_strength_plans` — `plan` (jsonb completo), `cycle_name`, `objective`, `duration_weeks`, `biomechanical_notes`, `anamnese_id`, `bundle_id`.
-- `prescription_bundles` — agrupa as prescrições de um ciclo (`has_strength`, `has_cardio`, refs para os planos e a avaliação, `status`).
+### 2. `App.tsx` — agrupar rotas sob o layout persistente
+- Criar uma rota-pai com `element={<AppLayout />}` que envolve todas as rotas de painel (master, admin, coordinator, trainer). A sidebar já se adapta ao papel internamente, então um único shell serve a todos.
+- Cada rota-filha mantém seus guards atuais (`ProtectedRoute` / `FeatureRoute` com `allowedRoles`, `requiredFeature`, `requiredModule`) envolvendo apenas o elemento da página.
+- Rotas públicas (`/`, `/auth`, `/inscricao`, `/anamnese`, `/pagamento`, `/aluno...`) ficam **fora** do shell, como hoje.
 
-RLS: acesso por `company_members` (admin/coordinator/trainer da empresa); aluno lê a própria anamnese/planos.
+### 3. Remover `<AppLayout>` de dentro das páginas (≈25 arquivos)
+Cada página passa a retornar só o seu conteúdo (sem o wrapper de layout). Arquivos:
+- Master: `MasterDashboard`, `CompaniesManager`, e a Biblioteca em `/master/exercises`.
+- Admin: `AdminDashboard`, `RegistrationManager`, `AnamnesisManager`, `PlansManager`, `TeamManager`, `StudentsManager`, `StudentDetail`, `AdminAgenda`, `FinancialDashboard`, `WhatsAppSettings/Chat/CRM/Automation/Templates`, `AppearanceSettings`, `ExerciseLibrary`, `WorkoutPrescriptions`, `WorkoutBuilder`, `UnifiedPrescriber`, `FunctionalAssessment`, `Announcements`.
+- Coordinator: `CoordinatorDashboard`.
+- Trainer: `TrainerDashboard`.
+- Páginas com `noPadding` (`WhatsAppChat`, `WhatsAppAutomation`): preservar o comportamento sem padding via wrapper próprio.
 
-## Edge functions (Anthropic)
+### 4. Manter animação de troca
+- O `RouteTransition` (fade + slide curto, respeitando `prefers-reduced-motion`) continua, agora só na área de conteúdo, então a sidebar não pisca.
+- O destaque ativo da sidebar (`layoutId="sidebar-active"`) passa a animar de forma contínua, já que a sidebar não remonta mais.
 
-Três funções adaptadas a partir do repo (limpando o texto de documentação que vem colado após o código, corrigindo CORS, validando JWT em código e salvando nas tabelas novas):
+## Resultado esperado
+- Sem spinner de tela cheia entre páginas; no máximo um spinner pequeno na área de conteúdo em primeira carga de um chunk.
+- Sidebar e cabeçalho permanecem fixos; só o conteúdo troca com transição suave.
+- Vale para todos os papéis, incluindo master.
 
-- `ai-prescribe-workout` → grava em `ai_strength_plans`. Recebe `running_days_context` e `assessment_context` (anti-interferência + avaliação funcional).
-- `ai-running-plan` → grava em `running_plans`. Recebe `strength_plan_context` e `assessment_context` (sincronização de periodização).
-- `ai-functional-assessment` → grava/atualiza `functional_assessments`; retorna `assessment_json` que alimenta as outras duas IAs.
-
-Mantêm os system prompts de metodologia (biomecânica/OHS, zonas FC, regras de anti-interferência). Modelo Anthropic será fixado num nome válido atual (o `claude-sonnet-4-6` do repo será corrigido). Tratamento de erros 401/402/429 repassado ao cliente. Registradas no `supabase/config.toml` com `verify_jwt`.
-
-## Frontend
-
-- **`src/pages/admin/UnifiedPrescriber.tsx`** — adaptado: usa `full_name`, remove a modalidade de nutrição, mantém o fluxo sequencial Musculação → Corrida com context passing, e mostra a avaliação funcional mais recente. Exibe os resultados gerados.
-- **`src/components/MusculacaoPrescriber.tsx`** e **`CorridaPrescriber.tsx`** — prescritores individuais (reaproveitados/adaptados).
-- **`src/pages/admin/FunctionalAssessment.tsx`** (novo) — UI da avaliadora: formulário (queixa, histórico, achados do OHS) → gera relatório e armazena para uso nas prescrições.
-- **Rotas** em `src/App.tsx`: `/admin/prescricao` (Prescritor Integrado), `/admin/avaliacao` (Avaliação Funcional), mais equivalentes para `coordinator`/`trainer`, protegidas por `FeatureRoute` com `requiredFeature="hasPrescription"`.
-- **`src/components/AppSidebar.tsx`** — itens "Prescrição IA" e "Avaliação Funcional".
-- **`useCompanyFeatures`** — gate da IA (sugiro liberar em `intermediate`+; confirmo na implementação).
-
-## Pré-requisito
-
-Como você escolheu Anthropic direto, vou precisar do segredo **`ANTHROPIC_API_KEY`** (pego em console.anthropic.com → API Keys). Vou solicitá-lo logo após a aprovação; as edge functions não funcionam sem ele.
-
-## Detalhes técnicos
-
-- Plans são salvos como JSON — a UI renderiza diretamente, sem depender do modelo de execução atual.
-- Anti-interferência: a saída da IA de musculação (dias de MMII pesado) é passada para a IA de corrida; a avaliação funcional é injetada como contexto em ambas.
-- Nada nas tabelas/triggers existentes (`training_cycles`, `workouts`, alerts) é alterado.
-
-## Fora de escopo (por ora)
-
-- Prescrição de nutrição (não selecionada).
-- Publicar o treino de IA no portal de execução do aluno (futuro).
+## Observações técnicas
+- Refator mecânico em ~25 páginas (remoção do wrapper), concentrando o risco em `App.tsx` e `AppLayout.tsx`.
+- Sem mudanças de schema, RLS, edge functions ou lógica de negócio — apenas estrutura de layout/rotas.
+- Guards de acesso (`FeatureRoute`/`ProtectedRoute`) e regras de tier/permissão ficam idênticos.
