@@ -1,9 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const MODEL = "claude-sonnet-4-5-20250929";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +13,29 @@ const corsHeaders = {
 };
 
 const clean = (s: string) => (s || "").replace(/[^\x20-\x7E\u00C0-\u017F]/g, "");
+
+async function requireUser(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const token = authHeader.replace("Bearer ", "");
+  const { data, error } = await supa.auth.getClaims(token);
+  if (error || !data?.claims) return null;
+  return data.claims;
+}
+
+function aiErrorResponse(status: number) {
+  const msg =
+    status === 429 ? "Limite de requisições da IA atingido. Tente novamente em instantes." :
+    status === 401 ? "Chave da Anthropic inválida. Verifique a ANTHROPIC_API_KEY." :
+    status === 402 ? "Créditos da Anthropic esgotados." :
+    "Erro ao chamar a IA.";
+  return new Response(JSON.stringify({ error: msg }), {
+    status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
 // ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `
