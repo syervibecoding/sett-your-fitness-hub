@@ -8,3 +8,12 @@ verify_jwt = false
 
 [functions.public-payment-context]
 verify_jwt = false
+
+[functions.ai-prescribe-workout]
+verify_jwt = false
+
+[functions.ai-running-plan]
+verify_jwt = false
+
+[functions.ai-functional-assessment]
+verify_jwt = false

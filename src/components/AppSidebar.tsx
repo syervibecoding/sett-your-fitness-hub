@@ -19,6 +19,9 @@ import {
   BookOpen,
   ClipboardCheck,
   Megaphone,
+  Sparkles,
+  Activity,
+
 
 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
@@ -188,7 +191,7 @@ export function AppSidebar() {
             : [];
 
   const isWhatsAppActive = location.pathname.includes("/whatsapp");
-  const isExercisesActive = location.pathname.includes("/exercises") || location.pathname.includes("/prescriptions") || location.pathname.includes("/workout/");
+  const isExercisesActive = location.pathname.includes("/exercises") || location.pathname.includes("/prescriptions") || location.pathname.includes("/workout/") || location.pathname.includes("/prescricao") || location.pathname.includes("/avaliacao");
   
   // Determine exercise menu prefix
   const exercisePrefix = showAdminView ? "/admin" : `/${role}`;
@@ -302,6 +305,22 @@ export function AppSidebar() {
                             <NavLink to={`${exercisePrefix}/prescriptions`} end>
                               <ClipboardCheck className="h-4 w-4" />
                               <span>Prescrição</span>
+                            </NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/prescricao`}>
+                            <NavLink to={`${exercisePrefix}/prescricao`} end>
+                              <Sparkles className="h-4 w-4" />
+                              <span>Prescrição IA</span>
+                            </NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/avaliacao`}>
+                            <NavLink to={`${exercisePrefix}/avaliacao`} end>
+                              <Activity className="h-4 w-4" />
+                              <span>Avaliação Funcional</span>
                             </NavLink>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
