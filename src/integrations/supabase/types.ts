@@ -110,6 +110,66 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_strength_plans: {
+        Row: {
+          anamnese_id: string | null
+          biomechanical_notes: string | null
+          bundle_id: string | null
+          company_id: string
+          created_at: string
+          cycle_name: string | null
+          duration_weeks: number | null
+          id: string
+          objective: string | null
+          plan: Json | null
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          anamnese_id?: string | null
+          biomechanical_notes?: string | null
+          bundle_id?: string | null
+          company_id: string
+          created_at?: string
+          cycle_name?: string | null
+          duration_weeks?: number | null
+          id?: string
+          objective?: string | null
+          plan?: Json | null
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          anamnese_id?: string | null
+          biomechanical_notes?: string | null
+          bundle_id?: string | null
+          company_id?: string
+          created_at?: string
+          cycle_name?: string | null
+          duration_weeks?: number | null
+          id?: string
+          objective?: string | null
+          plan?: Json | null
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_strength_plans_anamnese_id_fkey"
+            columns: ["anamnese_id"]
+            isOneToOne: false
+            referencedRelation: "student_anamneses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_strength_plans_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       anamnesis: {
         Row: {
           additional_notes: string | null
@@ -1016,6 +1076,62 @@ export type Database = {
           },
         ]
       }
+      functional_assessments: {
+        Row: {
+          ai_raw_response: string | null
+          assessment_json: Json | null
+          company_id: string
+          created_at: string
+          historico_lesoes: string | null
+          id: string
+          modalidade: string | null
+          nivel: string | null
+          queixa_principal: string | null
+          report_text: string | null
+          status: string | null
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          ai_raw_response?: string | null
+          assessment_json?: Json | null
+          company_id: string
+          created_at?: string
+          historico_lesoes?: string | null
+          id?: string
+          modalidade?: string | null
+          nivel?: string | null
+          queixa_principal?: string | null
+          report_text?: string | null
+          status?: string | null
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          ai_raw_response?: string | null
+          assessment_json?: Json | null
+          company_id?: string
+          created_at?: string
+          historico_lesoes?: string | null
+          id?: string
+          modalidade?: string | null
+          nivel?: string | null
+          queixa_principal?: string | null
+          report_text?: string | null
+          status?: string | null
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "functional_assessments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_templates: {
         Row: {
           category: string | null
@@ -1278,6 +1394,87 @@ export type Database = {
           },
         ]
       }
+      prescription_bundles: {
+        Row: {
+          anamnese_id: string | null
+          assessment_id: string | null
+          company_id: string
+          created_at: string
+          has_cardio: boolean | null
+          has_strength: boolean | null
+          id: string
+          notes: string | null
+          running_plan_id: string | null
+          status: string | null
+          strength_plan_id: string | null
+          student_id: string
+        }
+        Insert: {
+          anamnese_id?: string | null
+          assessment_id?: string | null
+          company_id: string
+          created_at?: string
+          has_cardio?: boolean | null
+          has_strength?: boolean | null
+          id?: string
+          notes?: string | null
+          running_plan_id?: string | null
+          status?: string | null
+          strength_plan_id?: string | null
+          student_id: string
+        }
+        Update: {
+          anamnese_id?: string | null
+          assessment_id?: string | null
+          company_id?: string
+          created_at?: string
+          has_cardio?: boolean | null
+          has_strength?: boolean | null
+          id?: string
+          notes?: string | null
+          running_plan_id?: string | null
+          status?: string | null
+          strength_plan_id?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prescription_bundles_anamnese_id_fkey"
+            columns: ["anamnese_id"]
+            isOneToOne: false
+            referencedRelation: "student_anamneses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prescription_bundles_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "functional_assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prescription_bundles_running_plan_id_fkey"
+            columns: ["running_plan_id"]
+            isOneToOne: false
+            referencedRelation: "running_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prescription_bundles_strength_plan_id_fkey"
+            columns: ["strength_plan_id"]
+            isOneToOne: false
+            referencedRelation: "ai_strength_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prescription_bundles_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1340,6 +1537,87 @@ export type Database = {
           },
         ]
       }
+      running_plans: {
+        Row: {
+          anamnese_id: string | null
+          bundle_id: string | null
+          company_id: string
+          complementary_strength: Json | null
+          created_at: string
+          duration_weeks: number | null
+          fc_zones: Json | null
+          general_tips: string | null
+          goal: string | null
+          id: string
+          model: string | null
+          nutrition_alert: string | null
+          plan_name: string | null
+          safety_check: Json | null
+          sport: string | null
+          student_id: string
+          updated_at: string
+          warnings: string[] | null
+          weeks: Json | null
+        }
+        Insert: {
+          anamnese_id?: string | null
+          bundle_id?: string | null
+          company_id: string
+          complementary_strength?: Json | null
+          created_at?: string
+          duration_weeks?: number | null
+          fc_zones?: Json | null
+          general_tips?: string | null
+          goal?: string | null
+          id?: string
+          model?: string | null
+          nutrition_alert?: string | null
+          plan_name?: string | null
+          safety_check?: Json | null
+          sport?: string | null
+          student_id: string
+          updated_at?: string
+          warnings?: string[] | null
+          weeks?: Json | null
+        }
+        Update: {
+          anamnese_id?: string | null
+          bundle_id?: string | null
+          company_id?: string
+          complementary_strength?: Json | null
+          created_at?: string
+          duration_weeks?: number | null
+          fc_zones?: Json | null
+          general_tips?: string | null
+          goal?: string | null
+          id?: string
+          model?: string | null
+          nutrition_alert?: string | null
+          plan_name?: string | null
+          safety_check?: Json | null
+          sport?: string | null
+          student_id?: string
+          updated_at?: string
+          warnings?: string[] | null
+          weeks?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "running_plans_anamnese_id_fkey"
+            columns: ["anamnese_id"]
+            isOneToOne: false
+            referencedRelation: "student_anamneses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "running_plans_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_achievements: {
         Row: {
           achievement_id: string
@@ -1363,6 +1641,110 @@ export type Database = {
           student_id?: string
         }
         Relationships: []
+      }
+      student_anamneses: {
+        Row: {
+          activity_level: string | null
+          age: number | null
+          body_fat_percent: number | null
+          budget_food: string | null
+          cardio_goal: string | null
+          company_id: string
+          created_at: string
+          current_volume_weekly: number | null
+          days_per_week_cardio: number | null
+          days_per_week_strength: number | null
+          equipment: string | null
+          experience_months: number | null
+          fcmax: number | null
+          fcrep: number | null
+          food_restrictions: string | null
+          has_kitchen: boolean | null
+          id: string
+          injuries: string | null
+          is_endurance_athlete: boolean | null
+          meals_per_day: number | null
+          notes: string | null
+          objective: string | null
+          session_duration_min: number | null
+          sleep_quality: number | null
+          sport: string | null
+          stress_score: number | null
+          student_id: string
+          training_modality: string | null
+          updated_at: string
+        }
+        Insert: {
+          activity_level?: string | null
+          age?: number | null
+          body_fat_percent?: number | null
+          budget_food?: string | null
+          cardio_goal?: string | null
+          company_id: string
+          created_at?: string
+          current_volume_weekly?: number | null
+          days_per_week_cardio?: number | null
+          days_per_week_strength?: number | null
+          equipment?: string | null
+          experience_months?: number | null
+          fcmax?: number | null
+          fcrep?: number | null
+          food_restrictions?: string | null
+          has_kitchen?: boolean | null
+          id?: string
+          injuries?: string | null
+          is_endurance_athlete?: boolean | null
+          meals_per_day?: number | null
+          notes?: string | null
+          objective?: string | null
+          session_duration_min?: number | null
+          sleep_quality?: number | null
+          sport?: string | null
+          stress_score?: number | null
+          student_id: string
+          training_modality?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activity_level?: string | null
+          age?: number | null
+          body_fat_percent?: number | null
+          budget_food?: string | null
+          cardio_goal?: string | null
+          company_id?: string
+          created_at?: string
+          current_volume_weekly?: number | null
+          days_per_week_cardio?: number | null
+          days_per_week_strength?: number | null
+          equipment?: string | null
+          experience_months?: number | null
+          fcmax?: number | null
+          fcrep?: number | null
+          food_restrictions?: string | null
+          has_kitchen?: boolean | null
+          id?: string
+          injuries?: string | null
+          is_endurance_athlete?: boolean | null
+          meals_per_day?: number | null
+          notes?: string | null
+          objective?: string | null
+          session_duration_min?: number | null
+          sleep_quality?: number | null
+          sport?: string | null
+          stress_score?: number | null
+          student_id?: string
+          training_modality?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_anamneses_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       student_categories: {
         Row: {
