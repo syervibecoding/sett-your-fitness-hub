@@ -234,6 +234,18 @@ INSTRUÇÃO DE SAÍDA — APENAS JSON VÁLIDO, SEM TEXTO ADICIONAL
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  if (!ANTHROPIC_API_KEY) {
+    return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY não configurada. Adicione o segredo para usar a IA." }), {
+      status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const claims = await requireUser(req);
+  if (!claims) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const {
@@ -247,8 +259,12 @@ serve(async (req) => {
       block_number,       // 1 | 2 | 3 (para liberar pliometria)
       is_endurance_athlete, // true/false — atleta de corrida/triathlon
       assessment_context,   // JSON da avaliação funcional BN
+      running_days_context, // { days_per_week, sport } — anti-interferência
+      anamnese_id,
+      bundle_id,
       notes,
     } = await req.json();
+
 
     const athleteContext = `
 DADOS DO ATLETA:
