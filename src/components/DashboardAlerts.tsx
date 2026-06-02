@@ -49,7 +49,7 @@ async function fetchAlerts(
     queries.push(addCompanyFilter(supabase.from("enrollments").select("id, student_id, trainer_id, students(full_name)")
       .in("status", ["active", "awaiting_training"]).is("training_start_date", null)));
     queries.push(addCompanyFilter(supabase.from("students").select("id, full_name").eq("status", "active")));
-    queries.push(supabase.from("enrollments").select("student_id").in("status", ["active", "awaiting_training"]));
+    queries.push(supabase.from("enrollments").select("student_id, trainer_id").in("status", ["active", "awaiting_training"]));
   }
 
   let enrollQuery = supabase.from("enrollments").select("id, student_id, trainer_id, students(full_name)")
