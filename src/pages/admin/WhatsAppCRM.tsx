@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { AppLayout } from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -218,7 +217,7 @@ export default function WhatsAppCRM() {
   });
 
   return (
-    <AppLayout>
+    <>
       <div className="flex flex-col h-[calc(100vh-4rem)]">
         <div className="mb-3">
           <h1 className="text-xl sm:text-2xl font-bold text-primary tracking-wide">CRM WhatsApp</h1>
@@ -400,6 +399,6 @@ export default function WhatsAppCRM() {
           </TabsContent>
         </Tabs>
       </div>
-    </AppLayout>
+    </>
   );
 }

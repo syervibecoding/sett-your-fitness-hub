@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Users, DollarSign, Activity, HardDrive, Info, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -96,7 +95,7 @@ export default function MasterDashboard() {
   const totalVideos = storageInfo.reduce((s, i) => s + i.videoCount, 0);
 
   return (
-    <AppLayout>
+    <>
       <div className="p-6 space-y-6">
         <h1 className="text-3xl font-bold text-foreground">Painel Master</h1>
         <p className="text-muted-foreground font-sans">Visão global de todas as instâncias da plataforma.</p>
@@ -232,6 +231,6 @@ export default function MasterDashboard() {
           </CardContent>
         </Card>
       </div>
-    </AppLayout>
+    </>
   );
 }

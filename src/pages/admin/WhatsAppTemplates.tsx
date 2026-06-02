@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { AppLayout } from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -99,7 +98,7 @@ export default function WhatsAppTemplates() {
   };
 
   return (
-    <AppLayout>
+    <>
       <div className="flex flex-col h-[calc(100vh-4rem)]">
         <div className="mb-3 flex items-center justify-between">
           <div>
@@ -179,6 +178,6 @@ export default function WhatsAppTemplates() {
           </DialogContent>
         </Dialog>
       </div>
-    </AppLayout>
+    </>
   );
 }

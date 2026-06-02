@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { AppLayout } from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -664,7 +663,7 @@ export default function WhatsAppChat() {
   const studentCtx = selectedChat ? studentContexts[selectedChat.id] : null;
 
   return (
-    <AppLayout noPadding>
+    <>
       <div className="flex flex-col h-[calc(100vh-3.5rem)]">
         <div className="flex items-center justify-between px-4 pt-3 pb-2">
           <div>
@@ -1142,6 +1141,6 @@ export default function WhatsAppChat() {
           )}
         </div>
       </div>
-    </AppLayout>
+    </>
   );
 }

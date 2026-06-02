@@ -11,7 +11,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { AppLayout } from "@/components/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
@@ -647,7 +646,7 @@ export default function TeamManager() {
 
 
   return (
-    <AppLayout>
+    <>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -1110,6 +1109,6 @@ export default function TeamManager() {
           </Dialog>
         </Tabs>
       </div>
-    </AppLayout>
+    </>
   );
 }

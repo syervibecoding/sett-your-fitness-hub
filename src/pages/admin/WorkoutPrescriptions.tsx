@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 import { useNavigate } from "react-router-dom";
-import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -150,7 +149,7 @@ export default function WorkoutPrescriptions() {
     s.cycles.reduce((sum, c) => sum + c.workouts.length, 0);
 
   return (
-    <AppLayout>
+    <>
       <div className="p-4 md:p-6 space-y-6">
         <div className="flex items-center gap-3">
           <Dumbbell className="h-6 w-6 text-primary" />
@@ -304,6 +303,6 @@ export default function WorkoutPrescriptions() {
           </div>
         </div>
       </div>
-    </AppLayout>
+    </>
   );
 }

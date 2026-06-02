@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Plus, Pencil, Trash2 } from "lucide-react";
-import { AppLayout } from "@/components/AppLayout";
 import { useMaster } from "@/contexts/MasterContext";
 
 interface Plan {
@@ -91,7 +90,7 @@ export default function PlansManager() {
   };
 
   return (
-    <AppLayout>
+    <>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -199,6 +198,6 @@ export default function PlansManager() {
           )}
         </div>
       </div>
-    </AppLayout>
+    </>
   );
 }

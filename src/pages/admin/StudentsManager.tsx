@@ -11,7 +11,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { UserPlus, Search, Pencil, Trash2, Phone, Mail, Eye, Play, Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { AppLayout } from "@/components/AppLayout";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMaster } from "@/contexts/MasterContext";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
@@ -271,7 +270,7 @@ export default function StudentsManager() {
   };
 
   return (
-    <AppLayout>
+    <>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -410,6 +409,6 @@ export default function StudentsManager() {
           </DialogContent>
         </Dialog>
       </div>
-    </AppLayout>
+    </>
   );
 }

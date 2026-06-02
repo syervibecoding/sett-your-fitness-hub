@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Dumbbell, AlertTriangle, CheckCircle, Clock, Pencil, Plus } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
-import { AppLayout } from "@/components/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
 
@@ -110,7 +109,7 @@ export default function TrainerDashboard() {
   };
 
   return (
-    <AppLayout>
+    <>
       <div className="space-y-6">
         <div>
           <h1 className="text-4xl text-primary">MEUS ALUNOS</h1>
@@ -191,6 +190,6 @@ export default function TrainerDashboard() {
           </div>
         )}
       </div>
-    </AppLayout>
+    </>
   );
 }

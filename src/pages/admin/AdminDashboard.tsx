@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, TrendingUp, RefreshCw, Clock, UserX, Timer } from "lucide-react";
 import { format, addDays } from "date-fns";
-import { AppLayout } from "@/components/AppLayout";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
 import { useMaster } from "@/contexts/MasterContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -169,7 +168,7 @@ export default function AdminDashboard() {
   const trainerMap = data?.trainerMap ?? {};
 
   return (
-    <AppLayout>
+    <>
       <div className="space-y-6">
         <div>
           <h1 className="text-4xl text-primary">DASHBOARD</h1>
@@ -303,6 +302,6 @@ export default function AdminDashboard() {
 
         <DashboardAlerts />
       </div>
-    </AppLayout>
+    </>
   );
 }

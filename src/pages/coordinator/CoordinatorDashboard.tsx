@@ -10,7 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Plus, UserCheck, Clock, Users } from "lucide-react";
 import { addWeeks, format } from "date-fns";
-import { AppLayout } from "@/components/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
 import { RenewalsAndCyclesPanel } from "@/components/dashboard/RenewalsAndCyclesPanel";
@@ -136,7 +135,7 @@ export default function CoordinatorDashboard() {
   };
 
   return (
-    <AppLayout>
+    <>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -305,6 +304,6 @@ export default function CoordinatorDashboard() {
           </DialogContent>
         </Dialog>
       </div>
-    </AppLayout>
+    </>
   );
 }

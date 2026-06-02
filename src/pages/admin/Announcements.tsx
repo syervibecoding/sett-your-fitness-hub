@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -78,7 +77,7 @@ export default function Announcements() {
   };
 
   return (
-    <AppLayout>
+    <>
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -155,6 +154,6 @@ export default function Announcements() {
           />
         )}
       </div>
-    </AppLayout>
+    </>
   );
 }
