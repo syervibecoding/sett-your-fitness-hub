@@ -52,9 +52,11 @@ export function AnnouncementEditor({ open, onClose, companyId, authorId, existin
   const handleUpload = async (file: File) => {
     setUploading(true);
     const ext = file.name.split(".").pop();
-    const path = `announcements/${companyId}/${Date.now()}.${ext}`;
+    // Storage RLS requires the first folder segment to be the company id.
+    const path = `${companyId}/announcements/${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from("platform-assets").upload(path, file, { upsert: false });
     if (error) {
+      console.error("Announcement image upload failed:", error);
       toast({ title: "Erro ao enviar imagem", description: error.message, variant: "destructive" });
       setUploading(false);
       return;
@@ -65,8 +67,12 @@ export function AnnouncementEditor({ open, onClose, companyId, authorId, existin
   };
 
   const handleSave = async () => {
+    if (!companyId) {
+      toast({ title: "Empresa não selecionada", description: "Selecione uma empresa antes de publicar.", variant: "destructive" });
+      return;
+    }
     if (!title.trim() || !body.trim()) {
-      toast({ title: "Preencha título e conteúdo", variant: "destructive" });
+      toast({ title: "Preencha título e conteúdo", description: "Título e conteúdo são obrigatórios.", variant: "destructive" });
       return;
     }
     setSaving(true);
@@ -78,17 +84,24 @@ export function AnnouncementEditor({ open, onClose, companyId, authorId, existin
       image_url: imageUrl,
       pinned,
     };
-    const { error } = existing
-      ? await supabase.from("announcements").update(payload).eq("id", existing.id)
-      : await supabase.from("announcements").insert(payload);
-    setSaving(false);
-    if (error) {
-      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
-      return;
+    try {
+      const { error } = existing
+        ? await supabase.from("announcements").update(payload).eq("id", existing.id)
+        : await supabase.from("announcements").insert(payload);
+      if (error) {
+        console.error("Announcement save failed:", error, "payload:", payload);
+        toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+        return;
+      }
+      toast({ title: existing ? "Aviso atualizado" : "Aviso publicado" });
+      onSaved?.();
+      onClose();
+    } catch (err: any) {
+      console.error("Announcement save threw:", err);
+      toast({ title: "Erro inesperado", description: err?.message ?? String(err), variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
-    toast({ title: existing ? "Aviso atualizado" : "Aviso publicado" });
-    onSaved?.();
-    onClose();
   };
 
   return (
