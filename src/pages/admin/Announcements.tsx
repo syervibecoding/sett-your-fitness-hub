@@ -46,6 +46,7 @@ export default function Announcements() {
 
   useEffect(() => {
     if (companyId) load();
+    else setLoading(false);
   }, [companyId]);
 
   const load = async () => {
