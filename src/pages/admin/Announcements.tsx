@@ -46,6 +46,7 @@ export default function Announcements() {
 
   useEffect(() => {
     if (companyId) load();
+    else setLoading(false);
   }, [companyId]);
 
   const load = async () => {
@@ -86,13 +87,27 @@ export default function Announcements() {
               Publique avisos, conteúdo educativo e mensagens para todos os alunos da empresa.
             </p>
           </div>
-          <Button onClick={() => { setEditing(null); setEditorOpen(true); }} disabled={!companyId}>
+          <Button
+            onClick={() => { setEditing(null); setEditorOpen(true); }}
+            disabled={!companyId}
+            title={!companyId ? "Selecione uma empresa para publicar avisos" : undefined}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Novo aviso
           </Button>
         </div>
 
-        {loading ? (
+        {!companyId ? (
+          <Card className="border-dashed">
+            <CardContent className="p-12 text-center">
+              <Megaphone className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+              <p className="text-muted-foreground">Selecione uma empresa para gerenciar o mural.</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Como master, escolha uma empresa no painel para publicar avisos.
+              </p>
+            </CardContent>
+          </Card>
+        ) : loading ? (
           <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
         ) : items.length === 0 ? (
           <Card className="border-dashed">
