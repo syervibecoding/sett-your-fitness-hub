@@ -93,7 +93,17 @@ export default function Announcements() {
           </Button>
         </div>
 
-        {loading ? (
+        {!companyId ? (
+          <Card className="border-dashed">
+            <CardContent className="p-12 text-center">
+              <Megaphone className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+              <p className="text-muted-foreground">Selecione uma empresa para gerenciar o mural.</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Como master, escolha uma empresa no painel para publicar avisos.
+              </p>
+            </CardContent>
+          </Card>
+        ) : loading ? (
           <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
         ) : items.length === 0 ? (
           <Card className="border-dashed">
