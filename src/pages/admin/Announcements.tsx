@@ -87,7 +87,11 @@ export default function Announcements() {
               Publique avisos, conteúdo educativo e mensagens para todos os alunos da empresa.
             </p>
           </div>
-          <Button onClick={() => { setEditing(null); setEditorOpen(true); }} disabled={!companyId}>
+          <Button
+            onClick={() => { setEditing(null); setEditorOpen(true); }}
+            disabled={!companyId}
+            title={!companyId ? "Selecione uma empresa para publicar avisos" : undefined}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Novo aviso
           </Button>
