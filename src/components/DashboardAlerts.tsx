@@ -101,10 +101,22 @@ async function fetchAlerts(
     awaitingTrainer = (results[1].data || [])
       .filter((s: any) => !studentsWithEnrollmentTrainer.has(s.id))
       .map((s: any) => ({ student_name: s.full_name, student_id: s.id }));
-    awaitingTrainingDate = (results[2].data || []).map((e: any) => ({
-      student_name: e.students?.full_name || "—", student_id: e.student_id, enrollment_id: e.id,
-      trainer_name: e.trainer_id ? trainerMap[e.trainer_id] : undefined,
-    }));
+    // Alunos que já têm alguma matrícula (ativa/aguardando) com data de treino definida — não devem aparecer como "sem data"
+    const studentsWithTrainingDate = new Set(
+      (results[4].data || []).filter((e: any) => e.training_start_date).map((e: any) => e.student_id)
+    );
+    const seenAwaitingDate = new Set<string>();
+    awaitingTrainingDate = (results[2].data || [])
+      .filter((e: any) => !studentsWithTrainingDate.has(e.student_id))
+      .filter((e: any) => {
+        if (seenAwaitingDate.has(e.student_id)) return false;
+        seenAwaitingDate.add(e.student_id);
+        return true;
+      })
+      .map((e: any) => ({
+        student_name: e.students?.full_name || "—", student_id: e.student_id, enrollment_id: e.id,
+        trainer_name: e.trainer_id ? trainerMap[e.trainer_id] : undefined,
+      }));
     const activeStudents = results[3].data || [];
     const enrolledIds = new Set((results[4].data || []).map((e: any) => e.student_id));
     missingEnrollment = activeStudents.filter((s: any) => !enrolledIds.has(s.id))
