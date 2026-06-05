@@ -338,7 +338,7 @@ export default function CompaniesManager() {
                       </Select>
 
                       {/* Subscription actions */}
-                      {company.stripe_subscription_id ? (
+                      {company.has_subscription ? (
                         <Button
                           variant="outline"
                           size="sm"
