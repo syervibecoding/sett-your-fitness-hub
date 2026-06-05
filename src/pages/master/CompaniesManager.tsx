@@ -20,9 +20,8 @@ interface Company {
   tier: string;
   is_active: boolean;
   created_at: string;
-  stripe_customer_id: string | null;
-  stripe_subscription_id: string | null;
   subscription_status: string | null;
+  has_subscription?: boolean;
 }
 
 const tierLabel: Record<string, string> = { 
@@ -71,7 +70,20 @@ export default function CompaniesManager() {
       .from("companies")
       .select("*")
       .order("created_at", { ascending: false });
-    setCompanies((data || []) as Company[]);
+    const { data: billing } = await supabase
+      .from("company_billing")
+      .select("company_id, stripe_subscription_id");
+    const subscribed = new Set(
+      (billing || [])
+        .filter((b: any) => b.stripe_subscription_id)
+        .map((b: any) => b.company_id)
+    );
+    setCompanies(
+      ((data || []) as Company[]).map((c) => ({
+        ...c,
+        has_subscription: subscribed.has(c.id),
+      }))
+    );
     setLoading(false);
   };
 
@@ -326,7 +338,7 @@ export default function CompaniesManager() {
                       </Select>
 
                       {/* Subscription actions */}
-                      {company.stripe_subscription_id ? (
+                      {company.has_subscription ? (
                         <Button
                           variant="outline"
                           size="sm"

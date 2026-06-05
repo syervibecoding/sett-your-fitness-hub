@@ -593,8 +593,6 @@ export type Database = {
           owner_id: string | null
           owner_user_id: string | null
           slug: string | null
-          stripe_customer_id: string | null
-          stripe_subscription_id: string | null
           subscription_status: string | null
           tier: string
           updated_at: string
@@ -608,8 +606,6 @@ export type Database = {
           owner_id?: string | null
           owner_user_id?: string | null
           slug?: string | null
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
           subscription_status?: string | null
           tier?: string
           updated_at?: string
@@ -623,10 +619,35 @@ export type Database = {
           owner_id?: string | null
           owner_user_id?: string | null
           slug?: string | null
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
           subscription_status?: string | null
           tier?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      company_billing: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
         }
         Relationships: []
