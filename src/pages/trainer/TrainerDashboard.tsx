@@ -54,7 +54,7 @@ export default function TrainerDashboard() {
   }, [user]);
 
   const loadData = async () => {
-    await supabase.rpc("advance_training_cycles");
+    await supabase.rpc("process_enrollment_lifecycle" as any);
     const { data: enroll } = await supabase
       .from("enrollments")
       .select("*, students(full_name), plans(name, duration_weeks)")
