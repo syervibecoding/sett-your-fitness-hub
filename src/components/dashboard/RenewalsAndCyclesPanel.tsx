@@ -131,6 +131,32 @@ export function RenewalsAndCyclesPanel({ effectiveCompanyId, routePrefix, renewa
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {awaitingRenewal.length > 0 && (
+          <div className="space-y-2 mb-4">
+            <p className="text-[11px] font-mono uppercase tracking-wide text-muted-foreground">Aguardando renovação</p>
+            <div className="space-y-3 max-h-[220px] overflow-auto">
+              {awaitingRenewal.map((contract: any) => {
+                const isOverdue = contract.payment_status === "overdue";
+                return (
+                  <div key={contract.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border cursor-pointer hover:brightness-110 transition-all" onClick={() => navigate(`/${routePrefix}/students/${contract.student_id}`)}>
+                    <div>
+                      <p className="text-foreground font-sans font-medium text-sm">{contract.students?.full_name}</p>
+                      <p className="text-muted-foreground text-xs font-sans">{contract.plans?.name}</p>
+                      {contract.trainer_id && trainerMap[contract.trainer_id] && (
+                        <p className="text-muted-foreground/70 text-[11px] font-sans">Treinador: {trainerMap[contract.trainer_id]}</p>
+                      )}
+                    </div>
+                    <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
+                      isOverdue ? "bg-destructive/20 text-destructive" : "bg-warning/20 text-warning"
+                    }`}>
+                      {isOverdue ? "Inadimplente" : "Renovar"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {expiringContracts.length > 0 ? (
           <div className="space-y-3 max-h-[250px] overflow-auto">
             {expiringContracts.map((contract: any) => {
@@ -154,9 +180,9 @@ export function RenewalsAndCyclesPanel({ effectiveCompanyId, routePrefix, renewa
               );
             })}
           </div>
-        ) : (
+        ) : awaitingRenewal.length === 0 ? (
           <p className="text-muted-foreground font-sans text-center py-8">Nenhuma renovação pendente</p>
-        )}
+        ) : null}
       </CardContent>
     </Card>
   );
