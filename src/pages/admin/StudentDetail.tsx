@@ -358,7 +358,7 @@ export default function StudentDetail() {
     setEnrollments(enrichedEnrollments);
 
     // Set header trainer from active enrollment, fallback to assigned_trainer_id
-    const activeEnrollment = enrichedEnrollments.find(e => e.status === "active" || e.status === "awaiting_training") || enrichedEnrollments[0];
+    const activeEnrollment = enrichedEnrollments.find(e => e.status === "active" || e.status === "awaiting_training" || e.status === "awaiting_renewal") || enrichedEnrollments[0];
     if (activeEnrollment) {
       setTrainerName(trainerMap.get(activeEnrollment.trainer_id) || null);
     } else if (studentData.assigned_trainer_id) {
