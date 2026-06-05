@@ -87,6 +87,7 @@ async function fetchRenewalsAndCycles(effectiveCompanyId: string | null | undefi
 
   const allTrainerIds = new Set<string>();
   expiringContracts.forEach((e: any) => { if (e.trainer_id) allTrainerIds.add(e.trainer_id); });
+  awaitingRenewal.forEach((e: any) => { if (e.trainer_id) allTrainerIds.add(e.trainer_id); });
   countdowns.forEach((m: any) => { if (m.trainer_id) allTrainerIds.add(m.trainer_id); });
   const trainerMap: Record<string, string> = {};
   if (allTrainerIds.size > 0) {
@@ -97,7 +98,7 @@ async function fetchRenewalsAndCycles(effectiveCompanyId: string | null | undefi
     (profiles || []).forEach((p: any) => { trainerMap[p.user_id] = p.full_name || ""; });
   }
 
-  return { expiringContracts, cycleCountdowns: countdowns, trainerMap };
+  return { expiringContracts, awaitingRenewal, cycleCountdowns: countdowns, trainerMap };
 }
 
 interface Props {
