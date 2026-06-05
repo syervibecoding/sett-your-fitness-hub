@@ -20,9 +20,8 @@ interface Company {
   tier: string;
   is_active: boolean;
   created_at: string;
-  stripe_customer_id: string | null;
-  stripe_subscription_id: string | null;
   subscription_status: string | null;
+  has_subscription?: boolean;
 }
 
 const tierLabel: Record<string, string> = { 
