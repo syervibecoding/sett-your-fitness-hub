@@ -126,7 +126,7 @@ async function fetchAlerts(
     nextIdx = 1;
   }
 
-  // Cycle alerts
+  // Cycle alerts — flag apenas alunos SEM nenhum treino em nenhum ciclo (aluno realmente novo)
   let missingWorkouts: MissingWorkout[] = [];
   const enrollments = results[nextIdx].data;
   if (enrollments && enrollments.length > 0) {
@@ -136,29 +136,52 @@ async function fetchAlerts(
       enrollMap[e.id] = { name: e.students?.full_name || "—", student_id: e.student_id, trainer_name: e.trainer_id ? trainerMap[e.trainer_id] : undefined };
     });
 
+    // Todos os ciclos (qualquer status) das matrículas vigentes
     const { data: allCycles } = await supabase.from("training_cycles").select("*")
-      .in("enrollment_id", enrollIds).in("status", ["active"]);
-    const activeCycleIds: string[] = (allCycles || []).map((c: any) => c.id);
+      .in("enrollment_id", enrollIds);
 
-    if (activeCycleIds.length > 0) {
-      const { data: workouts } = await supabase.from("workouts").select("cycle_id").in("cycle_id", activeCycleIds);
+    if (allCycles && allCycles.length > 0) {
+      const allCycleIds = allCycles.map((c: any) => c.id);
+      const { data: workouts } = await supabase.from("workouts").select("cycle_id").in("cycle_id", allCycleIds);
       const cyclesWithWorkout = new Set((workouts || []).map((w: any) => w.cycle_id));
-      const missing: MissingWorkout[] = [];
-      (allCycles || []).forEach((c: any) => {
-        if (!cyclesWithWorkout.has(c.id)) {
+
+      // Conjunto de alunos que possuem PELO MENOS UM treino em qualquer ciclo
+      const studentsWithAnyWorkout = new Set<string>();
+      allCycles.forEach((c: any) => {
+        if (cyclesWithWorkout.has(c.id)) {
           const info = enrollMap[c.enrollment_id];
-          missing.push({ student_name: info?.name || "—", student_id: info?.student_id || "", cycle_number: c.cycle_number, cycle_id: c.id, start_date: c.start_date, end_date: c.end_date, trainer_name: info?.trainer_name });
+          if (info?.student_id) studentsWithAnyWorkout.add(info.student_id);
         }
       });
-      const firstPerStudent = new Map<string, MissingWorkout>();
-      missing.forEach((m) => {
-        const existing = firstPerStudent.get(m.student_name);
-        if (!existing || m.cycle_number < existing.cycle_number) firstPerStudent.set(m.student_name, m);
+
+      // Para alunos sem nenhum treino, escolher o ciclo de referência (ativo, senão o primeiro)
+      const refPerStudent = new Map<string, MissingWorkout>();
+      allCycles.forEach((c: any) => {
+        const info = enrollMap[c.enrollment_id];
+        if (!info?.student_id || studentsWithAnyWorkout.has(info.student_id)) return;
+        const candidate: MissingWorkout = {
+          student_name: info.name || "—", student_id: info.student_id, cycle_number: c.cycle_number,
+          cycle_id: c.id, start_date: c.start_date, end_date: c.end_date, trainer_name: info.trainer_name,
+        };
+        const existing = refPerStudent.get(info.student_id);
+        const candidateActive = c.status === "active";
+        const existingActive = existing ? false : false; // recalculado abaixo
+        if (!existing) {
+          refPerStudent.set(info.student_id, candidate);
+        } else if (candidateActive && existing.cycle_number !== candidate.cycle_number) {
+          // prioriza ciclo ativo
+          refPerStudent.set(info.student_id, candidate);
+        } else if (candidate.cycle_number < existing.cycle_number) {
+          refPerStudent.set(info.student_id, candidate);
+        }
+        void existingActive;
       });
-      missingWorkouts = Array.from(firstPerStudent.values())
+
+      missingWorkouts = Array.from(refPerStudent.values())
         .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
     }
   }
+
 
   // Incomplete billing
   let incompleteBilling: IncompleteBilling[] = [];
