@@ -857,7 +857,7 @@ export default function StudentDetail() {
               <div className="space-y-4">
                 {/* Active enrollment summary */}
                 {enrollments.length > 0 && (() => {
-                  const active = enrollments.find(e => e.status === "active" || e.status === "awaiting_training") || enrollments[0];
+                  const active = enrollments.find(e => e.status === "active" || e.status === "awaiting_training" || e.status === "awaiting_renewal") || enrollments[0];
                   return (
                     <Card className="bg-card border-border">
                       <CardHeader className="pb-3">
