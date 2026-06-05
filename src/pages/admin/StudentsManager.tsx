@@ -66,7 +66,7 @@ export default function StudentsManager() {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [searchParams] = useSearchParams();
   const initialStatus = searchParams.get("status");
-  const [filter, setFilter] = useState(initialStatus && ["active", "pending", "inactive"].includes(initialStatus) ? initialStatus : "all");
+  const [filter, setFilter] = useState(initialStatus && ["active", "pending", "inactive", "awaiting_renewal"].includes(initialStatus) ? initialStatus : "all");
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Student | null>(null);
