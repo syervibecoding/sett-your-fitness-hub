@@ -154,7 +154,7 @@ async function fetchAlerts(
         }
       });
 
-      // Para alunos sem nenhum treino, escolher o ciclo de referência (ativo, senão o primeiro)
+      // Para alunos sem nenhum treino, escolher o ciclo de referência (ativo, senão o de menor número)
       const refPerStudent = new Map<string, MissingWorkout>();
       allCycles.forEach((c: any) => {
         const info = enrollMap[c.enrollment_id];
@@ -164,18 +164,15 @@ async function fetchAlerts(
           cycle_id: c.id, start_date: c.start_date, end_date: c.end_date, trainer_name: info.trainer_name,
         };
         const existing = refPerStudent.get(info.student_id);
-        const candidateActive = c.status === "active";
-        const existingActive = existing ? false : false; // recalculado abaixo
         if (!existing) {
           refPerStudent.set(info.student_id, candidate);
-        } else if (candidateActive && existing.cycle_number !== candidate.cycle_number) {
-          // prioriza ciclo ativo
+        } else if (c.status === "active") {
           refPerStudent.set(info.student_id, candidate);
         } else if (candidate.cycle_number < existing.cycle_number) {
           refPerStudent.set(info.student_id, candidate);
         }
-        void existingActive;
       });
+
 
       missingWorkouts = Array.from(refPerStudent.values())
         .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
