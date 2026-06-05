@@ -801,6 +801,16 @@ export default function StudentPortal() {
         {activeView === "avisos" && studentId && companyId && (
           <AnnouncementsFeed studentId={studentId} companyId={companyId} />
         )}
+
+        {/* MEDIDAS VIEW */}
+        {activeView === "medidas" && studentId && companyId && (
+          <BodyMeasurements
+            studentId={studentId}
+            companyId={companyId}
+            gender={gender}
+            onGenderChange={setGender}
+          />
+        )}
           </motion.div>
         </AnimatePresence>
 
