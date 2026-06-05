@@ -1160,7 +1160,7 @@ export default function StudentDetail() {
           {/* ===== TREINOS ===== */}
           <TabsContent value="workouts" className="space-y-4">
             {(() => {
-              const activeEnroll = enrollments.find(e => e.status === "active" || e.status === "awaiting_training");
+              const activeEnroll = enrollments.find(e => e.status === "active" || e.status === "awaiting_training" || e.status === "awaiting_renewal");
               if (!activeEnroll) return <p className="text-muted-foreground font-sans text-sm text-center py-8">Nenhuma matrícula ativa.</p>;
               const enrollCycles = cycles.filter(c => c.enrollment_id === activeEnroll.id);
               if (enrollCycles.length === 0) {
