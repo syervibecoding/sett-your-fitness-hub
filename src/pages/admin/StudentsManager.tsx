@@ -50,11 +50,12 @@ interface Trainer {
   full_name: string;
 }
 
-const statusLabels: Record<string, string> = { active: "Ativo", pending: "Pendente", inactive: "Inativo" };
+const statusLabels: Record<string, string> = { active: "Ativo", pending: "Pendente", inactive: "Inativo", awaiting_renewal: "Aguardando Renovação" };
 const statusColors: Record<string, string> = {
   active: "bg-success/15 text-success border-success/30",
   pending: "bg-warning/15 text-warning border-warning/30",
   inactive: "bg-muted text-muted-foreground border-border",
+  awaiting_renewal: "bg-warning/15 text-warning border-warning/30",
 };
 
 const emptyForm = { full_name: "", email: "", phone: "", status: "pending", notes: "", birth_date: "", cpf: "", cep: "", address: "", address_number: "", neighborhood: "", city: "", state: "", whatsapp: "" };
