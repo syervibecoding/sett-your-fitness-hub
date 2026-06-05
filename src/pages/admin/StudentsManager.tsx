@@ -313,6 +313,7 @@ export default function StudentsManager() {
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="active">Ativos</SelectItem>
+              <SelectItem value="awaiting_renewal">Aguardando Renovação</SelectItem>
               <SelectItem value="pending">Pendentes</SelectItem>
               <SelectItem value="inactive">Inativos</SelectItem>
             </SelectContent>
