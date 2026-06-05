@@ -70,7 +70,20 @@ export default function CompaniesManager() {
       .from("companies")
       .select("*")
       .order("created_at", { ascending: false });
-    setCompanies((data || []) as Company[]);
+    const { data: billing } = await supabase
+      .from("company_billing")
+      .select("company_id, stripe_subscription_id");
+    const subscribed = new Set(
+      (billing || [])
+        .filter((b: any) => b.stripe_subscription_id)
+        .map((b: any) => b.company_id)
+    );
+    setCompanies(
+      ((data || []) as Company[]).map((c) => ({
+        ...c,
+        has_subscription: subscribed.has(c.id),
+      }))
+    );
     setLoading(false);
   };
 
