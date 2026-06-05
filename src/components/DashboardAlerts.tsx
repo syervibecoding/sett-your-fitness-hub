@@ -46,10 +46,10 @@ async function fetchAlerts(
   if (!trainerId) {
     queries.push(addCompanyFilter(supabase.from("students").select("id, full_name, assigned_trainer_id")
       .in("status", ["active", "pending"]).is("assigned_trainer_id", null)));
-    queries.push(addCompanyFilter(supabase.from("enrollments").select("id, student_id, trainer_id, students(full_name)")
+    queries.push(addCompanyFilter(supabase.from("enrollments").select("id, student_id, trainer_id, created_at, students(full_name)")
       .in("status", ["active", "awaiting_training"]).is("training_start_date", null)));
     queries.push(addCompanyFilter(supabase.from("students").select("id, full_name").eq("status", "active")));
-    queries.push(supabase.from("enrollments").select("student_id, trainer_id").in("status", ["active", "awaiting_training"]));
+    queries.push(supabase.from("enrollments").select("student_id, trainer_id, training_start_date").in("status", ["active", "awaiting_training"]));
   }
 
   let enrollQuery = supabase.from("enrollments").select("id, student_id, trainer_id, students(full_name)")
@@ -101,10 +101,22 @@ async function fetchAlerts(
     awaitingTrainer = (results[1].data || [])
       .filter((s: any) => !studentsWithEnrollmentTrainer.has(s.id))
       .map((s: any) => ({ student_name: s.full_name, student_id: s.id }));
-    awaitingTrainingDate = (results[2].data || []).map((e: any) => ({
-      student_name: e.students?.full_name || "—", student_id: e.student_id, enrollment_id: e.id,
-      trainer_name: e.trainer_id ? trainerMap[e.trainer_id] : undefined,
-    }));
+    // Alunos que já têm alguma matrícula (ativa/aguardando) com data de treino definida — não devem aparecer como "sem data"
+    const studentsWithTrainingDate = new Set(
+      (results[4].data || []).filter((e: any) => e.training_start_date).map((e: any) => e.student_id)
+    );
+    const seenAwaitingDate = new Set<string>();
+    awaitingTrainingDate = (results[2].data || [])
+      .filter((e: any) => !studentsWithTrainingDate.has(e.student_id))
+      .filter((e: any) => {
+        if (seenAwaitingDate.has(e.student_id)) return false;
+        seenAwaitingDate.add(e.student_id);
+        return true;
+      })
+      .map((e: any) => ({
+        student_name: e.students?.full_name || "—", student_id: e.student_id, enrollment_id: e.id,
+        trainer_name: e.trainer_id ? trainerMap[e.trainer_id] : undefined,
+      }));
     const activeStudents = results[3].data || [];
     const enrolledIds = new Set((results[4].data || []).map((e: any) => e.student_id));
     missingEnrollment = activeStudents.filter((s: any) => !enrolledIds.has(s.id))
@@ -114,7 +126,7 @@ async function fetchAlerts(
     nextIdx = 1;
   }
 
-  // Cycle alerts
+  // Cycle alerts — flag apenas alunos SEM nenhum treino em nenhum ciclo (aluno realmente novo)
   let missingWorkouts: MissingWorkout[] = [];
   const enrollments = results[nextIdx].data;
   if (enrollments && enrollments.length > 0) {
@@ -124,29 +136,49 @@ async function fetchAlerts(
       enrollMap[e.id] = { name: e.students?.full_name || "—", student_id: e.student_id, trainer_name: e.trainer_id ? trainerMap[e.trainer_id] : undefined };
     });
 
+    // Todos os ciclos (qualquer status) das matrículas vigentes
     const { data: allCycles } = await supabase.from("training_cycles").select("*")
-      .in("enrollment_id", enrollIds).in("status", ["active"]);
-    const activeCycleIds: string[] = (allCycles || []).map((c: any) => c.id);
+      .in("enrollment_id", enrollIds);
 
-    if (activeCycleIds.length > 0) {
-      const { data: workouts } = await supabase.from("workouts").select("cycle_id").in("cycle_id", activeCycleIds);
+    if (allCycles && allCycles.length > 0) {
+      const allCycleIds = allCycles.map((c: any) => c.id);
+      const { data: workouts } = await supabase.from("workouts").select("cycle_id").in("cycle_id", allCycleIds);
       const cyclesWithWorkout = new Set((workouts || []).map((w: any) => w.cycle_id));
-      const missing: MissingWorkout[] = [];
-      (allCycles || []).forEach((c: any) => {
-        if (!cyclesWithWorkout.has(c.id)) {
+
+      // Conjunto de alunos que possuem PELO MENOS UM treino em qualquer ciclo
+      const studentsWithAnyWorkout = new Set<string>();
+      allCycles.forEach((c: any) => {
+        if (cyclesWithWorkout.has(c.id)) {
           const info = enrollMap[c.enrollment_id];
-          missing.push({ student_name: info?.name || "—", student_id: info?.student_id || "", cycle_number: c.cycle_number, cycle_id: c.id, start_date: c.start_date, end_date: c.end_date, trainer_name: info?.trainer_name });
+          if (info?.student_id) studentsWithAnyWorkout.add(info.student_id);
         }
       });
-      const firstPerStudent = new Map<string, MissingWorkout>();
-      missing.forEach((m) => {
-        const existing = firstPerStudent.get(m.student_name);
-        if (!existing || m.cycle_number < existing.cycle_number) firstPerStudent.set(m.student_name, m);
+
+      // Para alunos sem nenhum treino, escolher o ciclo de referência (ativo, senão o de menor número)
+      const refPerStudent = new Map<string, MissingWorkout>();
+      allCycles.forEach((c: any) => {
+        const info = enrollMap[c.enrollment_id];
+        if (!info?.student_id || studentsWithAnyWorkout.has(info.student_id)) return;
+        const candidate: MissingWorkout = {
+          student_name: info.name || "—", student_id: info.student_id, cycle_number: c.cycle_number,
+          cycle_id: c.id, start_date: c.start_date, end_date: c.end_date, trainer_name: info.trainer_name,
+        };
+        const existing = refPerStudent.get(info.student_id);
+        if (!existing) {
+          refPerStudent.set(info.student_id, candidate);
+        } else if (c.status === "active") {
+          refPerStudent.set(info.student_id, candidate);
+        } else if (candidate.cycle_number < existing.cycle_number) {
+          refPerStudent.set(info.student_id, candidate);
+        }
       });
-      missingWorkouts = Array.from(firstPerStudent.values())
+
+
+      missingWorkouts = Array.from(refPerStudent.values())
         .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
     }
   }
+
 
   // Incomplete billing
   let incompleteBilling: IncompleteBilling[] = [];

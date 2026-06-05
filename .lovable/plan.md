@@ -1,52 +1,51 @@
-# Transições de página suaves (master e demais painéis)
+# Corrigir alertas falsos de "Sem data" e "Sem treino"
 
 ## Problema
-Hoje **cada página** (`/master`, `/admin/...`, `/coordinator/...`, `/trainer/...`) renderiza o próprio `<AppLayout>` (sidebar + cabeçalho) por dentro. Como o layout está dentro da página carregada via `lazy()`, toda navegação:
 
-1. Mostra um **spinner de tela cheia** (`PageLoader`) enquanto o novo arquivo carrega.
-2. **Desmonta e remonta a sidebar inteira**, causando o "piscar"/recarregamento que você sente como master.
+Os cards do painel **DEFINIR DATA DE TREINO** e **SEM TREINO NO CICLO** estão mostrando alunos que, na prática, já estão com a situação resolvida. A causa é dupla:
 
-O `RouteTransition` não resolve porque o shell inteiro está sendo destruído a cada clique.
+1. **Matrículas duplicadas/antigas.** Vários alunos têm mais de uma matrícula. Quando uma matrícula antiga ficou "active" sem data de treino e sem ciclos (resquício de cadastro), ela continua sendo contada nos alertas mesmo que o aluno tenha uma matrícula nova completa. Ex.: Bruno Farias tem 3 matrículas — uma antiga vazia e duas novas com data e 8 ciclos.
 
-## Solução
-Tornar o shell (sidebar + cabeçalho) **persistente**. Ele monta uma vez e só a área de conteúdo troca, com um spinner pequeno apenas dentro do conteúdo (não na tela toda).
+2. **Lógica por matrícula, não por aluno.** O alerta avalia cada matrícula isoladamente. Basta uma matrícula sem data (ou um ciclo novo vazio) para o aluno aparecer, ignorando que ele já tem outra matrícula com data/treino definidos.
 
-```text
-Antes:  [clique] -> tela branca + spinner cheio -> sidebar remonta -> página
-Depois: [clique] -> sidebar fica parada -> só o conteúdo faz fade/troca
-```
+Resultado: o alerta vira ruído e o treinador não distingue quem realmente precisa de ação (ex.: Alexia, que nunca teve treino) de quem já está em dia.
+
+## Objetivo
+
+Os alertas devem refletir a situação real do aluno:
+
+- **Definir data de treino**: só listar aluno cuja matrícula vigente realmente não tem data, e que não possua nenhuma outra matrícula com data já definida.
+- **Sem treino no ciclo**: só listar aluno que não tem nenhum treino em nenhum ciclo da matrícula vigente (caso da Alexia). Aluno que já treina há ciclos e só está com o ciclo novo vazio não deve ser tratado como "aluno sem treino".
 
 ## Mudanças
 
-### 1. `AppLayout` vira shell de rota persistente
-- `AppLayout` passa a renderizar `<Outlet />` (do React Router) em vez de receber `children`.
-- O `<Suspense>` das páginas lazy é movido para **dentro** da área de conteúdo, com fallback discreto (spinner pequeno centralizado na área, sem `min-h-screen`).
-- O `RouteTransition` permanece envolvendo só o conteúdo (keyed por pathname).
-- Suporte a `noPadding` por página passa a ser controlado pela própria página (wrapper interno) ou por uma rota; manter o comportamento atual para WhatsApp Chat e Automação.
+### 1. Ajustar a lógica dos alertas (`src/components/DashboardAlerts.tsx`)
 
-### 2. `App.tsx` — agrupar rotas sob o layout persistente
-- Criar uma rota-pai com `element={<AppLayout />}` que envolve todas as rotas de painel (master, admin, coordinator, trainer). A sidebar já se adapta ao papel internamente, então um único shell serve a todos.
-- Cada rota-filha mantém seus guards atuais (`ProtectedRoute` / `FeatureRoute` com `allowedRoles`, `requiredFeature`, `requiredModule`) envolvendo apenas o elemento da página.
-- Rotas públicas (`/`, `/auth`, `/inscricao`, `/anamnese`, `/pagamento`, `/aluno...`) ficam **fora** do shell, como hoje.
+- **Escolher a matrícula vigente por aluno:** ao montar os alertas, agrupar matrículas por `student_id` e considerar apenas a matrícula mais relevante (a mais recente entre `active`/`awaiting_training`, dando preferência à que já tem ciclos). Matrículas antigas/duplicadas vazias deixam de gerar alerta.
+- **Alerta "Definir data de treino":** flag somente quando a matrícula vigente do aluno está sem `training_start_date` **e** o aluno não tem nenhuma outra matrícula com `training_start_date` preenchida.
+- **Alerta "Sem treino no ciclo":** flag somente quando o aluno não possui treino em **nenhum** ciclo da matrícula vigente (aluno verdadeiramente novo). Continua deduplicado por aluno (um item por aluno).
 
-### 3. Remover `<AppLayout>` de dentro das páginas (≈25 arquivos)
-Cada página passa a retornar só o seu conteúdo (sem o wrapper de layout). Arquivos:
-- Master: `MasterDashboard`, `CompaniesManager`, e a Biblioteca em `/master/exercises`.
-- Admin: `AdminDashboard`, `RegistrationManager`, `AnamnesisManager`, `PlansManager`, `TeamManager`, `StudentsManager`, `StudentDetail`, `AdminAgenda`, `FinancialDashboard`, `WhatsAppSettings/Chat/CRM/Automation/Templates`, `AppearanceSettings`, `ExerciseLibrary`, `WorkoutPrescriptions`, `WorkoutBuilder`, `UnifiedPrescriber`, `FunctionalAssessment`, `Announcements`.
-- Coordinator: `CoordinatorDashboard`.
-- Trainer: `TrainerDashboard`.
-- Páginas com `noPadding` (`WhatsAppChat`, `WhatsAppAutomation`): preservar o comportamento sem padding via wrapper próprio.
+### 2. Limpeza de dados (matrículas duplicadas/antigas)
 
-### 4. Manter animação de troca
-- O `RouteTransition` (fade + slide curto, respeitando `prefers-reduced-motion`) continua, agora só na área de conteúdo, então a sidebar não pisca.
-- O destaque ativo da sidebar (`layoutId="sidebar-active"`) passa a animar de forma contínua, já que a sidebar não remonta mais.
+Corrigir os registros que já estão inconsistentes, sem apagar histórico válido:
 
-## Resultado esperado
-- Sem spinner de tela cheia entre páginas; no máximo um spinner pequeno na área de conteúdo em primeira carga de um chunk.
-- Sidebar e cabeçalho permanecem fixos; só o conteúdo troca com transição suave.
-- Vale para todos os papéis, incluindo master.
+- **Matrículas duplicadas idênticas** (mesmo aluno, mesma data de início e mesma data de treino, criadas quase no mesmo momento): manter a mais recente e marcar a duplicada como `inactive`.
+- **Matrículas "active" vazias e antigas** (sem data de treino e sem ciclos) quando o aluno já tem outra matrícula completa: marcar como `inactive`.
 
-## Observações técnicas
-- Refator mecânico em ~25 páginas (remoção do wrapper), concentrando o risco em `App.tsx` e `AppLayout.tsx`.
-- Sem mudanças de schema, RLS, edge functions ou lógica de negócio — apenas estrutura de layout/rotas.
-- Guards de acesso (`FeatureRoute`/`ProtectedRoute`) e regras de tier/permissão ficam idênticos.
+Essa limpeza será feita com revisão caso a caso via atualização de dados (ferramenta de dados), não como migração de schema.
+
+### 3. Validação
+
+- Recarregar o painel do treinador/admin e confirmar que Bruno Farias sai do card "Definir data de treino".
+- Confirmar que apenas alunos realmente sem data aparecem nesse card.
+- Confirmar que apenas alunos sem nenhum treino (ex.: Alexia) aparecem em "Sem treino no ciclo".
+
+## Detalhes técnicos
+
+- A seleção da matrícula vigente por aluno será calculada em memória dentro de `fetchAlerts`, ordenando por `created_at` desc e priorizando matrículas com ciclos, evitando novas queries pesadas.
+- Para "Sem treino", a checagem passa a olhar todos os ciclos da matrícula vigente (não só o ativo) para decidir se o aluno tem qualquer treino prescrito.
+- A limpeza de dados afeta apenas a coluna `status` de `enrollments` (para `inactive`); nenhum ciclo, treino ou pagamento é removido.
+
+## Fora de escopo (a confirmar depois, se desejar)
+
+- Clonar automaticamente o treino do ciclo anterior para o ciclo novo (para o aluno nunca ficar com ciclo vazio). Não está incluído aqui; este plano apenas remove o ruído dos alertas. Posso adicionar em seguida se você quiser.
