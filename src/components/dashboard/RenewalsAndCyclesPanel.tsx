@@ -119,6 +119,7 @@ export function RenewalsAndCyclesPanel({ effectiveCompanyId, routePrefix, renewa
   });
 
   const expiringContracts = data?.expiringContracts || [];
+  const awaitingRenewal = data?.awaitingRenewal || [];
   const cycleCountdowns = data?.cycleCountdowns || [];
   const trainerMap = data?.trainerMap || {};
 
