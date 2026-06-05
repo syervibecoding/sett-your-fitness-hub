@@ -29,6 +29,8 @@ import { CycleFeedbackBanner } from "@/components/student/CycleFeedbackBanner";
 import { calculateStreak } from "@/lib/streakCalculator";
 import { ExternalActivitiesList } from "@/components/student/ExternalActivitiesList";
 import { AnnouncementsFeed } from "@/components/student/AnnouncementsFeed";
+import { BodyMeasurements } from "@/components/student/BodyMeasurements";
+import type { Gender } from "@/components/student/BodyAvatar";
 import { Megaphone, Activity } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
