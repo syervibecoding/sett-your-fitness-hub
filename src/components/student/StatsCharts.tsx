@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import { format, parseISO, differenceInCalendarDays, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { BodyMap } from "./BodyMap";
+import { MuscleRadar } from "./MuscleRadar";
 
 interface StatsChartsProps {
   allLogs: any[];
@@ -292,7 +292,7 @@ export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
           <Card className="bg-card border-border">
             <CardContent className="p-4">
               <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-4">Volume por Grupamento</h3>
-              <BodyMap muscleVolumes={muscleVolumes} />
+              <MuscleRadar muscleVolumes={muscleVolumes} />
             </CardContent>
           </Card>
 

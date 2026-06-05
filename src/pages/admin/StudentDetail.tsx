@@ -36,7 +36,7 @@ import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 // Heavy children loaded only when their tab is opened (chunk size win)
 const WorkoutAnalysis = lazy(() => import("@/components/trainer/WorkoutAnalysis").then(m => ({ default: m.WorkoutAnalysis })));
 const TrainerWeeklyBar = lazy(() => import("@/components/trainer/TrainerWeeklyBar").then(m => ({ default: m.TrainerWeeklyBar })));
-const BodyMap = lazy(() => import("@/components/student/BodyMap").then(m => ({ default: m.BodyMap })));
+const MuscleRadar = lazy(() => import("@/components/student/MuscleRadar").then(m => ({ default: m.MuscleRadar })));
 const StudentFeedbackTab = lazy(() => import("@/components/admin/StudentFeedbackTab").then(m => ({ default: m.StudentFeedbackTab })));
 
 const TabFallback = () => (
@@ -1252,7 +1252,7 @@ export default function StudentDetail() {
                                   return (
                                     <div key={w.id} className="space-y-2">
                                       <p className="text-xs font-sans font-medium text-muted-foreground">{w.title || `Treino ${w.name}`}</p>
-                                      <BodyMap muscleVolumes={muscleVolumes} />
+                                      <MuscleRadar muscleVolumes={muscleVolumes} />
                                     </div>
                                   );
                                 })}
