@@ -2658,6 +2658,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      process_enrollment_lifecycle: { Args: never; Returns: undefined }
       recalculate_training_cycles: {
         Args: { p_enrollment_id: string; p_new_start_date: string }
         Returns: undefined

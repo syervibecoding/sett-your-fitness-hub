@@ -7,12 +7,13 @@ import { useNavigate } from "react-router-dom";
 
 interface PanelData {
   expiringContracts: any[];
+  awaitingRenewal: any[];
   cycleCountdowns: any[];
   trainerMap: Record<string, string>;
 }
 
 async function fetchRenewalsAndCycles(effectiveCompanyId: string | null | undefined): Promise<PanelData> {
-  await supabase.rpc("advance_training_cycles");
+  await supabase.rpc("process_enrollment_lifecycle" as any);
   const thirtyDaysFromNow = format(addDays(new Date(), 30), "yyyy-MM-dd");
 
   let expiringQuery = supabase
@@ -22,6 +23,12 @@ async function fetchRenewalsAndCycles(effectiveCompanyId: string | null | undefi
     .lte("end_date", thirtyDaysFromNow)
     .order("end_date", { ascending: true });
 
+  let awaitingRenewalQuery = supabase
+    .from("enrollments")
+    .select("*, trainer_id, payment_status, students(full_name, status), plans(name)")
+    .eq("status", "awaiting_renewal")
+    .order("end_date", { ascending: true }) as any;
+
   let cycleEnrollQuery = supabase
     .from("enrollments")
     .select("id, student_id, training_start_date, trainer_id, students(full_name, assigned_trainer_id)")
@@ -29,14 +36,20 @@ async function fetchRenewalsAndCycles(effectiveCompanyId: string | null | undefi
 
   if (effectiveCompanyId) {
     expiringQuery = expiringQuery.eq("company_id", effectiveCompanyId);
+    awaitingRenewalQuery = awaitingRenewalQuery.eq("company_id", effectiveCompanyId);
     cycleEnrollQuery = cycleEnrollQuery.eq("company_id", effectiveCompanyId);
   }
 
-  const [expiringRes, activeEnrollsRes] = await Promise.all([expiringQuery, cycleEnrollQuery]);
+  const [expiringRes, awaitingRenewalRes, activeEnrollsRes] = await Promise.all([expiringQuery, awaitingRenewalQuery, cycleEnrollQuery]);
 
   const expiringContracts = (expiringRes.data || []).filter((e: any) => {
     const s = e.students?.status;
     return s === "active" || s === "pending";
+  });
+
+  const awaitingRenewal = ((awaitingRenewalRes as any)?.data || []).filter((e: any) => {
+    const s = e.students?.status;
+    return s !== "inactive";
   });
 
   const activeEnrolls = (activeEnrollsRes as any)?.data || [];
@@ -74,6 +87,7 @@ async function fetchRenewalsAndCycles(effectiveCompanyId: string | null | undefi
 
   const allTrainerIds = new Set<string>();
   expiringContracts.forEach((e: any) => { if (e.trainer_id) allTrainerIds.add(e.trainer_id); });
+  awaitingRenewal.forEach((e: any) => { if (e.trainer_id) allTrainerIds.add(e.trainer_id); });
   countdowns.forEach((m: any) => { if (m.trainer_id) allTrainerIds.add(m.trainer_id); });
   const trainerMap: Record<string, string> = {};
   if (allTrainerIds.size > 0) {
@@ -84,7 +98,7 @@ async function fetchRenewalsAndCycles(effectiveCompanyId: string | null | undefi
     (profiles || []).forEach((p: any) => { trainerMap[p.user_id] = p.full_name || ""; });
   }
 
-  return { expiringContracts, cycleCountdowns: countdowns, trainerMap };
+  return { expiringContracts, awaitingRenewal, cycleCountdowns: countdowns, trainerMap };
 }
 
 interface Props {
@@ -105,6 +119,7 @@ export function RenewalsAndCyclesPanel({ effectiveCompanyId, routePrefix, renewa
   });
 
   const expiringContracts = data?.expiringContracts || [];
+  const awaitingRenewal = data?.awaitingRenewal || [];
   const cycleCountdowns = data?.cycleCountdowns || [];
   const trainerMap = data?.trainerMap || {};
 
@@ -116,6 +131,32 @@ export function RenewalsAndCyclesPanel({ effectiveCompanyId, routePrefix, renewa
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {awaitingRenewal.length > 0 && (
+          <div className="space-y-2 mb-4">
+            <p className="text-[11px] font-mono uppercase tracking-wide text-muted-foreground">Aguardando renovação</p>
+            <div className="space-y-3 max-h-[220px] overflow-auto">
+              {awaitingRenewal.map((contract: any) => {
+                const isOverdue = contract.payment_status === "overdue";
+                return (
+                  <div key={contract.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border cursor-pointer hover:brightness-110 transition-all" onClick={() => navigate(`/${routePrefix}/students/${contract.student_id}`)}>
+                    <div>
+                      <p className="text-foreground font-sans font-medium text-sm">{contract.students?.full_name}</p>
+                      <p className="text-muted-foreground text-xs font-sans">{contract.plans?.name}</p>
+                      {contract.trainer_id && trainerMap[contract.trainer_id] && (
+                        <p className="text-muted-foreground/70 text-[11px] font-sans">Treinador: {trainerMap[contract.trainer_id]}</p>
+                      )}
+                    </div>
+                    <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
+                      isOverdue ? "bg-destructive/20 text-destructive" : "bg-warning/20 text-warning"
+                    }`}>
+                      {isOverdue ? "Inadimplente" : "Renovar"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {expiringContracts.length > 0 ? (
           <div className="space-y-3 max-h-[250px] overflow-auto">
             {expiringContracts.map((contract: any) => {
@@ -139,9 +180,9 @@ export function RenewalsAndCyclesPanel({ effectiveCompanyId, routePrefix, renewa
               );
             })}
           </div>
-        ) : (
+        ) : awaitingRenewal.length === 0 ? (
           <p className="text-muted-foreground font-sans text-center py-8">Nenhuma renovação pendente</p>
-        )}
+        ) : null}
       </CardContent>
     </Card>
   );

@@ -161,6 +161,7 @@ const statusLabels: Record<string, string> = {
   completed: "Concluído",
   upcoming: "Próximo",
   awaiting_training: "Aguardando Prescrição",
+  awaiting_renewal: "Aguardando Renovação",
 };
 
 const statusColors: Record<string, string> = {
@@ -170,6 +171,7 @@ const statusColors: Record<string, string> = {
   completed: "bg-muted text-muted-foreground border-border",
   upcoming: "bg-warning/15 text-warning border-warning/30",
   awaiting_training: "bg-warning/15 text-warning border-warning/30",
+  awaiting_renewal: "bg-warning/15 text-warning border-warning/30",
 };
 
 const cycleCalendarColors: Record<string, { bg: string; text: string }> = {
@@ -356,7 +358,7 @@ export default function StudentDetail() {
     setEnrollments(enrichedEnrollments);
 
     // Set header trainer from active enrollment, fallback to assigned_trainer_id
-    const activeEnrollment = enrichedEnrollments.find(e => e.status === "active" || e.status === "awaiting_training") || enrichedEnrollments[0];
+    const activeEnrollment = enrichedEnrollments.find(e => e.status === "active" || e.status === "awaiting_training" || e.status === "awaiting_renewal") || enrichedEnrollments[0];
     if (activeEnrollment) {
       setTrainerName(trainerMap.get(activeEnrollment.trainer_id) || null);
     } else if (studentData.assigned_trainer_id) {
@@ -855,7 +857,7 @@ export default function StudentDetail() {
               <div className="space-y-4">
                 {/* Active enrollment summary */}
                 {enrollments.length > 0 && (() => {
-                  const active = enrollments.find(e => e.status === "active" || e.status === "awaiting_training") || enrollments[0];
+                  const active = enrollments.find(e => e.status === "active" || e.status === "awaiting_training" || e.status === "awaiting_renewal") || enrollments[0];
                   return (
                     <Card className="bg-card border-border">
                       <CardHeader className="pb-3">
@@ -1158,7 +1160,7 @@ export default function StudentDetail() {
           {/* ===== TREINOS ===== */}
           <TabsContent value="workouts" className="space-y-4">
             {(() => {
-              const activeEnroll = enrollments.find(e => e.status === "active" || e.status === "awaiting_training");
+              const activeEnroll = enrollments.find(e => e.status === "active" || e.status === "awaiting_training" || e.status === "awaiting_renewal");
               if (!activeEnroll) return <p className="text-muted-foreground font-sans text-sm text-center py-8">Nenhuma matrícula ativa.</p>;
               const enrollCycles = cycles.filter(c => c.enrollment_id === activeEnroll.id);
               if (enrollCycles.length === 0) {
