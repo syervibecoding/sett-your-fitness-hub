@@ -85,8 +85,14 @@ serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
-    // Find or create Stripe customer
-    let customerId = company.stripe_customer_id;
+    // Find or create Stripe customer (billing data lives in restricted company_billing table)
+    const { data: billing } = await supabaseClient
+      .from("company_billing")
+      .select("stripe_customer_id")
+      .eq("company_id", companyId)
+      .maybeSingle();
+
+    let customerId = billing?.stripe_customer_id;
     if (!customerId) {
       const customers = await stripe.customers.list({ email: ownerEmail, limit: 1 });
       if (customers.data.length > 0) {
@@ -100,11 +106,10 @@ serve(async (req) => {
         customerId = customer.id;
       }
 
-      // Save customer ID to company
+      // Save customer ID to billing table
       await supabaseClient
-        .from("companies")
-        .update({ stripe_customer_id: customerId })
-        .eq("id", companyId);
+        .from("company_billing")
+        .upsert({ company_id: companyId, stripe_customer_id: customerId }, { onConflict: "company_id" });
 
       logStep("Stripe customer created/found", { customerId });
     }
