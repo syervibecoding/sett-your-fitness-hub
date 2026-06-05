@@ -120,7 +120,7 @@ export default function StudentsManager() {
       const studentIds = studentsData.map(s => s.id);
       const { data: enrollments } = await supabase
         .from("enrollments").select("student_id, plan_id, status")
-        .in("student_id", studentIds).in("status", ["active", "awaiting_training"]);
+        .in("student_id", studentIds).in("status", ["active", "awaiting_training", "awaiting_renewal"]);
 
       const planMap = new Map((plansData || []).map(p => [p.id, p.name]));
       const studentPlanMap = new Map<string, string>();
