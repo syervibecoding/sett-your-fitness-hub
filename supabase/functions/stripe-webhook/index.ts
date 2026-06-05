@@ -124,18 +124,18 @@ serve(async (req) => {
         const subscriptionId = invoice.subscription as string;
 
         if (subscriptionId) {
-          const { data: companies } = await supabaseClient
-            .from("companies")
-            .select("id")
+          const { data: billings } = await supabaseClient
+            .from("company_billing")
+            .select("company_id")
             .eq("stripe_subscription_id", subscriptionId);
 
-          if (companies && companies.length > 0) {
+          if (billings && billings.length > 0) {
             await supabaseClient
               .from("companies")
               .update({ subscription_status: "past_due" })
-              .eq("id", companies[0].id);
+              .eq("id", billings[0].company_id);
 
-            logStep("Company marked as past due", { companyId: companies[0].id });
+            logStep("Company marked as past due", { companyId: billings[0].company_id });
           }
         }
         break;
