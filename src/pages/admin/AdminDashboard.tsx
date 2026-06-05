@@ -35,8 +35,8 @@ interface DashboardData {
 }
 
 async function fetchDashboardData(effectiveCompanyId: string | null | undefined): Promise<DashboardData> {
-  // Advance expired cycles before loading dashboard data
-  await supabase.rpc("advance_training_cycles");
+  // Run enrollment lifecycle (advance cycles, renewals, auto-overdue) before loading dashboard data
+  await supabase.rpc("process_enrollment_lifecycle" as any);
   const thirtyDaysFromNow = format(addDays(new Date(), 30), "yyyy-MM-dd");
 
   let studentQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "active");
