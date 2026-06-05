@@ -59,11 +59,17 @@ serve(async (req) => {
           await supabaseClient
             .from("companies")
             .update({
-              stripe_subscription_id: subscriptionId,
               subscription_status: "active",
               tier: tier || "basic",
             })
             .eq("id", companyId);
+
+          await supabaseClient
+            .from("company_billing")
+            .upsert(
+              { company_id: companyId, stripe_subscription_id: subscriptionId },
+              { onConflict: "company_id" }
+            );
 
           logStep("Company updated with subscription", { companyId });
         }
