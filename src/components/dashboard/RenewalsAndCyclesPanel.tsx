@@ -7,12 +7,13 @@ import { useNavigate } from "react-router-dom";
 
 interface PanelData {
   expiringContracts: any[];
+  awaitingRenewal: any[];
   cycleCountdowns: any[];
   trainerMap: Record<string, string>;
 }
 
 async function fetchRenewalsAndCycles(effectiveCompanyId: string | null | undefined): Promise<PanelData> {
-  await supabase.rpc("advance_training_cycles");
+  await supabase.rpc("process_enrollment_lifecycle" as any);
   const thirtyDaysFromNow = format(addDays(new Date(), 30), "yyyy-MM-dd");
 
   let expiringQuery = supabase
@@ -22,6 +23,12 @@ async function fetchRenewalsAndCycles(effectiveCompanyId: string | null | undefi
     .lte("end_date", thirtyDaysFromNow)
     .order("end_date", { ascending: true });
 
+  let awaitingRenewalQuery = supabase
+    .from("enrollments")
+    .select("*, trainer_id, payment_status, students(full_name, status), plans(name)")
+    .eq("status", "awaiting_renewal")
+    .order("end_date", { ascending: true }) as any;
+
   let cycleEnrollQuery = supabase
     .from("enrollments")
     .select("id, student_id, training_start_date, trainer_id, students(full_name, assigned_trainer_id)")
@@ -29,14 +36,20 @@ async function fetchRenewalsAndCycles(effectiveCompanyId: string | null | undefi
 
   if (effectiveCompanyId) {
     expiringQuery = expiringQuery.eq("company_id", effectiveCompanyId);
+    awaitingRenewalQuery = awaitingRenewalQuery.eq("company_id", effectiveCompanyId);
     cycleEnrollQuery = cycleEnrollQuery.eq("company_id", effectiveCompanyId);
   }
 
-  const [expiringRes, activeEnrollsRes] = await Promise.all([expiringQuery, cycleEnrollQuery]);
+  const [expiringRes, awaitingRenewalRes, activeEnrollsRes] = await Promise.all([expiringQuery, awaitingRenewalQuery, cycleEnrollQuery]);
 
   const expiringContracts = (expiringRes.data || []).filter((e: any) => {
     const s = e.students?.status;
     return s === "active" || s === "pending";
+  });
+
+  const awaitingRenewal = ((awaitingRenewalRes as any)?.data || []).filter((e: any) => {
+    const s = e.students?.status;
+    return s !== "inactive";
   });
 
   const activeEnrolls = (activeEnrollsRes as any)?.data || [];
