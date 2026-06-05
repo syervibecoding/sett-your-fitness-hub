@@ -29,11 +29,13 @@ import { CycleFeedbackBanner } from "@/components/student/CycleFeedbackBanner";
 import { calculateStreak } from "@/lib/streakCalculator";
 import { ExternalActivitiesList } from "@/components/student/ExternalActivitiesList";
 import { AnnouncementsFeed } from "@/components/student/AnnouncementsFeed";
+import { BodyMeasurements } from "@/components/student/BodyMeasurements";
+import type { Gender } from "@/components/student/BodyAvatar";
 import { Megaphone, Activity } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 
-type ActiveView = "home" | "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos";
+type ActiveView = "home" | "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos" | "medidas";
 
 
 interface WorkoutExercise {
@@ -85,6 +87,7 @@ export default function StudentPortal() {
   const [studentId, setStudentId] = useState<string | null>(null);
   const [studentName, setStudentName] = useState("");
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [gender, setGender] = useState<Gender | null>(null);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [selectedCycle, setSelectedCycle] = useState<Cycle | null>(null);
   const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(null);
@@ -117,7 +120,7 @@ export default function StudentPortal() {
   const loadStudentData = async () => {
     const { data: student } = await supabase
       .from("students")
-      .select("id, full_name, company_id, weekly_workout_goal")
+      .select("id, full_name, company_id, weekly_workout_goal, gender")
       .eq("user_id", user!.id)
       .maybeSingle();
 
@@ -125,6 +128,7 @@ export default function StudentPortal() {
     setStudentId(student.id);
     setStudentName(student.full_name);
     setCompanyId(student.company_id);
+    setGender((student as any).gender === "male" || (student as any).gender === "female" ? (student as any).gender : null);
     setWeeklyGoal((student as any).weekly_workout_goal || 3);
 
 
@@ -516,6 +520,7 @@ export default function StudentPortal() {
     historico: "HISTÓRICO",
     atividades: "ATIVIDADES",
     avisos: "AVISOS",
+    medidas: "MEDIDAS",
   };
 
 
@@ -795,6 +800,16 @@ export default function StudentPortal() {
         {/* AVISOS VIEW */}
         {activeView === "avisos" && studentId && companyId && (
           <AnnouncementsFeed studentId={studentId} companyId={companyId} />
+        )}
+
+        {/* MEDIDAS VIEW */}
+        {activeView === "medidas" && studentId && companyId && (
+          <BodyMeasurements
+            studentId={studentId}
+            companyId={companyId}
+            gender={gender}
+            onGenderChange={setGender}
+          />
         )}
           </motion.div>
         </AnimatePresence>

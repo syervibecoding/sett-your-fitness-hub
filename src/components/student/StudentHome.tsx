@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Dumbbell, BarChart3, CalendarDays, History, Activity, Megaphone } from "lucide-react";
+import { Dumbbell, BarChart3, CalendarDays, History, Activity, Megaphone, Ruler } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { WeeklyBar } from "./WeeklyBar";
@@ -30,7 +30,7 @@ interface StudentHomeProps {
   streak: number;
   goalEditor?: React.ReactNode;
   achievementsPanel?: React.ReactNode;
-  onNavigate: (view: "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos") => void;
+  onNavigate: (view: "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos" | "medidas") => void;
 }
 
 
@@ -200,6 +200,21 @@ export function StudentHome({
               <div>
                 <h3 className="font-bold text-foreground font-sans text-sm">Avisos</h3>
                 <p className="text-xs text-muted-foreground font-sans mt-0.5">Mural do treinador</p>
+              </div>
+            </CardContent>
+          </Card>
+        </button>
+
+        {/* Medidas */}
+        <button onClick={() => onNavigate("medidas")} className="text-left">
+          <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
+            <CardContent className="p-5 flex flex-col gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Ruler className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-bold text-foreground font-sans text-sm">Medidas</h3>
+                <p className="text-xs text-muted-foreground font-sans mt-0.5">Circunferências e avatar</p>
               </div>
             </CardContent>
           </Card>

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart3, AlertTriangle, CheckCircle, TrendingUp, Activity } from "lucide-react";
-import { BodyMap } from "@/components/student/BodyMap";
+import { MuscleRadar } from "@/components/student/MuscleRadar";
 
 interface Props {
   studentId: string;
@@ -302,8 +302,8 @@ export function WorkoutAnalysis({ studentId }: Props) {
               <Activity className="h-4 w-4 text-primary" />
               Distribuição Muscular
             </h3>
-            <div className="flex justify-center">
-              <BodyMap muscleVolumes={muscleData.map(mg => ({ muscleGroup: mg.name, volume: mg.totalVolume }))} />
+            <div className="w-full">
+              <MuscleRadar muscleVolumes={muscleData.map(mg => ({ muscleGroup: mg.name, volume: mg.totalVolume }))} />
             </div>
 
             {/* Alerts */}

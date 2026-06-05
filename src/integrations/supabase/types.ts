@@ -583,6 +583,66 @@ export type Database = {
           },
         ]
       }
+      body_measurements: {
+        Row: {
+          abdomen: number | null
+          arm: number | null
+          calf: number | null
+          chest: number | null
+          company_id: string
+          created_at: string
+          forearm: number | null
+          hip: number | null
+          id: string
+          measured_at: string
+          neck: number | null
+          notes: string | null
+          shoulder: number | null
+          student_id: string
+          thigh: number | null
+          updated_at: string
+          waist: number | null
+        }
+        Insert: {
+          abdomen?: number | null
+          arm?: number | null
+          calf?: number | null
+          chest?: number | null
+          company_id: string
+          created_at?: string
+          forearm?: number | null
+          hip?: number | null
+          id?: string
+          measured_at?: string
+          neck?: number | null
+          notes?: string | null
+          shoulder?: number | null
+          student_id: string
+          thigh?: number | null
+          updated_at?: string
+          waist?: number | null
+        }
+        Update: {
+          abdomen?: number | null
+          arm?: number | null
+          calf?: number | null
+          chest?: number | null
+          company_id?: string
+          created_at?: string
+          forearm?: number | null
+          hip?: number | null
+          id?: string
+          measured_at?: string
+          neck?: number | null
+          notes?: string | null
+          shoulder?: number | null
+          student_id?: string
+          thigh?: number | null
+          updated_at?: string
+          waist?: number | null
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           created_at: string
