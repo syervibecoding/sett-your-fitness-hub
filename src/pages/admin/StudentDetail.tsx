@@ -161,6 +161,7 @@ const statusLabels: Record<string, string> = {
   completed: "Concluído",
   upcoming: "Próximo",
   awaiting_training: "Aguardando Prescrição",
+  awaiting_renewal: "Aguardando Renovação",
 };
 
 const statusColors: Record<string, string> = {
@@ -170,6 +171,7 @@ const statusColors: Record<string, string> = {
   completed: "bg-muted text-muted-foreground border-border",
   upcoming: "bg-warning/15 text-warning border-warning/30",
   awaiting_training: "bg-warning/15 text-warning border-warning/30",
+  awaiting_renewal: "bg-warning/15 text-warning border-warning/30",
 };
 
 const cycleCalendarColors: Record<string, { bg: string; text: string }> = {
