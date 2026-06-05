@@ -42,14 +42,14 @@ serve(async (req) => {
     const { companyId } = await req.json();
     if (!companyId) throw new Error("companyId is required");
 
-    // Get company info
-    const { data: company, error: companyError } = await supabaseClient
-      .from("companies")
+    // Get Stripe customer id from restricted billing table
+    const { data: billing, error: billingError } = await supabaseClient
+      .from("company_billing")
       .select("stripe_customer_id")
-      .eq("id", companyId)
-      .single();
+      .eq("company_id", companyId)
+      .maybeSingle();
 
-    if (companyError || !company?.stripe_customer_id) {
+    if (billingError || !billing?.stripe_customer_id) {
       throw new Error("Company not found or no Stripe customer");
     }
 
@@ -57,7 +57,7 @@ serve(async (req) => {
     const origin = req.headers.get("origin") || "https://bnperformancetraining.lovable.app";
 
     const portalSession = await stripe.billingPortal.sessions.create({
-      customer: company.stripe_customer_id,
+      customer: billing.stripe_customer_id,
       return_url: `${origin}/master/companies`,
     });
 
