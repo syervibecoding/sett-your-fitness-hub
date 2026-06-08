@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Trophy, Clock, Dumbbell, TrendingUp, CheckCircle2, Share2, MessageCircle } from "lucide-react";
 import type { ExerciseSummaryItem } from "@/hooks/useWorkoutSession";
 
+const WHATSAPP_FEEDBACK_URL = "https://wa.me/message/GZWXMSEEKWGII1";
+
 interface WorkoutSummaryProps {
   open: boolean;
   onClose: () => void;
@@ -13,11 +15,10 @@ interface WorkoutSummaryProps {
   totalSetsPrescribed: number;
   exercises: ExerciseSummaryItem[];
   formatTime: (s: number) => string;
-  whatsappNumber?: string | null;
 }
 
 export function WorkoutSummary({
-  open, onClose, durationSeconds, totalVolume, totalSetsCompleted, totalSetsPrescribed, exercises, formatTime, whatsappNumber
+  open, onClose, durationSeconds, totalVolume, totalSetsCompleted, totalSetsPrescribed, exercises, formatTime
 }: WorkoutSummaryProps) {
   const prs = exercises.filter(e => e.isPR);
 
