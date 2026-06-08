@@ -835,19 +835,8 @@ export default function StudentPortal() {
         </DialogContent>
       </Dialog>
 
-      {/* Post-workout feedback (shows before summary) */}
-      {pendingFeedbackSessionId && studentId && companyId && (
-        <PostWorkoutFeedback
-          open={!!pendingFeedbackSessionId}
-          onClose={() => setPendingFeedbackSessionId(null)}
-          studentId={studentId}
-          companyId={companyId}
-          workoutSessionId={pendingFeedbackSessionId}
-        />
-      )}
-
-      {/* Workout Summary Modal (gated by feedback step) */}
-      {session.summary && !pendingFeedbackSessionId && (
+      {/* Workout Summary Modal */}
+      {session.summary && (
         <WorkoutSummary
           open={!!session.summary}
           onClose={session.clearSummary}
@@ -857,7 +846,6 @@ export default function StudentPortal() {
           totalSetsPrescribed={session.summary.totalSetsPrescribed}
           exercises={session.summary.exercisesSummary}
           formatTime={session.formatTime}
-          whatsappNumber={companyWhatsapp}
         />
       )}
 
