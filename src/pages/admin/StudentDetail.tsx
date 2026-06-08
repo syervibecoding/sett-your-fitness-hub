@@ -37,7 +37,7 @@ import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 const WorkoutAnalysis = lazy(() => import("@/components/trainer/WorkoutAnalysis").then(m => ({ default: m.WorkoutAnalysis })));
 const TrainerWeeklyBar = lazy(() => import("@/components/trainer/TrainerWeeklyBar").then(m => ({ default: m.TrainerWeeklyBar })));
 const MuscleRadar = lazy(() => import("@/components/student/MuscleRadar").then(m => ({ default: m.MuscleRadar })));
-const StudentFeedbackTab = lazy(() => import("@/components/admin/StudentFeedbackTab").then(m => ({ default: m.StudentFeedbackTab })));
+
 
 const TabFallback = () => (
   <div className="flex items-center justify-center py-12">
