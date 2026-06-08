@@ -165,7 +165,7 @@ export default function AdminDashboard() {
     staleTime: 60_000,
   });
 
-  const stats = data?.stats ?? { totalStudents: 0, pendingStudents: 0, inactiveStudents: 0, trainers: 0 };
+  const stats = data?.stats ?? { totalStudents: 0, pendingStudents: 0, awaitingRenewalStudents: 0, inactiveStudents: 0, trainers: 0 };
   const planChart = data?.planChart ?? [];
   const expiringContracts = data?.expiringContracts ?? [];
   const cycleCountdowns = data?.cycleCountdowns ?? [];
@@ -181,7 +181,7 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <Card className="bg-card border-border cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate(`/${routePrefix}/students?status=active`)}>
             <CardContent className="flex items-center gap-4 pt-6">
               <div className="p-3 rounded-lg bg-primary/10"><Users className="h-6 w-6 text-primary" /></div>
@@ -197,6 +197,15 @@ export default function AdminDashboard() {
               <div>
                 <p className="text-2xl font-bold text-foreground font-sans">{stats.pendingStudents}</p>
                 <p className="text-sm text-muted-foreground font-sans">Alunos Pendentes</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border cursor-pointer hover:border-warning/50 transition-colors" onClick={() => navigate(`/${routePrefix}/students?status=awaiting_renewal`)}>
+            <CardContent className="flex items-center gap-4 pt-6">
+              <div className="p-3 rounded-lg bg-warning/10"><RotateCcw className="h-6 w-6 text-warning" /></div>
+              <div>
+                <p className="text-2xl font-bold text-foreground font-sans">{stats.awaitingRenewalStudents}</p>
+                <p className="text-sm text-muted-foreground font-sans">Aguardando Renovação</p>
               </div>
             </CardContent>
           </Card>
