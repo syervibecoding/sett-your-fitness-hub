@@ -2,7 +2,7 @@ import { lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, TrendingUp, RefreshCw, Clock, UserX, Timer } from "lucide-react";
+import { Users, TrendingUp, RefreshCw, Clock, UserX, Timer, RotateCcw } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
 import { useMaster } from "@/contexts/MasterContext";
@@ -27,7 +27,7 @@ const LazyChart = lazy(() => import("recharts").then(mod => ({
 })));
 
 interface DashboardData {
-  stats: { totalStudents: number; pendingStudents: number; inactiveStudents: number; trainers: number };
+  stats: { totalStudents: number; pendingStudents: number; awaitingRenewalStudents: number; inactiveStudents: number; trainers: number };
   planChart: { name: string; count: number }[];
   expiringContracts: any[];
   cycleCountdowns: any[];
@@ -41,6 +41,7 @@ async function fetchDashboardData(effectiveCompanyId: string | null | undefined)
 
   let studentQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "active");
   let pendingQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "pending");
+  let awaitingRenewalQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "awaiting_renewal");
   let inactiveQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "inactive");
   let enrollQuery = supabase.from("enrollments").select("plan_id, plans(name)");
   let expiringQuery = supabase.from("enrollments").select("*, trainer_id, students(full_name, status), plans(name)")
@@ -50,6 +51,7 @@ async function fetchDashboardData(effectiveCompanyId: string | null | undefined)
   if (effectiveCompanyId) {
     studentQuery = studentQuery.eq("company_id", effectiveCompanyId);
     pendingQuery = pendingQuery.eq("company_id", effectiveCompanyId);
+    awaitingRenewalQuery = awaitingRenewalQuery.eq("company_id", effectiveCompanyId);
     inactiveQuery = inactiveQuery.eq("company_id", effectiveCompanyId);
     enrollQuery = enrollQuery.eq("company_id", effectiveCompanyId);
     expiringQuery = expiringQuery.eq("company_id", effectiveCompanyId);
@@ -73,9 +75,10 @@ async function fetchDashboardData(effectiveCompanyId: string | null | undefined)
     return count || 0;
   })();
 
-  const [studentRes, pendingRes, inactiveRes, enrollRes, expiringRes, activeEnrollsRes, trainerCount] = await Promise.all([
+  const [studentRes, pendingRes, awaitingRenewalRes, inactiveRes, enrollRes, expiringRes, activeEnrollsRes, trainerCount] = await Promise.all([
     studentQuery,
     pendingQuery,
+    awaitingRenewalQuery,
     inactiveQuery,
     enrollQuery,
     expiringQuery,
@@ -86,6 +89,7 @@ async function fetchDashboardData(effectiveCompanyId: string | null | undefined)
   const stats = {
     totalStudents: studentRes.count || 0,
     pendingStudents: pendingRes.count || 0,
+    awaitingRenewalStudents: awaitingRenewalRes.count || 0,
     inactiveStudents: inactiveRes.count || 0,
     trainers: trainerCount,
   };
@@ -161,7 +165,7 @@ export default function AdminDashboard() {
     staleTime: 60_000,
   });
 
-  const stats = data?.stats ?? { totalStudents: 0, pendingStudents: 0, inactiveStudents: 0, trainers: 0 };
+  const stats = data?.stats ?? { totalStudents: 0, pendingStudents: 0, awaitingRenewalStudents: 0, inactiveStudents: 0, trainers: 0 };
   const planChart = data?.planChart ?? [];
   const expiringContracts = data?.expiringContracts ?? [];
   const cycleCountdowns = data?.cycleCountdowns ?? [];
@@ -177,7 +181,7 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <Card className="bg-card border-border cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate(`/${routePrefix}/students?status=active`)}>
             <CardContent className="flex items-center gap-4 pt-6">
               <div className="p-3 rounded-lg bg-primary/10"><Users className="h-6 w-6 text-primary" /></div>
@@ -193,6 +197,15 @@ export default function AdminDashboard() {
               <div>
                 <p className="text-2xl font-bold text-foreground font-sans">{stats.pendingStudents}</p>
                 <p className="text-sm text-muted-foreground font-sans">Alunos Pendentes</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border cursor-pointer hover:border-warning/50 transition-colors" onClick={() => navigate(`/${routePrefix}/students?status=awaiting_renewal`)}>
+            <CardContent className="flex items-center gap-4 pt-6">
+              <div className="p-3 rounded-lg bg-warning/10"><RotateCcw className="h-6 w-6 text-warning" /></div>
+              <div>
+                <p className="text-2xl font-bold text-foreground font-sans">{stats.awaitingRenewalStudents}</p>
+                <p className="text-sm text-muted-foreground font-sans">Aguardando Renovação</p>
               </div>
             </CardContent>
           </Card>
