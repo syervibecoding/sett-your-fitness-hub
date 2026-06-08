@@ -75,9 +75,10 @@ async function fetchDashboardData(effectiveCompanyId: string | null | undefined)
     return count || 0;
   })();
 
-  const [studentRes, pendingRes, inactiveRes, enrollRes, expiringRes, activeEnrollsRes, trainerCount] = await Promise.all([
+  const [studentRes, pendingRes, awaitingRenewalRes, inactiveRes, enrollRes, expiringRes, activeEnrollsRes, trainerCount] = await Promise.all([
     studentQuery,
     pendingQuery,
+    awaitingRenewalQuery,
     inactiveQuery,
     enrollQuery,
     expiringQuery,
@@ -88,6 +89,7 @@ async function fetchDashboardData(effectiveCompanyId: string | null | undefined)
   const stats = {
     totalStudents: studentRes.count || 0,
     pendingStudents: pendingRes.count || 0,
+    awaitingRenewalStudents: awaitingRenewalRes.count || 0,
     inactiveStudents: inactiveRes.count || 0,
     trainers: trainerCount,
   };
