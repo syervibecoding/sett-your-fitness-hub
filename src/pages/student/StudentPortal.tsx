@@ -421,8 +421,7 @@ export default function StudentPortal() {
       previousBestWeights[`ex-${idx}`] = maxW;
     });
 
-    const result = await session.finishSession(logs, selectedWorkout.exercises, previousBestWeights);
-    if (result?.id) setPendingFeedbackSessionId(result.id);
+    await session.finishSession(logs, selectedWorkout.exercises, previousBestWeights);
   };
 
 
