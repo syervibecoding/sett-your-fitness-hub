@@ -20,7 +20,6 @@ import { WeeklyBar } from "@/components/student/WeeklyBar";
 import { StudentHome } from "@/components/student/StudentHome";
 import { StudentCalendar } from "@/components/student/StudentCalendar";
 import { StudentHistory } from "@/components/student/StudentHistory";
-import { WorkoutSummary } from "@/components/student/WorkoutSummary";
 import { WorkoutHeader } from "@/components/student/WorkoutHeader";
 import { WeeklyGoalEditor } from "@/components/student/WeeklyGoalEditor";
 import { AchievementsPanel } from "@/components/student/AchievementsPanel";
