@@ -840,14 +840,9 @@ export default function StudentDetail() {
             <TabsTrigger value="anamnesis" className="text-xs sm:text-sm">Anamnese</TabsTrigger>
             <TabsTrigger value="financial" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
             <TabsTrigger value="evaluations" className="text-xs sm:text-sm">Avaliações</TabsTrigger>
-            <TabsTrigger value="feedback" className="text-xs sm:text-sm">Feedbacks</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="feedback">
-            <Suspense fallback={<TabFallback />}>
-              {student && <StudentFeedbackTab studentId={student.id} />}
-            </Suspense>
-          </TabsContent>
+
 
 
           {/* ===== VISÃO GERAL ===== */}
