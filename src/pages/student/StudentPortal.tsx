@@ -20,7 +20,6 @@ import { WeeklyBar } from "@/components/student/WeeklyBar";
 import { StudentHome } from "@/components/student/StudentHome";
 import { StudentCalendar } from "@/components/student/StudentCalendar";
 import { StudentHistory } from "@/components/student/StudentHistory";
-import { PostWorkoutFeedback } from "@/components/student/PostWorkoutFeedback";
 import { WorkoutHeader } from "@/components/student/WorkoutHeader";
 import { WeeklyGoalEditor } from "@/components/student/WeeklyGoalEditor";
 import { AchievementsPanel } from "@/components/student/AchievementsPanel";
@@ -104,7 +103,7 @@ export default function StudentPortal() {
   const [workoutSessions, setWorkoutSessions] = useState<any[]>([]);
   const [weeklyGoal, setWeeklyGoal] = useState<number>(3);
   const [activeEnrollmentId, setActiveEnrollmentId] = useState<string | null>(null);
-  const [pendingFeedbackSessionId, setPendingFeedbackSessionId] = useState<string | null>(null);
+  
 
   const selectedWorkout = selectedCycle?.workouts.find(w => w.id === selectedWorkoutId) || selectedCycle?.workouts[0] || null;
   const todayStr = new Date().toISOString().split("T")[0];
@@ -422,8 +421,7 @@ export default function StudentPortal() {
       previousBestWeights[`ex-${idx}`] = maxW;
     });
 
-    const result = await session.finishSession(logs, selectedWorkout.exercises, previousBestWeights);
-    if (result?.id) setPendingFeedbackSessionId(result.id);
+    await session.finishSession(logs, selectedWorkout.exercises, previousBestWeights);
   };
 
 
@@ -836,19 +834,8 @@ export default function StudentPortal() {
         </DialogContent>
       </Dialog>
 
-      {/* Post-workout feedback (shows before summary) */}
-      {pendingFeedbackSessionId && studentId && companyId && (
-        <PostWorkoutFeedback
-          open={!!pendingFeedbackSessionId}
-          onClose={() => setPendingFeedbackSessionId(null)}
-          studentId={studentId}
-          companyId={companyId}
-          workoutSessionId={pendingFeedbackSessionId}
-        />
-      )}
-
-      {/* Workout Summary Modal (gated by feedback step) */}
-      {session.summary && !pendingFeedbackSessionId && (
+      {/* Workout Summary Modal */}
+      {session.summary && (
         <WorkoutSummary
           open={!!session.summary}
           onClose={session.clearSummary}
@@ -858,7 +845,6 @@ export default function StudentPortal() {
           totalSetsPrescribed={session.summary.totalSetsPrescribed}
           exercises={session.summary.exercisesSummary}
           formatTime={session.formatTime}
-          whatsappNumber={companyWhatsapp}
         />
       )}
 
