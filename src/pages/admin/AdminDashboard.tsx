@@ -2,7 +2,7 @@ import { lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, TrendingUp, RefreshCw, Clock, UserX, Timer } from "lucide-react";
+import { Users, TrendingUp, RefreshCw, Clock, UserX, Timer, RotateCcw } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
 import { useMaster } from "@/contexts/MasterContext";
@@ -27,7 +27,7 @@ const LazyChart = lazy(() => import("recharts").then(mod => ({
 })));
 
 interface DashboardData {
-  stats: { totalStudents: number; pendingStudents: number; inactiveStudents: number; trainers: number };
+  stats: { totalStudents: number; pendingStudents: number; awaitingRenewalStudents: number; inactiveStudents: number; trainers: number };
   planChart: { name: string; count: number }[];
   expiringContracts: any[];
   cycleCountdowns: any[];
@@ -41,6 +41,7 @@ async function fetchDashboardData(effectiveCompanyId: string | null | undefined)
 
   let studentQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "active");
   let pendingQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "pending");
+  let awaitingRenewalQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "awaiting_renewal");
   let inactiveQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "inactive");
   let enrollQuery = supabase.from("enrollments").select("plan_id, plans(name)");
   let expiringQuery = supabase.from("enrollments").select("*, trainer_id, students(full_name, status), plans(name)")
@@ -50,6 +51,7 @@ async function fetchDashboardData(effectiveCompanyId: string | null | undefined)
   if (effectiveCompanyId) {
     studentQuery = studentQuery.eq("company_id", effectiveCompanyId);
     pendingQuery = pendingQuery.eq("company_id", effectiveCompanyId);
+    awaitingRenewalQuery = awaitingRenewalQuery.eq("company_id", effectiveCompanyId);
     inactiveQuery = inactiveQuery.eq("company_id", effectiveCompanyId);
     enrollQuery = enrollQuery.eq("company_id", effectiveCompanyId);
     expiringQuery = expiringQuery.eq("company_id", effectiveCompanyId);
