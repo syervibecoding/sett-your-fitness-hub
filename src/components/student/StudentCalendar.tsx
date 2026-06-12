@@ -163,7 +163,7 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
         <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(prev => subMonths(prev, 1))}>
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <h2 className="text-lg font-bold text-foreground font-sans capitalize">
+        <h2 className="text-lg font-display text-foreground capitalize">
           {format(currentMonth, "MMMM yyyy", { locale: ptBR })}
         </h2>
         <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(prev => addMonths(prev, 1))}>
@@ -174,7 +174,7 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
       {/* Weekday Headers */}
       <div className="grid grid-cols-7 gap-1">
         {WEEKDAY_LABELS.map(label => (
-          <div key={label} className="text-center text-xs font-medium text-muted-foreground py-1 font-sans">
+          <div key={label} className="text-center text-[11px] font-mono-data uppercase tracking-wide text-muted-foreground py-1">
             {label}
           </div>
         ))}
@@ -190,7 +190,7 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
               key={idx}
               onClick={() => setSelectedDate(prev => prev && isSameDay(prev, day) ? null : day)}
               className={cn(
-                "relative aspect-square flex flex-col items-center justify-center rounded-lg text-sm font-sans transition-all",
+                "relative aspect-square flex flex-col items-center justify-center rounded-lg text-sm font-mono-data transition-all",
                 !inMonth && "opacity-30",
                 inMonth && "hover:bg-accent/40",
                 today && "ring-2 ring-primary ring-offset-1 ring-offset-background",
@@ -222,7 +222,7 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
         <Card className="bg-card border-border">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-bold text-foreground font-sans capitalize">
+              <h3 className="text-base font-display text-foreground capitalize">
                 {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
               </h3>
               {selectedDateTrained && (
@@ -257,19 +257,19 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
                         <div className="bg-muted/50 rounded-lg p-2 text-center">
                           <Target className="h-3.5 w-3.5 text-primary mx-auto mb-0.5" />
                           <p className="text-xs text-muted-foreground font-sans">Séries</p>
-                          <p className="text-sm font-bold text-foreground font-sans">{setsCompleted}/{setsPrescribed}</p>
+                          <p className="text-sm font-bold text-foreground font-mono-data">{setsCompleted}/{setsPrescribed}</p>
                         </div>
                         <div className="bg-muted/50 rounded-lg p-2 text-center">
                           <TrendingUp className="h-3.5 w-3.5 text-primary mx-auto mb-0.5" />
                           <p className="text-xs text-muted-foreground font-sans">Volume</p>
-                          <p className="text-sm font-bold text-foreground font-sans">
+                          <p className="text-sm font-bold text-foreground font-mono-data">
                             {totalVolume > 0 ? `${(totalVolume / 1000).toFixed(1)}t` : "—"}
                           </p>
                         </div>
                         <div className="bg-muted/50 rounded-lg p-2 text-center">
                           <Clock className="h-3.5 w-3.5 text-primary mx-auto mb-0.5" />
                           <p className="text-xs text-muted-foreground font-sans">Duração</p>
-                          <p className="text-sm font-bold text-foreground font-sans">
+                          <p className="text-sm font-bold text-foreground font-mono-data">
                             {durationSec ? formatDuration(durationSec) : "—"}
                           </p>
                         </div>

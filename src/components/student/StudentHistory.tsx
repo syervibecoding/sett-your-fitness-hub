@@ -75,7 +75,7 @@ export function StudentHistory({ allLogs, workouts, sessions }: StudentHistoryPr
   if (groupedSessions.length === 0) {
     return (
       <div className="space-y-4">
-        <h2 className="text-lg font-bold text-foreground font-sans">Histórico</h2>
+        <h2 className="text-lg font-display text-foreground">Histórico</h2>
         <Card className="bg-card border-border border-dashed">
           <CardContent className="p-8 text-center">
             <CalendarDays className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
@@ -96,7 +96,7 @@ export function StudentHistory({ allLogs, workouts, sessions }: StudentHistoryPr
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-bold text-foreground font-sans">Histórico</h2>
+      <h2 className="text-lg font-display text-foreground">Histórico</h2>
 
       {Object.entries(byMonth).map(([monthKey, sessions]) => (
         <div key={monthKey} className="space-y-2">
@@ -112,20 +112,20 @@ export function StudentHistory({ allLogs, workouts, sessions }: StudentHistoryPr
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground font-sans">{s.workoutTitle}</p>
-                    <p className="text-xs text-muted-foreground font-sans">
+                    <p className="text-xs text-muted-foreground font-mono-data">
                       {format(parseISO(s.date), "dd/MM/yyyy (EEEE)", { locale: ptBR })}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {s.durationSeconds && (
-                    <Badge variant="secondary" className="text-[10px] gap-1 font-sans">
+                    <Badge variant="secondary" className="text-[10px] gap-1 font-mono-data">
                       <Clock className="h-3 w-3" />
                       {formatDuration(s.durationSeconds)}
                     </Badge>
                   )}
                   {s.totalVolume > 0 && (
-                    <Badge variant="outline" className="text-[10px] font-sans border-primary/30 text-primary">
+                    <Badge variant="outline" className="text-[10px] font-mono-data border-primary/30 text-primary">
                       {(s.totalVolume / 1000).toFixed(1)}t
                     </Badge>
                   )}

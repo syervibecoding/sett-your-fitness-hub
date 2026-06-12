@@ -293,7 +293,7 @@ export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
         <TabsContent value="bodymap" className="space-y-4">
           <Card className="bg-card border-border">
             <CardContent className="p-4">
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-4">Volume por Grupamento</h3>
+              <h3 className="text-sm font-mono-data font-semibold text-muted-foreground uppercase tracking-wider mb-4">Volume por Grupamento</h3>
               <MuscleRadar muscleVolumes={muscleVolumes} />
             </CardContent>
           </Card>
@@ -302,7 +302,7 @@ export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
             <CardContent className="p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Flame className="h-4 w-4 text-orange-500" />
-                <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider">Frequência por Grupamento</h3>
+                <h3 className="text-sm font-mono-data font-semibold text-muted-foreground uppercase tracking-wider">Frequência por Grupamento</h3>
               </div>
               {muscleFrequency.length === 0 ? (
                 <p className="text-xs text-muted-foreground font-sans">Sem dados no período.</p>
@@ -354,7 +354,7 @@ export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
           <Card className="bg-card border-border">
             <CardContent className="p-4">
               <div className="flex items-baseline justify-between mb-1">
-                <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider">
+                <h3 className="text-sm font-mono-data font-semibold text-muted-foreground uppercase tracking-wider">
                   {selectedExercise === "all" ? "Carga (kg) — top 5 exercícios" : `Carga (kg) — ${selectedExercise}`}
                 </h3>
               </div>
@@ -484,7 +484,7 @@ export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Trophy className="h-4 w-4 text-yellow-500" />
-                  <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider">Recordes Pessoais</h3>
+                  <h3 className="text-sm font-mono-data font-semibold text-muted-foreground uppercase tracking-wider">Recordes Pessoais</h3>
                 </div>
                 <div className="space-y-2">
                   {personalRecords.slice(0, 10).map((pr, i) => (
@@ -508,7 +508,7 @@ export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
         <TabsContent value="volume" className="space-y-4">
           <Card className="bg-card border-border">
             <CardContent className="p-4">
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+              <h3 className="text-sm font-mono-data font-semibold text-muted-foreground uppercase tracking-wider mb-4">
                 Tonelagem por Sessão (kg)
               </h3>
               <div className="h-64">
@@ -530,7 +530,7 @@ export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
 
           <Card className="bg-card border-border">
             <CardContent className="p-4">
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              <h3 className="text-sm font-mono-data font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                 Comparativo — últimos {comparison.days}d vs {comparison.days}d anteriores
               </h3>
               <div className="grid grid-cols-3 gap-2">
@@ -557,7 +557,7 @@ export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
 
           <Card className="bg-card border-border">
             <CardContent className="p-4">
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-3">Resumo</h3>
+              <h3 className="text-sm font-mono-data font-semibold text-muted-foreground uppercase tracking-wider mb-3">Resumo</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-secondary/50 rounded-lg p-3 text-center">
                   <p className="text-2xl font-bold font-mono text-foreground">{totalSessions}</p>
@@ -590,7 +590,7 @@ export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
         <TabsContent value="intensidade" className="space-y-4">
           <Card className="bg-card border-border">
             <CardContent className="p-4">
-              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+              <h3 className="text-sm font-mono-data font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                 Intensidade Média por Sessão
               </h3>
               <p className="text-[10px] text-muted-foreground font-sans mb-3">
@@ -616,7 +616,7 @@ export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
           <Card className="bg-card border-border">
             <CardContent className="p-4">
               <div className="flex items-baseline justify-between mb-3">
-                <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider">
+                <h3 className="text-sm font-mono-data font-semibold text-muted-foreground uppercase tracking-wider">
                   Distribuição de RPE
                 </h3>
                 {avgRpe > 0 && (

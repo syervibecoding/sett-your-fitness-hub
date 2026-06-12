@@ -931,7 +931,7 @@ export default function WhatsAppChat() {
                               <p className="text-xs text-muted-foreground italic mb-1">Carregando mídia...</p>
                             ) : null}
                             <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                            <p className={cn("text-[10px] mt-1", msg.source === "outgoing" ? "text-primary-foreground/70" : "text-muted-foreground")}>{format(new Date(msg.created_at), "HH:mm")}</p>
+                            <p className={cn("text-[10px] mt-1 font-mono-data", msg.source === "outgoing" ? "text-primary-foreground/70" : "text-muted-foreground")}>{format(new Date(msg.created_at), "HH:mm")}</p>
                             </div>
                           </div>
                         </div>
