@@ -8,13 +8,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Search, User, MessageSquare, AlertTriangle, DollarSign,
-  Plus, Trash2, Tag,
+  Plus, Trash2, Tag, Megaphone, Send, Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { interpolateTemplate } from "@/lib/templateVars";
 
 type CRMStudent = {
   id: string;
@@ -54,6 +57,12 @@ export default function WhatsAppCRM() {
   const [students, setStudents] = useState<CRMStudent[]>([]);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [segmentFilter, setSegmentFilter] = useState<"all" | "no-workout" | "pending">("all");
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [broadcastMsg, setBroadcastMsg] = useState("");
+  const [broadcasting, setBroadcasting] = useState(false);
+  const [broadcastSent, setBroadcastSent] = useState(0);
+  const [bcTemplates, setBcTemplates] = useState<{ id: string; title: string; content: string }[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [labels, setLabels] = useState<Label[]>([]);
 
@@ -149,6 +158,16 @@ export default function WhatsAppCRM() {
 
   useEffect(() => { loadStudents(); loadCategories(); loadLabels(); }, [loadStudents, loadCategories, loadLabels]);
 
+  // Templates para o disparo em lote.
+  useEffect(() => {
+    (async () => {
+      let q = supabase.from("message_templates").select("id, title, content").order("title");
+      if (effectiveCompanyId) q = q.eq("company_id", effectiveCompanyId);
+      const { data } = await q;
+      if (data) setBcTemplates(data as { id: string; title: string; content: string }[]);
+    })();
+  }, [effectiveCompanyId]);
+
   const getCategoryColor = (catName: string) => {
     const cat = categories.find(c => c.name === catName);
     return cat?.color || "#6b7280";
@@ -213,8 +232,45 @@ export default function WhatsAppCRM() {
   const filtered = students.filter((s) => {
     if (!s.full_name.toLowerCase().includes(search.toLowerCase())) return false;
     if (categoryFilter !== "all" && s.category !== categoryFilter) return false;
+    if (segmentFilter === "no-workout" && !(s.status === "active" && !s.hasWorkout)) return false;
+    if (segmentFilter === "pending" && !s.hasPendingPayment) return false;
     return true;
   });
+  const broadcastRecipients = filtered.filter((s) => s.chatId);
+
+  const handleBroadcast = async () => {
+    const recipients = broadcastRecipients;
+    if (recipients.length === 0 || !broadcastMsg.trim()) return;
+    setBroadcasting(true);
+    setBroadcastSent(0);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error("Sessão expirada"); return; }
+      const chatIds = recipients.map((r) => r.chatId!).filter(Boolean);
+      const { data: chatRows } = await supabase.from("whatsapp_chats").select("id, remote_jid").in("id", chatIds);
+      const jidByChat: Record<string, string> = {};
+      (chatRows || []).forEach((c: { id: string; remote_jid: string }) => { jidByChat[c.id] = c.remote_jid; });
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-manager`;
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY };
+      let sent = 0, failed = 0;
+      for (const r of recipients) {
+        const remoteJid = r.chatId ? jidByChat[r.chatId] : null;
+        if (!remoteJid) { failed++; setBroadcastSent((n) => n + 1); continue; }
+        const content = interpolateTemplate(broadcastMsg, { nome: r.full_name, primeiro_nome: r.full_name.split(" ")[0] || "" });
+        try {
+          const res = await fetch(url, { method: "POST", headers, body: JSON.stringify({ action: "send-message", companyId: effectiveCompanyId, remoteJid, content, chatId: r.chatId }) });
+          if (res.ok) sent++; else failed++;
+        } catch { failed++; }
+        setBroadcastSent((n) => n + 1);
+        await new Promise((res) => setTimeout(res, 700)); // evita rate limit do Evolution
+      }
+      toast.success(`Disparo concluído: ${sent} enviada(s)${failed ? `, ${failed} falha(s)` : ""}`);
+      setBroadcastOpen(false);
+      setBroadcastMsg("");
+    } finally {
+      setBroadcasting(false);
+    }
+  };
 
   return (
     <>
@@ -256,6 +312,28 @@ export default function WhatsAppCRM() {
                     ))}
                   </SelectContent>
                 </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1.5 shrink-0"
+                  onClick={() => setBroadcastOpen(true)}
+                  disabled={broadcastRecipients.length === 0}
+                  title="Disparar mensagem para o segmento filtrado"
+                >
+                  <Megaphone className="h-4 w-4" />
+                  Disparar ({broadcastRecipients.length})
+                </Button>
+              </div>
+              <div className="px-2.5 sm:px-3 py-2 flex flex-wrap gap-1.5 border-b border-border">
+                {([["all", "Todos"], ["no-workout", "Sem treino"], ["pending", "Inadimplentes"]] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setSegmentFilter(key)}
+                    className={cn("text-xs rounded-full px-2.5 py-1 border transition-colors", segmentFilter === key ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-muted-foreground/40")}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
 
               <ScrollArea className="flex-1">
@@ -400,6 +478,45 @@ export default function WhatsAppCRM() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={broadcastOpen} onOpenChange={(o) => { if (!broadcasting) setBroadcastOpen(o); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Megaphone className="h-4 w-4" /> Disparar mensagem</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Será enviada para <strong className="text-foreground">{broadcastRecipients.length}</strong> aluno(s) do segmento atual (apenas os que já têm conversa no WhatsApp).
+            </p>
+            {bcTemplates.length > 0 && (
+              <Select onValueChange={(id) => { const t = bcTemplates.find((t) => t.id === id); if (t) setBroadcastMsg(t.content); }}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Usar um template..." /></SelectTrigger>
+                <SelectContent>
+                  {bcTemplates.map((t) => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            <Textarea
+              value={broadcastMsg}
+              onChange={(e) => setBroadcastMsg(e.target.value)}
+              placeholder="Mensagem... use {{nome}} ou {{primeiro_nome}}"
+              className="min-h-[120px]"
+              disabled={broadcasting}
+            />
+            <p className="text-[11px] text-amber-600 dark:text-amber-500">
+              ⚠️ Isso envia mensagens reais no WhatsApp, uma a uma. Revise antes de confirmar.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setBroadcastOpen(false)} disabled={broadcasting}>Cancelar</Button>
+            <Button onClick={handleBroadcast} disabled={broadcasting || !broadcastMsg.trim() || broadcastRecipients.length === 0}>
+              {broadcasting
+                ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Enviando {broadcastSent}/{broadcastRecipients.length}</>
+                : <><Send className="h-4 w-4 mr-1.5" /> Enviar para {broadcastRecipients.length}</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
