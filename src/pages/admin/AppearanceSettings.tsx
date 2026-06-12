@@ -11,12 +11,14 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Palette, Upload, RotateCcw, Save } from "lucide-react";
 
+// Alinhado ao default canônico do ThemeContext (evita uma academia nova ver o tema
+// escuro BN antigo e o "Resetar" voltar pra marca errada).
 const DEFAULTS = {
-  primary_color: "#1d4ed8",
-  background_color: "#121212",
-  card_color: "#1a1a1a",
-  text_color: "#ebebeb",
-  platform_title: "BN PERFORMANCE",
+  primary_color: "#1D2D5C",
+  background_color: "#FAFAF7",
+  card_color: "#F2F0EA",
+  text_color: "#0A0A0A",
+  platform_title: "Set Training App",
 };
 
 export default function AppearanceSettings() {
