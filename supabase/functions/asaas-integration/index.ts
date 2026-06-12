@@ -111,22 +111,47 @@ async function updateCustomer(body: any) {
 }
 
 
+// SECURITY: never trust a client-supplied amount. Derive the authoritative price from the plan
+// in the DB (validated against the student's company). Public payment flows always send planId,
+// so this fails closed when a plan/price cannot be resolved.
+async function resolvePlanPrice(student: any, planId?: string): Promise<number> {
+  const effectivePlanId = planId || student?.selected_plan_id;
+  if (!effectivePlanId) {
+    throw new Error("Plano não informado para o pagamento.");
+  }
+  const { data: plan } = await supabaseAdmin
+    .from("plans")
+    .select("price, company_id")
+    .eq("id", effectivePlanId)
+    .maybeSingle();
+  if (!plan || plan.price == null) {
+    throw new Error("Plano inválido ou sem preço definido.");
+  }
+  if (plan.company_id && student?.company_id && plan.company_id !== student.company_id) {
+    throw new Error("Plano não pertence à empresa do aluno.");
+  }
+  return Number(plan.price);
+}
+
 async function createPayment(body: any) {
-  const { studentId, billingType, value, dueDate, description, planId } = body;
-  if (!studentId || !billingType || !value) {
-    throw new Error("studentId, billingType e value são obrigatórios");
+  const { studentId, billingType, dueDate, description, planId } = body;
+  if (!studentId || !billingType) {
+    throw new Error("studentId e billingType são obrigatórios");
   }
 
   // Get customer id
   const { data: student } = await supabaseAdmin
     .from("students")
-    .select("asaas_customer_id, company_id, full_name, email, cpf, phone, whatsapp, cep, address, address_number, neighborhood, city, state")
+    .select("asaas_customer_id, company_id, selected_plan_id, full_name, email, cpf, phone, whatsapp, cep, address, address_number, neighborhood, city, state")
     .eq("id", studentId)
     .single();
 
   if (!student) {
     throw new Error("Aluno não encontrado.");
   }
+
+  // SECURITY: amount comes from the plan in the DB, never from the client body.
+  const value = await resolvePlanPrice(student, planId);
 
   // Auto-create Asaas customer if missing
   if (!student.asaas_customer_id) {
@@ -200,30 +225,31 @@ async function getPixQrCode(body: any) {
 async function createCardPayment(body: any) {
   const {
     studentId,
-    value,
     dueDate,
     description,
     creditCard,
     creditCardHolderInfo,
     remoteIp,
     installmentCount,
-    installmentValue,
     planId,
   } = body;
 
-  if (!studentId || !value || !creditCard || !creditCardHolderInfo) {
+  if (!studentId || !creditCard || !creditCardHolderInfo) {
     throw new Error("Dados incompletos para pagamento com cartão");
   }
 
   const { data: student } = await supabaseAdmin
     .from("students")
-    .select("asaas_customer_id, company_id, full_name, email, cpf, phone, whatsapp, cep, address, address_number, neighborhood, city, state")
+    .select("asaas_customer_id, company_id, selected_plan_id, full_name, email, cpf, phone, whatsapp, cep, address, address_number, neighborhood, city, state")
     .eq("id", studentId)
     .single();
 
   if (!student) {
     throw new Error("Aluno não encontrado.");
   }
+
+  // SECURITY: amount comes from the plan in the DB, never from the client body.
+  const value = await resolvePlanPrice(student, planId);
 
   // Auto-create Asaas customer if missing
   if (!student.asaas_customer_id) {
@@ -271,7 +297,8 @@ async function createCardPayment(body: any) {
 
   if (installmentCount && installmentCount > 1) {
     paymentPayload.installmentCount = installmentCount;
-    paymentPayload.installmentValue = installmentValue || Number((Number(value) / installmentCount).toFixed(2));
+    // Recalculado a partir do valor autoritativo do servidor (ignora installmentValue do client).
+    paymentPayload.installmentValue = Number((Number(value) / installmentCount).toFixed(2));
   }
 
   const payment = await asaasFetch("/payments", {

@@ -67,6 +67,7 @@ export default function PublicPayment() {
   const [pixPayload, setPixPayload] = useState("");
   const [pixPaymentId, setPixPaymentId] = useState("");
   const pollingRef = useRef<number | null>(null);
+  const pollAttemptsRef = useRef<number>(0);
 
   // Card state
   const [cardForm, setCardForm] = useState({
@@ -157,7 +158,15 @@ export default function PublicPayment() {
       setPixPayload(payload);
       setStep("pix");
 
+      pollAttemptsRef.current = 0;
       pollingRef.current = window.setInterval(async () => {
+        pollAttemptsRef.current += 1;
+        // Para de pollar após ~15 min (90 × 10s) para não rodar indefinidamente em background.
+        if (pollAttemptsRef.current > 90) {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          toast({ title: "Tempo de espera esgotado", description: "Se você já pagou, a confirmação chega em instantes. Pode atualizar a página." });
+          return;
+        }
         try {
           const { status } = await callAsaas("get-payment-status", { paymentId });
           if (status === "RECEIVED" || status === "CONFIRMED") {

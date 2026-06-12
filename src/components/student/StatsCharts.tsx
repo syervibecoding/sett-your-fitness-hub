@@ -52,8 +52,10 @@ export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
   }, [period, todayStr]);
 
   const filteredLogs = useMemo(() => {
-    if (!periodCutoff) return allLogs;
-    return allLogs.filter((l: any) => parseISO(l.session_date) >= periodCutoff);
+    // Descarta registros sem session_date para não quebrar parseISO/sort/localeCompare.
+    const valid = allLogs.filter((l: any) => l.session_date);
+    if (!periodCutoff) return valid;
+    return valid.filter((l: any) => parseISO(l.session_date) >= periodCutoff);
   }, [allLogs, periodCutoff]);
 
   // Volume por grupamento (BodyMap)
@@ -179,7 +181,7 @@ export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
     let sessionsA = new Set<string>(), sessionsB = new Set<string>();
     let prsA = 0, prsB = 0;
     const bestBefore: Record<string, number> = {};
-    const sortedAll = [...allLogs].sort((a, b) => a.session_date.localeCompare(b.session_date));
+    const sortedAll = [...allLogs].filter((l: any) => l.session_date).sort((a, b) => a.session_date.localeCompare(b.session_date));
     sortedAll.forEach((l: any) => {
       const meta = findMeta(l.workout_id, l.exercise_index);
       if (!meta) return;

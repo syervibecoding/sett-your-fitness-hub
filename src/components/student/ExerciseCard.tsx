@@ -207,7 +207,7 @@ export function ExerciseCard({
                         inputMode="decimal"
                         className="h-7 text-xs bg-card border-border px-1.5"
                         placeholder={prevWeight > 0 ? String(prevWeight) : "0"}
-                        value={log?.weight || ""}
+                        value={log?.weight ?? ""}
                         onChange={(e) => onUpdateLog(idx, s + 1, "weight", parseFloat(e.target.value) || 0)}
                         onClick={(e) => e.stopPropagation()}
                       />
@@ -218,7 +218,7 @@ export function ExerciseCard({
                         inputMode="numeric"
                         className="h-7 text-xs bg-card border-border px-1.5"
                         placeholder={ex.reps}
-                        value={log?.reps_done || ""}
+                        value={log?.reps_done ?? ""}
                         onChange={(e) => onUpdateLog(idx, s + 1, "reps_done", parseInt(e.target.value) || 0)}
                         onClick={(e) => e.stopPropagation()}
                       />

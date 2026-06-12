@@ -117,13 +117,14 @@ export default function StudentPortal() {
   }, [user]);
 
   const loadStudentData = async () => {
+    try {
     const { data: student } = await supabase
       .from("students")
       .select("id, full_name, company_id, weekly_workout_goal, gender")
       .eq("user_id", user!.id)
       .maybeSingle();
 
-    if (!student) { setLoading(false); return; }
+    if (!student) { return; }
     setStudentId(student.id);
     setStudentName(student.full_name);
     setCompanyId(student.company_id);
@@ -270,7 +271,12 @@ export default function StudentPortal() {
         }
       }
     }
-    setLoading(false);
+    } catch (err) {
+      console.error("Erro ao carregar dados do aluno:", err);
+      toast({ title: "Erro ao carregar seus dados", description: "Tente recarregar a página.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getLogKey = (workoutId: string, exIdx: number, setNum: number) =>
@@ -334,8 +340,10 @@ export default function StudentPortal() {
     if (!selectedWorkout || !studentId) return;
     setSavingLogs(true);
     const workoutId = selectedWorkout.id;
-    const logsToSave = Object.values(logs).filter(l => l.workout_id === workoutId && (l.weight > 0 || l.reps_done > 0));
+    // Inclui séries marcadas como concluídas mesmo sem carga/reps (ex.: peso corporal, abdominal).
+    const logsToSave = Object.values(logs).filter(l => l.workout_id === workoutId && (l.weight > 0 || l.reps_done > 0 || l.completed));
 
+    let hadError = false;
     for (const log of logsToSave) {
       const existing = allLogs.find(
         l => l.workout_id === log.workout_id && l.exercise_index === log.exercise_index && l.set_number === log.set_number && l.session_date === todayStr
@@ -347,18 +355,21 @@ export default function StudentPortal() {
         rpe: log.rpe || null,
         completed: log.completed || false,
       };
-      if (existing) {
-        await supabase.from("workout_logs").update(payload).eq("id", existing.id);
-      } else {
-        await supabase.from("workout_logs").insert({
-          workout_id: log.workout_id, exercise_index: log.exercise_index,
-          set_number: log.set_number, ...payload,
-          student_id: studentId, company_id: companyId, session_date: todayStr,
-        });
-      }
+      const { error } = existing
+        ? await supabase.from("workout_logs").update(payload).eq("id", existing.id)
+        : await supabase.from("workout_logs").insert({
+            workout_id: log.workout_id, exercise_index: log.exercise_index,
+            set_number: log.set_number, ...payload,
+            student_id: studentId, company_id: companyId, session_date: todayStr,
+          });
+      if (error) { hadError = true; console.error("Erro ao salvar carga:", error); }
     }
-    toast({ title: "Cargas salvas!" });
     setSavingLogs(false);
+    if (hadError) {
+      toast({ title: "Algumas cargas não foram salvas", description: "Verifique sua conexão e tente novamente.", variant: "destructive" });
+    } else {
+      toast({ title: "Cargas salvas!" });
+    }
   };
 
   const getStoragePublicUrl = (path: string) => {
@@ -389,6 +400,7 @@ export default function StudentPortal() {
     const start = parseISO(enrollmentInfo.start_date);
     const end = parseISO(enrollmentInfo.end_date);
     const total = differenceInDays(end, start);
+    if (total <= 0) return today >= end ? 100 : 0;
     const elapsed = differenceInDays(today, start);
     return Math.max(0, Math.min(100, Math.round((elapsed / total) * 100)));
   };
@@ -398,6 +410,7 @@ export default function StudentPortal() {
     const start = parseISO(cycle.start_date);
     const end = parseISO(cycle.end_date);
     const total = differenceInDays(end, start);
+    if (total <= 0) return today >= end ? 100 : 0;
     const elapsed = differenceInDays(today, start);
     return Math.max(0, Math.min(100, Math.round((elapsed / total) * 100)));
   };

@@ -66,14 +66,31 @@ Deno.serve(async (req) => {
       apikey: evoKey,
     };
 
-    // Resolve company and instance dynamically
-    let resolvedCompanyId = bodyCompanyId || null;
-    if (!resolvedCompanyId) {
-      const { data: cid } = await adminClient.rpc("get_user_company_id", { _user_id: userId });
-      resolvedCompanyId = cid;
+    // Resolve the user's own company once (used for defaulting + tenant validation).
+    const { data: userCompanyId } = await adminClient.rpc("get_user_company_id", { _user_id: userId });
+
+    // Resolve target company; default to the user's own company when not provided.
+    let resolvedCompanyId = bodyCompanyId || userCompanyId || null;
+    if (!resolvedCompanyId) return json({ error: "Company not found" }, 400);
+
+    // SECURITY (IDOR): only master may operate on a company other than their own; every other
+    // role is locked to their own company. This function uses the service-role client, which
+    // bypasses RLS, so without this check a trusted bodyCompanyId would allow cross-tenant access.
+    if (!hasMaster && resolvedCompanyId !== userCompanyId) {
+      return json({ error: "Forbidden: company mismatch" }, 403);
     }
 
-    if (!resolvedCompanyId) return json({ error: "Company not found" }, 400);
+    // SECURITY (IDOR): when a chatId is supplied, ensure it belongs to this company
+    // before any read/update/delete touches it (service-role bypasses RLS).
+    if (body.chatId) {
+      const { data: chatRow } = await adminClient
+        .from("whatsapp_chats")
+        .select("id")
+        .eq("id", body.chatId)
+        .eq("company_id", resolvedCompanyId)
+        .maybeSingle();
+      if (!chatRow) return json({ error: "Forbidden: chat not in company" }, 403);
+    }
 
     // Look up instance_name from whatsapp_instances table
     const { data: instanceRow } = await adminClient

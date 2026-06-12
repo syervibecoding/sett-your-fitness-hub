@@ -20,6 +20,7 @@ import { format, differenceInDays } from "date-fns";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
+import { useLocation } from "react-router-dom";
 
 type Chat = {
   id: string;
@@ -82,7 +83,12 @@ export default function WhatsAppChat() {
   const { viewingCompany, isViewingCompany } = useMaster();
   const effectiveCompanyId = userRole === "master" ? (isViewingCompany ? viewingCompany?.id : null) : companyId;
   const [chats, setChats] = useState<Chat[]>([]);
+  const location = useLocation();
+  // Chat alvo vindo do CRM (navigate("/admin/whatsapp-chat", { state: { chatId } }))
+  const pendingChatIdRef = useRef<string | null>((location.state as { chatId?: string } | null)?.chatId ?? null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const selectedChatIdRef = useRef<string | null>(null);
+  useEffect(() => { selectedChatIdRef.current = selectedChatId; }, [selectedChatId]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -292,7 +298,7 @@ export default function WhatsAppChat() {
     } catch (err) {
       console.error("Error loading contacts:", err);
     }
-  }, []);
+  }, [effectiveCompanyId]);
 
   // Search students for linking
   const searchStudentsForLink = useCallback(async (term: string) => {
@@ -408,6 +414,13 @@ export default function WhatsAppChat() {
   // Load contacts from Evolution API separately to avoid overwhelming edge function workers
   useEffect(() => { const t = setTimeout(() => loadContacts(), 2000); return () => clearTimeout(t); }, [loadContacts]);
   useEffect(() => { if (chats.length > 0) { loadStudentData(chats); loadChatLabels(chats.map(c => c.id)); } }, [chats, loadStudentData, loadChatLabels]);
+  // Pré-seleciona a conversa vinda do CRM assim que ela aparece na lista carregada (aplica uma única vez).
+  useEffect(() => {
+    if (pendingChatIdRef.current && chats.some((c) => c.id === pendingChatIdRef.current)) {
+      setSelectedChatId(pendingChatIdRef.current);
+      pendingChatIdRef.current = null;
+    }
+  }, [chats]);
   useEffect(() => { if (selectedChatId) loadMessages(selectedChatId); }, [selectedChatId, loadMessages]);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -425,19 +438,23 @@ export default function WhatsAppChat() {
   }, [messages, mediaFallbacks, failedMediaFetches]);
 
   // Realtime - canal privado por empresa (compatível com policy de realtime.messages)
+  // Usa selectedChatIdRef para não re-subscrever o canal a cada conversa aberta (evita thrash).
   useEffect(() => {
     if (!effectiveCompanyId) return;
     const channel = supabase
       .channel(`company:${effectiveCompanyId}`, { config: { private: true } })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "whatsapp_messages", filter: `company_id=eq.${effectiveCompanyId}` }, (payload) => {
         const newMsg = payload.new as Message & { chat_id: string };
-        if (newMsg.chat_id === selectedChatId) setMessages((prev) => [...prev, newMsg]);
+        if (newMsg.chat_id === selectedChatIdRef.current) {
+          // Dedupe: o realtime pode reenviar uma mensagem já carregada pelo loadMessages / inserção própria.
+          setMessages((prev) => (prev.some((m) => m.id === newMsg.id) ? prev : [...prev, newMsg]));
+        }
         loadChats();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "whatsapp_chats", filter: `company_id=eq.${effectiveCompanyId}` }, () => { loadChats(); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [selectedChatId, loadChats, effectiveCompanyId]);
+  }, [effectiveCompanyId, loadChats]);
 
   const handleSend = async () => {
     if (!newMessage.trim() || !selectedChatId) return;
@@ -913,7 +930,7 @@ export default function WhatsAppChat() {
                             ) : isMedia && !mediaSrc ? (
                               <p className="text-xs text-muted-foreground italic mb-1">Carregando mídia...</p>
                             ) : null}
-                            <p className="whitespace-pre-wrap break-all">{msg.content}</p>
+                            <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                             <p className={cn("text-[10px] mt-1", msg.source === "outgoing" ? "text-primary-foreground/70" : "text-muted-foreground")}>{format(new Date(msg.created_at), "HH:mm")}</p>
                             </div>
                           </div>
