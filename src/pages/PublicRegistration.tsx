@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,8 +23,10 @@ interface CompanyBranding {
 export default function PublicRegistration() {
   const { slug } = useParams<{ slug?: string }>();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [newStudentId, setNewStudentId] = useState<string | null>(null);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [branding, setBranding] = useState<CompanyBranding | null>(null);
 
@@ -112,6 +114,7 @@ export default function PublicRegistration() {
     }
 
     setSaving(false);
+    setNewStudentId(data.studentId);
     setDone(true);
   };
 
@@ -123,9 +126,14 @@ export default function PublicRegistration() {
             <CheckCircle className="h-16 w-16 text-primary mx-auto" />
             <h2 className="text-3xl text-primary">CADASTRO RECEBIDO!</h2>
             <p className="text-muted-foreground font-sans">
-              Seus dados foram registrados com sucesso. Em breve seu treinador
-              entrará em contato com o link para escolher o plano e finalizar o pagamento.
+              Seus dados foram registrados com sucesso. Você já pode escolher seu plano
+              e garantir sua vaga agora — ou aguardar seu treinador enviar o link.
             </p>
+            {newStudentId && (
+              <Button className="w-full" onClick={() => navigate(`/pagamento/${newStudentId}`)}>
+                Escolher plano e pagar agora
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>

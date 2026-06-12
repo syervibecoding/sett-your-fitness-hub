@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Copy, CreditCard, QrCode, Loader2, Check } from "lucide-react";
+import { CheckCircle, Copy, CreditCard, QrCode, Loader2, Check, ShieldCheck, Lock } from "lucide-react";
 import bnLogo from "@/assets/bn-logo.png";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 
@@ -297,8 +297,13 @@ export default function PublicPayment() {
             <p className="text-muted-foreground font-sans">
               {isRenewal
                 ? "Seu plano foi renovado com sucesso! Seus novos treinos já estão disponíveis."
-                : "Nossa equipe entrará em contato pelo WhatsApp para os próximos passos."}
+                : "Recebemos seu pagamento! Em instantes seu treinador entra em contato pelo WhatsApp para liberar seu acesso e os próximos passos."}
             </p>
+            {!isRenewal && (
+              <p className="text-xs text-muted-foreground font-sans">
+                Você vai acessar seus treinos pelo app assim que seu treinador concluir a configuração.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -636,9 +641,16 @@ export default function PublicPayment() {
           </Card>
         )}
 
-        <p className="text-center text-xs text-muted-foreground font-sans">
-          Pagamento processado com segurança
-        </p>
+        <div className="space-y-1.5 pt-1">
+          <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground font-sans">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+            Pagamento processado com segurança por <span className="font-medium text-foreground">Asaas</span>
+          </div>
+          <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground font-sans">
+            <Lock className="h-3 w-3" />
+            Seus dados de cartão são criptografados e não ficam armazenados conosco
+          </div>
+        </div>
       </div>
     </div>
   );
