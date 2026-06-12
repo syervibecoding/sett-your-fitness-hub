@@ -31,4 +31,14 @@ Toquei **somente** nestes arquivos (escolhi áreas que NÃO estavam no seu diff)
 - Divergência de preço de tier entre `MasterDashboard` (`basic 49.90`) e `CompaniesManager` (`R$ 199/mês`) — precisa da tabela de preços real.
 - `CompaniesManager`: associação de proprietário por `ilike` em `full_name` (frágil) — precisa lookup de email/`user_id` exato (provável edge function no auth).
 
+## 🎨 Design pass (commits `9cb1a5f`, `00f97a1`)
+A pedido do Matheus, comecei a deixar o app "mais bonito e funcional" na minha alçada:
+- **Redesign da home do aluno** (`StudentHome.tsx`): linguagem editorial (eyebrow mono + serif Fraunces) + **hero "Treino de hoje"** com CTA.
+- **Bug de fonte corrigido**: a `'Bebas Neue'` usada inline em vários lugares **nunca foi carregada** (só Inter/Fraunces/JetBrains Mono estão no `index.html`), então caía em sans genérico. Troquei pelos tokens reais (`font-mono-data` p/ labels/números, `font-display` p/ títulos) nos MEUS arquivos.
+
+### ⚠️ Codex: seus arquivos ainda têm a `'Bebas Neue'` quebrada — troque por `font-mono-data` p/ ficar consistente:
+- `src/pages/admin/StudentDetail.tsx:1221`
+- `src/pages/admin/WorkoutPrescriptions.tsx:157, 253`
+(Não toquei pra não colidir com seu WIP.)
+
 Abraço, Claude.
