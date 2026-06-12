@@ -1,9 +1,10 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Dumbbell, BarChart3, CalendarDays, History, Activity, Megaphone, Ruler } from "lucide-react";
+import { Dumbbell, BarChart3, CalendarDays, History, Activity, Megaphone, Ruler, Play, Moon, ArrowRight } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { WeeklyBar } from "./WeeklyBar";
 
 interface Cycle {
@@ -33,6 +34,15 @@ interface StudentHomeProps {
   onNavigate: (view: "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos" | "medidas") => void;
 }
 
+const NAV_ITEMS = [
+  { view: "treino", label: "Treino", icon: Dumbbell },
+  { view: "stats", label: "Estatísticas", icon: BarChart3, sub: "Volume e força" },
+  { view: "calendario", label: "Calendário", icon: CalendarDays, sub: "Histórico mensal" },
+  { view: "historico", label: "Histórico", icon: History },
+  { view: "atividades", label: "Atividades", icon: Activity, sub: "Corrida, natação e mais" },
+  { view: "avisos", label: "Avisos", icon: Megaphone, sub: "Mural do treinador" },
+  { view: "medidas", label: "Medidas", icon: Ruler, sub: "Circunferências e avatar" },
+] as const;
 
 export function StudentHome({
   studentName,
@@ -50,43 +60,92 @@ export function StudentHome({
   goalEditor,
   achievementsPanel,
   onNavigate,
-
 }: StudentHomeProps) {
   const firstName = studentName.split(" ")[0];
+  const todayLabel = format(new Date(), "EEEE · dd 'de' MMMM", { locale: ptBR });
+  const todayWorkout = selectedCycle?.workouts.find((w) => w.day_of_week === currentDayOfWeek) ?? null;
+
+  const subFor = (view: typeof NAV_ITEMS[number]["view"], fallback?: string) => {
+    if (view === "treino") return workoutCount > 0 ? `${workoutCount} treinos disponíveis` : "Ver treinos do ciclo";
+    if (view === "historico") return totalSessions > 0 ? `${totalSessions} sessões` : "Sessões passadas";
+    return fallback ?? "";
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Greeting */}
+    <div className="space-y-7">
+      {/* Greeting — editorial */}
       <div>
-        <h2 className="text-2xl font-bold text-foreground font-sans">
-          Olá, {firstName}! 👋
+        <p className="text-eyebrow">{todayLabel}</p>
+        <h2 className="font-display text-3xl sm:text-4xl text-foreground mt-1 leading-tight">
+          Olá, {firstName}.
         </h2>
         {enrollmentInfo && (
-          <div className="mt-3 space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground font-sans">{enrollmentInfo.plan_name}</span>
-              <span className="text-muted-foreground font-sans">
-                {format(parseISO(enrollmentInfo.start_date), "dd/MM/yy")} — {format(parseISO(enrollmentInfo.end_date), "dd/MM/yy")}
+          <div className="mt-4 space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-mono-data text-[11px] tracking-wide text-muted-foreground">{enrollmentInfo.plan_name}</span>
+              <span className="font-mono-data text-[11px] text-muted-foreground">
+                {format(parseISO(enrollmentInfo.start_date), "dd/MM/yy")} – {format(parseISO(enrollmentInfo.end_date), "dd/MM/yy")} · {overallProgress}%
               </span>
             </div>
-            <Progress value={overallProgress} className="h-2" />
+            <Progress value={overallProgress} className="h-1.5" />
           </div>
         )}
       </div>
 
-      {/* Cycle info */}
+      {/* Hero — Treino de hoje (maior ação do atleta) */}
+      {selectedCycle && (
+        <button onClick={() => onNavigate("treino")} className="w-full text-left group">
+          <Card className="relative overflow-hidden border-primary bg-primary text-primary-foreground transition-shadow group-hover:shadow-lg">
+            <Dumbbell className="absolute -right-4 -bottom-5 h-32 w-32 text-primary-foreground/10 rotate-12 pointer-events-none" />
+            <CardContent className="relative p-5">
+              {todayWorkout ? (
+                <>
+                  <p className="font-mono-data text-[11px] uppercase tracking-[0.18em] text-primary-foreground/60">
+                    Treino de hoje
+                  </p>
+                  <h3 className="font-display text-2xl mt-1.5 text-primary-foreground leading-snug">
+                    {todayWorkout.title}
+                  </h3>
+                  <span className="inline-flex items-center gap-2 mt-4 text-sm font-semibold">
+                    <span className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-primary-foreground/15">
+                      <Play className="h-3.5 w-3.5 fill-current" />
+                    </span>
+                    Iniciar treino
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </span>
+                </>
+              ) : (
+                <>
+                  <p className="font-mono-data text-[11px] uppercase tracking-[0.18em] text-primary-foreground/60">
+                    Hoje
+                  </p>
+                  <h3 className="font-display text-2xl mt-1.5 text-primary-foreground leading-snug flex items-center gap-2">
+                    <Moon className="h-5 w-5" /> Dia de descanso
+                  </h3>
+                  <span className="inline-flex items-center gap-1.5 mt-4 text-sm font-medium text-primary-foreground/80">
+                    Ver treinos do ciclo
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </span>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </button>
+      )}
+
+      {/* Ciclo atual */}
       {selectedCycle && (
         <Card className="bg-card border-border">
           <CardContent className="p-4 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <h3 className="text-primary font-bold" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
-                  CICLO {selectedCycle.cycle_number}
+                <h3 className="font-mono-data text-sm font-semibold uppercase tracking-[0.12em] text-primary">
+                  Ciclo {selectedCycle.cycle_number}
                 </h3>
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/50 text-primary">Atual</Badge>
               </div>
-              <span className="text-xs text-muted-foreground font-sans">
-                {format(parseISO(selectedCycle.start_date), "dd/MM", { locale: ptBR })} — {format(parseISO(selectedCycle.end_date), "dd/MM", { locale: ptBR })}
+              <span className="font-mono-data text-[11px] text-muted-foreground">
+                {format(parseISO(selectedCycle.start_date), "dd/MM", { locale: ptBR })} – {format(parseISO(selectedCycle.end_date), "dd/MM", { locale: ptBR })} · {cycleProgress}%
               </span>
             </div>
             <Progress value={cycleProgress} className="h-1.5" />
@@ -94,7 +153,7 @@ export function StudentHome({
         </Card>
       )}
 
-      {/* Weekly bar - shows actual trained days */}
+      {/* Semana */}
       <WeeklyBar
         trainedDays={trainedDays}
         currentDayOfWeek={currentDayOfWeek}
@@ -106,121 +165,40 @@ export function StudentHome({
 
       {achievementsPanel}
 
-
-
-
-      {/* Navigation grid */}
-      <div className="grid grid-cols-2 gap-3">
-        {/* Treino */}
-        <button onClick={() => onNavigate("treino")} className="text-left">
-          <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
-            <CardContent className="p-5 flex flex-col gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Dumbbell className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-bold text-foreground font-sans text-sm">Treino</h3>
-                <p className="text-xs text-muted-foreground font-sans mt-0.5">
-                  {workoutCount > 0 ? `${workoutCount} treinos disponíveis` : "Ver treinos do ciclo"}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </button>
-
-        {/* Estatísticas */}
-        <button onClick={() => onNavigate("stats")} className="text-left">
-          <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
-            <CardContent className="p-5 flex flex-col gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <BarChart3 className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-bold text-foreground font-sans text-sm">Estatísticas</h3>
-                <p className="text-xs text-muted-foreground font-sans mt-0.5">Volume e força</p>
-              </div>
-            </CardContent>
-          </Card>
-        </button>
-
-        {/* Calendário */}
-        <button onClick={() => onNavigate("calendario")} className="text-left">
-          <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
-            <CardContent className="p-5 flex flex-col gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <CalendarDays className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-bold text-foreground font-sans text-sm">Calendário</h3>
-                <p className="text-xs text-muted-foreground font-sans mt-0.5">Histórico mensal</p>
-              </div>
-            </CardContent>
-          </Card>
-        </button>
-
-        {/* Histórico */}
-        <button onClick={() => onNavigate("historico")} className="text-left">
-          <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
-            <CardContent className="p-5 flex flex-col gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <History className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-bold text-foreground font-sans text-sm">Histórico</h3>
-                <p className="text-xs text-muted-foreground font-sans mt-0.5">
-                  {totalSessions > 0 ? `${totalSessions} sessões` : "Sessões passadas"}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </button>
-
-        {/* Atividades externas */}
-        <button onClick={() => onNavigate("atividades")} className="text-left">
-          <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
-            <CardContent className="p-5 flex flex-col gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Activity className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-bold text-foreground font-sans text-sm">Atividades</h3>
-                <p className="text-xs text-muted-foreground font-sans mt-0.5">Corrida, natação e mais</p>
-              </div>
-            </CardContent>
-          </Card>
-        </button>
-
-        {/* Avisos */}
-        <button onClick={() => onNavigate("avisos")} className="text-left">
-          <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
-            <CardContent className="p-5 flex flex-col gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Megaphone className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-bold text-foreground font-sans text-sm">Avisos</h3>
-                <p className="text-xs text-muted-foreground font-sans mt-0.5">Mural do treinador</p>
-              </div>
-            </CardContent>
-          </Card>
-        </button>
-
-        {/* Medidas */}
-        <button onClick={() => onNavigate("medidas")} className="text-left">
-          <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
-            <CardContent className="p-5 flex flex-col gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Ruler className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-bold text-foreground font-sans text-sm">Medidas</h3>
-                <p className="text-xs text-muted-foreground font-sans mt-0.5">Circunferências e avatar</p>
-              </div>
-            </CardContent>
-          </Card>
-        </button>
+      {/* Navegação */}
+      <div>
+        <p className="text-eyebrow mb-3">Explorar</p>
+        <div className="grid grid-cols-2 gap-3">
+          {NAV_ITEMS.map(({ view, label, icon: Icon, sub }) => {
+            const isToday = view === "treino" && !!todayWorkout;
+            return (
+              <button key={view} onClick={() => onNavigate(view)} className="text-left group">
+                <Card className={cn(
+                  "h-full bg-card border-border transition-all duration-200",
+                  "group-hover:border-primary/50 group-hover:shadow-md group-hover:-translate-y-0.5",
+                )}>
+                  <CardContent className="p-5 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center transition-colors group-hover:bg-primary/15">
+                        <Icon className="h-5 w-5 text-primary" />
+                      </div>
+                      {isToday && (
+                        <span className="font-mono-data text-[9px] uppercase tracking-[0.14em] text-primary bg-primary/10 rounded-full px-2 py-0.5">
+                          Hoje
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-foreground font-sans text-sm">{label}</h3>
+                      <p className="text-xs text-muted-foreground font-sans mt-0.5">{subFor(view, sub)}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
-
   );
 }
