@@ -241,7 +241,7 @@ export default function AppearanceSettings() {
                 <div className="rounded-lg p-4 space-y-3 border" style={{ backgroundColor: backgroundColor, color: textColor, borderColor: cardColor }}>
                   <div className="flex items-center gap-3">
                     {displayLogo && <img src={displayLogo} alt="Preview logo" className="h-8 w-8 object-contain" />}
-                    <span className="text-lg tracking-wider" style={{ color: primaryColor, fontFamily: "'Bebas Neue', sans-serif" }}>
+                    <span className="font-display text-lg" style={{ color: primaryColor }}>
                       {platformTitle}
                     </span>
                   </div>

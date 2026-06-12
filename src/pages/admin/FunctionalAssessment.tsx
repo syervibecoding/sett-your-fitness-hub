@@ -147,7 +147,7 @@ export default function FunctionalAssessment() {
     <>
       <div className="max-w-3xl mx-auto space-y-5">
         <div>
-          <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">Avaliação</p>
+          <p className="text-eyebrow">Avaliação</p>
           <div className="flex items-center gap-2">
             <h1 className="font-display text-3xl">Avaliação Funcional com IA</h1>
             <BnitoContextButton

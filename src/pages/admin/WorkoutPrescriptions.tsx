@@ -154,7 +154,7 @@ export default function WorkoutPrescriptions() {
       <div className="p-4 md:p-6 space-y-6">
         <div className="flex items-center gap-3">
           <Dumbbell className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl text-primary font-bold tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+          <h1 className="font-display text-2xl text-primary">
             PRESCRIÇÃO DE TREINOS
           </h1>
           <BnitoContextButton
@@ -250,7 +250,7 @@ export default function WorkoutPrescriptions() {
                         <CardContent className="p-4 space-y-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <h3 className="text-primary font-bold text-sm" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+                              <h3 className="text-primary font-mono-data font-semibold text-sm">
                                 CICLO {cycle.cycle_number}
                               </h3>
                               <Badge

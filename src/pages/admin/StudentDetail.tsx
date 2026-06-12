@@ -21,6 +21,7 @@ import { format, parseISO, eachDayOfInterval, addWeeks, addDays, isValid } from 
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
+import { ProgressPhotosPanel } from "@/components/ProgressPhotosPanel";
 
 // Safely format a date string. Returns "—" when value is missing or invalid.
 function safeFormatDate(value: string | null | undefined, fmt: string, opts?: Parameters<typeof format>[2]): string {
@@ -846,6 +847,7 @@ export default function StudentDetail() {
             <TabsTrigger value="anamnesis" className="text-xs sm:text-sm">Anamnese</TabsTrigger>
             <TabsTrigger value="financial" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
             <TabsTrigger value="evaluations" className="text-xs sm:text-sm">Avaliações</TabsTrigger>
+            <TabsTrigger value="progress" className="text-xs sm:text-sm">Progresso</TabsTrigger>
           </TabsList>
 
 
@@ -1218,7 +1220,7 @@ export default function StudentDetail() {
                         <CardContent className="p-4 space-y-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <h3 className="text-primary font-bold text-sm" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+                              <h3 className="text-primary font-mono-data font-semibold text-sm">
                                 CICLO {cycle.cycle_number}
                               </h3>
                               <Badge
@@ -1537,6 +1539,11 @@ export default function StudentDetail() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* ===== PROGRESSO ===== */}
+          <TabsContent value="progress">
+            <ProgressPhotosPanel studentId={id!} />
           </TabsContent>
         </Tabs>
 

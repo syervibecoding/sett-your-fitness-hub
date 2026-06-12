@@ -52,11 +52,19 @@ const OBJECTIVE_OPTIONS = [
   ["saude", "Saúde e bem-estar"],
 ];
 
+const ANAMNESIS_STEPS = [
+  { title: "Dados e rotina", kicker: "Etapa 01 / Prescrição", description: "Base de treino, agenda e equipamentos." },
+  { title: "Saúde e objetivos", kicker: "Etapa 02 / Triagem", description: "Metas, dores, lesões e sinais clínicos." },
+  { title: "Nutrição e recuperação", kicker: "Etapa 03 / Rotina", description: "Alimentação, sono e contexto do dia a dia." },
+  { title: "Compromisso", kicker: "Etapa 04 / Fechamento", description: "Expectativa, obstáculos e autorizações." },
+];
+
 export default function PublicAnamnesis() {
   const { studentId } = useParams<{ studentId: string }>();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [step, setStep] = useState(1);
   const [studentName, setStudentName] = useState("");
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -177,12 +185,60 @@ export default function PublicAnamnesis() {
   };
   const hasEndurance = modalities.some(m => ["Corrida", "Natação", "Bike", "Triathlon"].includes(m));
 
+  const getMissingFields = (targetStep: number) => {
+    if (targetStep === 1) {
+      return [
+        [sessionDuration, "tempo livre para as sessões"],
+        [trainingLocation, "local de treino"],
+      ].filter(([value]) => !value).map(([, label]) => label);
+    }
+    if (targetStep === 2) {
+      return [
+        [goals, "metas com o treino"],
+        [diseases, "doenças ou remédios contínuos"],
+        [injuries, "histórico de lesões"],
+        [currentPain, "dor atual"],
+      ].filter(([value]) => !value).map(([, label]) => label);
+    }
+    if (targetStep === 3) {
+      return [
+        [nutrition, "alimentação"],
+        [profession, "profissão e rotina"],
+        [sleepHours, "horas de sono"],
+        [restorativeSleep, "sono reparador"],
+        [awareOfTrilogy, "consciência sobre alimentação, treino e sono"],
+      ].filter(([value]) => !value).map(([, label]) => label);
+    }
+    return [
+      [feelIn3Months, "como quer se sentir em 3 meses"],
+      [biggestObstacle, "principal obstáculo"],
+      [authorizesPlan, "autorização do plano"],
+      [commitsCommunication, "compromisso de comunicação"],
+    ].filter(([value]) => !value).map(([, label]) => label);
+  };
+
+  const validateStep = (targetStep: number) => {
+    const missing = getMissingFields(targetStep);
+    if (missing.length === 0) return true;
+    toast({
+      title: "Preencha os campos obrigatórios desta etapa",
+      description: missing.join(", "),
+      variant: "destructive",
+    });
+    return false;
+  };
+
+  const goNext = () => {
+    if (!validateStep(step)) return;
+    setStep(current => Math.min(current + 1, ANAMNESIS_STEPS.length));
+  };
+
   const handleSubmit = async () => {
-    if (!goals || !diseases || !injuries || !currentPain || !nutrition || !profession || !sleepHours ||
-      !restorativeSleep || !awareOfTrilogy || !feelIn3Months || !biggestObstacle ||
-      !authorizesPlan || !commitsCommunication || !sessionDuration || !trainingLocation) {
-      toast({ title: "Preencha todos os campos obrigatórios", variant: "destructive" });
-      return;
+    for (let targetStep = 1; targetStep <= ANAMNESIS_STEPS.length; targetStep += 1) {
+      if (!validateStep(targetStep)) {
+        setStep(targetStep);
+        return;
+      }
     }
     setSaving(true);
 
@@ -313,6 +369,9 @@ export default function PublicAnamnesis() {
     );
   }
 
+  const currentStep = ANAMNESIS_STEPS[step - 1];
+  const progress = Math.round((step / ANAMNESIS_STEPS.length) * 100);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
@@ -323,17 +382,31 @@ export default function PublicAnamnesis() {
             <div className="flex justify-center"><Logo size="lg" sublabel="Training App" /></div>
           )}
           <p className="text-eyebrow">Ficha de anamnese</p>
-          <h1 className="text-4xl text-primary">{titleText}</h1>
+          <h1 className="font-display text-4xl text-primary">{titleText}</h1>
           {studentName && <p className="text-muted-foreground font-sans">Aluno: <strong className="text-foreground">{studentName}</strong></p>}
         </div>
 
         <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-primary text-xl">Ficha de anamnese</CardTitle>
+          <CardHeader className="space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <p className="text-eyebrow">{currentStep.kicker}</p>
+                <CardTitle className="font-display text-primary text-2xl">{currentStep.title}</CardTitle>
+                <p className="text-sm text-muted-foreground font-sans">{currentStep.description}</p>
+              </div>
+              <div className="font-mono-data text-xs text-muted-foreground whitespace-nowrap">
+                {step}/{ANAMNESIS_STEPS.length}
+              </div>
+            </div>
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+            </div>
           </CardHeader>
           <CardContent className="space-y-6">
+            {step === 1 && (
+            <>
             <div className="space-y-4">
-              <h3 className="text-lg text-primary">Dados para prescrição integrada</h3>
+              <h3 className="font-display text-lg text-primary">Dados para prescrição integrada</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="font-sans font-medium">Idade</Label>
@@ -532,7 +605,11 @@ export default function PublicAnamnesis() {
                 </div>
               </div>
             )}
+            </>
+            )}
 
+            {step === 2 && (
+            <>
             <div className="space-y-2">
               <Label className="font-sans font-medium">Quais as suas metas com o treino? *</Label>
               <Textarea value={goals} onChange={e => setGoals(e.target.value)} />
@@ -554,7 +631,7 @@ export default function PublicAnamnesis() {
             </div>
 
             <div className="space-y-4 rounded-lg border border-border p-4">
-              <h3 className="text-lg text-primary">Triagem clínica</h3>
+              <h3 className="font-display text-lg text-primary">Triagem clínica</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2 sm:col-span-2">
                   <Label className="font-sans font-medium">Condições médicas relevantes</Label>
@@ -654,14 +731,18 @@ export default function PublicAnamnesis() {
                 </div>
               </div>
             </div>
+            </>
+            )}
 
+            {step === 3 && (
+            <>
             <div className="space-y-2">
               <Label className="font-sans font-medium">Como é a sua alimentação? Faz acompanhamento com Nutricionista? *</Label>
               <Textarea value={nutrition} onChange={e => setNutrition(e.target.value)} />
             </div>
 
             <div className="space-y-4 rounded-lg border border-border p-4">
-              <h3 className="text-lg text-primary">Rotina alimentar e treino</h3>
+              <h3 className="font-display text-lg text-primary">Rotina alimentar e treino</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="font-sans font-medium">Refeições por dia</Label>
@@ -818,7 +899,11 @@ export default function PublicAnamnesis() {
                 <div className="flex items-center gap-2"><RadioGroupItem value="nao" id="at-nao" /><Label htmlFor="at-nao" className="font-sans font-normal cursor-pointer">Não</Label></div>
               </RadioGroup>
             </div>
+            </>
+            )}
 
+            {step === 4 && (
+            <>
             <div className="space-y-2">
               <Label className="font-sans font-medium">Como você quer se sentir em 3 meses? *</Label>
               <Textarea value={feelIn3Months} onChange={e => setFeelIn3Months(e.target.value)} />
@@ -849,10 +934,31 @@ export default function PublicAnamnesis() {
                 <div className="flex items-center gap-2"><RadioGroupItem value="nao" id="cc-nao" /><Label htmlFor="cc-nao" className="font-sans font-normal cursor-pointer">Não</Label></div>
               </RadioGroup>
             </div>
+            </>
+            )}
 
-            <Button className="w-full" onClick={handleSubmit} disabled={saving}>
-              {saving ? "Salvando..." : "Finalizar Anamnese"}
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              {step > 1 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="sm:w-36"
+                  onClick={() => setStep(current => Math.max(current - 1, 1))}
+                  disabled={saving}
+                >
+                  Voltar
+                </Button>
+              )}
+              {step < ANAMNESIS_STEPS.length ? (
+                <Button type="button" className="flex-1" onClick={goNext} disabled={saving}>
+                  Avançar
+                </Button>
+              ) : (
+                <Button className="flex-1" onClick={handleSubmit} disabled={saving}>
+                  {saving ? "Salvando..." : "Finalizar Anamnese"}
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

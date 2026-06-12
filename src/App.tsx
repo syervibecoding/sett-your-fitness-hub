@@ -175,7 +175,7 @@ const App = () => (
           <Route path="/anamnese/:studentId" element={<RouteTransition><PublicAnamnesis /></RouteTransition>} />
           <Route path="/anamnese-convite/:token" element={<RouteTransition><StudioAnamnese /></RouteTransition>} />
           <Route path="/pagamento/:studentId" element={<RouteTransition><PublicPayment /></RouteTransition>} />
-          <Route path="/aluno/treino/:studentId" element={<ProtectedRoute allowedRoles={["student", "admin", "coordinator", "trainer"]}><StudentWorkoutAccessGuard><RouteTransition><StudentWorkout /></RouteTransition></StudentWorkoutAccessGuard></ProtectedRoute>} />
+          <Route path="/aluno/treino/:studentId" element={<ProtectedRoute allowedRoles={["student", "admin", "coordinator", "trainer", "master"]}><StudentWorkoutAccessGuard><RouteTransition><StudentWorkout /></RouteTransition></StudentWorkoutAccessGuard></ProtectedRoute>} />
           <Route path="/aluno" element={<ProtectedRoute allowedRoles={["student"]}><RouteTransition><StudentPortal /></RouteTransition></ProtectedRoute>} />
           <Route path="/" element={<RouteTransition><RootRoute /></RouteTransition>} />
 
