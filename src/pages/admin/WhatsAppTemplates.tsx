@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { TEMPLATE_VARIABLES } from "@/lib/templateVars";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from "@/components/ui/dialog";
@@ -167,7 +168,22 @@ export default function WhatsAppTemplates() {
                   placeholder="Olá {{nome}}, seja bem-vindo(a)!"
                   className="min-h-[120px]"
                 />
-                <p className="text-xs text-muted-foreground">Use {"{{nome}}"} para inserir o nome do aluno automaticamente.</p>
+                <div className="space-y-1.5">
+                  <p className="text-xs text-muted-foreground">Variáveis (clique para inserir — são preenchidas com os dados do aluno no envio):</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TEMPLATE_VARIABLES.map(v => (
+                      <button
+                        key={v.key}
+                        type="button"
+                        onClick={() => setTplContent(prev => `${prev}{{${v.key}}}`)}
+                        className="font-mono-data text-[11px] rounded-full border border-border px-2 py-0.5 text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors"
+                        title={v.label}
+                      >
+                        {`{{${v.key}}}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
             <DialogFooter>

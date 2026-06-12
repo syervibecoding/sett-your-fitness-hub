@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 import { useLocation } from "react-router-dom";
+import { interpolateTemplate } from "@/lib/templateVars";
 
 type Chat = {
   id: string;
@@ -55,6 +56,9 @@ type StudentContext = {
   paymentStatus: string;
   hasActiveWorkout: boolean;
   studentName: string;
+  planName?: string;
+  planValue?: number | null;
+  dueDate?: string | null;
 };
 
 type FilterType = "all" | "unread" | "groups" | "mine" | "no-workout";
@@ -190,7 +194,7 @@ export default function WhatsAppChat() {
 
     let enrollQuery = supabase
       .from("enrollments")
-      .select("id, student_id, status, training_start_date")
+      .select("id, student_id, status, training_start_date, plan_id, plans(name, price)")
       .in("student_id", studentIds)
       .eq("status", "active");
     if (effectiveCompanyId) enrollQuery = enrollQuery.eq("company_id", effectiveCompanyId);
@@ -209,7 +213,7 @@ export default function WhatsAppChat() {
 
     const { data: payments } = await supabase
       .from("payments")
-      .select("id, student_id, status")
+      .select("id, student_id, status, due_date")
       .in("student_id", studentIds)
       .not("status", "in", '("RECEIVED","CONFIRMED","RECEIVED_IN_CASH")');
 
@@ -217,20 +221,30 @@ export default function WhatsAppChat() {
     const labels: Record<string, string[]> = {};
     const workoutsByCycle = new Set((workouts || []).map((w) => w.cycle_id));
     const pendingPaymentsByStudent = new Set((payments || []).map((p) => p.student_id));
+    // Vencimento pendente mais próximo por aluno (para a variável {{vencimento}}).
+    const dueByStudent: Record<string, string> = {};
+    for (const p of payments || []) {
+      const due = (p as { due_date?: string | null }).due_date;
+      if (!due) continue;
+      if (!dueByStudent[p.student_id] || due < dueByStudent[p.student_id]) dueByStudent[p.student_id] = due;
+    }
 
     for (const chat of studentChats) {
       const studentId = chat.student_id!;
       const enrollment = (enrollments || []).find((e) => e.student_id === studentId);
       const cycle = enrollment ? (cycles || []).find((c) => c.enrollment_id === enrollment.id) : null;
       const chatLabelsArr: string[] = [];
+      const planRaw = (enrollment as { plans?: { name?: string; price?: number } | { name?: string; price?: number }[] } | undefined)?.plans;
+      const plan = Array.isArray(planRaw) ? planRaw[0] : planRaw;
+      const planExtras = { planName: plan?.name, planValue: plan?.price ?? null, dueDate: dueByStudent[studentId] || null };
 
       if (cycle) {
         const daysRemaining = Math.max(0, differenceInDays(new Date(cycle.end_date), new Date()));
         const hasWorkout = workoutsByCycle.has(cycle.id);
-        contexts[chat.id] = { cycleNumber: cycle.cycle_number, cycleStartDate: cycle.start_date, daysRemaining, paymentStatus: pendingPaymentsByStudent.has(studentId) ? "pendente" : "em dia", hasActiveWorkout: hasWorkout, studentName: chat.student?.full_name || "" };
+        contexts[chat.id] = { cycleNumber: cycle.cycle_number, cycleStartDate: cycle.start_date, daysRemaining, paymentStatus: pendingPaymentsByStudent.has(studentId) ? "pendente" : "em dia", hasActiveWorkout: hasWorkout, studentName: chat.student?.full_name || "", ...planExtras };
         if (!hasWorkout) chatLabelsArr.push("Aguardando Treino");
       } else if (enrollment) {
-        contexts[chat.id] = { cycleNumber: 0, cycleStartDate: enrollment.training_start_date || "", daysRemaining: 0, paymentStatus: pendingPaymentsByStudent.has(studentId) ? "pendente" : "em dia", hasActiveWorkout: false, studentName: chat.student?.full_name || "" };
+        contexts[chat.id] = { cycleNumber: 0, cycleStartDate: enrollment.training_start_date || "", daysRemaining: 0, paymentStatus: pendingPaymentsByStudent.has(studentId) ? "pendente" : "em dia", hasActiveWorkout: false, studentName: chat.student?.full_name || "", ...planExtras };
         chatLabelsArr.push("Aguardando Treino");
       }
 
@@ -1028,7 +1042,15 @@ export default function WhatsAppChat() {
                                     key={t.id}
                                     className="w-full text-left px-3 py-2 hover:bg-muted/50 transition-colors border-b border-border last:border-b-0"
                                     onClick={() => {
-                                      const content = t.content.replace(/\{\{nome\}\}/g, studentName);
+                                      const ctx = selectedChat ? studentContexts[selectedChat.id] : null;
+                                      const content = interpolateTemplate(t.content, {
+                                        nome: studentName,
+                                        primeiro_nome: studentName.split(" ")[0] || "",
+                                        plano: ctx?.planName || "",
+                                        vencimento: ctx?.dueDate ? format(new Date(ctx.dueDate), "dd/MM/yyyy") : "",
+                                        valor: ctx?.planValue != null ? ctx.planValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "",
+                                        dias_restantes: ctx?.daysRemaining ?? "",
+                                      });
                                       setNewMessage(content);
                                       setShowTemplates(false);
                                     }}
