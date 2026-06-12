@@ -21,6 +21,7 @@ import {
   Megaphone,
   Sparkles,
   Activity,
+  BrainCircuit,
 
 
 } from "lucide-react";
@@ -191,7 +192,7 @@ export function AppSidebar() {
             : [];
 
   const isWhatsAppActive = location.pathname.includes("/whatsapp");
-  const isExercisesActive = location.pathname.includes("/exercises") || location.pathname.includes("/prescriptions") || location.pathname.includes("/workout/") || location.pathname.includes("/prescricao") || location.pathname.includes("/avaliacao");
+  const isExercisesActive = location.pathname.includes("/exercises") || location.pathname.includes("/prescriptions") || location.pathname.includes("/workout/") || location.pathname.includes("/prescricao") || location.pathname.includes("/studio") || location.pathname.includes("/avaliacao") || location.pathname.includes("/ia");
   
   // Determine exercise menu prefix
   const exercisePrefix = showAdminView ? "/admin" : `/${role}`;
@@ -309,27 +310,27 @@ export function AppSidebar() {
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            className="cursor-not-allowed opacity-60 pointer-events-none"
-                            aria-disabled
-                          >
-                            <Sparkles className="h-4 w-4" />
-                            <span>Prescrição IA</span>
-                            <span className="ml-auto rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-                              Em dev
-                            </span>
+                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/studio`}>
+                            <NavLink to={`${exercisePrefix}/studio`} end>
+                              <Sparkles className="h-4 w-4" />
+                              <span>Studio Integrado</span>
+                            </NavLink>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            className="cursor-not-allowed opacity-60 pointer-events-none"
-                            aria-disabled
-                          >
+                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/ia`}>
+                            <NavLink to={`${exercisePrefix}/ia`} end>
+                              <BrainCircuit className="h-4 w-4" />
+                              <span>Central IA</span>
+                            </NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/avaliacao`}>
+                            <NavLink to={`${exercisePrefix}/avaliacao`} end>
                             <Activity className="h-4 w-4" />
                             <span>Avaliação Funcional</span>
-                            <span className="ml-auto rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-                              Em dev
-                            </span>
+                            </NavLink>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                       </SidebarMenuSub>

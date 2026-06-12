@@ -14,6 +14,7 @@ import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
+import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 
 interface FinancialStats {
   monthRevenueBilling: number;
@@ -411,7 +412,14 @@ export default function FinancialDashboard() {
       <div className="space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-4xl text-primary">FINANCEIRO</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-4xl text-primary">FINANCEIRO</h1>
+              <BnitoContextButton
+                label="dashboard financeiro"
+                context="Dashboard financeiro com faturamento, caixa, pendencias, inadimplencia, conversao, metodo de pagamento e historico."
+                question="Como devo interpretar o financeiro e priorizar pendencias?"
+              />
+            </div>
             <p className="text-muted-foreground font-sans">Gestão financeira da consultoria</p>
           </div>
           <div className="flex gap-2">
@@ -526,7 +534,15 @@ export default function FinancialDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-primary text-xl">FATURAMENTO MENSAL</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-primary text-xl">
+                FATURAMENTO MENSAL
+                <BnitoContextButton
+                  label="faturamento mensal"
+                  context="Grafico de faturamento por mes de criacao da venda."
+                  question="O que devo observar neste faturamento mensal?"
+                  className="ml-auto"
+                />
+              </CardTitle>
               <p className="text-xs text-muted-foreground font-sans">Valor total das vendas no mês de criação</p>
             </CardHeader>
             <CardContent>
@@ -536,7 +552,15 @@ export default function FinancialDashboard() {
 
           <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-primary text-xl">CAIXA MENSAL + PREVISÃO</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-primary text-xl">
+                CAIXA MENSAL + PREVISÃO
+                <BnitoContextButton
+                  label="caixa mensal e previsao"
+                  context="Grafico de recebido por mes e previsao de parcelas futuras."
+                  question="Como devo ler caixa recebido versus previsao futura?"
+                  className="ml-auto"
+                />
+              </CardTitle>
               <p className="text-xs text-muted-foreground font-sans">Recebido por mês + previsão dos próximos meses (parcelas futuras)</p>
             </CardHeader>
             <CardContent>
@@ -545,7 +569,17 @@ export default function FinancialDashboard() {
           </Card>
 
           <Card className="bg-card border-border">
-            <CardHeader><CardTitle className="text-primary text-xl">MÉTODO DE PAGAMENTO (R$)</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-primary text-xl">
+                MÉTODO DE PAGAMENTO (R$)
+                <BnitoContextButton
+                  label="metodos de pagamento"
+                  context="Distribuicao de receita por metodo de pagamento."
+                  question="O que a distribuicao por metodo de pagamento sugere operacionalmente?"
+                  className="ml-auto"
+                />
+              </CardTitle>
+            </CardHeader>
             <CardContent>
               {paymentMethodChart.length > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
@@ -567,7 +601,17 @@ export default function FinancialDashboard() {
           </Card>
 
           <Card className="bg-card border-border">
-            <CardHeader><CardTitle className="text-primary text-xl">RECEITA POR PLANO</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-primary text-xl">
+                RECEITA POR PLANO
+                <BnitoContextButton
+                  label="receita por plano"
+                  context="Receita agrupada por plano vendido."
+                  question="Como devo interpretar a receita por plano para ajustar oferta e operacao?"
+                  className="ml-auto"
+                />
+              </CardTitle>
+            </CardHeader>
             <CardContent>
               {revenueByPlan.length > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
@@ -587,7 +631,15 @@ export default function FinancialDashboard() {
 
         <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle className="text-primary text-xl">CAIXA — DETALHE POR ALUNO</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-primary text-xl">
+              CAIXA — DETALHE POR ALUNO
+              <BnitoContextButton
+                label="caixa por aluno"
+                context="Detalhamento mensal de caixa por aluno e previsao de parcelas futuras."
+                question="Quais alunos devo revisar pelo impacto no caixa?"
+                className="ml-auto"
+              />
+            </CardTitle>
             <p className="text-xs text-muted-foreground font-sans">Quanto entra no caixa por aluno em cada mês (inclui previsão de parcelas futuras)</p>
           </CardHeader>
           <CardContent>
@@ -641,7 +693,15 @@ export default function FinancialDashboard() {
           <CardHeader>
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
-                <CardTitle className="text-primary text-xl">HISTÓRICO DE PAGAMENTOS</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-primary text-xl">
+                  HISTÓRICO DE PAGAMENTOS
+                  <BnitoContextButton
+                    label="historico de pagamentos"
+                    context="Tabela filtravel de pagamentos, status, datas e metodos."
+                    question="Como devo auditar este historico de pagamentos?"
+                    className="ml-auto"
+                  />
+                </CardTitle>
                 <p className="text-xs text-muted-foreground font-sans mt-1">{filteredPayments.length} pagamentos encontrados</p>
               </div>
             </div>

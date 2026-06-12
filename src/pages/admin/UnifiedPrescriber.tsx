@@ -6,7 +6,7 @@
 //   4. "Gerar" roda em sequência passando contexto entre as IAs:
 //      Musculação → Corrida (recebe o plano de força para anti-interferência)
 // ============================================================================
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,12 @@ import {
   Loader2, CheckCircle2, Circle, AlertCircle, Dumbbell, Activity,
   ChevronDown, ChevronUp, ClipboardCheck,
 } from "lucide-react";
+import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
+import {
+  buildBnitoOrchestrationPlan,
+  buildPrescriptionIntegration,
+  formatPrescriptionIntegrationSummary,
+} from "@/lib/prescriptionIntegration";
 
 interface Student { id: string; full_name: string; }
 interface Anamnese {
@@ -57,6 +63,7 @@ export default function UnifiedPrescriber() {
   const [anamnese, setAnamnese]     = useState<Anamnese>(DEFAULT_ANAMNESE);
   const [anamneseId, setAnamneseId] = useState<string | null>(null);
   const [assessmentExists, setAssessmentExists] = useState(false);
+  const [assessment, setAssessment] = useState<any>(null);
   const [modalities, setModalities] = useState<Set<Modality>>(new Set(["musculacao"]));
   const [open, setOpen]             = useState({ personal: true, training: true, cardio: false, health: false });
   const [status, setStatus]         = useState<Record<Modality, GenStatus>>({ musculacao: "idle", corrida: "idle" });
@@ -112,7 +119,11 @@ export default function UnifiedPrescriber() {
         setAnamnese(DEFAULT_ANAMNESE);
       }
       const { data: assess } = await supabase.from("functional_assessments")
-        .select("id").eq("student_id", studentId).limit(1).maybeSingle();
+        .select("id, assessment_json, report_text, created_at")
+        .eq("student_id", studentId)
+        .order("created_at", { ascending: false })
+        .limit(1).maybeSingle();
+      setAssessment(assess);
       setAssessmentExists(!!assess);
     })();
   }, [studentId]);
@@ -128,6 +139,22 @@ export default function UnifiedPrescriber() {
     return next;
   });
   const student = students.find(s => s.id === studentId);
+  const assessmentContext = assessment?.assessment_json
+    ? { ...assessment.assessment_json, report_text: assessment.report_text, id: assessment.id, created_at: assessment.created_at }
+    : null;
+  const prescriptionIntegration = useMemo(
+    () => buildPrescriptionIntegration({
+      anamnese: anamneseId ? { ...anamnese, id: anamneseId } : anamnese,
+      assessment: assessmentContext,
+      assessmentId: assessment?.id,
+      assessmentCreatedAt: assessment?.created_at,
+    }),
+    [anamnese, anamneseId, assessmentContext, assessment?.id, assessment?.created_at],
+  );
+  const bnitoOrchestration = useMemo(
+    () => buildBnitoOrchestrationPlan(prescriptionIntegration),
+    [prescriptionIntegration],
+  );
 
   async function saveAnamnese(): Promise<string> {
     const payload = {
@@ -175,11 +202,25 @@ export default function UnifiedPrescriber() {
     try {
       const savedAnamneseId = await saveAnamnese();
 
-      const { data: assessment } = await supabase
-        .from("functional_assessments").select("assessment_json")
+      const { data: latestAssessment } = await supabase
+        .from("functional_assessments").select("id, assessment_json, report_text, created_at")
         .eq("student_id", studentId).order("created_at", { ascending: false })
         .limit(1).maybeSingle();
-      const assessmentCtx = assessment?.assessment_json ?? null;
+      const assessmentCtx = latestAssessment?.assessment_json
+        ? {
+            ...latestAssessment.assessment_json,
+            report_text: latestAssessment.report_text,
+            id: latestAssessment.id,
+            created_at: latestAssessment.created_at,
+          }
+        : null;
+      const integrationCtx = buildPrescriptionIntegration({
+        anamnese: { ...anamnese, id: savedAnamneseId },
+        assessment: assessmentCtx,
+        assessmentId: latestAssessment?.id,
+        assessmentCreatedAt: latestAssessment?.created_at,
+      });
+      const orchestrationCtx = buildBnitoOrchestrationPlan(integrationCtx);
 
       // 1) Musculação
       if (modalities.has("musculacao")) {
@@ -198,6 +239,9 @@ export default function UnifiedPrescriber() {
               sport: anamnese.sport,
             } : null,
             assessment_context: assessmentCtx,
+            anamnese_context: { ...anamnese, id: savedAnamneseId },
+            prescription_integration: integrationCtx,
+            bnito_orchestration: orchestrationCtx,
           },
         });
         if (e || data?.error) throw new Error(data?.error || e?.message);
@@ -214,7 +258,7 @@ export default function UnifiedPrescriber() {
             student_id: studentId, student_name: student?.full_name, company_id: companyId,
             anamnese_id: savedAnamneseId, bundle_id: bundleId,
             sport: anamnese.sport, goal: anamnese.cardio_goal || "Melhora de performance geral",
-            duration_weeks: 8,
+            duration_weeks: 6,
             days_per_week: Number(anamnese.days_per_week_cardio),
             session_duration: Number(anamnese.session_duration_min),
             current_volume: anamnese.current_volume_weekly ? Number(anamnese.current_volume_weekly) : null,
@@ -235,6 +279,9 @@ export default function UnifiedPrescriber() {
               })) ?? [],
             } : null,
             assessment_context: assessmentCtx,
+            anamnese_context: { ...anamnese, id: savedAnamneseId },
+            prescription_integration: integrationCtx,
+            bnito_orchestration: orchestrationCtx,
           },
         });
         if (e || data?.error) throw new Error(data?.error || e?.message);
@@ -246,10 +293,15 @@ export default function UnifiedPrescriber() {
       await supabase.from("prescription_bundles").insert({
         id: bundleId, company_id: companyId, student_id: studentId,
         anamnese_id: savedAnamneseId,
+        assessment_id: integrationCtx.sources.assessment_id,
         strength_plan_id: strengthPlanId,
         running_plan_id: runningPlanId,
         has_strength: modalities.has("musculacao"),
         has_cardio: modalities.has("corrida"),
+        notes: [
+          formatPrescriptionIntegrationSummary(integrationCtx),
+          `BNITO: periodizacao de ${orchestrationCtx.duration_weeks} semanas em blocos de ${orchestrationCtx.block_length_weeks} semanas.`,
+        ].join("\n"),
         status: "active",
       });
     } catch (err: any) {
@@ -266,14 +318,21 @@ export default function UnifiedPrescriber() {
   const inputCls = "h-9 text-sm";
   const Section = ({ id, label, children }: { id: keyof typeof open; label: string; children: React.ReactNode }) => (
     <div className="border border-line rounded-lg overflow-hidden">
-      <button
-        type="button"
-        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-left hover:bg-muted/50"
-        onClick={() => setOpen(o => ({ ...o, [id]: !o[id] }))}
-      >
-        {label}
-        {open[id] ? <ChevronUp className="h-4 w-4 opacity-50" /> : <ChevronDown className="h-4 w-4 opacity-50" />}
-      </button>
+      <div className="flex items-center gap-2 px-4 py-3 hover:bg-muted/50">
+        <button
+          type="button"
+          className="flex flex-1 items-center justify-between text-left text-sm font-medium"
+          onClick={() => setOpen(o => ({ ...o, [id]: !o[id] }))}
+        >
+          {label}
+          {open[id] ? <ChevronUp className="h-4 w-4 opacity-50" /> : <ChevronDown className="h-4 w-4 opacity-50" />}
+        </button>
+        <BnitoContextButton
+          label={`prescricao integrada: ${label}`}
+          context={`Secao ${label} dentro da prescricao integrada. Campos atuais ajudam a IA a decidir objetivo, carga, restricoes e modalidade.`}
+          question={`Como devo preencher e interpretar a secao ${label} para uma prescricao mais segura?`}
+        />
+      </div>
       {open[id] && <div className="px-4 pb-4 pt-2 grid gap-3 grid-cols-2 md:grid-cols-3 border-t border-line">{children}</div>}
     </div>
   );
@@ -284,10 +343,14 @@ export default function UnifiedPrescriber() {
     </div>
   );
   const SI = (props: any) => <Input {...props} className={inputCls} />;
-  const SS = ({ value, onChange, opts }: any) => (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
-      <SelectContent>{opts.map(([v, l]: [string, string]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
+  const SS = ({ value, onChange, opts, placeholder = "Selecione..." }: any) => (
+    <Select value={value || undefined} onValueChange={onChange}>
+      <SelectTrigger className={inputCls}><SelectValue placeholder={placeholder} /></SelectTrigger>
+      <SelectContent>
+        {opts
+          .filter(([v]: [string, string]) => v !== "")
+          .map(([v, l]: [string, string]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+      </SelectContent>
     </Select>
   );
   const genStatusIcon = (s: GenStatus) => {
@@ -302,12 +365,29 @@ export default function UnifiedPrescriber() {
       <div className="max-w-3xl mx-auto space-y-5">
         <div>
           <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">Prescrição</p>
-          <h1 className="font-display text-3xl">Prescrição Integrada com IA</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-display text-3xl">Prescrição Integrada com IA</h1>
+            <BnitoContextButton
+              label="prescricao integrada com IA"
+              context="Fluxo que junta anamnese, avaliacao funcional, musculacao e corrida em uma prescricao sincronizada."
+              question="Me ajuda a decidir se devo gerar musculacao, corrida ou ambos para este aluno?"
+            />
+          </div>
           <p className="text-sm text-muted-foreground">Anamnese única · IAs em sequência · periodização sincronizada</p>
         </div>
 
         <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-base">Aluno</CardTitle></CardHeader>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              Aluno
+              <BnitoContextButton
+                label="aluno da prescricao integrada"
+                context="Selecao de aluno para carregar anamnese e avaliacao funcional antes da geracao integrada."
+                question="O que devo conferir neste aluno antes de gerar uma prescricao integrada?"
+                className="ml-auto"
+              />
+            </CardTitle>
+          </CardHeader>
           <CardContent>
             <SS value={studentId} onChange={setStudentId} opts={[["", "Selecione..."], ...students.map(s => [s.id, s.full_name])]} />
             {anamneseId && <p className="text-xs text-navy mt-1">Anamnese salva carregada — edite se necessário.</p>}
@@ -326,7 +406,15 @@ export default function UnifiedPrescriber() {
           <>
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Anamnese</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  Anamnese
+                  <BnitoContextButton
+                    label="anamnese da prescricao integrada"
+                    context="Campos de objetivo, nivel, restricoes, endurance, frequencia, equipamento e saude usados por todas as IAs."
+                    question="Quais pontos desta anamnese podem mudar a montagem do treino?"
+                    className="ml-auto"
+                  />
+                </CardTitle>
                 <p className="text-xs text-muted-foreground">Preenchida uma vez — usada por todas as IAs selecionadas.</p>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -383,7 +471,89 @@ export default function UnifiedPrescriber() {
             </Card>
 
             <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-base">Quais prescrições gerar?</CardTitle></CardHeader>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  Resultado integrado para prescrição
+                  <Badge variant={prescriptionIntegration.readiness.status === "pronto" ? "default" : "outline"} className="text-xs">
+                    {prescriptionIntegration.readiness.status}
+                  </Badge>
+                  <BnitoContextButton
+                    label="resultado integrado da prescricao"
+                    context="Resumo tecnico que cruza anamnese, avaliacao funcional, objetivo, restricoes e regras para gerar musculacao/corrida."
+                    question="Revise este resultado integrado e aponte cuidados para a prescricao."
+                    className="ml-auto"
+                  />
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <p className="text-muted-foreground">{prescriptionIntegration.readiness.reason}</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded border border-line p-2">
+                    Anamnese: {prescriptionIntegration.sources.has_anamnese ? "ok" : "pendente"}
+                  </div>
+                  <div className="rounded border border-line p-2">
+                    Avaliação: {prescriptionIntegration.sources.has_assessment ? "ok" : "pendente"}
+                  </div>
+                </div>
+                {prescriptionIntegration.functional_findings.priorities.length > 0 && (
+                  <div>
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Prioridades funcionais</p>
+                    <ul className="space-y-1 text-muted-foreground">
+                      {prescriptionIntegration.functional_findings.priorities.slice(0, 4).map((item, index) => (
+                        <li key={index}>- {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {prescriptionIntegration.prescription_decision.exercise_selection_rules.length > 0 && (
+                  <div>
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Regras para a IA</p>
+                    <ul className="space-y-1 text-muted-foreground">
+                      {prescriptionIntegration.prescription_decision.exercise_selection_rules.slice(0, 4).map((item, index) => (
+                        <li key={index}>- {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  Orquestração BNITO
+                  <Badge variant="outline" className="text-xs">6 semanas</Badge>
+                  <BnitoContextButton
+                    label="orquestracao BNITO integrada"
+                    context="BNITO coordena os agentes de musculacao, corrida e nutricao em 6 semanas, com mudanca de estimulo a cada 2 semanas."
+                    question="Revise esta periodizacao e me diga se os blocos estao coerentes com o aluno."
+                    className="ml-auto"
+                  />
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-2 text-xs text-muted-foreground md:grid-cols-3">
+                {bnitoOrchestration.blocks.map((block) => (
+                  <div key={block.block} className="rounded border border-line p-3">
+                    <p className="font-medium text-foreground">Semanas {block.weeks[0]}-{block.weeks[1]}</p>
+                    <p className="mt-1">{block.name}</p>
+                    <p className="mt-2">{block.advanced_methods.join(", ")}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  Quais prescrições gerar?
+                  <BnitoContextButton
+                    label="modalidades da prescricao"
+                    context="Escolha entre musculacao e corrida/cardio, considerando interferencia, objetivo e restricoes."
+                    question="Com base em objetivo, rotina e restricoes, quais prescricoes devo gerar e como sincronizar?"
+                    className="ml-auto"
+                  />
+                </CardTitle>
+              </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-3">
                   {([

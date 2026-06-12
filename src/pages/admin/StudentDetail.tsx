@@ -20,6 +20,7 @@ import { ArrowLeft, Mail, Phone, Cake, CalendarDays, Dumbbell, Plus, CalendarIco
 import { format, parseISO, eachDayOfInterval, addWeeks, addDays, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 
 // Safely format a date string. Returns "—" when value is missing or invalid.
 function safeFormatDate(value: string | null | undefined, fmt: string, opts?: Parameters<typeof format>[2]): string {
@@ -801,6 +802,11 @@ export default function StudentDetail() {
             </div>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
+            <BnitoContextButton
+              label={`perfil de ${student.full_name}`}
+              context={`Detalhe do aluno. Status: ${student.status}. Treinador: ${trainerName || "nao definido"}. Matriculas: ${enrollments.length}. Ciclos: ${cycles.length}.`}
+              question="Me ajude a identificar os principais riscos e proximos passos deste aluno."
+            />
             <Button variant="ghost" size="sm" className="text-xs" onClick={async () => {
               const link = `${window.location.origin}/anamnese/${id}`;
               try { await navigator.clipboard.writeText(link); } catch {
@@ -854,9 +860,17 @@ export default function StudentDetail() {
                 {enrollments.length > 0 && (() => {
                   const active = enrollments.find(e => e.status === "active" || e.status === "awaiting_training" || e.status === "awaiting_renewal") || enrollments[0];
                   return (
-                    <Card className="bg-card border-border">
+                      <Card className="bg-card border-border">
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-primary text-lg">MATRÍCULA ATIVA</CardTitle>
+                        <CardTitle className="flex items-center gap-2 text-primary text-lg">
+                          MATRÍCULA ATIVA
+                          <BnitoContextButton
+                            label="matricula ativa do aluno"
+                            context={`Matricula ativa do aluno ${student.full_name}. Plano: ${active.plan_name}. Status: ${active.status}. Treinador: ${active.trainer_name || "sem treinador"}.`}
+                            question="O que devo revisar nesta matricula antes de prescrever ou renovar?"
+                            className="ml-auto"
+                          />
+                        </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-2 text-sm font-sans">
                         <div className="flex items-center justify-between">
@@ -894,7 +908,15 @@ export default function StudentDetail() {
                 {/* Personal details */}
                 <Card className="bg-card border-border">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-primary text-lg">DADOS PESSOAIS</CardTitle>
+                    <CardTitle className="flex items-center gap-2 text-primary text-lg">
+                      DADOS PESSOAIS
+                      <BnitoContextButton
+                        label="dados pessoais do aluno"
+                        context="Dados de contato, idade, CPF, endereco e observacoes que impactam cobranca, acesso e rotina."
+                        question="Quais dados deste cadastro podem impactar cobranca, acesso ou acompanhamento?"
+                        className="ml-auto"
+                      />
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm font-sans">
@@ -939,7 +961,14 @@ export default function StudentDetail() {
             {/* Enrollments */}
             <Card className="bg-card border-border">
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-primary text-lg">MATRÍCULAS</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-primary text-lg">
+                  MATRÍCULAS
+                  <BnitoContextButton
+                    label="programa e matriculas do aluno"
+                    context={`Matriculas, datas de treino, ciclos e status de prescricao do aluno ${student.full_name}.`}
+                    question="Como devo organizar os ciclos e proximas prescricoes deste aluno?"
+                  />
+                </CardTitle>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" onClick={async () => {
                     const link = `${window.location.origin}/pagamento/${id}`;
@@ -1129,7 +1158,17 @@ export default function StudentDetail() {
 
             {/* Calendar */}
             <Card className="bg-card border-border">
-              <CardHeader><CardTitle className="text-primary text-lg">CALENDÁRIO DE CICLOS</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-primary text-lg">
+                  CALENDÁRIO DE CICLOS
+                  <BnitoContextButton
+                    label="calendario de ciclos"
+                    context={`Calendario de ciclos do aluno ${student.full_name}; dias de prescrever, entregue e vencido sem treino.`}
+                    question="Como devo interpretar este calendario de ciclos e atrasos?"
+                    className="ml-auto"
+                  />
+                </CardTitle>
+              </CardHeader>
               <CardContent>
                 {cycles.length > 0 && (
                   <div className="flex flex-wrap gap-4 mb-4 text-xs font-sans">
@@ -1275,7 +1314,14 @@ export default function StudentDetail() {
           <TabsContent value="anamnesis">
             <Card className="bg-card border-border">
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-primary text-lg">ANAMNESE</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-primary text-lg">
+                  ANAMNESE
+                  <BnitoContextButton
+                    label="anamnese do aluno"
+                    context={`Anamnese do aluno ${student.full_name}: objetivos, dores, lesoes, rotina, sono, equipamentos e restricoes.`}
+                    question="Quais pontos desta anamnese devem mudar a prescricao?"
+                  />
+                </CardTitle>
                 <Button variant="ghost" size="sm" onClick={openEditAnamnesis}>
                   <Pencil className="h-4 w-4 mr-1" />{anamnesis ? "Editar" : "Adicionar"}
                 </Button>
@@ -1317,6 +1363,12 @@ export default function StudentDetail() {
               <CardHeader>
                 <CardTitle className="text-primary text-lg flex items-center gap-2">
                   <DollarSign className="h-5 w-5" />FINANCEIRO
+                  <BnitoContextButton
+                    label="financeiro do aluno"
+                    context={`Financeiro do aluno ${student.full_name}: matriculas, pagamentos, Asaas, links e status de cobranca.`}
+                    question="O que preciso regularizar no financeiro antes de seguir com este aluno?"
+                    className="ml-auto"
+                  />
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1397,6 +1449,12 @@ export default function StudentDetail() {
               <CardHeader>
                 <CardTitle className="text-primary text-lg flex items-center gap-2">
                   <FileText className="h-5 w-5" />AVALIAÇÕES
+                  <BnitoContextButton
+                    label="avaliacoes do aluno"
+                    context={`Avaliacoes do aluno ${student.full_name}: fotos, audios, observacoes e registros que podem influenciar treino.`}
+                    question="Como devo transformar estas avaliacoes em ajustes de treino?"
+                    className="ml-auto"
+                  />
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">

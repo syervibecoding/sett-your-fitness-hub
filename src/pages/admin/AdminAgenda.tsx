@@ -9,6 +9,7 @@ import { CalendarDays, RefreshCw, ClipboardList, CheckCircle, ChevronLeft, Chevr
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, isToday, isBefore } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
+import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 
 interface AgendaEvent {
   id: string;
@@ -145,7 +146,14 @@ export default function AdminAgenda() {
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-4xl text-primary">AGENDA</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-4xl text-primary">AGENDA</h1>
+            <BnitoContextButton
+              label="agenda operacional"
+              context="Agenda consolidada com renovacoes, ciclos para prescrever e ciclos entregues."
+              question="Como devo priorizar os eventos da agenda deste mes?"
+            />
+          </div>
           <p className="text-muted-foreground font-sans">Visão consolidada de datas importantes de todos os alunos</p>
         </div>
 
@@ -219,6 +227,12 @@ export default function AdminAgenda() {
               <CardTitle className="text-primary text-lg flex items-center gap-2">
                 <CalendarDays className="h-5 w-5" />
                 {selectedDate ? format(selectedDate, "dd 'de' MMMM", { locale: ptBR }) : "Próximos Eventos"}
+                <BnitoContextButton
+                  label="eventos da agenda"
+                  context={`Agenda com ${events.length} eventos no mes e ${selectedEvents.length} eventos no dia selecionado.`}
+                  question="Quais eventos exigem acao primeiro e por que?"
+                  className="ml-auto"
+                />
               </CardTitle>
             </CardHeader>
             <CardContent>

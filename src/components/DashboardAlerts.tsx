@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Cake, Dumbbell, UserCheck, CalendarDays, AlertTriangle, Bell, Check } from "lucide-react";
 import { differenceInDays, setYear } from "date-fns";
+import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 
 interface Birthday { full_name: string; birth_date: string; daysUntil: number; student_id: string; }
 interface MissingWorkout { student_name: string; student_id: string; cycle_number: number; cycle_id: string; start_date: string; end_date: string; trainer_name?: string; }
@@ -264,6 +265,12 @@ export function DashboardAlerts({ trainerId }: Props) {
           <CardHeader className="pb-3">
             <CardTitle className="text-primary text-lg flex items-center gap-2">
               <Bell className="h-5 w-5" />AÇÕES PENDENTES
+              <BnitoContextButton
+                label="acoes pendentes"
+                context={`Dashboard com ${pendingActions.length} acoes pendentes administrativas e tecnicas.`}
+                question="Como devo priorizar estas acoes pendentes?"
+                className="ml-auto"
+              />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -300,6 +307,12 @@ export function DashboardAlerts({ trainerId }: Props) {
           <CardHeader className="pb-3">
             <CardTitle className="text-primary text-lg flex items-center gap-2">
               <CalendarDays className="h-5 w-5" />DEFINIR DATA DE TREINO
+              <BnitoContextButton
+                label="alunos sem data de treino"
+                context={`Existem ${awaitingTrainingDate.length} alunos aguardando definicao de data de treino.`}
+                question="Qual criterio usar para definir data de inicio de treino destes alunos?"
+                className="ml-auto"
+              />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -323,6 +336,12 @@ export function DashboardAlerts({ trainerId }: Props) {
           <CardHeader className="pb-3">
             <CardTitle className="text-primary text-lg flex items-center gap-2">
               <UserCheck className="h-5 w-5" />AGUARDANDO TREINADOR
+              <BnitoContextButton
+                label="alunos aguardando treinador"
+                context={`Existem ${awaitingTrainer.length} alunos aguardando treinador.`}
+                question="Como devo distribuir estes alunos entre os treinadores?"
+                className="ml-auto"
+              />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -343,6 +362,12 @@ export function DashboardAlerts({ trainerId }: Props) {
           <CardHeader className="pb-3">
             <CardTitle className="text-destructive text-lg flex items-center gap-2">
               <Dumbbell className="h-5 w-5" />SEM MATRÍCULA ATIVA
+              <BnitoContextButton
+                label="alunos sem matricula ativa"
+                context={`Existem ${missingEnrollment.length} alunos ativos sem matricula ativa.`}
+                question="O que devo conferir antes de regularizar matricula destes alunos?"
+                className="ml-auto"
+              />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -363,6 +388,12 @@ export function DashboardAlerts({ trainerId }: Props) {
           <CardHeader className="pb-3">
             <CardTitle className="text-destructive text-lg flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />COBRANÇA INCOMPLETA
+              <BnitoContextButton
+                label="cobranca incompleta"
+                context={`Existem ${incompleteBilling.length} alunos com dados obrigatorios faltando para link de cobranca.`}
+                question="Quais dados devo corrigir primeiro para o link de cobranca funcionar?"
+                className="ml-auto"
+              />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -408,6 +439,12 @@ export function DashboardAlerts({ trainerId }: Props) {
           <CardHeader className="pb-3">
             <CardTitle className="text-primary text-lg flex items-center gap-2">
               <Dumbbell className="h-5 w-5" />SEM TREINO NO CICLO
+              <BnitoContextButton
+                label="ciclos sem treino"
+                context={`Existem ${missingWorkouts.length} ciclos sem treino prescrito no dashboard.`}
+                question="Como devo priorizar e montar os treinos pendentes destes ciclos?"
+                className="ml-auto"
+              />
             </CardTitle>
           </CardHeader>
           <CardContent>

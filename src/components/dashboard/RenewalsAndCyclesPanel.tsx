@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw, Timer } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 
 interface PanelData {
   expiringContracts: any[];
@@ -128,6 +129,12 @@ export function RenewalsAndCyclesPanel({ effectiveCompanyId, routePrefix, renewa
       <CardHeader>
         <CardTitle className="text-primary text-xl flex items-center gap-2">
           <RefreshCw className="h-5 w-5" />RENOVAÇÃO
+          <BnitoContextButton
+            label="renovacoes"
+            context={`Painel de renovacao: ${awaitingRenewal.length} aguardando renovacao e ${expiringContracts.length} contratos vencendo.`}
+            question="Como devo priorizar renovacoes e contratos perto do vencimento?"
+            className="ml-auto"
+          />
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -192,6 +199,12 @@ export function RenewalsAndCyclesPanel({ effectiveCompanyId, routePrefix, renewa
       <CardHeader>
         <CardTitle className="text-primary text-xl flex items-center gap-2">
           <Timer className="h-5 w-5" />TROCA DE TREINO
+          <BnitoContextButton
+            label="troca de treino"
+            context={`Painel de troca de treino com ${cycleCountdowns.length} ciclos ativos ou perto do vencimento.`}
+            question="Quais ciclos precisam de troca de treino primeiro e como decidir o foco?"
+            className="ml-auto"
+          />
         </CardTitle>
       </CardHeader>
       <CardContent>

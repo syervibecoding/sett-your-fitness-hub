@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart3, AlertTriangle, CheckCircle, TrendingUp, Activity } from "lucide-react";
 import { MuscleRadar } from "@/components/student/MuscleRadar";
+import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 
 interface Props {
   studentId: string;
@@ -241,6 +242,12 @@ export function WorkoutAnalysis({ studentId }: Props) {
         <CardTitle className="text-primary text-lg flex items-center gap-2">
           <BarChart3 className="h-5 w-5" />
           ANÁLISE DE TREINO
+          <BnitoContextButton
+            label="analise de treino"
+            context={`Analise de treino por periodo de ${period} dias: aderencia, volume executado, grupos musculares e alertas de sub/over volume.`}
+            question="Como devo interpretar esta analise e ajustar a prescricao?"
+            className="ml-auto"
+          />
         </CardTitle>
         <Select value={period} onValueChange={setPeriod}>
           <SelectTrigger className="w-[140px] bg-secondary border-border">

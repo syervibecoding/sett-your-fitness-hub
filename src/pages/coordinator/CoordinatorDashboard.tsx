@@ -13,6 +13,7 @@ import { addWeeks, format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
 import { RenewalsAndCyclesPanel } from "@/components/dashboard/RenewalsAndCyclesPanel";
+import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 
 interface Student {
   id: string;
@@ -139,7 +140,14 @@ export default function CoordinatorDashboard() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl text-primary">MATRÍCULAS</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-4xl text-primary">MATRÍCULAS</h1>
+              <BnitoContextButton
+                label="dashboard de matriculas"
+                context={`Fila de matriculas com ${pendingStudents.length} pendentes, ${activeStudents.length} ativos e ${students.length} alunos totais.`}
+                question="Como devo priorizar esta fila de matriculas e alunos?"
+              />
+            </div>
             <p className="text-muted-foreground font-sans">Fila de alunos e matrículas</p>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
@@ -218,7 +226,15 @@ export default function CoordinatorDashboard() {
         {/* Student List */}
         <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle className="text-primary text-xl">FILA DE ALUNOS</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-primary text-xl">
+              FILA DE ALUNOS
+              <BnitoContextButton
+                label="fila de alunos"
+                context="Fila de alunos com status pendente, triagem, ativo ou inativo; usada para matricular e liberar."
+                question="Qual criterio usar para tirar alunos da fila e liberar matricula?"
+                className="ml-auto"
+              />
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">

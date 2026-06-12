@@ -1,0 +1,389 @@
+import { createContext, FormEvent, ReactNode, useCallback, useContext, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { BrainCircuit, HelpCircle, Loader2, Send, Sparkles } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+type BnitoMessage = {
+  id: string;
+  role: "assistant" | "user";
+  content: string;
+};
+
+type BnitoResult = {
+  summary?: string;
+  answer?: string;
+  suggestions?: Array<{
+    title?: string;
+    rationale?: string;
+    action?: string;
+  }>;
+  questions_to_professor?: string[];
+};
+
+type BnitoResponse = {
+  result?: BnitoResult | string;
+  raw?: string;
+  error?: string;
+  details?: string;
+};
+
+type BnitoOpenOptions = {
+  label?: string;
+  context?: string;
+  question?: string;
+  source?: string;
+};
+
+type BnitoAssistantContextValue = {
+  isAvailable: boolean;
+  openBnito: (options?: BnitoOpenOptions) => void;
+};
+
+type BnitoContextButtonProps = {
+  label: string;
+  context?: string;
+  question?: string;
+  className?: string;
+  text?: string;
+};
+
+const BnitoAssistantContext = createContext<BnitoAssistantContextValue | null>(null);
+
+const quickPrompts = [
+  {
+    label: "Dor no joelho",
+    prompt: "Aluno relatou dor no joelho na anamnese. Como ajusto o treino de pernas?",
+  },
+  {
+    label: "Auditar volume",
+    prompt: "Audite um volume semanal alto para hipertrofia e me diga riscos.",
+  },
+  {
+    label: "Forca + corrida",
+    prompt: "Como organizar forca e corrida sem atrapalhar os treinos de tiro?",
+  },
+  {
+    label: "Avaliacao funcional",
+    prompt: "Quais sinais na avaliacao funcional pedem regressao tecnica?",
+  },
+];
+
+const firstMessage: BnitoMessage = {
+  id: "bnito-welcome",
+  role: "assistant",
+  content:
+    "Oi, professor. Eu sou o BNITO. Posso revisar volume, coerencia com objetivo, dor/restricao, avaliacao funcional e te devolver sugestoes tecnicas para voce aprovar.",
+};
+
+function createMessage(role: BnitoMessage["role"], content: string): BnitoMessage {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    role,
+    content,
+  };
+}
+
+function getCycleId(pathname: string) {
+  const match = pathname.match(/\/workout\/([^/]+)/);
+  return match?.[1] || null;
+}
+
+function getPageLabel(pathname: string) {
+  if (pathname.includes("/workout/")) return "builder manual de treino";
+  if (pathname.includes("/ia")) return "central IA";
+  if (pathname.includes("/exercises")) return "biblioteca de exercicios";
+  if (pathname.includes("/prescriptions")) return "prescricoes";
+  if (pathname.includes("/prescricao")) return "prescricao integrada";
+  if (pathname.includes("/studio")) return "studio de prescricao";
+  if (pathname.includes("/students")) return "alunos";
+  if (pathname.includes("/anamnesis")) return "anamnese";
+  if (pathname.includes("/avaliacao")) return "avaliacao funcional";
+  if (pathname.includes("/financial")) return "financeiro";
+  if (pathname.includes("/agenda")) return "agenda";
+  return "painel";
+}
+
+function formatBnitoResponse(data: BnitoResponse) {
+  if (typeof data.result === "string") return data.result;
+  const result = data.result;
+  if (!result) return data.raw || "BNITO respondeu, mas sem texto estruturado.";
+
+  const base = result.answer || result.summary || "Analise tecnica gerada.";
+  const suggestions = Array.isArray(result.suggestions)
+    ? result.suggestions
+        .slice(0, 3)
+        .map((item, index) => {
+          const title = item.title || `Sugestao ${index + 1}`;
+          const detail = item.action || item.rationale || "";
+          return detail ? `${index + 1}. ${title}: ${detail}` : `${index + 1}. ${title}`;
+        })
+    : [];
+  const questions = Array.isArray(result.questions_to_professor)
+    ? result.questions_to_professor.slice(0, 2).map((question) => `Pergunta: ${question}`)
+    : [];
+
+  return [base, ...suggestions, ...questions].filter(Boolean).join("\n\n");
+}
+
+function getUnavailableMessage(message: string) {
+  if (/function|edge|404|403|fetch|non-2xx/i.test(message)) {
+    return "Nao consegui conectar com o BNITO agora. A interface ja esta instalada, mas a funcao ai-bnito-coach precisa estar publicada na Supabase para eu responder com IA.";
+  }
+  return `Nao consegui responder agora: ${message}`;
+}
+
+export function useBnitoAssistant() {
+  const context = useContext(BnitoAssistantContext);
+  return context || { isAvailable: false, openBnito: () => {} };
+}
+
+export function BnitoContextButton({ label, context, question, className, text }: BnitoContextButtonProps) {
+  const assistant = useBnitoAssistant();
+  if (!assistant.isAvailable) return null;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size={text ? "sm" : "icon"}
+          className={`rounded-full border border-navy/15 bg-background/80 text-navy shadow-sm hover:bg-navy hover:text-primary-foreground ${text ? "h-8 px-3 text-xs" : "h-8 w-8"} ${className || ""}`}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            assistant.openBnito({ label, context, question });
+          }}
+          aria-label={`Perguntar ao BNITO sobre ${label}`}
+        >
+          <BrainCircuit className="h-4 w-4" />
+          {text && <span>{text}</span>}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top">Perguntar ao BNITO sobre {label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+export function BnitoAssistantProvider({ children }: { children: ReactNode }) {
+  const { role } = useAuth();
+  const location = useLocation();
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [messages, setMessages] = useState<BnitoMessage[]>([firstMessage]);
+  const [sessionContext, setSessionContext] = useState<BnitoOpenOptions | null>(null);
+
+  const shouldShow = role === "admin" || role === "coordinator" || role === "trainer";
+  const cycleId = useMemo(() => getCycleId(location.pathname), [location.pathname]);
+  const pageLabel = useMemo(() => getPageLabel(location.pathname), [location.pathname]);
+  const activeLabel = sessionContext?.label || pageLabel;
+
+  const openBnito = useCallback((options?: BnitoOpenOptions) => {
+    setSessionContext(options || null);
+    setInput(options?.question || "");
+    setOpen(true);
+  }, []);
+
+  const askBnito = async (question: string) => {
+    const trimmed = question.trim();
+    if (!trimmed || loading) return;
+
+    setInput("");
+    setLoading(true);
+    setMessages((current) => [...current, createMessage("user", trimmed)]);
+
+    try {
+      const { data, error } = await supabase.functions.invoke<BnitoResponse>("ai-bnito-coach", {
+        body: {
+          action: "ask",
+          cycle_id: cycleId,
+          question: trimmed,
+          profile: {
+            role,
+            source: sessionContext?.source || "bnito_contextual_assistant",
+            current_page: pageLabel,
+            context_label: sessionContext?.label || null,
+          },
+          context: [
+            `Origem: ${pageLabel}.`,
+            sessionContext?.label ? `Secao acionada: ${sessionContext.label}.` : "",
+            sessionContext?.context ? `Contexto da secao: ${sessionContext.context}.` : "",
+            `Rota atual: ${location.pathname}.`,
+            cycleId ? `Ciclo aberto: ${cycleId}.` : "",
+          ].filter(Boolean).join(" "),
+          page_context: {
+            pathname: location.pathname,
+            page_label: pageLabel,
+            context_label: sessionContext?.label || null,
+            context: sessionContext?.context || null,
+            cycle_id: cycleId,
+          },
+        },
+      });
+
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("resposta vazia");
+      if (data.error) throw new Error(data.details || data.error);
+
+      setMessages((current) => [...current, createMessage("assistant", formatBnitoResponse(data))]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "erro inesperado";
+      setMessages((current) => [...current, createMessage("assistant", getUnavailableMessage(message))]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void askBnito(input);
+  };
+
+  const contextValue = useMemo(
+    () => ({ isAvailable: shouldShow, openBnito }),
+    [openBnito, shouldShow],
+  );
+
+  return (
+    <BnitoAssistantContext.Provider value={contextValue}>
+      {children}
+      {shouldShow && (
+        <Dialog open={open} onOpenChange={setOpen}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label="Abrir BNITO"
+                onClick={() => openBnito()}
+                className="fixed bottom-6 right-6 z-40 flex h-16 w-16 items-center justify-center rounded-full border border-white/60 bg-navy text-primary-foreground shadow-[0_18px_45px_rgba(29,45,92,0.32)] ring-8 ring-navy/10 transition duration-200 hover:-translate-y-0.5 hover:bg-navy/95 focus:outline-none focus:ring-4 focus:ring-ring focus:ring-offset-2"
+              >
+                <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/45 bg-white/10">
+                  <BrainCircuit className="h-7 w-7" />
+                </span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="left">Abrir BNITO</TooltipContent>
+          </Tooltip>
+
+          <DialogContent className="flex max-h-[88vh] w-[calc(100vw-2rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-[28px] border-line bg-paper p-0 shadow-2xl [&>button]:rounded-full">
+            <DialogHeader className="shrink-0 border-b border-line bg-background px-5 py-4 text-left">
+          <div className="flex items-start gap-3 pr-8">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-navy text-primary-foreground shadow-md">
+              <BrainCircuit className="h-6 w-6" />
+            </div>
+            <div className="min-w-0">
+              <DialogTitle className="font-display text-2xl text-navy">BNITO</DialogTitle>
+              <DialogDescription className="mt-1 text-sm">
+                copiloto tecnico para treino, anamnese e avaliacao funcional
+              </DialogDescription>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Badge variant="outline" className="bg-paper text-navy">
+              Volume
+            </Badge>
+            <Badge variant="outline" className="bg-paper text-navy">
+              Dor e restricao
+            </Badge>
+            <Badge variant="outline" className="bg-paper text-navy">
+              Treino manual
+            </Badge>
+          </div>
+            </DialogHeader>
+
+            <div className="shrink-0 border-b border-line bg-paper-warm/45 px-5 py-3 text-xs text-muted-foreground">
+              <span className="font-medium text-navy">Contexto:</span> {activeLabel}. O BNITO usa a pagina atual e, quando houver ciclo aberto, usa esse contexto para responder com mais precisao.
+            </div>
+
+            <div className="shrink-0 space-y-3 px-5 py-4">
+          <div className="rounded-[18px] border border-line bg-background p-3 text-sm">
+            <span className="font-semibold text-navy">BNITO lembra:</span> tecnica, dor, nivel e objetivo vem antes de carga.
+          </div>
+          <div className="rounded-[18px] border border-primary/20 bg-primary/5 p-3 text-sm text-navy">
+            <span className="font-semibold">Plano tecnico agora:</span> descreva o aluno, o objetivo, a restricao e o rascunho do treino. Eu devolvo riscos e ajustes para voce aprovar.
+          </div>
+            </div>
+
+            <ScrollArea className="min-h-[120px] flex-1 px-5">
+          <div className="space-y-3 pb-4">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[86%] rounded-[20px] border px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+                    message.role === "user"
+                      ? "border-navy bg-navy text-primary-foreground"
+                      : "border-line bg-background text-foreground"
+                  }`}
+                >
+                  {message.content}
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="flex items-center gap-2 rounded-[20px] border border-line bg-background px-4 py-3 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  BNITO revisando contexto...
+                </div>
+              </div>
+            )}
+          </div>
+            </ScrollArea>
+
+            <div className="shrink-0 border-t border-line bg-background px-5 py-4">
+          <div className="mb-3 flex flex-wrap gap-2">
+            {quickPrompts.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => void askBnito(item.prompt)}
+                disabled={loading}
+                className="rounded-full border border-line bg-paper px-3 py-1.5 text-xs font-medium text-navy transition hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+              >
+                <Sparkles className="mr-1 inline h-3 w-3" />
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={handleSubmit} className="flex items-end gap-2 rounded-[24px] border border-line bg-paper px-3 py-2">
+            <HelpCircle className="mb-2 h-4 w-4 shrink-0 text-muted-foreground" />
+            <Textarea
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              placeholder="Conta para o BNITO..."
+              className="min-h-[44px] flex-1 resize-none border-0 bg-transparent px-0 py-2 shadow-none focus-visible:ring-0"
+            />
+            <Button type="submit" size="icon" disabled={loading || !input.trim()} className="mb-1 h-9 w-9 rounded-full">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              <span className="sr-only">Enviar pergunta</span>
+            </Button>
+          </form>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </BnitoAssistantContext.Provider>
+  );
+}
+
+export function BnitoFloatingAssistant() {
+  return <BnitoAssistantProvider>{null}</BnitoAssistantProvider>;
+}

@@ -16,6 +16,7 @@ import { useMaster } from "@/contexts/MasterContext";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 import { format, addWeeks } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 
 interface Student {
   id: string;
@@ -275,7 +276,14 @@ export default function StudentsManager() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl text-primary">ALUNOS</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-4xl text-primary">ALUNOS</h1>
+              <BnitoContextButton
+                label="gestao de alunos"
+                context="Lista de alunos, status, treinador, plano, inicio de matricula, dados de cobranca e proximo passo operacional."
+                question="Como devo priorizar alunos pendentes, sem treinador, sem plano ou aguardando prescricao?"
+              />
+            </div>
             <p className="text-muted-foreground font-sans">Gerencie alunos, atribua treinadores e inicie matrículas</p>
           </div>
           <div className="flex items-center gap-2">
@@ -338,6 +346,11 @@ export default function StudentsManager() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 ml-4">
+                    <BnitoContextButton
+                      label={`aluno ${s.full_name}`}
+                      context={`Aluno na lista. Status: ${statusLabels[s.status] || s.status}. Plano: ${s.plan_name || "sem plano"}. Treinador atribuido: ${s.assigned_trainer_id ? "sim" : "nao"}.`}
+                      question="Qual o proximo passo operacional e tecnico para este aluno?"
+                    />
                     <Button variant="ghost" size="icon" onClick={() => navigate(`${rolePrefix}/students/${s.id}`)}><Eye className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id)} className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
@@ -370,7 +383,15 @@ export default function StudentsManager() {
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-primary">{editing ? "EDITAR ALUNO" : "NOVO ALUNO"}</DialogTitle>
+              <DialogTitle className="flex items-center gap-2 text-primary">
+                {editing ? "EDITAR ALUNO" : "NOVO ALUNO"}
+                <BnitoContextButton
+                  label="cadastro do aluno"
+                  context="Formulario do aluno com dados de contato, cobranca, status e observacoes usados para matricula e links de pagamento."
+                  question="Quais campos sao criticos para evitar problema de cobranca, matricula ou prescricao?"
+                  className="ml-auto"
+                />
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2"><Label className="font-sans">Nome completo *</Label><Input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} className="bg-secondary border-border" /></div>

@@ -37,11 +37,184 @@ function aiErrorResponse(status: number) {
   });
 }
 
+interface ExerciseCatalogEntry {
+  id: string;
+  name: string;
+  description: string | null;
+  muscle_group: string | null;
+  targets: Array<{
+    muscle_group: string;
+    role: string | null;
+    volume_percentage: number | null;
+  }>;
+}
+
+interface ExerciseCatalog {
+  company_id: string | null;
+  total: number;
+  exercises: ExerciseCatalogEntry[];
+}
+
+function compactJson(value: unknown, maxLength = 20000) {
+  return JSON.stringify(value ?? {}, null, 2).slice(0, maxLength);
+}
+
+async function loadExerciseCatalog(
+  supabase: ReturnType<typeof createClient>,
+  companyId: string | null,
+): Promise<ExerciseCatalog> {
+  let exerciseQuery = supabase
+    .from("exercise_library")
+    .select("id, name, description, muscle_group, is_global, company_id")
+    .order("muscle_group", { ascending: true })
+    .order("name", { ascending: true })
+    .limit(700);
+
+  exerciseQuery = companyId
+    ? exerciseQuery.or(`is_global.eq.true,company_id.eq.${companyId}`)
+    : exerciseQuery.eq("is_global", true);
+
+  const { data: exercises, error: exerciseError } = await exerciseQuery;
+  if (exerciseError) {
+    throw new Error(`Falha ao carregar biblioteca de exercicios: ${exerciseError.message}`);
+  }
+
+  const exerciseRows = exercises ?? [];
+  const exerciseIds = exerciseRows.map((exercise) => exercise.id as string).filter(Boolean);
+
+  const [targetsResult, groupsResult, overridesResult] = await Promise.all([
+    exerciseIds.length
+      ? supabase
+          .from("exercise_muscle_targets")
+          .select("exercise_id, muscle_group_id, role, volume_percentage")
+          .in("exercise_id", exerciseIds)
+      : Promise.resolve({ data: [], error: null }),
+    supabase.from("muscle_groups").select("id, name"),
+    companyId && exerciseIds.length
+      ? supabase
+          .from("company_exercise_volumes")
+          .select("exercise_id, muscle_group_id, volume_percentage")
+          .eq("company_id", companyId)
+          .in("exercise_id", exerciseIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (targetsResult.error) throw new Error(`Falha ao carregar alvos musculares: ${targetsResult.error.message}`);
+  if (groupsResult.error) throw new Error(`Falha ao carregar grupos musculares: ${groupsResult.error.message}`);
+  if (overridesResult.error) throw new Error(`Falha ao carregar volumes da empresa: ${overridesResult.error.message}`);
+
+  const groupNames = new Map<string, string>();
+  for (const group of groupsResult.data ?? []) {
+    groupNames.set(group.id as string, group.name as string);
+  }
+
+  const volumeOverrides = new Map<string, number>();
+  for (const override of overridesResult.data ?? []) {
+    volumeOverrides.set(
+      `${override.exercise_id as string}:${override.muscle_group_id as string}`,
+      override.volume_percentage as number,
+    );
+  }
+
+  const targetsByExercise = new Map<string, ExerciseCatalogEntry["targets"]>();
+  for (const target of targetsResult.data ?? []) {
+    const exerciseId = target.exercise_id as string;
+    const muscleGroupId = target.muscle_group_id as string;
+    const targets = targetsByExercise.get(exerciseId) ?? [];
+    targets.push({
+      muscle_group: groupNames.get(muscleGroupId) ?? muscleGroupId,
+      role: (target.role as string | null) ?? null,
+      volume_percentage:
+        volumeOverrides.get(`${exerciseId}:${muscleGroupId}`) ??
+        ((target.volume_percentage as number | null) ?? null),
+    });
+    targetsByExercise.set(exerciseId, targets);
+  }
+
+  return {
+    company_id: companyId,
+    total: exerciseRows.length,
+    exercises: exerciseRows.map((exercise) => ({
+      id: exercise.id as string,
+      name: exercise.name as string,
+      description: (exercise.description as string | null) ?? null,
+      muscle_group: (exercise.muscle_group as string | null) ?? null,
+      targets: targetsByExercise.get(exercise.id as string) ?? [],
+    })),
+  };
+}
+
+function formatExerciseCatalog(catalog: ExerciseCatalog) {
+  return compactJson(
+    {
+      total_available: catalog.total,
+      company_id: catalog.company_id,
+      exercises: catalog.exercises.map((exercise) => ({
+        id: exercise.id,
+        name: exercise.name,
+        group: exercise.muscle_group ?? "nao_informado",
+        targets: exercise.targets
+          .map((target) =>
+            [
+              target.muscle_group,
+              target.role ? `role:${target.role}` : null,
+              target.volume_percentage !== null ? `volume:${target.volume_percentage}%` : null,
+            ]
+              .filter(Boolean)
+              .join(" "),
+          )
+          .join("; "),
+        description: exercise.description ? clean(exercise.description).slice(0, 120) : undefined,
+      })),
+    },
+    20000,
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function validatePlanLibraryUsage(plan: unknown, validExerciseIds: Set<string>) {
+  if (!isRecord(plan)) return null;
+  const workouts = Array.isArray(plan.workouts) ? plan.workouts : [];
+  const missing: string[] = [];
+  const invalid: string[] = [];
+
+  workouts.forEach((workout, workoutIndex) => {
+    if (!isRecord(workout)) return;
+    const exercises = Array.isArray(workout.exercises) ? workout.exercises : [];
+    exercises.forEach((exercise, exerciseIndex) => {
+      if (!isRecord(exercise)) return;
+      const label = `workouts[${workoutIndex}].exercises[${exerciseIndex}]`;
+      const exerciseId = exercise.exercise_id;
+      if (typeof exerciseId !== "string" || !exerciseId.trim()) {
+        missing.push(label);
+        return;
+      }
+      if (!validExerciseIds.has(exerciseId)) invalid.push(`${label}:${exerciseId}`);
+    });
+  });
+
+  return {
+    valid: missing.length === 0 && invalid.length === 0,
+    missing,
+    invalid,
+  };
+}
+
 // ─── SYSTEM PROMPT — METODOLOGIA BN MUSCULAÇÃO ───────────────────────────────
 const SYSTEM_PROMPT = `
 Você é o Expert de BN Musculação/Força e Biomecânica da BN Performance Training.
 Seu papel é prescrever treinos de força utilizando biomecânica de precisão, controlando
 a distribuição de torque articular e o alinhamento de vetores de força.
+
+REGRA ZERO — BIBLIOTECA DE EXERCÍCIOS DO APP:
+Toda prescrição deve usar EXCLUSIVAMENTE os exercícios fornecidos no contexto
+"BIBLIOTECA DE EXERCÍCIOS DO APP". Não invente nomes, variações, máquinas ou exercícios.
+Cada exercício deve conter exercise_id real e exercise_name exatamente igual ao nome da biblioteca.
+Se não houver opção segura na biblioteca para uma necessidade específica, marque a lacuna em
+library_policy.gaps e não substitua por exercício inexistente.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FILOSOFIA BN FORÇA
@@ -205,7 +378,9 @@ INSTRUÇÃO DE SAÍDA — APENAS JSON VÁLIDO, SEM TEXTO ADICIONAL
       "exercises": [
         {
           "phase": "mobilidade | ativacao_core | ativacao_especifica | controle_motor | pliometria | forca_global | forca_especifica",
-          "exercise_name": "Nome do exercício",
+          "exercise_id": "uuid exato da biblioteca",
+          "exercise_name": "Nome exato do exercício na biblioteca",
+          "library_exercise_name": "Nome exato do exercício na biblioteca",
           "muscle_group": "Grupo muscular primário",
           "sets": N,
           "reps": "8-10 | 5 | 15+ | 30s",
@@ -222,6 +397,19 @@ INSTRUÇÃO DE SAÍDA — APENAS JSON VÁLIDO, SEM TEXTO ADICIONAL
       ],
       "volume_load_estimate": "VL estimado da sessão (séries × reps × carga média)",
       "notes": "Observações gerais da sessão"
+    }
+  ],
+  "library_policy": {
+    "only_library_exercises": true,
+    "catalog_count": N,
+    "gaps": ["necessidades sem opção segura na biblioteca, se houver"]
+  },
+  "periodization_blocks": [
+    {
+      "weeks": "1-2",
+      "stimulus": "base tecnica | volume | intensidade | consolidacao",
+      "methods": ["metodos usados no bloco"],
+      "progression_rule": "como progredir dentro do bloco"
     }
   ],
   "weekly_structure": "Descrição da estrutura semanal e ordem dos treinos",
@@ -259,12 +447,17 @@ serve(async (req) => {
       block_number,       // 1 | 2 | 3 (para liberar pliometria)
       is_endurance_athlete, // true/false — atleta de corrida/triathlon
       assessment_context,   // JSON da avaliação funcional BN
+      anamnese_context,     // JSON bruto/resumido da anamnese
+      prescription_integration, // resultado integrado anamnese + avaliação
+      bnito_orchestration, // contrato do BNITO para sincronizar agentes
       running_days_context, // { days_per_week, sport } — anti-interferência
       anamnese_id,
       bundle_id,
       notes,
     } = await req.json();
 
+    const exerciseCatalog = await loadExerciseCatalog(supabase, (company_id as string | null) ?? null);
+    const exerciseCatalogText = formatExerciseCatalog(exerciseCatalog);
 
     const athleteContext = `
 DADOS DO ATLETA:
@@ -278,6 +471,26 @@ Equipamentos: ${clean(equipment || "academia completa")}
 É atleta de endurance (corrida/triathlon): ${is_endurance_athlete ? "SIM — aplicar protocolo anti-interferência" : "NÃO"}
 Restrições/Lesões: ${clean(restrictions || "nenhuma")}
 Observações adicionais: ${clean(notes || "")}
+
+RESULTADO INTEGRADO ANAMNESE + AVALIAÇÃO (PRIORIDADE MÁXIMA):
+${prescription_integration
+  ? compactJson(prescription_integration, 12000)
+  : "Sem resultado integrado — usar anamnese e avaliação separadamente, com cautela."}
+
+ORQUESTRAÇÃO BNITO — CONTRATO ENTRE AGENTES:
+${bnito_orchestration
+  ? compactJson(bnito_orchestration, 9000)
+  : "Sem orquestracao explicita — ainda assim prescrever 6 semanas em 3 blocos de 2 semanas."}
+
+ANAMNESE E CONTEXTO CLÍNICO/ROTINA:
+${anamnese_context ? compactJson(anamnese_context, 8000) : "Sem anamnese estruturada adicional."}
+
+BIBLIOTECA DE EXERCÍCIOS DO APP:
+${exerciseCatalogText}
+
+REGRA DE MAPA PARA O APP:
+Use somente os exercícios acima. Para cada exercício prescrito, retorne exercise_id e exercise_name exatamente como aparecem na biblioteca.
+Se a metodologia BN pedir um padrão que não exista na biblioteca, registre a lacuna em library_policy.gaps e escolha a alternativa mais segura já cadastrada quando houver.
 
 INTEGRAÇÃO COM CORRIDA (anti-interferência):
 ${running_days_context
@@ -294,13 +507,25 @@ ${running_days_context
 AVALIAÇÃO FUNCIONAL BN (PRIORIDADE MÁXIMA — adapte TODOS os exercícios):
 ${assessment_context ? JSON.stringify(assessment_context) : "Sem avaliação funcional disponível — presumir boa mobilidade, aplicar protocolo padrão"}
 
+Se a avaliação trouxer "sequencia_bn_video", "direcionamento_protocolo",
+"red_yellow_flags" ou "criterios_progressao_bn", esses campos têm prioridade
+sobre inferências genéricas. Use o protocolo indicado para definir mobilidade,
+ativação, controle motor, cautelas, restrições e liberação ou bloqueio de
+pliometria/potência.
+
 INSTRUÇÕES:
-1. Analise a avaliação funcional e ajuste CADA exercício conforme as disfunções encontradas
-2. Siga obrigatoriamente a estrutura de 7 etapas em CADA sessão
-3. Pliometria apenas se block_number >= 2
-4. Inclua cues técnicos específicos baseados nas falhas do OHS
-5. Para atleta de endurance: preferir RIR 2-3, volume moderado, força excêntrica
-6. Retorne APENAS o JSON, sem texto adicional, sem markdown
+1. Comece pelo RESULTADO INTEGRADO: ele resolve conflitos entre objetivo, anamnese, dor, recuperação e avaliação funcional.
+2. Analise a avaliação funcional e ajuste CADA exercício conforme as disfunções encontradas.
+3. O ciclo deve ter EXATAMENTE 6 semanas, dividido em semanas 1-2, 3-4 e 5-6.
+4. Troque o estimulo a cada 2 semanas: series, repeticoes, intensidade, descanso ou metodo.
+5. Metodos avancados permitidos somente se coerentes com nivel/risco: up-set, piramide, cluster-set e drop-set seletivo. Nunca use metodo avancado em padrao doloroso ou instavel.
+6. Siga obrigatoriamente a estrutura de 7 etapas em CADA sessão.
+7. Pliometria apenas se block_number >= 2 E criterios_progressao_bn/liberações do resultado integrado permitirem.
+8. Inclua cues técnicos específicos baseados nas falhas do OHS e nos riscos da anamnese.
+9. Para atleta de endurance: preferir RIR 2-3, volume moderado, força excêntrica.
+10. Use somente exercícios cadastrados na biblioteca do app.
+11. Retorne exercise_id em todos os itens de treino.
+12. Retorne APENAS o JSON, sem texto adicional, sem markdown.
     `.trim();
 
     const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
@@ -331,6 +556,33 @@ INSTRUÇÕES:
         JSON.stringify({ error: "Falha ao parsear JSON", raw: rawText.slice(0, 500) }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    const libraryValidation = validatePlanLibraryUsage(
+      planJson,
+      new Set(exerciseCatalog.exercises.map((exercise) => exercise.id)),
+    );
+    planJson.library_policy = {
+      ...(isRecord(planJson.library_policy) ? planJson.library_policy : {}),
+      only_library_exercises: true,
+      catalog_count: exerciseCatalog.total,
+      validation: libraryValidation,
+    };
+    if (prescription_integration) {
+      planJson.prescription_integration = {
+        readiness: prescription_integration.readiness ?? null,
+        coach_summary: prescription_integration.coach_summary ?? null,
+        risk_screening: prescription_integration.risk_screening ?? null,
+        prescription_decision: prescription_integration.prescription_decision ?? null,
+      };
+    }
+    if (bnito_orchestration) {
+      planJson.bnito_orchestration = {
+        duration_weeks: bnito_orchestration.duration_weeks ?? 6,
+        block_length_weeks: bnito_orchestration.block_length_weeks ?? 2,
+        blocks: bnito_orchestration.blocks ?? null,
+        synchronization_rules: bnito_orchestration.synchronization_rules ?? null,
+      };
     }
 
     // Salva o plano de força gerado pela IA (JSON, desacoplado da execução)

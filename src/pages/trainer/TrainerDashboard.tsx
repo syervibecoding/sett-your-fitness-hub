@@ -9,6 +9,7 @@ import { Dumbbell, AlertTriangle, CheckCircle, Clock, Pencil, Plus } from "lucid
 import { format, differenceInDays } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
+import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 
 interface Enrollment {
   id: string;
@@ -112,7 +113,14 @@ export default function TrainerDashboard() {
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-4xl text-primary">MEUS ALUNOS</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-4xl text-primary">MEUS ALUNOS</h1>
+            <BnitoContextButton
+              label="dashboard do professor"
+              context={`Painel do professor com ${enrollments.length} matriculas atribuidas e ciclos de treino.`}
+              question="Como devo priorizar meus alunos e ciclos de treino hoje?"
+            />
+          </div>
           <p className="text-muted-foreground font-sans">Gerencie os treinos dos seus alunos</p>
         </div>
 
@@ -131,7 +139,14 @@ export default function TrainerDashboard() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle className="text-primary text-xl">{enrollment.students?.full_name}</CardTitle>
+                        <CardTitle className="flex items-center gap-2 text-primary text-xl">
+                          {enrollment.students?.full_name}
+                          <BnitoContextButton
+                            label={`aluno ${enrollment.students?.full_name || ""}`}
+                            context={`Aluno no painel do professor. Plano: ${enrollment.plans?.name || "sem plano"}. Dias restantes: ${daysLeft}. Ciclos: ${enrollCycles.length}.`}
+                            question="Qual ciclo ou ajuste tecnico devo priorizar para este aluno?"
+                          />
+                        </CardTitle>
                         <p className="text-muted-foreground text-sm font-sans">
                           {enrollment.plans?.name} · {format(new Date(enrollment.start_date), "dd/MM/yyyy")} → {format(new Date(enrollment.end_date), "dd/MM/yyyy")}
                         </p>

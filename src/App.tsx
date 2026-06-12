@@ -1,10 +1,11 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { MasterProvider } from "@/contexts/MasterContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -12,6 +13,7 @@ import { FeatureRoute } from "@/components/FeatureRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RouteTransition } from "@/components/RouteTransition";
 import { AppLayout } from "@/components/AppLayout";
+import { StudentBnitoAssistantProvider } from "@/components/StudentBnitoAssistant";
 
 
 // Lazy load all pages
@@ -36,7 +38,9 @@ const WorkoutBuilder = lazy(() => import("./pages/admin/WorkoutBuilder"));
 const WorkoutPrescriptions = lazy(() => import("./pages/admin/WorkoutPrescriptions"));
 const Announcements = lazy(() => import("./pages/admin/Announcements"));
 const UnifiedPrescriber = lazy(() => import("./pages/admin/UnifiedPrescriber"));
+const PrescriptionStudio = lazy(() => import("./pages/admin/PrescriptionStudio"));
 const FunctionalAssessment = lazy(() => import("./pages/admin/FunctionalAssessment"));
+const AICoachHub = lazy(() => import("./pages/admin/AICoachHub"));
 
 const CoordinatorDashboard = lazy(() => import("./pages/coordinator/CoordinatorDashboard"));
 const TrainerDashboard = lazy(() => import("./pages/trainer/TrainerDashboard"));
@@ -45,6 +49,7 @@ const CompaniesManager = lazy(() => import("./pages/master/CompaniesManager"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PublicRegistration = lazy(() => import("./pages/PublicRegistration"));
 const PublicAnamnesis = lazy(() => import("./pages/PublicAnamnesis"));
+const StudioAnamnese = lazy(() => import("./pages/StudioAnamnese"));
 const PublicPayment = lazy(() => import("./pages/PublicPayment"));
 const StudentWorkout = lazy(() => import("./pages/student/StudentWorkout"));
 const StudentPortal = lazy(() => import("./pages/student/StudentPortal"));
@@ -87,6 +92,68 @@ function RootRoute() {
   );
 }
 
+function StudentWorkoutAccessGuard({ children }: { children: ReactNode }) {
+  const { studentId } = useParams<{ studentId: string }>();
+  const { user, role, companyId, loading } = useAuth();
+  const [status, setStatus] = useState<"checking" | "allowed" | "denied">("checking");
+
+  useEffect(() => {
+    let active = true;
+
+    async function verifyAccess() {
+      if (loading) {
+        setStatus("checking");
+        return;
+      }
+      if (!user || !role || !studentId) {
+        setStatus("denied");
+        return;
+      }
+
+      setStatus("checking");
+      const { data, error } = await supabase
+        .from("students")
+        .select("id, user_id, company_id")
+        .eq("id", studentId)
+        .maybeSingle();
+
+      if (!active) return;
+
+      if (error || !data) {
+        setStatus("denied");
+        return;
+      }
+
+      const staffRoles = ["admin", "coordinator", "trainer"];
+      const canAccess =
+        role === "master" ||
+        (role === "student" && data.user_id === user.id) ||
+        (staffRoles.includes(role) && !!companyId && data.company_id === companyId);
+
+      setStatus(canAccess ? "allowed" : "denied");
+    }
+
+    verifyAccess();
+    return () => {
+      active = false;
+    };
+  }, [companyId, loading, role, studentId, user]);
+
+  if (loading || status === "checking") return <PageLoader />;
+  if (status === "denied") {
+    const fallbackByRole: Record<string, string> = {
+      admin: "/admin",
+      coordinator: "/coordinator",
+      trainer: "/trainer",
+      master: "/master",
+      student: "/aluno",
+    };
+    return <Navigate to={fallbackByRole[role || ""] || "/"} replace />;
+  }
+
+  return <>{children}</>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -98,6 +165,7 @@ const App = () => (
         <MasterProvider>
         <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
+        <StudentBnitoAssistantProvider>
         <Routes>
           <Route path="/auth" element={<RouteTransition><Auth /></RouteTransition>} />
           <Route path="/inscricao/:slug" element={<RouteTransition><PublicRegistration /></RouteTransition>} />
@@ -105,8 +173,9 @@ const App = () => (
           <Route path="/inscricao" element={<RouteTransition><PublicRegistration /></RouteTransition>} />
           <Route path="/cadastro" element={<RouteTransition><PublicRegistration /></RouteTransition>} />
           <Route path="/anamnese/:studentId" element={<RouteTransition><PublicAnamnesis /></RouteTransition>} />
+          <Route path="/anamnese-convite/:token" element={<RouteTransition><StudioAnamnese /></RouteTransition>} />
           <Route path="/pagamento/:studentId" element={<RouteTransition><PublicPayment /></RouteTransition>} />
-          <Route path="/aluno/treino/:studentId" element={<RouteTransition><StudentWorkout /></RouteTransition>} />
+          <Route path="/aluno/treino/:studentId" element={<ProtectedRoute allowedRoles={["student", "admin", "coordinator", "trainer"]}><StudentWorkoutAccessGuard><RouteTransition><StudentWorkout /></RouteTransition></StudentWorkoutAccessGuard></ProtectedRoute>} />
           <Route path="/aluno" element={<ProtectedRoute allowedRoles={["student"]}><RouteTransition><StudentPortal /></RouteTransition></ProtectedRoute>} />
           <Route path="/" element={<RouteTransition><RootRoute /></RouteTransition>} />
 
@@ -137,6 +206,8 @@ const App = () => (
           <Route path="/admin/prescriptions" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><WorkoutPrescriptions /></FeatureRoute>} />
           <Route path="/admin/workout/:cycleId" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><WorkoutBuilder /></FeatureRoute>} />
           <Route path="/admin/prescricao" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><UnifiedPrescriber /></FeatureRoute>} />
+          <Route path="/admin/studio" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><PrescriptionStudio /></FeatureRoute>} />
+          <Route path="/admin/ia" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><AICoachHub /></FeatureRoute>} />
           <Route path="/admin/avaliacao" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><FunctionalAssessment /></FeatureRoute>} />
           <Route path="/admin/announcements" element={<ProtectedRoute allowedRoles={["admin"]}><Announcements /></ProtectedRoute>} />
           <Route path="/coordinator/announcements" element={<ProtectedRoute allowedRoles={["coordinator"]}><Announcements /></ProtectedRoute>} />
@@ -157,6 +228,8 @@ const App = () => (
           <Route path="/coordinator/prescriptions" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutPrescriptions /></FeatureRoute>} />
           <Route path="/coordinator/workout/:cycleId" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutBuilder /></FeatureRoute>} />
           <Route path="/coordinator/prescricao" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><UnifiedPrescriber /></FeatureRoute>} />
+          <Route path="/coordinator/studio" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><PrescriptionStudio /></FeatureRoute>} />
+          <Route path="/coordinator/ia" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><AICoachHub /></FeatureRoute>} />
           <Route path="/coordinator/avaliacao" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><FunctionalAssessment /></FeatureRoute>} />
           <Route path="/coordinator/whatsapp" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasWhatsApp"><WhatsAppSettings /></FeatureRoute>} />
           <Route path="/coordinator/whatsapp-chat" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasWhatsApp"><WhatsAppChat /></FeatureRoute>} />
@@ -179,6 +252,8 @@ const App = () => (
           <Route path="/trainer/prescriptions" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutPrescriptions /></FeatureRoute>} />
           <Route path="/trainer/workout/:cycleId" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutBuilder /></FeatureRoute>} />
           <Route path="/trainer/prescricao" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><UnifiedPrescriber /></FeatureRoute>} />
+          <Route path="/trainer/studio" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><PrescriptionStudio /></FeatureRoute>} />
+          <Route path="/trainer/ia" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><AICoachHub /></FeatureRoute>} />
           <Route path="/trainer/avaliacao" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><FunctionalAssessment /></FeatureRoute>} />
           <Route path="/trainer/whatsapp" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasWhatsApp"><WhatsAppSettings /></FeatureRoute>} />
           <Route path="/trainer/whatsapp-chat" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasWhatsApp"><WhatsAppChat /></FeatureRoute>} />
@@ -189,6 +264,7 @@ const App = () => (
 
           <Route path="*" element={<RouteTransition><NotFound /></RouteTransition>} />
         </Routes>
+        </StudentBnitoAssistantProvider>
         </Suspense>
         </ErrorBoundary>
         </MasterProvider>

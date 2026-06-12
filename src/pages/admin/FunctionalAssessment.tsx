@@ -15,6 +15,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Loader2, Upload, X, ClipboardCheck, AlertCircle } from "lucide-react";
+import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
+import VideoAssessment from "@/components/VideoAssessment";
 
 interface Student { id: string; full_name: string; }
 
@@ -41,7 +43,18 @@ export default function FunctionalAssessment() {
   const [students, setStudents]   = useState<Student[]>([]);
   const [studentId, setStudentId] = useState("");
   const [images, setImages]       = useState<Record<string, string>>({});
-  const [form, setForm] = useState({ queixa_principal: "", historico_lesoes: "", modalidade: "", nivel: "intermediario" });
+  const [form, setForm] = useState({
+    queixa_principal: "",
+    historico_lesoes: "",
+    modalidade: "",
+    nivel: "intermediario",
+    peso_kg: "",
+    altura_cm: "",
+    cintura_cm: "",
+    percentual_gordura: "",
+    perimetros: "",
+    observacoes_tecnicas: "",
+  });
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState("");
   const [result, setResult]       = useState<any>(null);
@@ -67,12 +80,21 @@ export default function FunctionalAssessment() {
         .select("*").eq("student_id", studentId)
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
       setResult(data ?? null);
-      if (data) setForm({
-        queixa_principal: data.queixa_principal ?? "",
-        historico_lesoes: data.historico_lesoes ?? "",
-        modalidade: data.modalidade ?? "",
-        nivel: data.nivel ?? "intermediario",
-      });
+      if (data) {
+        const composition = data.assessment_json?.composicao_corporal ?? {};
+        setForm({
+          queixa_principal: data.queixa_principal ?? "",
+          historico_lesoes: data.historico_lesoes ?? "",
+          modalidade: data.modalidade ?? "",
+          nivel: data.nivel ?? "intermediario",
+          peso_kg: composition.peso_kg != null ? String(composition.peso_kg) : "",
+          altura_cm: composition.altura_cm != null ? String(composition.altura_cm) : "",
+          cintura_cm: composition.cintura_cm != null ? String(composition.cintura_cm) : "",
+          percentual_gordura: composition.percentual_gordura_informado != null ? String(composition.percentual_gordura_informado) : "",
+          perimetros: Array.isArray(composition.prioridades_de_acompanhamento) ? composition.prioridades_de_acompanhamento.join("; ") : "",
+          observacoes_tecnicas: "",
+        });
+      }
     })();
   }, [studentId]);
 
@@ -86,11 +108,23 @@ export default function FunctionalAssessment() {
 
   async function generate() {
     if (!studentId || !companyId) { setError("Selecione um aluno."); return; }
-    if (Object.keys(images).length === 0) { setError("Envie ao menos uma foto."); return; }
+    const hasAssessmentInput = Object.keys(images).length > 0 || [
+      form.queixa_principal,
+      form.historico_lesoes,
+      form.peso_kg,
+      form.altura_cm,
+      form.cintura_cm,
+      form.percentual_gordura,
+      form.perimetros,
+      form.observacoes_tecnicas,
+    ].some((value) => value.trim());
+    if (!hasAssessmentInput) { setError("Envie fotos ou preencha dados de composicao/analise tecnica."); return; }
     setLoading(true); setError(""); setResult(null);
     try {
+      const assessmentId = crypto.randomUUID();
       const { data, error: e } = await supabase.functions.invoke("ai-functional-assessment", {
         body: {
+          assessment_id: assessmentId,
           student_id: studentId, student_name: student?.full_name, company_id: companyId,
           ...images, ...form,
         },
@@ -104,18 +138,39 @@ export default function FunctionalAssessment() {
   }
 
   const json = result?.assessment_json;
+  const assessmentContext = {
+    studentName: student?.full_name,
+    ...form,
+  };
 
   return (
     <>
       <div className="max-w-3xl mx-auto space-y-5">
         <div>
           <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">Avaliação</p>
-          <h1 className="font-display text-3xl">Avaliação Funcional com IA</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-display text-3xl">Avaliação Funcional com IA</h1>
+            <BnitoContextButton
+              label="avaliacao funcional"
+              context="Avaliacao postural, overhead squat, queixa principal, historico de lesoes e laudo usado para prescricao."
+              question="Como devo interpretar a avaliacao funcional para ajustar a prescricao com seguranca?"
+            />
+          </div>
           <p className="text-sm text-muted-foreground">Postura estática + overhead squat · laudo técnico · contexto para a prescrição</p>
         </div>
 
         <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-base">Aluno</CardTitle></CardHeader>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              Aluno
+              <BnitoContextButton
+                label="aluno da avaliacao funcional"
+                context="Selecao do aluno para carregar avaliacao funcional e contexto clinico."
+                question="Que informacoes do aluno devo revisar antes de gerar a avaliacao funcional?"
+                className="ml-auto"
+              />
+            </CardTitle>
+          </CardHeader>
           <CardContent>
             <Select value={studentId} onValueChange={setStudentId}>
               <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Selecione..." /></SelectTrigger>
@@ -128,9 +183,28 @@ export default function FunctionalAssessment() {
 
         {studentId && (
           <>
+            {companyId && (
+              <VideoAssessment
+                studentId={studentId}
+                companyId={companyId}
+                assessmentContext={assessmentContext}
+                onComplete={(_, videoResult) => {
+                  if (videoResult) setResult(videoResult);
+                }}
+              />
+            )}
+
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Fotos</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  Fotos
+                  <BnitoContextButton
+                    label="fotos da avaliacao funcional"
+                    context="Fotos de postura frontal/lateral/posterior e overhead squat frontal/lateral/posterior."
+                    question="Quais angulos e sinais devo observar nestas fotos antes de confiar no laudo?"
+                    className="ml-auto"
+                  />
+                </CardTitle>
                 <p className="text-xs text-muted-foreground">Envie o que tiver — nem todas são obrigatórias.</p>
               </CardHeader>
               <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -164,7 +238,69 @@ export default function FunctionalAssessment() {
             </Card>
 
             <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-base">Dados clínicos</CardTitle></CardHeader>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  Composição e técnica
+                  <BnitoContextButton
+                    label="composicao e tecnica"
+                    context="Medidas corporais, perimetros, observacoes tecnicas, assimetrias e execucao para alimentar a avaliacao funcional."
+                    question="Como devo interpretar medidas e observacoes tecnicas junto com a avaliacao funcional?"
+                    className="ml-auto"
+                  />
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3 grid-cols-2">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1">Peso kg</Label>
+                  <Input className="h-9 text-sm" value={form.peso_kg}
+                    onChange={e => setForm(f => ({ ...f, peso_kg: e.target.value }))}
+                    placeholder="Ex: 78" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1">Altura cm</Label>
+                  <Input className="h-9 text-sm" value={form.altura_cm}
+                    onChange={e => setForm(f => ({ ...f, altura_cm: e.target.value }))}
+                    placeholder="Ex: 178" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1">Cintura cm</Label>
+                  <Input className="h-9 text-sm" value={form.cintura_cm}
+                    onChange={e => setForm(f => ({ ...f, cintura_cm: e.target.value }))}
+                    placeholder="Ex: 84" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1">% gordura</Label>
+                  <Input className="h-9 text-sm" value={form.percentual_gordura}
+                    onChange={e => setForm(f => ({ ...f, percentual_gordura: e.target.value }))}
+                    placeholder="Opcional" />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs text-muted-foreground mb-1">Perímetros, dobras ou evolução</Label>
+                  <Textarea className="text-sm min-h-[56px]" value={form.perimetros}
+                    onChange={e => setForm(f => ({ ...f, perimetros: e.target.value }))}
+                    placeholder="Ex: quadril, tórax, braço, histórico de peso, fotos comparativas..." />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs text-muted-foreground mb-1">Observações técnicas</Label>
+                  <Textarea className="text-sm min-h-[56px]" value={form.observacoes_tecnicas}
+                    onChange={e => setForm(f => ({ ...f, observacoes_tecnicas: e.target.value }))}
+                    placeholder="Ex: joelho entra no agachamento, pouca dorsiflexão, assimetria de passada..." />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  Dados clínicos
+                  <BnitoContextButton
+                    label="dados clinicos da avaliacao"
+                    context="Queixa principal, historico de lesoes, modalidade e nivel do aluno antes da analise funcional."
+                    question="Como devo usar queixa, lesoes e nivel para calibrar a interpretacao da avaliacao?"
+                    className="ml-auto"
+                  />
+                </CardTitle>
+              </CardHeader>
               <CardContent className="grid gap-3 grid-cols-2">
                 <div className="col-span-2">
                   <Label className="text-xs text-muted-foreground mb-1">Queixa principal</Label>
@@ -212,7 +348,17 @@ export default function FunctionalAssessment() {
 
             {result && (
               <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-base">Laudo</CardTitle></CardHeader>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    Laudo
+                    <BnitoContextButton
+                      label="laudo funcional"
+                      context="Resultado da avaliacao funcional com scores, compensacoes e recomendacoes para prescricao."
+                      question="Me ajuda a transformar este laudo em ajustes práticos de treino?"
+                      className="ml-auto"
+                    />
+                  </CardTitle>
+                </CardHeader>
                 <CardContent className="space-y-3 text-sm">
                   {(json?.score_postural?.total != null || json?.score_funcional?.total != null) && (
                     <div className="grid grid-cols-2 gap-2">
@@ -230,11 +376,94 @@ export default function FunctionalAssessment() {
                       )}
                     </div>
                   )}
+                  {json?.direcionamento_protocolo?.protocolo && (
+                    <div className="rounded border border-line p-3">
+                      <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground mb-1">Direcionamento de protocolo</p>
+                      <p className="font-medium">{json.direcionamento_protocolo.protocolo}</p>
+                      {json.direcionamento_protocolo.motivo && (
+                        <p className="text-muted-foreground">{json.direcionamento_protocolo.motivo}</p>
+                      )}
+                      {Array.isArray(json.direcionamento_protocolo.testes_recomendados) && json.direcionamento_protocolo.testes_recomendados.length > 0 && (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Testes: {json.direcionamento_protocolo.testes_recomendados.join(", ")}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {Array.isArray(json?.red_yellow_flags) && json.red_yellow_flags.length > 0 && (
+                    <div>
+                      <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground mb-1">Pontos de atenção</p>
+                      <ul className="space-y-2">
+                        {json.red_yellow_flags.map((flag: any, i: number) => (
+                          <li key={i} className="rounded border border-line p-2">
+                            <p className="font-medium">{flag.tipo || "atenção"} · {flag.sinal || "ponto observado"}</p>
+                            {flag.conduta && <p className="text-muted-foreground">{flag.conduta}</p>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   {Array.isArray(json?.prioridades_corretivas) && json.prioridades_corretivas.length > 0 && (
                     <div>
                       <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground mb-1">Prioridades corretivas</p>
                       <ul className="list-disc pl-5 space-y-0.5">
                         {json.prioridades_corretivas.map((p: string, i: number) => <li key={i}>{p}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {Array.isArray(json?.sequencia_bn_video) && json.sequencia_bn_video.length > 0 && (
+                    <div>
+                      <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground mb-1">Sequência BN</p>
+                      <ul className="space-y-2">
+                        {json.sequencia_bn_video.map((item: any, i: number) => (
+                          <li key={i} className="rounded border border-line p-2">
+                            <p className="font-medium">
+                              {item.movimento || "Movimento"}{item.score != null ? ` · ${item.score}/10` : ""}
+                            </p>
+                            {Array.isArray(item.achados) && item.achados.length > 0 && (
+                              <p className="text-muted-foreground">{item.achados.join("; ")}</p>
+                            )}
+                            {item.cue_ou_teste && <p className="text-muted-foreground">{item.cue_ou_teste}</p>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {json?.criterios_progressao_bn && (
+                    <div className="rounded border border-line p-3">
+                      <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground mb-1">Progressão BN</p>
+                      <p className="text-muted-foreground">
+                        Pliometria: {json.criterios_progressao_bn.liberado_para_pliometria ? "liberada com critério" : "manter cautela"}
+                      </p>
+                      {json.criterios_progressao_bn.motivo && (
+                        <p className="text-muted-foreground">{json.criterios_progressao_bn.motivo}</p>
+                      )}
+                    </div>
+                  )}
+                  {json?.composicao_corporal && (
+                    <div>
+                      <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground mb-1">Composição corporal</p>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded border border-line p-2">Peso: {json.composicao_corporal.peso_kg ?? "—"} kg</div>
+                        <div className="rounded border border-line p-2">IMC: {json.composicao_corporal.imc ?? "—"}</div>
+                        <div className="rounded border border-line p-2">Cintura: {json.composicao_corporal.cintura_cm ?? "—"} cm</div>
+                        <div className="rounded border border-line p-2">Confiança: {json.composicao_corporal.confianca ?? "—"}</div>
+                      </div>
+                      {json.composicao_corporal.leitura_tecnica && (
+                        <p className="mt-2 text-muted-foreground">{json.composicao_corporal.leitura_tecnica}</p>
+                      )}
+                    </div>
+                  )}
+                  {Array.isArray(json?.analise_tecnica_movimento) && json.analise_tecnica_movimento.length > 0 && (
+                    <div>
+                      <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground mb-1">Análise técnica</p>
+                      <ul className="space-y-2">
+                        {json.analise_tecnica_movimento.map((item: any, i: number) => (
+                          <li key={i} className="rounded border border-line p-2">
+                            <p className="font-medium">{item.movimento || "Movimento"} · {item.achado || "achado técnico"}</p>
+                            <p className="text-muted-foreground">{item.cue_ou_ajuste || item.impacto || "—"}</p>
+                          </li>
+                        ))}
                       </ul>
                     </div>
                   )}

@@ -15,5 +15,17 @@ verify_jwt = false
 [functions.ai-running-plan]
 verify_jwt = false
 
+[functions.ai-nutrition-plan]
+verify_jwt = false
+
 [functions.ai-functional-assessment]
 verify_jwt = false
+
+[functions.ai-coach-pack]
+verify_jwt = true
+
+[functions.ai-bnito-coach]
+verify_jwt = true
+
+[functions.ai-student-bnito]
+verify_jwt = true

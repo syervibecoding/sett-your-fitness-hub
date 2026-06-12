@@ -5,7 +5,7 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-const MODEL = "claude-sonnet-4-5-20250929";
+const MODEL = Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-4-5-20250929";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +13,43 @@ const corsHeaders = {
 };
 
 const clean = (s: string) => (s || "").replace(/[^\x20-\x7E\u00C0-\u017F]/g, "");
+const textValue = (v: any) => typeof v === "string" ? v : v == null ? "" : JSON.stringify(v);
+const compactJson = (value: unknown, maxLength = 10000) => JSON.stringify(value ?? {}, null, 2).slice(0, maxLength);
+
+function fallbackCardioPlan(input: any, rawText = "") {
+  const sport = input.sport || "corrida";
+  return {
+    plan_name: `Plano BN de ${sport}`,
+    sport,
+    goal: input.goal || "Melhora de performance",
+    duration_weeks: 6,
+    model: "polarizado",
+    volume_weekly_hours: Math.max(1, ((Number(input.days_per_week) || 3) * (Number(input.session_duration) || 60)) / 60),
+    fc_zones: {
+      z1: { min: 110, max: 125 },
+      z2: { min: 126, max: 140 },
+      z3: { min: 141, max: 155 },
+      z4: { min: 156, max: 170 },
+      z5: { min: 171, max: 185 },
+    },
+    sample_week: [
+      { day: "Segunda", workout: "Z2 leve 40-50 min + mobilidade." },
+      { day: "Quarta", workout: "Intervalado moderado: 6x3 min Z3 com 2 min Z1." },
+      { day: "Sábado", workout: "Sessão longa Z2, mantendo conversa confortável." },
+    ],
+    warnings: rawText
+      ? [`A IA retornou resposta parcial; plano base gerado para continuidade. Prévia: ${clean(rawText).slice(0, 350)}`]
+      : ["Plano base gerado para continuidade. Revisar antes de prescrever ao aluno."],
+  };
+}
+
+function normalizeCardioPlan(plan: any, input: any, rawText = "") {
+  if (!plan || typeof plan !== "object") return fallbackCardioPlan(input, rawText);
+  plan.duration_weeks = 6;
+  plan.sample_week = plan.sample_week || plan.semana_modelo || plan.weeks?.[0]?.sessions || plan.weeks?.[0]?.dias || [];
+  plan.volume_weekly_hours = plan.volume_weekly_hours || Math.max(1, ((Number(input.days_per_week) || 3) * (Number(input.session_duration) || 60)) / 60);
+  return plan;
+}
 
 async function requireUser(req: Request) {
   const authHeader = req.headers.get("Authorization");
@@ -240,6 +277,7 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const input = await req.json();
     const {
       student_id, student_name, company_id,
       sport,            // "corrida" | "ciclismo" | "natacao" | "triathlon"
@@ -257,10 +295,13 @@ serve(async (req) => {
       equipment,        // esteira, rua, piscina, bicicleta outdoor/indoor
       diet_type,        // "emagrecimento" | "hipertrofia" | "performance"
       assessment_context, // JSON da avaliação funcional BN (se houver)
+      anamnese_context, // JSON bruto/resumido da anamnese
+      prescription_integration, // resultado integrado anamnese + avaliação
+      bnito_orchestration, // contrato do BNITO para sincronizar agentes
       strength_plan_context, // { days_per_week, workouts:[{day,focus,has_heavy_legs}] }
       anamnese_id,
       bundle_id,
-    } = await req.json();
+    } = input;
 
 
     // Monta contexto do atleta
@@ -281,6 +322,19 @@ EVA articular: ${JSON.stringify(eva || {})} (0=sem dor, 10=dor máxima)
 Lesões/histórico: ${clean(injuries || "nenhum")}
 Equipamentos: ${clean(equipment || "não informado")}
 Dieta atual: ${clean(diet_type || "não informado")}
+
+RESULTADO INTEGRADO ANAMNESE + AVALIAÇÃO (PRIORIDADE MÁXIMA):
+${prescription_integration
+  ? compactJson(prescription_integration, 10000)
+  : "Sem resultado integrado — usar anamnese e avaliação separadamente, com cautela."}
+
+ORQUESTRAÇÃO BNITO — CONTRATO ENTRE AGENTES:
+${bnito_orchestration
+  ? compactJson(bnito_orchestration, 9000)
+  : "Sem orquestracao explicita — ainda assim prescrever 6 semanas em 3 blocos de 2 semanas."}
+
+ANAMNESE E CONTEXTO CLÍNICO/ROTINA:
+${anamnese_context ? compactJson(anamnese_context, 7000) : "Sem anamnese estruturada adicional."}
 
 AVALIAÇÃO FUNCIONAL BN (se disponível):
 ${assessment_context ? JSON.stringify(assessment_context) : "Sem avaliação funcional — não incluir orientações baseadas em avaliação postural"}
@@ -303,12 +357,16 @@ ${strength_plan_context
 
 
 INSTRUÇÕES:
-1. Calcule as zonas de FC usando Karvonen
-2. Verifique as linhas vermelhas (TSB e EVA) ANTES de prescrever
-3. Escolha o modelo (Polarizado ou Piramidal) baseado nas regras de decisão
-4. Respeite a Regra dos 10% de progressão de volume
-5. Gere o plano semana a semana com todas as sessões
-6. Retorne APENAS o JSON conforme instruído, sem texto adicional
+1. Comece pelo RESULTADO INTEGRADO para ajustar volume, intensidade, terreno, intervalos e restrições.
+2. Calcule as zonas de FC usando Karvonen.
+3. Verifique as linhas vermelhas (TSB, EVA, dor e flags funcionais) ANTES de prescrever.
+4. Escolha o modelo (Polarizado ou Piramidal) baseado nas regras de decisão.
+5. Respeite a Regra dos 10% de progressão de volume.
+6. O plano deve ter EXATAMENTE 6 semanas, sincronizado com o BNITO em blocos 1-2, 3-4 e 5-6.
+7. Troque o estimulo a cada 2 semanas: base, qualidade moderada, consolidacao/deload conforme o risco.
+8. Detalhe todas as sessoes das 6 semanas, mas seja conciso em notes e fc_target para fechar JSON valido.
+9. Nunca posicione Z4/Z5 no mesmo dia nem na vespera de MMII pesado quando houver strength_plan_context.
+10. Retorne APENAS o JSON conforme instruído, sem texto adicional
     `.trim();
 
     const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
@@ -320,7 +378,7 @@ INSTRUÇÕES:
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 8000,
+        max_tokens: 12000,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: clean(athleteContext) }],
       }),
@@ -337,10 +395,24 @@ INSTRUÇÕES:
       const cleaned = rawText.replace(/```json|```/g, "").trim();
       planJson = JSON.parse(cleaned);
     } catch {
-      return new Response(
-        JSON.stringify({ error: "Falha ao parsear JSON da IA", raw: rawText.slice(0, 500) }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      planJson = fallbackCardioPlan(input, rawText);
+    }
+    planJson = normalizeCardioPlan(planJson, input, rawText);
+    if (prescription_integration) {
+      planJson.prescription_integration = {
+        readiness: prescription_integration.readiness ?? null,
+        coach_summary: prescription_integration.coach_summary ?? null,
+        risk_screening: prescription_integration.risk_screening ?? null,
+        prescription_decision: prescription_integration.prescription_decision ?? null,
+      };
+    }
+    if (bnito_orchestration) {
+      planJson.bnito_orchestration = {
+        duration_weeks: bnito_orchestration.duration_weeks ?? 6,
+        block_length_weeks: bnito_orchestration.block_length_weeks ?? 2,
+        blocks: bnito_orchestration.blocks ?? null,
+        synchronization_rules: bnito_orchestration.synchronization_rules ?? null,
+      };
     }
 
     // Salva no banco
@@ -355,10 +427,10 @@ INSTRUÇÕES:
       weeks: planJson.weeks,
       fc_zones: planJson.fc_zones,
       safety_check: planJson.safety_check,
-      general_tips: planJson.general_tips,
-      warnings: planJson.warnings,
+      general_tips: textValue(planJson.general_tips),
+      warnings: Array.isArray(planJson.warnings) ? planJson.warnings.map(textValue) : planJson.warnings ? [textValue(planJson.warnings)] : [],
       complementary_strength: planJson.complementary_strength,
-      nutrition_alert: planJson.nutrition_alert,
+      nutrition_alert: textValue(planJson.nutrition_alert),
       duration_weeks: planJson.duration_weeks,
       model: planJson.model,
       anamnese_id: anamnese_id ?? null,

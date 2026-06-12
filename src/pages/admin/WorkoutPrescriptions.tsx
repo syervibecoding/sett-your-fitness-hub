@@ -12,6 +12,7 @@ import { Users, Search, Dumbbell, ChevronRight, Calendar, Plus, Edit, Clock, Che
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 
 interface WorkoutSummary {
   id: string;
@@ -156,6 +157,11 @@ export default function WorkoutPrescriptions() {
           <h1 className="text-2xl text-primary font-bold tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
             PRESCRIÇÃO DE TREINOS
           </h1>
+          <BnitoContextButton
+            label="prescricao de treinos"
+            context="Lista alunos, ciclos ativos e treinos ja prescritos ou pendentes."
+            question="Como devo priorizar ciclos sem treino e revisar prescricoes existentes?"
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -220,6 +226,11 @@ export default function WorkoutPrescriptions() {
                     <h2 className="text-xl font-sans font-semibold text-foreground">{selectedStudent.full_name}</h2>
                     <p className="text-sm text-muted-foreground font-sans">{selectedStudent.plan_name}</p>
                   </div>
+                  <BnitoContextButton
+                    label={`prescricoes de ${selectedStudent.full_name}`}
+                    context={`Aluno selecionado na tela de prescricao. Plano: ${selectedStudent.plan_name || "sem plano"}. Ciclos: ${selectedStudent.cycles.length}. Treinos totais: ${totalWorkouts(selectedStudent)}.`}
+                    question="Qual ciclo devo revisar primeiro e o que preciso checar antes de prescrever?"
+                  />
                 </div>
 
                 {selectedStudent.cycles.length === 0 ? (
@@ -248,6 +259,11 @@ export default function WorkoutPrescriptions() {
                               >
                                 {cycle.status === "active" ? "Ativo" : cycle.status === "completed" ? "Concluído" : "Futuro"}
                               </Badge>
+                              <BnitoContextButton
+                                label={`ciclo ${cycle.cycle_number}`}
+                                context={`Ciclo ${cycle.cycle_number}; status ${cycle.status}; periodo ${cycle.start_date} a ${cycle.end_date}; treinos cadastrados: ${cycle.workouts.length}.`}
+                                question="Como devo estruturar ou revisar este ciclo de treino?"
+                              />
                             </div>
                             <span className="text-xs text-muted-foreground font-sans">
                               {format(parseISO(cycle.start_date), "dd/MM", { locale: ptBR })} — {format(parseISO(cycle.end_date), "dd/MM", { locale: ptBR })}
