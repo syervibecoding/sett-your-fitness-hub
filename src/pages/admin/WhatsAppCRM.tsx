@@ -220,8 +220,9 @@ export default function WhatsAppCRM() {
     <>
       <div className="flex flex-col h-[calc(100vh-4rem)]">
         <div className="mb-3">
-          <h1 className="text-xl sm:text-2xl font-bold text-primary tracking-wide">CRM WhatsApp</h1>
-          <p className="text-muted-foreground font-sans text-xs sm:text-sm">Gestão de alunos, categorias e etiquetas</p>
+          <p className="text-eyebrow">WhatsApp · CRM</p>
+          <h1 className="font-display text-xl sm:text-2xl text-foreground leading-tight">Gestão de alunos</h1>
+          <p className="text-muted-foreground font-sans text-xs sm:text-sm mt-0.5">Categorias, etiquetas e contexto de cada aluno</p>
         </div>
 
         <Tabs defaultValue="students" className="flex-1 flex flex-col min-h-0">

@@ -117,7 +117,7 @@ export function ExternalActivityForm({ open, onClose, studentId, companyId, exis
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="bg-card border-border max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-primary" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+          <DialogTitle className="text-primary font-mono-data text-base font-semibold uppercase tracking-wide">
             {existing ? "EDITAR ATIVIDADE" : "REGISTRAR ATIVIDADE"}
           </DialogTitle>
         </DialogHeader>

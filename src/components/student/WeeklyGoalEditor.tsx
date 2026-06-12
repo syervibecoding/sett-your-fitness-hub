@@ -41,7 +41,7 @@ export function WeeklyGoalEditor({ studentId, currentGoal, onSaved, trigger }: P
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="bg-card border-border max-w-xs">
           <DialogHeader>
-            <DialogTitle className="text-primary" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>META SEMANAL</DialogTitle>
+            <DialogTitle className="text-primary font-mono-data text-base font-semibold uppercase tracking-wide">META SEMANAL</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-3 gap-2 py-2">
             {OPTIONS.map((n) => (

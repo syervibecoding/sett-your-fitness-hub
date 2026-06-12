@@ -43,7 +43,7 @@ export function WorkoutSummary({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="bg-card border-border max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-center text-primary text-xl" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+          <DialogTitle className="text-center text-primary text-xl font-mono-data font-semibold tracking-wide">
             TREINO CONCLUÍDO! 💪
           </DialogTitle>
         </DialogHeader>

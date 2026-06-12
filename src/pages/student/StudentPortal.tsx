@@ -548,7 +548,7 @@ export default function StudentPortal() {
                 </Button>
               )}
               <Dumbbell className="h-6 w-6 text-primary" />
-              <h1 className="text-2xl text-primary font-bold tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+              <h1 className="text-xl text-primary font-mono-data font-semibold tracking-wide">
                 {viewTitles[activeView]}
               </h1>
             </div>
@@ -639,7 +639,7 @@ export default function StudentPortal() {
                 <Card className="bg-card border-border">
                   <CardContent className="p-4 space-y-2">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-primary font-bold" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>CICLO {selectedCycle.cycle_number}</h3>
+                      <h3 className="text-primary font-mono-data text-sm font-semibold uppercase tracking-[0.12em]">CICLO {selectedCycle.cycle_number}</h3>
                       <span className="text-xs text-muted-foreground font-sans">
                         {format(parseISO(selectedCycle.start_date), "dd/MM", { locale: ptBR })} — {format(parseISO(selectedCycle.end_date), "dd/MM", { locale: ptBR })}
                       </span>

@@ -684,8 +684,8 @@ export default function WhatsAppChat() {
       <div className="flex flex-col h-[calc(100vh-3.5rem)]">
         <div className="flex items-center justify-between px-4 pt-3 pb-2">
           <div>
-            <h1 className="text-2xl font-bold text-primary tracking-wide">Conversas</h1>
-            <p className="text-muted-foreground font-sans text-sm">Gestão de atendimento WhatsApp</p>
+            <p className="text-eyebrow">WhatsApp</p>
+            <h1 className="font-display text-2xl text-foreground leading-tight">Conversas</h1>
           </div>
         </div>
 

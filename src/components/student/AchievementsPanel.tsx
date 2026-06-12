@@ -72,7 +72,7 @@ export function AchievementsPanel({ studentId }: Props) {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-primary" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+              <span className="text-2xl font-bold text-primary font-mono-data">
                 {xp.toLocaleString("pt-BR")}
               </span>
               <span className="text-xs text-muted-foreground font-sans">XP</span>

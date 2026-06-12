@@ -235,7 +235,7 @@ export default function StudentWorkout() {
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-3 mb-1">
             <Dumbbell className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl sm:text-3xl text-primary font-bold tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+            <h1 className="text-xl sm:text-2xl text-primary font-mono-data font-semibold tracking-wide">
               MEU TREINO
             </h1>
           </div>
@@ -309,7 +309,7 @@ export default function StudentWorkout() {
             <Card className="bg-card border-border">
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-primary font-bold tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+                  <h3 className="text-primary font-mono-data text-sm font-semibold uppercase tracking-[0.12em]">
                     CICLO {selectedCycle.cycle_number}
                   </h3>
                   <span className="text-xs text-muted-foreground font-sans">
