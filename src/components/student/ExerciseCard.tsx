@@ -99,7 +99,7 @@ export function ExerciseCard({
     <Card className="bg-card border-border overflow-hidden">
       <CardContent className="p-0">
         <div className="flex items-center gap-3 p-3 cursor-pointer" onClick={onToggle}>
-          <div className={`flex items-center justify-center h-8 w-8 rounded-full text-sm font-bold font-sans flex-shrink-0 ${
+          <div className={`flex items-center justify-center h-8 w-8 rounded-full text-sm font-bold font-mono-data flex-shrink-0 ${
             completedSets === numSets && completedSets > 0
               ? "bg-green-500/20 text-green-400"
               : "bg-primary/10 text-primary"
@@ -113,9 +113,9 @@ export function ExerciseCard({
           <div className="flex-1 min-w-0">
             <p className="font-sans font-medium text-foreground text-sm truncate">{ex.exercise_name}</p>
             <div className="flex items-center gap-2">
-              <p className="text-xs text-muted-foreground font-sans">{numSets}×{ex.reps} · {ex.rest}</p>
+              <p className="text-xs text-muted-foreground font-mono-data">{numSets}×{ex.reps} · {ex.rest}</p>
               {completedSets > 0 && (
-                <span className="text-[10px] text-primary font-sans">{completedSets}/{numSets}</span>
+                <span className="text-[10px] text-primary font-mono-data">{completedSets}/{numSets}</span>
               )}
             </div>
           </div>
