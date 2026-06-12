@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, Copy, CreditCard, QrCode, Loader2, Check, ShieldCheck, Lock } from "lucide-react";
 import bnLogo from "@/assets/bn-logo.png";
+import { applyTheme } from "@/contexts/ThemeContext";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -52,6 +53,7 @@ export default function PublicPayment() {
   const { toast } = useToast();
 
   const [student, setStudent] = useState<any>(null);
+  const [logoSrc, setLogoSrc] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [step, setStep] = useState<Step>("select_plan");
   const [loading, setLoading] = useState(false);
@@ -113,6 +115,11 @@ export default function PublicPayment() {
         province: s.neighborhood || "",
       }));
       if (s.selected_plan_id) setSelectedPlanOptionId(s.selected_plan_id);
+      // White-label: aplica logo + tema da empresa (some o logo BN fixo para outras marcas).
+      if (data.branding) {
+        if (data.branding.logo_url) setLogoSrc(data.branding.logo_url);
+        applyTheme(data.branding);
+      }
       setIsRenewal(!!data.isRenewal);
       setAvailablePlans((data.plans as PlanOption[]) || []);
       setLoadingPlans(false);
@@ -314,7 +321,7 @@ export default function PublicPayment() {
     <div className="min-h-screen bg-background">
       <div className="max-w-lg mx-auto px-4 py-8 space-y-6">
         <div className="text-center space-y-3">
-          <img src={bnLogo} alt="BN Performance Training" className="h-16 mx-auto" />
+          <img src={logoSrc || bnLogo} alt="Logo" className="h-16 mx-auto object-contain" />
           <h1 className="text-4xl text-primary">
             {isRenewal ? "RENOVAÇÃO" : "PAGAMENTO"}
           </h1>

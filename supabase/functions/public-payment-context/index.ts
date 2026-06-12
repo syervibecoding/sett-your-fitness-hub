@@ -14,6 +14,17 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
+// Branding white-label da empresa (mesmo contrato de public-anamnesis/public-registration).
+async function getBranding(companyId: string | null) {
+  if (!companyId) return null;
+  const { data } = await supabase
+    .from("platform_settings")
+    .select("logo_url, platform_title, primary_color, background_color, card_color, text_color")
+    .eq("company_id", companyId)
+    .maybeSingle();
+  return data ?? null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -47,11 +58,13 @@ Deno.serve(async (req) => {
           .select("id").eq("student_id", studentId).eq("status", "active").maybeSingle(),
       ]);
 
+      const branding = await getBranding(student.company_id);
       const { company_id: _omit, ...safeStudent } = student;
       return new Response(JSON.stringify({
         student: safeStudent,
         plans: plans ?? [],
         isRenewal: !!enrollment,
+        branding,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
