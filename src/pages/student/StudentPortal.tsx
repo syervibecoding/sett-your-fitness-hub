@@ -16,6 +16,7 @@ import { WorkoutSummary } from "@/components/student/WorkoutSummary";
 import { ExerciseCard } from "@/components/student/ExerciseCard";
 import { StatsCharts } from "@/components/student/StatsCharts";
 import { useRestTimer } from "@/components/student/RestTimer";
+import { useWakeLock } from "@/hooks/useWakeLock";
 import { WeeklyBar } from "@/components/student/WeeklyBar";
 import { StudentHome } from "@/components/student/StudentHome";
 import { StudentCalendar } from "@/components/student/StudentCalendar";
@@ -109,6 +110,9 @@ export default function StudentPortal() {
   const todayStr = new Date().toISOString().split("T")[0];
 
   const session = useWorkoutSession(studentId, companyId);
+
+  // Mantém a tela acesa durante o treino (academia: evita destravar de mão suada).
+  useWakeLock(session.isActive);
 
   const { activeRest, startRest, clearRest } = useRestTimer();
 

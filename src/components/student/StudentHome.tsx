@@ -133,6 +133,33 @@ export function StudentHome({
         </button>
       )}
 
+      {/* Onboarding — aluno ainda sem ciclo/treino montado */}
+      {!selectedCycle && (
+        <Card className="border-border bg-card">
+          <CardContent className="p-5">
+            <p className="font-mono-data text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Bem-vindo</p>
+            <h3 className="font-display text-xl text-foreground mt-1.5 leading-snug">Seu treino está sendo montado</h3>
+            <p className="text-sm text-muted-foreground mt-2">
+              Seu treinador está preparando seu programa. Enquanto isso, adiante seu cadastro para o treino sair sob medida:
+            </p>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <button
+                onClick={() => onNavigate("medidas")}
+                className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:border-primary/50"
+              >
+                <Ruler className="h-4 w-4 text-primary" /> Registrar medidas
+              </button>
+              <button
+                onClick={() => onNavigate("avisos")}
+                className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:border-primary/50"
+              >
+                <Megaphone className="h-4 w-4 text-primary" /> Ver avisos
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Ciclo atual */}
       {selectedCycle && (
         <Card className="bg-card border-border">

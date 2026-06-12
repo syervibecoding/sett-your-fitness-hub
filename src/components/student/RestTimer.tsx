@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Timer } from "lucide-react";
+import { Timer, Volume2, VolumeX } from "lucide-react";
+import { restDoneFeedback, isSoundMuted, setSoundMuted } from "@/lib/feedback";
 
 interface RestTimerProps {
   restSeconds: number;
@@ -9,6 +10,7 @@ interface RestTimerProps {
 export function RestTimer({ restSeconds, onComplete }: RestTimerProps) {
   const [remaining, setRemaining] = useState(restSeconds);
   const [isRunning, setIsRunning] = useState(true);
+  const [muted, setMuted] = useState(isSoundMuted());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -22,8 +24,7 @@ export function RestTimer({ restSeconds, onComplete }: RestTimerProps) {
       setRemaining(prev => {
         if (prev <= 1) {
           setIsRunning(false);
-          // Vibrate if available
-          try { navigator.vibrate?.(300); } catch {}
+          restDoneFeedback();
           onComplete?.();
           return 0;
         }
@@ -48,7 +49,16 @@ export function RestTimer({ restSeconds, onComplete }: RestTimerProps) {
     <div className="space-y-1">
       <div className="flex items-center gap-2 text-xs font-sans text-primary">
         <Timer className="h-3.5 w-3.5 animate-pulse" />
-        <span>Descanso: {remaining}s</span>
+        <span className="font-mono-data">Descanso: {remaining}s</span>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); const next = !muted; setMuted(next); setSoundMuted(next); }}
+          className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
+          title={muted ? "Ativar som do descanso" : "Silenciar som do descanso"}
+          aria-label={muted ? "Ativar som" : "Silenciar som"}
+        >
+          {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+        </button>
       </div>
       <div className="h-1 bg-muted rounded-full overflow-hidden">
         <div

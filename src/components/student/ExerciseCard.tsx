@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Play, ChevronDown, ChevronUp, History, TrendingUp, TrendingDown, Minus, CheckCircle2, Plus, Check, X } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { toast } from "sonner";
+import { prFeedback } from "@/lib/feedback";
 import { RestTimer } from "./RestTimer";
 import { SET_TYPE_CONFIG, SET_TYPES, getSetLabel, type SetType } from "@/lib/setTypes";
 import {
@@ -63,6 +65,12 @@ export function ExerciseCard({
   const numSets = totalSets;
   const hasVideo = !!(ex.video_path || ex.video_url);
   const getLogKey = (s: number) => `${workoutId}-${idx}-${s}`;
+
+  // Melhor carga histórica deste exercício (antes de hoje) — base para detectar recorde.
+  const exerciseBest = Math.max(
+    0,
+    ...exerciseHistory.flatMap((h) => h.sets.map((st) => st.weight || 0)),
+  );
 
   const completedSets = Array.from({ length: numSets }, (_, s) => {
     const key = getLogKey(s + 1);
@@ -252,6 +260,13 @@ export function ExerciseCard({
                           onUpdateLog(idx, s + 1, "completed", newCompleted);
                           if (newCompleted && isSessionActive) {
                             onSetComplete(idx, s + 1, ex.rest);
+                          }
+                          // Celebração de recorde: carga bateu o melhor histórico do exercício.
+                          if (newCompleted && weight > 0 && exerciseBest > 0 && weight > exerciseBest) {
+                            prFeedback();
+                            toast.success(`🏆 Novo recorde em ${ex.exercise_name}!`, {
+                              description: `${weight} kg — seu melhor anterior era ${exerciseBest} kg`,
+                            });
                           }
                         }}
                       >
