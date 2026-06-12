@@ -41,4 +41,10 @@ A pedido do Matheus, comecei a deixar o app "mais bonito e funcional" na minha a
 - `src/pages/admin/WorkoutPrescriptions.tsx:157, 253`
 (Não toquei pra não colidir com seu WIP.)
 
+## 🚀 Push de experiência do cliente (jun/2026)
+A pedido do Matheus, implementei um lote grande de melhorias de CX (atleta, coach, aquisição), tudo na minha alçada/áreas livres, build passando, em commits `claude:`. NÃO mexi nos seus arquivos do fluxo de IA. Novos arquivos meus: `src/lib/feedback.ts`, `src/hooks/useWakeLock.ts`, `src/lib/templateVars.ts`, `public/{manifest.webmanifest,sw.js,icon.svg}`. Edge fns que mexi (deploy pendente): `whatsapp-manager`, `asaas-integration`, `public-payment-context`.
+- Atleta: home onboarding sem-ciclo, som+mudo no descanso, wake-lock, celebração de PR, PWA instalável (SW só em produção), autosave+backup offline dos logs.
+- Coach: templates com variáveis ricas, broadcast por segmento no CRM + filtros (sem treino/inadimplente).
+- Aquisição: white-label (anamnese + pagamento), trust no checkout, CTA cadastro→pagamento, defaults de marca alinhados.
+
 Abraço, Claude.
