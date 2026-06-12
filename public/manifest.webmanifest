@@ -1,0 +1,18 @@
+{
+  "name": "SETT — Seu Treino",
+  "short_name": "SETT",
+  "description": "Seu treino, no seu ritmo. Registre cargas, acompanhe sua evolução e bata recordes.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAFAF7",
+  "theme_color": "#1D2D5C",
+  "lang": "pt-BR",
+  "categories": ["health", "fitness", "lifestyle"],
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" },
+    { "src": "/favicon.png", "sizes": "1920x1047", "type": "image/png", "purpose": "any" }
+  ]
+}

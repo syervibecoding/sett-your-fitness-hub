@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
@@ -340,9 +340,10 @@ export default function StudentPortal() {
     }
   };
 
-  const saveCurrentLogs = async () => {
+  const saveCurrentLogs = async (opts?: { silent?: boolean }) => {
     if (!selectedWorkout || !studentId) return;
-    setSavingLogs(true);
+    const silent = opts?.silent === true;
+    if (!silent) setSavingLogs(true);
     const workoutId = selectedWorkout.id;
     // Inclui séries marcadas como concluídas mesmo sem carga/reps (ex.: peso corporal, abdominal).
     const logsToSave = Object.values(logs).filter(l => l.workout_id === workoutId && (l.weight > 0 || l.reps_done > 0 || l.completed));
@@ -368,13 +369,56 @@ export default function StudentPortal() {
           });
       if (error) { hadError = true; console.error("Erro ao salvar carga:", error); }
     }
-    setSavingLogs(false);
+    if (!silent) setSavingLogs(false);
+    if (silent) return; // autosave: sem toast para não poluir
     if (hadError) {
       toast({ title: "Algumas cargas não foram salvas", description: "Verifique sua conexão e tente novamente.", variant: "destructive" });
     } else {
       toast({ title: "Cargas salvas!" });
     }
   };
+
+  // ---- Autosave + backup local dos logs do dia (resiliência a wifi ruim / reload) ----
+  const logsBackupKey = studentId ? `sett_logs_${studentId}_${todayStr}` : null;
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const logsRestoredRef = useRef(false);
+
+  // Backup local a cada mudança (não grava vazio para não apagar um backup pendente de restore).
+  useEffect(() => {
+    if (!logsBackupKey || Object.keys(logs).length === 0) return;
+    try { localStorage.setItem(logsBackupKey, JSON.stringify(logs)); } catch { /* quota */ }
+  }, [logs, logsBackupKey]);
+
+  // Restaura, uma vez após o load, entradas locais que o banco não trouxe (edições offline).
+  useEffect(() => {
+    if (logsRestoredRef.current || loading || !logsBackupKey) return;
+    logsRestoredRef.current = true;
+    try {
+      const raw = localStorage.getItem(logsBackupKey);
+      if (!raw) return;
+      const local = JSON.parse(raw) as Record<string, WorkoutLog>;
+      setLogs(prev => {
+        const merged = { ...prev };
+        for (const [k, v] of Object.entries(local)) if (!merged[k]) merged[k] = v;
+        return merged;
+      });
+    } catch { /* ignore */ }
+  }, [loading, logsBackupKey]);
+
+  // Autosave com debounce (silencioso) — o atleta não depende mais de lembrar de salvar.
+  useEffect(() => {
+    if (!studentId || !selectedWorkout || Object.keys(logs).length === 0) return;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => { void saveCurrentLogs({ silent: true }); }, 2000);
+    return () => { if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current); };
+  }, [logs, studentId, selectedWorkout]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tenta salvar ao reconectar.
+  useEffect(() => {
+    const onOnline = () => { if (Object.keys(logs).length > 0) void saveCurrentLogs({ silent: true }); };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [logs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getStoragePublicUrl = (path: string) => {
     const { data } = supabase.storage.from("exercises-videos").getPublicUrl(path);
