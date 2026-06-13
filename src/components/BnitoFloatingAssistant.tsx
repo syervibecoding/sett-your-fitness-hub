@@ -187,7 +187,7 @@ export function BnitoAssistantProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<BnitoMessage[]>([firstMessage]);
   const [sessionContext, setSessionContext] = useState<BnitoOpenOptions | null>(null);
 
-  const shouldShow = role === "admin" || role === "coordinator" || role === "trainer";
+  const shouldShow = role === "admin" || role === "coordinator" || role === "trainer" || role === "master";
   const cycleId = useMemo(() => getCycleId(location.pathname), [location.pathname]);
   const pageLabel = useMemo(() => getPageLabel(location.pathname), [location.pathname]);
   const activeLabel = sessionContext?.label || pageLabel;
