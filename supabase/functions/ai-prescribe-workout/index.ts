@@ -12,7 +12,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const clean = (s: string) => (s || "").replace(/[^\x20-\x7E\u00C0-\u017F]/g, "");
+const clean = (s: unknown) => String(s || "").replace(/[^\x20-\x7E\u00C0-\u017F]/g, "");
 
 async function requireUser(req: Request) {
   const authHeader = req.headers.get("Authorization");
@@ -55,12 +55,100 @@ interface ExerciseCatalog {
   exercises: ExerciseCatalogEntry[];
 }
 
+interface ValidationWarning {
+  severity: "info" | "warning" | "blocker";
+  code: string;
+  message: string;
+  recommendation: string;
+  source: "biblioteca" | "volume" | "anamnese" | "avaliacao_funcional" | "objetivo" | "nivel" | "periodizacao" | "metodologia_bn";
+}
+
+const METHODOLOGY_PRESETS = {
+  hipertrofia_iniciante: {
+    label: "Hipertrofia iniciante",
+    target_weekly_sets: "8-12 series efetivas por grupo prioritario; maximo conservador de 14-16 para MMII quando houver boa recuperacao",
+    reps: "8-12 nos multiarticulares, 10-15 nos acessorios",
+    rir: "2-3",
+    methods_by_block: {
+      "1-2": ["base tecnica", "tempo controlado"],
+      "3-4": ["aumento discreto de series ou carga", "progressao dupla"],
+      "5-6": ["up-set leve apenas em exercicio estavel"],
+    },
+  },
+  hipertrofia_intermediario: {
+    label: "Hipertrofia intermediario",
+    target_weekly_sets: "10-16 series efetivas por grupo prioritario; 16-20 apenas com justificativa e boa tolerancia",
+    reps: "6-12 nos multiarticulares, 10-15 nos acessorios",
+    rir: "1-3",
+    methods_by_block: {
+      "1-2": ["volume base", "progressao dupla"],
+      "3-4": ["piramide ou up-set em padroes estaveis"],
+      "5-6": ["drop-set seletivo em isoladores seguros"],
+    },
+  },
+  emagrecimento: {
+    label: "Emagrecimento",
+    target_weekly_sets: "8-14 series por grupo, mantendo tecnica e recuperacao para aderencia",
+    reps: "8-15 com descansos moderados e densidade controlada",
+    rir: "2-4",
+    methods_by_block: {
+      "1-2": ["base tecnica", "densidade baixa/moderada"],
+      "3-4": ["reduzir descansos em acessorios", "circuito tecnico sem falha"],
+      "5-6": ["metodo metabolico seletivo sem comprometer dor/tecnica"],
+    },
+  },
+  recomposicao: {
+    label: "Recomposicao corporal",
+    target_weekly_sets: "10-16 series por grupo prioritario com controle de fadiga",
+    reps: "6-12 forca/hipertrofia + 12-15 acessorios",
+    rir: "2-3",
+    methods_by_block: {
+      "1-2": ["base tecnica e volume moderado"],
+      "3-4": ["progressao de carga ou reps"],
+      "5-6": ["piramide/up-set em exercicios estaveis"],
+    },
+  },
+  forca: {
+    label: "Forca",
+    target_weekly_sets: "6-12 series efetivas nos padroes principais; acessorios suficientes para suporte tecnico",
+    reps: "3-6 em forca global, 8-12 em suporte",
+    rir: "1-3, nunca falha sistematica",
+    methods_by_block: {
+      "1-2": ["tecnica e exposicao submaxima"],
+      "3-4": ["intensificacao controlada"],
+      "5-6": ["cluster-set apenas se nivel e avaliacao permitirem"],
+    },
+  },
+  retorno_lesao: {
+    label: "Retorno de lesao",
+    target_weekly_sets: "6-10 series por grupo afetado, progressao por tolerancia e dor <= 3",
+    reps: "10-15 com amplitude livre de dor; isometria/tempo quando seguro",
+    rir: "3-4",
+    methods_by_block: {
+      "1-2": ["mobilidade", "ativacao", "controle motor"],
+      "3-4": ["aumentar amplitude/carga apenas sem dor"],
+      "5-6": ["integrar padrao global conservador"],
+    },
+  },
+  corrida_musculacao: {
+    label: "Corrida + musculacao",
+    target_weekly_sets: "6-12 series MMII, 8-14 MMSS/core, reduzindo 20% vs nao corredor",
+    reps: "4-8 forca global, 8-12 acessorios, foco unilateral/excentrico",
+    rir: "2-3",
+    methods_by_block: {
+      "1-2": ["base tecnica anti-interferencia"],
+      "3-4": ["progressao discreta com deload sincronizado"],
+      "5-6": ["potencia apenas se liberado e fora de semana critica da corrida"],
+    },
+  },
+};
+
 function compactJson(value: unknown, maxLength = 20000) {
   return JSON.stringify(value ?? {}, null, 2).slice(0, maxLength);
 }
 
 async function loadExerciseCatalog(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   companyId: string | null,
 ): Promise<ExerciseCatalog> {
   let exerciseQuery = supabase
@@ -79,7 +167,7 @@ async function loadExerciseCatalog(
     throw new Error(`Falha ao carregar biblioteca de exercicios: ${exerciseError.message}`);
   }
 
-  const exerciseRows = exercises ?? [];
+  const exerciseRows = (exercises ?? []) as any[];
   const exerciseIds = exerciseRows.map((exercise) => exercise.id as string).filter(Boolean);
 
   const [targetsResult, groupsResult, overridesResult] = await Promise.all([
@@ -104,12 +192,12 @@ async function loadExerciseCatalog(
   if (overridesResult.error) throw new Error(`Falha ao carregar volumes da empresa: ${overridesResult.error.message}`);
 
   const groupNames = new Map<string, string>();
-  for (const group of groupsResult.data ?? []) {
+  for (const group of ((groupsResult.data ?? []) as any[])) {
     groupNames.set(group.id as string, group.name as string);
   }
 
   const volumeOverrides = new Map<string, number>();
-  for (const override of overridesResult.data ?? []) {
+  for (const override of ((overridesResult.data ?? []) as any[])) {
     volumeOverrides.set(
       `${override.exercise_id as string}:${override.muscle_group_id as string}`,
       override.volume_percentage as number,
@@ -117,7 +205,7 @@ async function loadExerciseCatalog(
   }
 
   const targetsByExercise = new Map<string, ExerciseCatalogEntry["targets"]>();
-  for (const target of targetsResult.data ?? []) {
+  for (const target of ((targetsResult.data ?? []) as any[])) {
     const exerciseId = target.exercise_id as string;
     const muscleGroupId = target.muscle_group_id as string;
     const targets = targetsByExercise.get(exerciseId) ?? [];
@@ -200,6 +288,219 @@ function validatePlanLibraryUsage(plan: unknown, validExerciseIds: Set<string>) 
     valid: missing.length === 0 && invalid.length === 0,
     missing,
     invalid,
+  };
+}
+
+function normalizeText(value: unknown) {
+  const raw = typeof value === "string" ? value : JSON.stringify(value ?? {});
+  return clean(raw)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function selectMethodologyPreset(
+  objective: unknown,
+  fitnessLevel: unknown,
+  restrictions: unknown,
+  assessmentContext: unknown,
+  isEnduranceAthlete: unknown,
+) {
+  const objectiveText = normalizeText(objective);
+  const levelText = normalizeText(fitnessLevel);
+  const riskText = normalizeText({ restrictions, assessmentContext });
+  if (riskText.match(/lesao|lesoes|dor|eva|retorno|pos[- ]?operatorio|cirurgia|radicul|formigamento/)) return "retorno_lesao";
+  if (isEnduranceAthlete) return "corrida_musculacao";
+  if (objectiveText.includes("forca")) return "forca";
+  if (objectiveText.includes("emagrec") || objectiveText.includes("perda") || objectiveText.includes("gordura")) return "emagrecimento";
+  if (objectiveText.includes("recompos")) return "recomposicao";
+  if (objectiveText.includes("hipertrof")) return levelText.includes("inic") ? "hipertrofia_iniciante" : "hipertrofia_intermediario";
+  return levelText.includes("inic") ? "hipertrofia_iniciante" : "recomposicao";
+}
+
+function extractOhsCompensations(assessmentContext: unknown): any[] {
+  if (!isRecord(assessmentContext)) return [];
+  const direct = assessmentContext.ohs_compensations;
+  const nested = isRecord(assessmentContext.prescription_context)
+    ? assessmentContext.prescription_context.ohs_compensations
+    : null;
+  return Array.isArray(direct) ? direct : Array.isArray(nested) ? nested : [];
+}
+
+function buildVolumeSummary(plan: unknown, catalog: ExerciseCatalog) {
+  const exerciseMap = new Map(catalog.exercises.map((exercise) => [exercise.id, exercise]));
+  const weeklySets = new Map<string, number>();
+  if (!isRecord(plan) || !Array.isArray(plan.workouts)) return weeklySets;
+
+  for (const workout of plan.workouts) {
+    if (!isRecord(workout) || !Array.isArray(workout.exercises)) continue;
+    for (const exercise of workout.exercises) {
+      if (!isRecord(exercise)) continue;
+      const sets = typeof exercise.sets === "number" ? exercise.sets : Number(exercise.sets || 0);
+      if (!Number.isFinite(sets) || sets <= 0) continue;
+      const exerciseId = typeof exercise.exercise_id === "string" ? exercise.exercise_id : "";
+      const catalogExercise = exerciseMap.get(exerciseId);
+      const targets = catalogExercise?.targets?.length
+        ? catalogExercise.targets
+        : [{ muscle_group: clean(exercise.muscle_group || catalogExercise?.muscle_group || "nao_informado"), role: null, volume_percentage: 100 }];
+      for (const target of targets) {
+        const group = target.muscle_group || "nao_informado";
+        const multiplier = typeof target.volume_percentage === "number" ? target.volume_percentage / 100 : 1;
+        weeklySets.set(group, (weeklySets.get(group) ?? 0) + sets * multiplier);
+      }
+    }
+  }
+  return weeklySets;
+}
+
+function hasAdvancedMethod(plan: unknown) {
+  const text = normalizeText(plan);
+  return /(drop[- ]?set|cluster[- ]?set|piramide|up[- ]?set|rest[- ]?pause|bi[- ]?set|tri[- ]?set)/.test(text);
+}
+
+function hasPhase(plan: unknown, phase: string) {
+  if (!isRecord(plan) || !Array.isArray(plan.workouts)) return false;
+  return plan.workouts.some((workout) =>
+    isRecord(workout) && Array.isArray(workout.exercises) &&
+    workout.exercises.some((exercise) => isRecord(exercise) && normalizeText(exercise.phase).includes(phase)),
+  );
+}
+
+function validatePrescriptionPlan(args: {
+  plan: any;
+  libraryValidation: ReturnType<typeof validatePlanLibraryUsage>;
+  catalog: ExerciseCatalog;
+  objective: unknown;
+  fitnessLevel: unknown;
+  restrictions: unknown;
+  assessmentContext: unknown;
+  durationWeeks: unknown;
+  blockNumber: unknown;
+  isEnduranceAthlete: unknown;
+}) {
+  const warnings: ValidationWarning[] = [];
+  const blockers: ValidationWarning[] = [];
+  const add = (warning: ValidationWarning) => {
+    if (warning.severity === "blocker") blockers.push(warning);
+    else warnings.push(warning);
+  };
+
+  if (args.libraryValidation && !args.libraryValidation.valid) {
+    add({
+      severity: "blocker",
+      code: "library_exercise_contract_failed",
+      message: "A prescricao contem exercicios sem exercise_id ou fora da biblioteca do app.",
+      recommendation: "Regerar ou ajustar usando somente exercise_id real da biblioteca; registre lacunas em library_policy.gaps.",
+      source: "biblioteca",
+    });
+  }
+
+  const duration = Number(args.plan?.duration_weeks || args.durationWeeks || 0);
+  if (duration !== 6) {
+    add({
+      severity: "warning",
+      code: "periodization_duration_not_6_weeks",
+      message: "A metodologia desta fase exige ciclo de exatamente 6 semanas.",
+      recommendation: "Ajustar duration_weeks para 6 e manter blocos 1-2, 3-4 e 5-6.",
+      source: "periodizacao",
+    });
+  }
+
+  const blocks = Array.isArray(args.plan?.periodization_blocks) ? args.plan.periodization_blocks : [];
+  const blockText = normalizeText(blocks);
+  for (const requiredBlock of ["1-2", "3-4", "5-6"]) {
+    if (!blockText.includes(requiredBlock)) {
+      add({
+        severity: "warning",
+        code: `missing_periodization_block_${requiredBlock}`,
+        message: `Bloco ${requiredBlock} nao apareceu claramente na periodizacao.`,
+        recommendation: "Declarar estimulo, metodo e regra de progressao para este bloco.",
+        source: "periodizacao",
+      });
+    }
+  }
+
+  const riskText = normalizeText({ restrictions: args.restrictions, assessmentContext: args.assessmentContext });
+  const levelText = normalizeText(args.fitnessLevel);
+  const objectiveText = normalizeText(args.objective);
+  const painActive = /(dor|eva\s*[4-9]|eva\s*10|joelho|lombar|ombro|tornozelo|quadril|lesao|lesoes)/.test(riskText);
+
+  if ((levelText.includes("inic") || painActive) && hasAdvancedMethod(args.plan)) {
+    add({
+      severity: painActive ? "warning" : "info",
+      code: "advanced_method_requires_justification",
+      message: "Ha metodo avancado em contexto iniciante ou com dor/lesao.",
+      recommendation: "Usar metodo avancado apenas em exercicio estavel, sem dor, preferencialmente no bloco 5-6; caso contrario trocar por progressao dupla.",
+      source: "nivel",
+    });
+  }
+
+  const planText = normalizeText(args.plan);
+  if (Number(args.blockNumber || 1) < 2 && /(pliometr|salto|jump|hop|bound)/.test(planText)) {
+    add({
+      severity: "warning",
+      code: "plyometrics_in_initial_block",
+      message: "Pliometria apareceu no primeiro bloco, mas a metodologia BN bloqueia pliometria nas primeiras 6 semanas/inicio.",
+      recommendation: "Remover pliometria e substituir por controle motor, forca global tecnica e acessorios.",
+      source: "metodologia_bn",
+    });
+  }
+
+  const compensations = extractOhsCompensations(args.assessmentContext).filter((item) => isRecord(item) && item.presente);
+  if (compensations.length > 0 && (!hasPhase(args.plan, "mobilidade") || !hasPhase(args.plan, "ativacao"))) {
+    add({
+      severity: "warning",
+      code: "ohs_compensation_without_corrective_phases",
+      message: "A avaliacao funcional indicou compensacoes, mas o treino nao deixou claro mobilidade/ativacao corretiva.",
+      recommendation: "Incluir mobilidade e ativacao especifica ligadas aos achados do OHS antes da forca global.",
+      source: "avaliacao_funcional",
+    });
+  }
+
+  const weeklySets = buildVolumeSummary(args.plan, args.catalog);
+  const highSetLimit = levelText.includes("inic") ? 16 : objectiveText.includes("forca") ? 14 : 20;
+  const lowSetLimit = objectiveText.includes("hipertrof") ? 8 : 6;
+  const volume_review = Array.from(weeklySets.entries()).map(([muscle_group, sets]) => ({
+    muscle_group,
+    weekly_sets: Math.round(sets * 10) / 10,
+    status: sets < lowSetLimit ? "baixo" : sets > highSetLimit ? "alto" : "ok",
+    note: sets < lowSetLimit
+      ? "Volume possivelmente baixo para o objetivo, se este grupo for prioridade."
+      : sets > highSetLimit
+        ? "Volume alto; exige justificativa, recuperacao e ausencia de dor."
+        : "Volume dentro da faixa conservadora.",
+  }));
+
+  for (const review of volume_review) {
+    if (review.status === "alto") {
+      add({
+        severity: "warning",
+        code: `high_weekly_volume_${normalizeText(review.muscle_group).replace(/\s+/g, "_")}`,
+        message: `${review.muscle_group}: ${review.weekly_sets} series/semana estimadas.`,
+        recommendation: levelText.includes("inic")
+          ? "Reduzir para <=16 series/semana ou justificar progressao por historico/tolerancia."
+          : "Confirmar recuperacao, sono, dor e distribuicao antes de manter >20 series/semana.",
+        source: "volume",
+      });
+    }
+  }
+
+  if (painActive) {
+    add({
+      severity: "warning",
+      code: "pain_or_injury_requires_conservative_progression",
+      message: "Anamnese/avaliacao sugere dor, lesao ou regiao sensivel.",
+      recommendation: "Manter dor <=3, reduzir amplitude/carga/braco de momento em padroes dolorosos e sinalizar professor se houver piora.",
+      source: "anamnese",
+    });
+  }
+
+  return {
+    status: blockers.length ? "blocked" : warnings.some((warning) => warning.severity === "warning") ? "warnings" : "ok",
+    blockers,
+    warnings,
+    volume_review,
+    checked_at: new Date().toISOString(),
   };
 }
 
@@ -368,6 +669,11 @@ INSTRUÇÃO DE SAÍDA — APENAS JSON VÁLIDO, SEM TEXTO ADICIONAL
   "objective": "Objetivo do ciclo",
   "duration_weeks": N,
   "block": "1 | 2 | 3",
+  "methodology_preset": {
+    "key": "preset recebido no contexto",
+    "label": "nome do preset BN usado",
+    "why_selected": "motivo tecnico ligado a objetivo, nivel, anamnese e avaliacao"
+  },
   "biomechanical_notes": "Principais adaptações biomecânicas aplicadas com base na avaliação",
   "workouts": [
     {
@@ -414,7 +720,12 @@ INSTRUÇÃO DE SAÍDA — APENAS JSON VÁLIDO, SEM TEXTO ADICIONAL
   ],
   "weekly_structure": "Descrição da estrutura semanal e ordem dos treinos",
   "progression_protocol": "Como progredir no próximo bloco",
-  "warnings": ["Alertas específicos baseados nas limitações identificadas"]
+  "warnings": ["Alertas específicos baseados nas limitações identificadas"],
+  "bnito_after_generation": {
+    "intent": "notify_student_prescription_ready",
+    "question_to_teacher": "Quer que eu avise o aluno que a prescrição foi feita?",
+    "suggested_message": "mensagem curta para o aluno, sem prometer nada fora do app"
+  }
 }
 `.trim();
 
@@ -458,6 +769,14 @@ serve(async (req) => {
 
     const exerciseCatalog = await loadExerciseCatalog(supabase, (company_id as string | null) ?? null);
     const exerciseCatalogText = formatExerciseCatalog(exerciseCatalog);
+    const presetKey = selectMethodologyPreset(
+      objective,
+      fitness_level,
+      restrictions,
+      assessment_context,
+      is_endurance_athlete,
+    );
+    const selectedPreset = METHODOLOGY_PRESETS[presetKey as keyof typeof METHODOLOGY_PRESETS];
 
     const athleteContext = `
 DADOS DO ATLETA:
@@ -471,6 +790,9 @@ Equipamentos: ${clean(equipment || "academia completa")}
 É atleta de endurance (corrida/triathlon): ${is_endurance_athlete ? "SIM — aplicar protocolo anti-interferência" : "NÃO"}
 Restrições/Lesões: ${clean(restrictions || "nenhuma")}
 Observações adicionais: ${clean(notes || "")}
+
+PRESET BN OBRIGATORIO PARA ESTA PRESCRICAO:
+${compactJson({ key: presetKey, ...selectedPreset }, 5000)}
 
 RESULTADO INTEGRADO ANAMNESE + AVALIAÇÃO (PRIORIDADE MÁXIMA):
 ${prescription_integration
@@ -518,14 +840,16 @@ INSTRUÇÕES:
 2. Analise a avaliação funcional e ajuste CADA exercício conforme as disfunções encontradas.
 3. O ciclo deve ter EXATAMENTE 6 semanas, dividido em semanas 1-2, 3-4 e 5-6.
 4. Troque o estimulo a cada 2 semanas: series, repeticoes, intensidade, descanso ou metodo.
-5. Metodos avancados permitidos somente se coerentes com nivel/risco: up-set, piramide, cluster-set e drop-set seletivo. Nunca use metodo avancado em padrao doloroso ou instavel.
-6. Siga obrigatoriamente a estrutura de 7 etapas em CADA sessão.
-7. Pliometria apenas se block_number >= 2 E criterios_progressao_bn/liberações do resultado integrado permitirem.
-8. Inclua cues técnicos específicos baseados nas falhas do OHS e nos riscos da anamnese.
-9. Para atleta de endurance: preferir RIR 2-3, volume moderado, força excêntrica.
-10. Use somente exercícios cadastrados na biblioteca do app.
-11. Retorne exercise_id em todos os itens de treino.
-12. Retorne APENAS o JSON, sem texto adicional, sem markdown.
+5. Siga o PRESET BN OBRIGATORIO: ele define faixa de volume, reps/RIR e metodos por bloco.
+6. Metodos avancados permitidos somente se coerentes com nivel/risco: up-set, piramide, cluster-set e drop-set seletivo. Nunca use metodo avancado em padrao doloroso ou instavel.
+7. Siga obrigatoriamente a estrutura de 7 etapas em CADA sessão.
+8. Pliometria apenas se block_number >= 2 E criterios_progressao_bn/liberações do resultado integrado permitirem.
+9. Inclua cues técnicos específicos baseados nas falhas do OHS e nos riscos da anamnese.
+10. Para atleta de endurance: preferir RIR 2-3, volume moderado, força excêntrica.
+11. Use somente exercícios cadastrados na biblioteca do app.
+12. Retorne exercise_id em todos os itens de treino.
+13. Ao final, inclua bnito_after_generation com a intenção: "Quer que eu avise o aluno que a prescrição foi feita?"
+14. Retorne APENAS o JSON, sem texto adicional, sem markdown.
     `.trim();
 
     const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
@@ -562,12 +886,61 @@ INSTRUÇÕES:
       planJson,
       new Set(exerciseCatalog.exercises.map((exercise) => exercise.id)),
     );
+    const preSaveValidation = validatePrescriptionPlan({
+      plan: planJson,
+      libraryValidation,
+      catalog: exerciseCatalog,
+      objective,
+      fitnessLevel: fitness_level,
+      restrictions,
+      assessmentContext: assessment_context,
+      durationWeeks: duration_weeks,
+      blockNumber: block_number,
+      isEnduranceAthlete: is_endurance_athlete,
+    });
+
+    const existingGaps = isRecord(planJson.library_policy) && Array.isArray(planJson.library_policy.gaps)
+      ? planJson.library_policy.gaps
+      : [];
     planJson.library_policy = {
       ...(isRecord(planJson.library_policy) ? planJson.library_policy : {}),
       only_library_exercises: true,
       catalog_count: exerciseCatalog.total,
       validation: libraryValidation,
+      gaps: [
+        ...existingGaps,
+        ...(libraryValidation?.missing?.length ? [`Itens sem exercise_id: ${libraryValidation.missing.join(", ")}`] : []),
+        ...(libraryValidation?.invalid?.length ? [`Exercicios fora da biblioteca: ${libraryValidation.invalid.join(", ")}`] : []),
+      ],
     };
+    planJson.methodology_preset = {
+      key: presetKey,
+      label: selectedPreset.label,
+      why_selected: planJson.methodology_preset?.why_selected || "Selecionado pelo objetivo, nivel, restricoes/anamnese, avaliacao funcional e contexto de endurance.",
+      rules: selectedPreset,
+    };
+    planJson.validator = {
+      pre_save: preSaveValidation,
+    };
+    planJson.bnito_after_generation = {
+      ...(isRecord(planJson.bnito_after_generation) ? planJson.bnito_after_generation : {}),
+      intent: "notify_student_prescription_ready",
+      question_to_teacher: "Quer que eu avise o aluno que a prescrição foi feita?",
+      suggested_message: planJson.bnito_after_generation?.suggested_message
+        || "Sua prescrição nova já está pronta no app. Dá uma olhada com calma e me chama por aqui se quiser tirar dúvida de execução.",
+    };
+
+    if (preSaveValidation.status === "blocked") {
+      return new Response(
+        JSON.stringify({
+          error: "Prescricao bloqueada pelo validador pre-salvar.",
+          validator: preSaveValidation,
+          plan: planJson,
+        }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     if (prescription_integration) {
       planJson.prescription_integration = {
         readiness: prescription_integration.readiness ?? null,
@@ -604,8 +977,9 @@ INSTRUÇÕES:
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
+    const message = e instanceof Error ? e.message : "Erro inesperado";
     return new Response(
-      JSON.stringify({ error: e.message }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
