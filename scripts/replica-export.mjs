@@ -74,7 +74,9 @@ const STRIP_COLUMNS = new Set([
 
 const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const CPF_RE = /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g;
-const PHONE_RE = /\b(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?(?:9\s?)?\d{4}[-\s]?\d{4}\b/g;
+const PHONE_RE = /(^|[^\w-])((?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?(?:9\s?)?\d{4}[-\s]?\d{4})(?![\w-])/g;
+const UUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+const ID_FIELD_RE = /(^id$|_id$|_ids$|^source_node_id$|^target_node_id$)/i;
 
 async function loadEnvFile(filePath) {
   try {
@@ -97,14 +99,28 @@ function env(name, fallback) {
 }
 
 function sanitizeText(value) {
-  return value
+  const uuidMasks = [];
+  const masked = value.replace(UUID_RE, (match) => {
+    const token = `__UUID_MASK_${uuidMasks.length}__`;
+    uuidMasks.push(match);
+    return token;
+  });
+
+  const redacted = masked
     .replace(EMAIL_RE, "[redacted-email]")
     .replace(CPF_RE, "[redacted-cpf]")
-    .replace(PHONE_RE, "[redacted-phone]");
+    .replace(PHONE_RE, "$1[redacted-phone]");
+
+  return uuidMasks.reduce((text, uuid, index) => text.replace(`__UUID_MASK_${index}__`, uuid), redacted);
 }
 
-function sanitizeValue(value) {
-  if (Array.isArray(value)) return value.map(sanitizeValue);
+function isIdentityField(key) {
+  return typeof key === "string" && ID_FIELD_RE.test(key);
+}
+
+function sanitizeValue(value, key) {
+  if (isIdentityField(key)) return value;
+  if (Array.isArray(value)) return value.map((item) => sanitizeValue(item, key));
   if (value && typeof value === "object") return sanitizeRow(value);
   if (typeof value === "string") return sanitizeText(value);
   return value;
@@ -114,7 +130,7 @@ function sanitizeRow(row) {
   const clean = {};
   for (const [key, value] of Object.entries(row)) {
     if (STRIP_COLUMNS.has(key)) continue;
-    clean[key] = sanitizeValue(value);
+    clean[key] = sanitizeValue(value, key);
   }
   return clean;
 }
@@ -221,7 +237,11 @@ async function main() {
   console.log(JSON.stringify({ exportedAt, counts }, null, 2));
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}
+
+export { sanitizeRow, sanitizeText, sanitizeValue };

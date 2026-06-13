@@ -26,7 +26,7 @@ if (!url || !key) {
   process.exit(1);
 }
 
-const GLOBAL_TABLES = ["muscle_groups", "exercise_library", "exercise_muscle_targets"];
+const GLOBAL_TABLES = ["muscle_groups", "exercise_library", "exercise_muscle_targets", "achievements"];
 // Curado: só o que é valioso e seguro. Pula platform_settings (branding) e automation_* (nós corrompidos / baixo valor).
 const COMPANY_TABLES = ["plans", "form_fields", "whatsapp_labels", "role_permissions"];
 
@@ -78,6 +78,9 @@ imported.exercise_library = await upsert("exercise_library", exRows);
 const exIds = new Set(exRows.map((r) => r.id));
 const targets = tgAll.filter((r) => exIds.has(r.exercise_id) && (!r.muscle_group_id || mgIds.has(r.muscle_group_id)));
 imported.exercise_muscle_targets = await upsert("exercise_muscle_targets", targets);
+
+const achievements = repair(t.achievements ?? [], ["id"]).map((r) => ({ ...r, company_id: null }));
+imported.achievements = await upsert("achievements", achievements);
 }
 
 // 2) Por empresa (só com TARGET_COMPANY_ID)
