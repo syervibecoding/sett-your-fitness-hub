@@ -48,6 +48,29 @@ function formatBRL(value: number): string {
   return value.toFixed(2).replace(".", ",");
 }
 
+async function recordRecoveryEvent(
+  studentId: string | undefined,
+  eventType: "plan_selected" | "payment_started" | "payment_abandoned" | "payment_completed",
+  metadata: Record<string, any> = {},
+  planId?: string | null,
+  paymentId?: string | null,
+) {
+  if (!studentId) return;
+  try {
+    await supabase.rpc("record_payment_recovery_event" as any, {
+      _student_id: studentId,
+      _event_type: eventType,
+      _plan_id: planId || null,
+      _payment_id: paymentId || null,
+      _enrollment_id: null,
+      _metadata: metadata,
+      _source: "public-payment",
+    });
+  } catch {
+    // Recovery telemetry must never block checkout.
+  }
+}
+
 export default function PublicPayment() {
   const { studentId } = useParams<{ studentId: string }>();
   const { toast } = useToast();
@@ -91,6 +114,39 @@ export default function PublicPayment() {
   const [planName, setPlanName] = useState("");
   const [planDurationWeeks, setPlanDurationWeeks] = useState(0);
   const [installments, setInstallments] = useState(1);
+  const abandonedRecordedRef = useRef(false);
+  const recoveryStateRef = useRef({
+    studentId,
+    step,
+    selectedPlanOptionId,
+    planName,
+    planValue,
+    pixPaymentId,
+  });
+
+  useEffect(() => {
+    recoveryStateRef.current = {
+      studentId,
+      step,
+      selectedPlanOptionId,
+      planName,
+      planValue,
+      pixPaymentId,
+    };
+  }, [studentId, step, selectedPlanOptionId, planName, planValue, pixPaymentId]);
+
+  const recordAbandoned = (reason: string) => {
+    const state = recoveryStateRef.current;
+    if (abandonedRecordedRef.current || state.step === "success" || !state.selectedPlanOptionId) return;
+    abandonedRecordedRef.current = true;
+    void recordRecoveryEvent(state.studentId, "payment_abandoned", {
+      reason,
+      step: state.step,
+      plan_name: state.planName,
+      amount: state.planValue,
+      asaas_payment_id: state.pixPaymentId || null,
+    }, state.selectedPlanOptionId);
+  };
 
   useEffect(() => {
     if (!studentId) { setNotFound(true); return; }
@@ -132,6 +188,22 @@ export default function PublicPayment() {
     };
   }, [studentId]);
 
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") recordAbandoned("tab_hidden");
+    };
+    const onBeforeUnload = () => recordAbandoned("before_unload");
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, []);
+
+  useEffect(() => () => recordAbandoned("page_unmounted"), []);
+
   const handleSelectPlan = async (plan: PlanOption) => {
     setSelectedPlanOptionId(plan.id);
     setPlanValue(plan.price);
@@ -144,6 +216,11 @@ export default function PublicPayment() {
       await supabase.functions.invoke("public-payment-context", {
         body: { action: "select-plan", studentId, planId: plan.id },
       });
+      await recordRecoveryEvent(studentId, "plan_selected", {
+        plan_name: plan.name,
+        amount: plan.price,
+        duration_weeks: plan.duration_weeks,
+      }, plan.id);
     }
   };
 
@@ -159,6 +236,13 @@ export default function PublicPayment() {
         planId: selectedPlanOptionId,
       });
       setPixPaymentId(paymentId);
+      abandonedRecordedRef.current = false;
+      await recordRecoveryEvent(studentId, "payment_started", {
+        method: "PIX",
+        plan_name: planName,
+        amount: planValue,
+        asaas_payment_id: paymentId,
+      }, selectedPlanOptionId);
 
       const { encodedImage, payload } = await callAsaas("get-pix-qrcode", { paymentId });
       setPixImage(encodedImage);
@@ -178,6 +262,14 @@ export default function PublicPayment() {
           const { status } = await callAsaas("get-payment-status", { paymentId });
           if (status === "RECEIVED" || status === "CONFIRMED") {
             if (pollingRef.current) clearInterval(pollingRef.current);
+            abandonedRecordedRef.current = true;
+            await recordRecoveryEvent(studentId, "payment_completed", {
+              method: "PIX",
+              status,
+              plan_name: planName,
+              amount: planValue,
+              asaas_payment_id: paymentId,
+            }, selectedPlanOptionId);
             setStep("success");
           }
         } catch {}
@@ -217,6 +309,12 @@ export default function PublicPayment() {
 
     setLoading(true);
     try {
+      await recordRecoveryEvent(studentId, "payment_started", {
+        method: "CARD",
+        plan_name: planName,
+        amount: planValue,
+        installments,
+      }, selectedPlanOptionId);
       // Captura IP real do cliente (requerido por antifraude do Asaas)
       let remoteIp = "";
       try {
@@ -255,12 +353,22 @@ export default function PublicPayment() {
       const { status } = await callAsaas("create-card-payment", payload);
 
       if (status === "CONFIRMED" || status === "RECEIVED") {
+        abandonedRecordedRef.current = true;
+        await recordRecoveryEvent(studentId, "payment_completed", {
+          method: "CARD",
+          status,
+          plan_name: planName,
+          amount: planValue,
+          installments,
+        }, selectedPlanOptionId);
         setStep("success");
       } else if (status === "PENDING" || status === "AWAITING_RISK_ANALYSIS") {
         toast({ title: "Pagamento em análise", description: "Você receberá a confirmação em breve." });
+        abandonedRecordedRef.current = true;
         setStep("success");
       } else {
         toast({ title: "Pagamento processado", description: `Status: ${status}` });
+        abandonedRecordedRef.current = true;
         setStep("success");
       }
     } catch (err: any) {

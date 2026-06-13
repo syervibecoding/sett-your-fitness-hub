@@ -18,6 +18,7 @@ import {
   Tooltip,
 } from "recharts";
 import { BodyAvatar, type Gender, type BodyMeasurementValues } from "./BodyAvatar";
+import { ProgressPhotosPanel } from "@/components/ProgressPhotosPanel";
 
 interface BodyMeasurementsProps {
   studentId: string;
@@ -264,6 +265,8 @@ export function BodyMeasurements({ studentId, companyId, gender, onGenderChange 
           </Button>
         </CardContent>
       </Card>
+
+      <ProgressPhotosPanel studentId={studentId} compact />
 
       {/* Evolution chart */}
       {history.length >= 2 && (
