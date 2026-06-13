@@ -47,6 +47,216 @@ function aiErrorResponse(status: number) {
   });
 }
 
+type FrameRef = { frameId: string; vista: string };
+
+type OhsCompensationDefinition = {
+  key: string;
+  label: string;
+  aliases: string[];
+  vistaKeywords: string[];
+  trainingImplication: string;
+};
+
+const OHS_COMPENSATIONS: OhsCompensationDefinition[] = [
+  {
+    key: "dorsiflexion_limitation",
+    label: "Limitação de dorsiflexão de tornozelo",
+    aliases: ["dorsiflex", "tornozelo", "adm_tornozelo", "mobilidade_tornozelo", "calcanhar", "ankle"],
+    vistaKeywords: ["lateral ohs", "air squat", "squat", "vista lateral"],
+    trainingImplication: "Priorizar mobilidade de tornozelo e variações de agachamento com menor exigência de dorsiflexão; considerar elevação provisória de calcanhar e evitar progressão agressiva de carga axial.",
+  },
+  {
+    key: "dynamic_valgus",
+    label: "Valgo dinâmico de joelho",
+    aliases: ["valgo", "joelho", "colapso medial", "valgus"],
+    vistaKeywords: ["anterior ohs", "vista anterior", "air squat", "lunge"],
+    trainingImplication: "Adicionar ativação/fortalecimento de glúteo médio e rotadores externos, controle motor com cue de joelhos para fora e cautela com agachamentos/afundos pesados.",
+  },
+  {
+    key: "trunk_forward_lean",
+    label: "Inclinação excessiva de tronco",
+    aliases: ["inclinação", "inclinacao", "tronco", "tibiotronco", "à frente", "a frente"],
+    vistaKeywords: ["lateral ohs", "air squat", "vista lateral"],
+    trainingImplication: "Reduzir braço de momento lombar, priorizar core lombo-pélvico e variações mais verticalizadas/estáveis antes de carga livre pesada.",
+  },
+  {
+    key: "butt_wink",
+    label: "Retroversão pélvica / butt wink",
+    aliases: ["butt wink", "retrovers", "pelve_fundo", "isquiotibiais", "pélvica", "pelvica"],
+    vistaKeywords: ["lateral ohs", "vista lateral", "air squat"],
+    trainingImplication: "Limitar amplitude ao ponto de controle pélvico, trabalhar mobilidade de quadril/isquiotibiais e evitar sobrecarga axial com perda de coluna neutra.",
+  },
+  {
+    key: "pelvic_drop_trendelenburg",
+    label: "Drop de pelve / Trendelenburg funcional",
+    aliases: ["drop", "trendelenburg", "pelve", "quadril cai", "queda da pelve"],
+    vistaKeywords: ["posterior ohs", "vista posterior", "lunge", "equilibrio", "unipodal"],
+    trainingImplication: "Priorizar abdutores de quadril e exercícios unilaterais progressivos, com regressão quando houver perda de alinhamento pélvico.",
+  },
+  {
+    key: "shoulder_protraction_kyphosis",
+    label: "Protrusão de ombro / cifose torácica",
+    aliases: ["protrusão", "protrusao", "cifose", "torácica", "toracica", "escap", "ombros"],
+    vistaKeywords: ["postura", "lateral", "shoulder flexion", "posterior"],
+    trainingImplication: "Adicionar trabalho escapular, mobilidade torácica e fortalecimento de trapézio inferior/romboides/serrátil; cautela com pressões intensas se houver limitação overhead.",
+  },
+  {
+    key: "overhead_arm_asymmetry",
+    label: "Assimetria de braços no overhead",
+    aliases: ["assimetria de braço", "assimetria de braco", "bracos", "braços", "overhead", "ombro mais baixo", "assimetria_bracas"],
+    vistaKeywords: ["anterior ohs", "posterior ohs", "shoulder flexion", "overhead"],
+    trainingImplication: "Avaliar mobilidade unilateral de ombro/torácica, incluir mobilidade do lado limitado e exercícios unilaterais para equalizar o padrão.",
+  },
+];
+
+function isRecord(value: unknown): value is Record<string, any> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeSeverity(value: unknown): string {
+  const raw = clean(value || "").toLowerCase();
+  if (raw.includes("sever")) return "severa";
+  if (raw.includes("moder")) return "moderada";
+  if (raw.includes("leve")) return "leve";
+  if (raw.includes("ausente") || raw.includes("sem alteração") || raw.includes("sem alteracao")) return "ausente";
+  if (raw.includes("incert") || raw.includes("baixa confiança") || raw.includes("baixa confianca")) return "incerta";
+  return raw ? "moderada" : "incerta";
+}
+
+function stringifyForSearch(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(stringifyForSearch).join(" ");
+  if (isRecord(value)) return Object.values(value).map(stringifyForSearch).join(" ");
+  return "";
+}
+
+function findFrameReference(definition: OhsCompensationDefinition, frameRefs: FrameRef[], explicitFrameId?: unknown) {
+  const explicit = typeof explicitFrameId === "string" ? frameRefs.find((fr) => fr.frameId === explicitFrameId) : null;
+  if (explicit) return explicit;
+  const match = frameRefs.find((fr) => {
+    const vista = fr.vista.toLowerCase();
+    return definition.vistaKeywords.some((keyword) => vista.includes(keyword));
+  });
+  return match || frameRefs[0] || { frameId: null, vista: null };
+}
+
+function extractExplicitCompensation(assessmentJson: any, definition: OhsCompensationDefinition) {
+  const candidates = [
+    ...(Array.isArray(assessmentJson?.ohs_compensations) ? assessmentJson.ohs_compensations : []),
+    ...(Array.isArray(assessmentJson?.compensacoes_ohs) ? assessmentJson.compensacoes_ohs : []),
+    ...(Array.isArray(assessmentJson?.disfuncoes_identificadas) ? assessmentJson.disfuncoes_identificadas : []),
+  ];
+  return candidates.find((item) => {
+    const text = stringifyForSearch(item).toLowerCase();
+    return text.includes(definition.key) || definition.aliases.some((alias) => text.includes(alias));
+  });
+}
+
+function inferOhsCompensation(assessmentJson: any, definition: OhsCompensationDefinition, frameRefs: FrameRef[]) {
+  const explicit = extractExplicitCompensation(assessmentJson, definition);
+  const globalText = stringifyForSearch(assessmentJson).toLowerCase();
+  const mentioned = definition.aliases.some((alias) => globalText.includes(alias));
+  const frameText = Array.isArray(assessmentJson?.frame_findings)
+    ? assessmentJson.frame_findings.find((frame: any) => {
+        const text = stringifyForSearch(frame).toLowerCase();
+        return definition.aliases.some((alias) => text.includes(alias));
+      })
+    : null;
+  const frameReference = findFrameReference(definition, frameRefs, explicit?.frameId || explicit?.frame_id || frameText?.frameId);
+  const present = !!explicit || !!frameText || mentioned;
+  const severity = present
+    ? normalizeSeverity(explicit?.severidade || explicit?.gravidade || explicit?.severity || frameText?.gravidade || stringifyForSearch(explicit || frameText))
+    : "ausente";
+  const explicitPresent = typeof explicit?.presente === "boolean" ? explicit.presente : undefined;
+  const normalizedPresent = explicitPresent ?? (present && severity !== "ausente" && severity !== "incerta");
+  const evidence = explicit?.evidencia
+    || explicit?.descricao
+    || explicit?.achado
+    || explicit?.nome
+    || frameText?.findings?.[0]?.descricao
+    || (normalizedPresent
+      ? "Inferido do conjunto do laudo estruturado."
+      : severity === "incerta"
+        ? "Imagem ou contexto insuficiente para confirmar este achado."
+        : "Não observado nos frames analisados.");
+
+  return {
+    key: definition.key,
+    compensacao: definition.label,
+    presente: normalizedPresent,
+    severidade: severity,
+    frame_referencia: frameReference.frameId,
+    vista_referencia: frameReference.vista,
+    evidencia: evidence,
+    implicacao_treino: explicit?.implicacao_treino || explicit?.impacto_treino || definition.trainingImplication,
+  };
+}
+
+function ensureFrameFindings(assessmentJson: any, frameRefs: FrameRef[]) {
+  const current = Array.isArray(assessmentJson?.frame_findings) ? assessmentJson.frame_findings : [];
+  const byId = new Map(current.map((item: any) => [item?.frameId, item]));
+  return frameRefs.map((frame) => ({
+    frameId: frame.frameId,
+    vista: byId.get(frame.frameId)?.vista || frame.vista,
+    findings: Array.isArray(byId.get(frame.frameId)?.findings) ? byId.get(frame.frameId).findings : [],
+  }));
+}
+
+function buildReportSections(assessmentJson: any) {
+  return {
+    postura: assessmentJson?.postura_estatica || {},
+    overhead_squat: assessmentJson?.overhead_squat || {},
+    laudo: {
+      texto_aluno: assessmentJson?.relatorio_para_aluno || "",
+      disfuncoes_identificadas: assessmentJson?.disfuncoes_identificadas || [],
+      prioridades_corretivas: assessmentJson?.prioridades_corretivas || [],
+      red_yellow_flags: assessmentJson?.red_yellow_flags || [],
+    },
+    contexto_prescricao: {
+      resumo: assessmentJson?.resumo_para_prescricao || "",
+      musculos_encurtados: assessmentJson?.musculos_encurtados || [],
+      musculos_fracos: assessmentJson?.musculos_fracos || [],
+      restricoes_movimento: assessmentJson?.restricoes_movimento || [],
+      exercicios_contraindicados: assessmentJson?.exercicios_contraindicados || [],
+      exercicios_cautela: assessmentJson?.exercicios_cautela || [],
+    },
+  };
+}
+
+function normalizeAssessmentJson(assessmentJson: any, frameRefs: FrameRef[]) {
+  if (!isRecord(assessmentJson)) assessmentJson = {};
+  const frame_findings = ensureFrameFindings(assessmentJson, frameRefs);
+  const ohs_compensations = OHS_COMPENSATIONS.map((definition) => inferOhsCompensation({ ...assessmentJson, frame_findings }, definition, frameRefs));
+  const prescription_context = {
+    contract: "bn_functional_assessment_v1",
+    source: "ai-functional-assessment",
+    ohs_compensations,
+    posture_static: assessmentJson.postura_estatica || null,
+    overhead_squat: assessmentJson.overhead_squat || null,
+    protocol_direction: assessmentJson.direcionamento_protocolo || null,
+    red_yellow_flags: assessmentJson.red_yellow_flags || [],
+    progression_criteria: assessmentJson.criterios_progressao_bn || null,
+    corrective_priorities: assessmentJson.prioridades_corretivas || [],
+    shortened_muscles: assessmentJson.musculos_encurtados || [],
+    weak_muscles: assessmentJson.musculos_fracos || [],
+    movement_restrictions: assessmentJson.restricoes_movimento || [],
+    contraindicated_exercises: assessmentJson.exercicios_contraindicados || [],
+    caution_exercises: assessmentJson.exercicios_cautela || [],
+    summary_for_prescription: assessmentJson.resumo_para_prescricao || "",
+  };
+
+  return {
+    ...assessmentJson,
+    schema: "bn_functional_assessment_v1",
+    assessment_contract_version: "2026-06-13.phase1",
+    frame_findings,
+    ohs_compensations,
+    report_sections: assessmentJson.report_sections || buildReportSections(assessmentJson),
+    prescription_context,
+  };
+}
+
 // ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `
 Você é um especialista em avaliação postural e funcional da BN Performance Training.
@@ -261,6 +471,78 @@ Você deve retornar EXATAMENTE este JSON, sem texto adicional, sem markdown:
     "vista_lateral": { "inclinacao_tronco": "adequada | excessiva", "angulo_tibiotronco": "paralelo | tronco muito a frente", "adm_tornozelo": "adequada | limitada", "pelve_fundo": "neutra | retroversao | anteversao", "lordose_lombar": "mantida | aumentada | reduzida", "profundidade_squat": "completa | parcial | limitada", "observacoes": "outras observações" },
     "vista_posterior": { "drop_pelve": "ausente | direito | esquerdo", "assimetria_bracas": "ausente | presente direito | presente esquerdo", "desvio_coluna": "ausente | presente", "observacoes": "outras observações" }
   },
+  "ohs_compensations": [
+    {
+      "key": "dorsiflexion_limitation",
+      "compensacao": "Limitação de dorsiflexão de tornozelo",
+      "presente": false,
+      "severidade": "ausente | leve | moderada | severa | incerta",
+      "frame_referencia": "frameId principal ou null",
+      "vista_referencia": "vista principal ou null",
+      "evidencia": "sinal visual objetivo observado ou 'Não observado'",
+      "implicacao_treino": "como muda mobilidade, seleção de exercícios, amplitude, carga e progressão"
+    },
+    {
+      "key": "dynamic_valgus",
+      "compensacao": "Valgo dinâmico de joelho",
+      "presente": false,
+      "severidade": "ausente | leve | moderada | severa | incerta",
+      "frame_referencia": "frameId principal ou null",
+      "vista_referencia": "vista principal ou null",
+      "evidencia": "sinal visual objetivo observado ou 'Não observado'",
+      "implicacao_treino": "como muda mobilidade, ativação, controle motor, exercício, volume e progressão"
+    },
+    {
+      "key": "trunk_forward_lean",
+      "compensacao": "Inclinação excessiva de tronco",
+      "presente": false,
+      "severidade": "ausente | leve | moderada | severa | incerta",
+      "frame_referencia": "frameId principal ou null",
+      "vista_referencia": "vista principal ou null",
+      "evidencia": "sinal visual objetivo observado ou 'Não observado'",
+      "implicacao_treino": "como muda controle lombo-pélvico, variação de agachamento, core e carga axial"
+    },
+    {
+      "key": "butt_wink",
+      "compensacao": "Retroversão pélvica / butt wink",
+      "presente": false,
+      "severidade": "ausente | leve | moderada | severa | incerta",
+      "frame_referencia": "frameId principal ou null",
+      "vista_referencia": "vista principal ou null",
+      "evidencia": "sinal visual objetivo observado ou 'Não observado'",
+      "implicacao_treino": "como muda amplitude, carga axial, mobilidade de quadril/isquiotibiais e progressão"
+    },
+    {
+      "key": "pelvic_drop_trendelenburg",
+      "compensacao": "Drop de pelve / Trendelenburg funcional",
+      "presente": false,
+      "severidade": "ausente | leve | moderada | severa | incerta",
+      "frame_referencia": "frameId principal ou null",
+      "vista_referencia": "vista principal ou null",
+      "evidencia": "sinal visual objetivo observado ou 'Não observado'",
+      "implicacao_treino": "como muda abdutores, unilaterais, estabilidade e integração com corrida"
+    },
+    {
+      "key": "shoulder_protraction_kyphosis",
+      "compensacao": "Protrusão de ombro / cifose torácica",
+      "presente": false,
+      "severidade": "ausente | leve | moderada | severa | incerta",
+      "frame_referencia": "frameId principal ou null",
+      "vista_referencia": "vista principal ou null",
+      "evidencia": "sinal visual objetivo observado ou 'Não observado'",
+      "implicacao_treino": "como muda mobilidade torácica, escápulas, puxadas/remadas e pressões"
+    },
+    {
+      "key": "overhead_arm_asymmetry",
+      "compensacao": "Assimetria de braços no overhead",
+      "presente": false,
+      "severidade": "ausente | leve | moderada | severa | incerta",
+      "frame_referencia": "frameId principal ou null",
+      "vista_referencia": "vista principal ou null",
+      "evidencia": "sinal visual objetivo observado ou 'Não observado'",
+      "implicacao_treino": "como muda mobilidade unilateral de ombro/torácica, exercícios unilaterais e pressões overhead"
+    }
+  ],
   "composicao_corporal": {
     "peso_kg": 0,
     "altura_cm": 0,
@@ -323,12 +605,35 @@ Você deve retornar EXATAMENTE este JSON, sem texto adicional, sem markdown:
   "exercicios_cautela": [ { "exercicio": "nome do exercício", "adaptacao": "como adaptar para tornar seguro" } ],
   "score_postural": { "total": 0, "cabeca_cervical": 0, "coluna_toracolombar": 0, "pelve_quadril": 0, "membros_inferiores": 0, "obs": "escala de 0 a 10 onde 10 é ideal" },
   "score_funcional": { "total": 0, "mobilidade_tornozelo": 0, "mobilidade_quadril": 0, "estabilidade_lombar": 0, "controle_joelho": 0, "simetria_movimento": 0, "obs": "escala de 0 a 10 onde 10 é ideal" },
+  "report_sections": {
+    "postura": "bloco estruturado do relatório: postura estática por vista",
+    "overhead_squat": "bloco estruturado do relatório: OHS por vista + compensações",
+    "laudo": "bloco estruturado do relatório: leitura técnica, flags e prioridades",
+    "contexto_prescricao": "bloco estruturado do relatório: o que a prescrição deve respeitar"
+  },
+  "prescription_context": {
+    "contract": "bn_functional_assessment_v1",
+    "ohs_compensations": "copiar exatamente o array ohs_compensations",
+    "corrective_priorities": ["prioridades em ordem"],
+    "shortened_muscles": ["músculos encurtados"],
+    "weak_muscles": ["músculos fracos/inibidos"],
+    "movement_restrictions": ["restrições"],
+    "contraindicated_exercises": ["exercícios/padrões contraindicados"],
+    "caution_exercises": ["exercícios/padrões com cautela/adaptação"],
+    "summary_for_prescription": "contexto técnico direto para ai-prescribe-workout"
+  },
   "relatorio_para_aluno": "Texto em português claro, acolhedor e motivador (3-5 parágrafos). Explica o que foi encontrado em linguagem acessível, sem termos técnicos excessivos. Tom: profissional e encorajador.",
   "resumo_para_prescricao": "Texto técnico resumido (2-3 parágrafos) para quem vai prescrever: principais disfunções, músculos a priorizar, restrições e orientações por modalidade."
 }
 
 REGRAS:
 - SEMPRE preencha "frame_findings" com um item por imagem recebida, copiando o frameId rotulado. Se uma vista não tiver compensação, use findings: [].
+- SEMPRE retorne os 7 itens de "ohs_compensations", nesta ordem e com as keys exatas: dorsiflexion_limitation, dynamic_valgus, trunk_forward_lean, butt_wink, pelvic_drop_trendelenburg, shoulder_protraction_kyphosis, overhead_arm_asymmetry.
+- Para cada item de "ohs_compensations", marque presente=false e severidade="ausente" quando não observar; se a imagem não permitir concluir, use severidade="incerta" e explique a limitação em evidencia.
+- "frame_referencia" deve apontar para o melhor frameId observado. Se não houver frame aplicável, use null.
+- "implicacao_treino" deve sempre traduzir o achado para prescrição BN: mobilidade, ativação, controle motor, exercício, amplitude, carga, volume ou progressão.
+- "report_sections" deve seguir o formato do relatório BN: postura + overhead squat + laudo + contexto p/ prescrição.
+- "prescription_context" é o contrato que a IA de musculação vai consumir; não coloque texto genérico, coloque restrições e prioridades acionáveis.
 - Baseie "disfuncoes_identificadas" no conjunto de TODAS as imagens.
 - Se os frames seguirem a sequência oficial BN, preencha "sequencia_bn_video", "direcionamento_protocolo", "red_yellow_flags" e "criterios_progressao_bn" mesmo que algumas vistas clássicas de postura/OHS estejam ausentes.
 - Nunca invente dor, diagnóstico ou dado clínico. Se uma dor não foi informada, escreva que não foi relatada e use baixa/média confiança.
@@ -376,8 +681,10 @@ serve(async (req) => {
 
     // Monta o conteúdo de imagens, rotulando cada uma com vista + frameId
     const imageContent: any[] = [];
+    const frameRefs: FrameRef[] = [];
     const pushImage = (label: string, frameId: string, dataUrlOrB64: string) => {
       if (!dataUrlOrB64) return;
+      frameRefs.push({ frameId, vista: label });
       imageContent.push({ type: "text", text: `\n--- ${label} [frameId=${frameId}] ---` });
       imageContent.push({
         type: "image",
@@ -456,6 +763,7 @@ ${imageContent.length > 0
     let frameFindings: any[] = [];
     try {
       assessmentJson = extractJson(rawText);
+      assessmentJson = normalizeAssessmentJson(assessmentJson, frameRefs);
       reportText = assessmentJson.relatorio_para_aluno || "";
       resumoPrescricao = assessmentJson.resumo_para_prescricao || "";
       frameFindings = assessmentJson.frame_findings || [];
