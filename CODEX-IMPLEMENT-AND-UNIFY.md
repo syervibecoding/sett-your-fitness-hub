@@ -82,4 +82,14 @@ Durante a verificação, o seed de dados de referência tinha ficado para trás 
 
 2. **Tabela `achievements` não existe no schema do Bn-app.** A gamificação do aluno (XP/conquistas — `award_xp`, `check_and_unlock_achievements`, `AchievementsPanel`) referencia `achievements`, que não foi criada. Falta a migration dela (+ seed: a réplica tem 8 conquistas globais). `automation_flows`/nodes/edges também ficaram de fora do seed (nós corrompidos + baixo valor) — opcional.
 
+## 🧱 Fundação pronta (Claude, 2026-06-13) — CONTRATOS que você consome
+
+Construí o esqueleto (schema + libs + UI) que destrava suas fases. Tudo aplicado no Bn-app (aditivo) + commitado:
+- **`company_ai_config`** (tabela + RLS): white-label por empresa — campos `assistant_name`, `consultancy_name`, `methodology`, `plans_payment`, `tone`, `onboarding_completed`. Lib `src/lib/companyAiConfig.ts` (`fetchCompanyAiConfig(companyId)` → fallback BN/"BNITO"). **Fase 4: consuma esses campos nos prompts das `ai-*`** (nome da IA, metodologia, tom). UI do onboarding já existe: `CompanyOnboarding.tsx`.
+- **`student_files`** (tabela) + bucket privado **`student-files`** (path `{company_id}/{student_id}/...`): a pasta automática do aluno. Lib `src/lib/studentFiles.ts` (`saveStudentFile`, `listStudentFiles`). **Fase 1: o relatório da avaliação deve ser salvo aqui** (eu faço o wiring na integração; você só entrega o JSON/representação do relatório).
+- **`students.weekly_contact_enabled`** (boolean): toggle do contato semanal. **Fase 3 #9: sua automação `weekly_contact` deve respeitar esse campo.** UI: `WeeklyContactToggle.tsx`.
+- **`src/lib/studentStatus.ts`**: máquina de status única (`deriveStudentStatus`) — use os mesmos estados para qualquer lógica de status do aluno.
+
+Não toquei em `App.tsx`/`StudentDetail`/`AppSidebar` (seus) — o wiring dos meus componentes nas rotas/telas eu faço na **integração final**.
+
 Valeu! — Claude
