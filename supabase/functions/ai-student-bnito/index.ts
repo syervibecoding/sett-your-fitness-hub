@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 type ChatRole = "user" | "assistant";
-type StudentBnitoAction = "ask" | "brief";
+type StudentBnitoAction = "ask" | "brief" | "weekly_contact" | "contextual";
 
 interface AuthContext {
   authHeader: string;
@@ -25,15 +25,34 @@ interface AnthropicResponse {
   content?: AnthropicTextBlock[];
 }
 
+interface CompanyAiConfig {
+  assistant_name: string;
+  consultancy_name: string | null;
+  methodology: string | null;
+  plans_payment: string | null;
+  tone: string | null;
+  onboarding_completed: boolean;
+}
+
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const MODEL = Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-4-5-20250929";
 const FAST_MODEL = Deno.env.get("ANTHROPIC_MODEL_FAST") || "claude-haiku-4-5-20251001";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const BN_AI_CONFIG: CompanyAiConfig = {
+  assistant_name: "BNITO",
+  consultancy_name: "BN Performance Training",
+  methodology: null,
+  plans_payment: null,
+  tone: null,
+  onboarding_completed: false,
 };
 
 const STUDENT_BNITO_SYSTEM = `
@@ -46,6 +65,8 @@ Sua funcao:
 - Ajudar o aluno a entender sinais do corpo e quando deve avisar a equipe.
 - Conhecer as areas do app, os planos, o que cada tela faz e como orientar o aluno a usar melhor cada recurso.
 - Ser tecnico, mas com linguagem simples, proxima e segura.
+- No contato semanal, manter SEMPRE o objetivo: descobrir dificuldade no treino e convidar o aluno a mandar video para correcao. A redacao deve mudar sempre: varie abertura, ordem da pergunta, vocabulario e chamada final.
+- Em textos contextuais por tela, seja curto e acionavel: uma orientacao para aquela sessao do app e um proximo passo simples.
 
 O que voce aprendeu do padrao Femmy/Zony:
 - Seja presente e conversacional, nao um FAQ frio.
@@ -64,6 +85,7 @@ Metodologia BN:
 
 Regras de seguranca:
 - Nunca diagnostique lesao ou doenca.
+- Quando o aluno relatar dor no joelho/lombar/ombro/tornozelo/quadril ou qualquer sintoma, NUNCA tome decisao clinica. Oriente pegar mais leve no proximo treino ou parar o padrao doloroso conforme gravidade, diga que vai avisar o treinador/equipe e marque handoff_to_team=true.
 - Nunca prescreva remedio, tratamento medico ou promessa de resultado.
 - Nunca invente carga, pace, serie ou treino fora do que esta no contexto. Voce pode explicar e orientar como conversar com a equipe.
 - Se houver dor aguda, piora progressiva, edema importante, perda de forca, formigamento, dor no peito, falta de ar fora do normal, tontura/desmaio ou suspeita de fratura por estresse: mande parar o treino, avisar a equipe e procurar profissional de saude quando adequado.
@@ -116,6 +138,14 @@ const OUTPUT_SCHEMA = `
   "urgency": "normal|cautela|parar_e_avisar",
   "student_action": "proxima acao simples para o aluno agora",
   "handoff_to_team": false,
+  "team_alert": {
+    "should_alert": false,
+    "title": "titulo curto para professor",
+    "message": "resumo objetivo do relato do aluno",
+    "severity": "info|warning|critical"
+  },
+  "contextual_helper": "texto curto para a tela atual quando action=contextual, ou null",
+  "weekly_contact_message": "mensagem proativa quando action=weekly_contact, ou null",
   "follow_up_question": "uma pergunta curta se faltar dado importante, ou null"
 }
 `.trim();
@@ -134,8 +164,66 @@ function cleanText(value: unknown, maxLength = 4000) {
     .trim();
 }
 
+function normalizeText(value: unknown) {
+  return cleanText(value, 8000).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
 function compact(value: unknown, maxLength = 8000) {
   return JSON.stringify(value ?? null, null, 2).slice(0, maxLength);
+}
+
+async function loadCompanyAiConfig(companyId: string | null | undefined): Promise<CompanyAiConfig> {
+  if (!companyId) return BN_AI_CONFIG;
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const { data } = await supabase
+    .from("company_ai_config")
+    .select("assistant_name, consultancy_name, methodology, plans_payment, tone, onboarding_completed")
+    .eq("company_id", companyId)
+    .maybeSingle();
+  return data ? { ...BN_AI_CONFIG, ...data } : BN_AI_CONFIG;
+}
+
+function companyAiSystem(config: CompanyAiConfig) {
+  return `
+CONFIGURACAO WHITE-LABEL DA EMPRESA:
+- Nome da IA: ${cleanText(config.assistant_name || "BNITO", 200)}
+- Consultoria/app: ${cleanText(config.consultancy_name || "BN Performance Training", 300)}
+- Tom: ${cleanText(config.tone || "proximo, tecnico, humano e seguro", 500)}
+- Metodologia proprietaria: ${config.methodology ? cleanText(config.methodology, 4000) : "Usar Metodologia BN como fallback."}
+- Planos/pagamento/contexto comercial: ${config.plans_payment ? cleanText(config.plans_payment, 2500) : "Nao informado; usar somente dados reais do contexto do aluno."}
+
+Use esses nomes e tom. Se houver conflito entre metodologia configurada e seguranca/dor/linhas vermelhas, escolha a conduta mais conservadora.
+`.trim();
+}
+
+function isPainReport(question: string, parsed: unknown) {
+  const text = normalizeText(`${question}\n${compact(parsed, 2000)}`);
+  return /(dor|doendo|machuc|lesao|joelho|lombar|ombro|tornozelo|quadril|formig|tontura|peito|falta de ar|desmaio|edema|inchaco)/.test(text);
+}
+
+async function createPainAlert(studentContext: any, question: string, result: any) {
+  if (!studentContext?.student?.id || !studentContext?.student?.company_id) return null;
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const severity = result?.urgency === "parar_e_avisar" ? "critical" : "warning";
+  const title = result?.team_alert?.title || "BNITO: aluno relatou dor/sintoma";
+  const message = result?.team_alert?.message
+    || `Aluno ${studentContext.student.full_name || ""} relatou: ${cleanText(question, 600)}`;
+  const { data, error } = await supabase
+    .from("admin_alerts")
+    .insert({
+      company_id: studentContext.student.company_id,
+      type: "student_pain_report",
+      severity,
+      target_role: "coordinator",
+      student_id: studentContext.student.id,
+      title,
+      message,
+      action_url: `/admin/students/${studentContext.student.id}`,
+    })
+    .select("id")
+    .maybeSingle();
+  if (error) return { error: error.message };
+  return { id: data?.id ?? null };
 }
 
 function stripCodeFence(text: string) {
@@ -377,7 +465,7 @@ async function loadStudentContext(auth: AuthContext) {
 }
 
 function pickModel(action: StudentBnitoAction, question: string) {
-  if (action === "brief") return { model: FAST_MODEL, max_tokens: 900, tier: "haiku" };
+  if (action === "brief" || action === "weekly_contact" || action === "contextual") return { model: FAST_MODEL, max_tokens: 900, tier: "haiku" };
   const normalized = question.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const critical = /(dor|lesa|lesao|joelho|lombar|ombro|tornozelo|quadril|formig|tontura|peito|falta de ar|desmaio|edema|inchaco|machuc|substitu|trocar|pace|zona|rpe|rir)/.test(normalized);
   if (critical || question.length > 180) return { model: MODEL, max_tokens: 1600, tier: "sonnet" };
@@ -407,9 +495,19 @@ serve(async (req) => {
 
   try {
     const body = (await req.json()) as StudentBnitoRequest;
-    const action: StudentBnitoAction = body.action === "brief" ? "brief" : "ask";
+    const action: StudentBnitoAction =
+      body.action === "brief" || body.action === "weekly_contact" || body.action === "contextual"
+        ? body.action
+        : "ask";
     const question = cleanText(
-      body.question || (action === "brief" ? "Gere uma missao proativa para o aluno agora." : ""),
+      body.question
+        || (action === "weekly_contact"
+          ? "Gere o contato semanal do BNITO: dificuldade no treino e convite para mandar video de execucao."
+          : action === "contextual"
+            ? "Gere uma ajuda contextual curta para a tela atual."
+            : action === "brief"
+              ? "Gere uma missao proativa para o aluno agora."
+              : ""),
       1200,
     );
     if (!question) return jsonResponse({ error: "Pergunta vazia" }, 400);
@@ -426,10 +524,11 @@ serve(async (req) => {
 
     const studentContext = await loadStudentContext(auth);
     const picked = pickModel(action, question);
+    const aiConfig = await loadCompanyAiConfig(studentContext.student?.company_id as string | undefined);
 
     const prompt = `
 ACAO:
-${action === "brief" ? "gerar missao proativa curta" : "responder pergunta do aluno"}
+${action === "weekly_contact" ? "gerar contato semanal proativo" : action === "contextual" ? "gerar ajuda contextual curta" : action === "brief" ? "gerar missao proativa curta" : "responder pergunta do aluno"}
 
 PERGUNTA DO ALUNO:
 ${question}
@@ -456,8 +555,11 @@ INSTRUCOES:
 - Se houver treino do dia, use os exercicios e observacoes dele antes de responder de forma generica.
 - Se a pergunta for de tecnica de exercicio, explique cue simples, erro comum e quando reduzir carga/amplitude.
 - Se a pergunta for dor ou sintoma, classifique cautela, nao diagnostique e diga quando parar/avisar.
+- Se houver dor/sintoma, nunca decida clinicamente: oriente pegar mais leve no proximo treino ou parar o padrao doloroso conforme gravidade, diga que a equipe sera avisada, marque handoff_to_team=true e preencha team_alert.
 - Se a pergunta pedir mudar treino, substituir exercicio ou alterar carga/pace, explique criterio e oriente confirmar com a equipe quando fugir do plano.
 - Se a acao for missao proativa, gere uma resposta curta que diga: foco de agora, por que isso importa e uma acao simples. Nao espere pergunta.
+- Se a acao for contato semanal, mantenha o objetivo fixo: perguntar se houve dificuldade e convidar a mandar video para correcao. Varie totalmente a redacao; nao use frase pronta repetida.
+- Se a acao for ajuda contextual, use CONTEXTO DA PAGINA e devolva contextual_helper com 1 frase curta e acionavel.
 - Nao diga que voce aplicou mudancas no app.
 - Responda apenas JSON valido, sem markdown, neste formato:
 ${OUTPUT_SCHEMA}
@@ -473,7 +575,7 @@ ${OUTPUT_SCHEMA}
       body: JSON.stringify({
         model: picked.model,
         max_tokens: picked.max_tokens,
-        system: STUDENT_BNITO_SYSTEM,
+        system: `${STUDENT_BNITO_SYSTEM}\n\n${companyAiSystem(aiConfig)}`,
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -486,17 +588,36 @@ ${OUTPUT_SCHEMA}
     const data = (await response.json()) as AnthropicResponse;
     const text = data.content?.find((block) => block.type === "text")?.text || "";
     const parsed = parseJson(text);
+    const result = (parsed.result && typeof parsed.result === "object")
+      ? parsed.result as any
+      : {
+          answer: parsed.raw || "Nao consegui montar uma resposta completa agora. Me mande a duvida de novo com mais detalhes.",
+          topic: "outro",
+          urgency: "normal",
+          student_action: "Descreva o exercicio, a sensacao e em que momento aconteceu.",
+          handoff_to_team: false,
+          team_alert: { should_alert: false, title: null, message: null, severity: "info" },
+          follow_up_question: null,
+        };
+    const painReport = isPainReport(question, result);
+    let alertRecord = null;
+    if (painReport) {
+      result.topic = result.topic === "outro" ? "dor" : result.topic;
+      result.urgency = result.urgency || "cautela";
+      result.handoff_to_team = true;
+      result.team_alert = {
+        should_alert: true,
+        title: result.team_alert?.title || "BNITO: aluno relatou dor/sintoma",
+        message: result.team_alert?.message || `Relato do aluno: ${cleanText(question, 600)}`,
+        severity: result.urgency === "parar_e_avisar" ? "critical" : "warning",
+      };
+      alertRecord = await createPainAlert(studentContext, question, result);
+    }
 
     return jsonResponse({
-      result: parsed.result ?? {
-        answer: parsed.raw || "Nao consegui montar uma resposta completa agora. Me mande a duvida de novo com mais detalhes.",
-        topic: "outro",
-        urgency: "normal",
-        student_action: "Descreva o exercicio, a sensacao e em que momento aconteceu.",
-        handoff_to_team: false,
-        follow_up_question: null,
-      },
+      result,
       raw: parsed.result ? undefined : parsed.raw,
+      team_alert_created: alertRecord,
       model_tier: picked.tier,
       generated_at: new Date().toISOString(),
       context_loaded: {

@@ -16,6 +16,47 @@ const clean = (s: string) => (s || "").replace(/[^\x20-\x7E\u00C0-\u017F]/g, "")
 const textValue = (v: any) => typeof v === "string" ? v : v == null ? "" : JSON.stringify(v);
 const compactJson = (value: unknown, maxLength = 10000) => JSON.stringify(value ?? {}, null, 2).slice(0, maxLength);
 
+interface CompanyAiConfig {
+  assistant_name: string;
+  consultancy_name: string | null;
+  methodology: string | null;
+  plans_payment: string | null;
+  tone: string | null;
+  onboarding_completed: boolean;
+}
+
+const BN_AI_CONFIG: CompanyAiConfig = {
+  assistant_name: "BNITO",
+  consultancy_name: "BN Performance Training",
+  methodology: null,
+  plans_payment: null,
+  tone: null,
+  onboarding_completed: false,
+};
+
+async function loadCompanyAiConfig(supabase: any, companyId: string | null | undefined): Promise<CompanyAiConfig> {
+  if (!companyId) return BN_AI_CONFIG;
+  const { data } = await supabase
+    .from("company_ai_config")
+    .select("assistant_name, consultancy_name, methodology, plans_payment, tone, onboarding_completed")
+    .eq("company_id", companyId)
+    .maybeSingle();
+  return data ? { ...BN_AI_CONFIG, ...data } : BN_AI_CONFIG;
+}
+
+function companyAiSystem(config: CompanyAiConfig) {
+  return `
+CONFIGURACAO WHITE-LABEL DA EMPRESA:
+- Nome da IA: ${clean(config.assistant_name || "BNITO")}
+- Consultoria/app: ${clean(config.consultancy_name || "BN Performance Training")}
+- Tom: ${clean(config.tone || "tecnico, objetivo, humano e seguro")}
+- Metodologia proprietaria: ${config.methodology ? clean(config.methodology).slice(0, 4000) : "Usar Metodologia BN como fallback."}
+- Planos/pagamento/contexto comercial: ${config.plans_payment ? clean(config.plans_payment).slice(0, 2500) : "Nao informado; nao inventar."}
+
+Use essa configuracao para nomes, tom e contexto. Para corrida/endurance, preserve as linhas vermelhas de dor, TSB, progressao e seguranca mesmo que a metodologia configurada seja agressiva.
+`.trim();
+}
+
 function fallbackCardioPlan(input: any, rawText = "") {
   const sport = input.sport || "corrida";
   return {
@@ -303,6 +344,7 @@ serve(async (req) => {
       bundle_id,
     } = input;
 
+    const aiConfig = await loadCompanyAiConfig(supabase, (company_id as string | null) ?? null);
 
     // Monta contexto do atleta
     const athleteContext = `
@@ -379,7 +421,7 @@ INSTRUÇÕES:
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 12000,
-        system: SYSTEM_PROMPT,
+        system: `${SYSTEM_PROMPT}\n\n${companyAiSystem(aiConfig)}`,
         messages: [{ role: "user", content: clean(athleteContext) }],
       }),
     });
@@ -444,8 +486,9 @@ INSTRUÇÕES:
 
   } catch (e) {
     console.error(e);
+    const message = e instanceof Error ? e.message : "Erro inesperado";
     return new Response(
-      JSON.stringify({ error: e.message }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

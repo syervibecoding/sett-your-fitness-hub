@@ -63,6 +63,24 @@ interface ValidationWarning {
   source: "biblioteca" | "volume" | "anamnese" | "avaliacao_funcional" | "objetivo" | "nivel" | "periodizacao" | "metodologia_bn";
 }
 
+interface CompanyAiConfig {
+  assistant_name: string;
+  consultancy_name: string | null;
+  methodology: string | null;
+  plans_payment: string | null;
+  tone: string | null;
+  onboarding_completed: boolean;
+}
+
+const BN_AI_CONFIG: CompanyAiConfig = {
+  assistant_name: "BNITO",
+  consultancy_name: "BN Performance Training",
+  methodology: null,
+  plans_payment: null,
+  tone: null,
+  onboarding_completed: false,
+};
+
 const METHODOLOGY_PRESETS = {
   hipertrofia_iniciante: {
     label: "Hipertrofia iniciante",
@@ -145,6 +163,29 @@ const METHODOLOGY_PRESETS = {
 
 function compactJson(value: unknown, maxLength = 20000) {
   return JSON.stringify(value ?? {}, null, 2).slice(0, maxLength);
+}
+
+async function loadCompanyAiConfig(supabase: any, companyId: string | null | undefined): Promise<CompanyAiConfig> {
+  if (!companyId) return BN_AI_CONFIG;
+  const { data } = await supabase
+    .from("company_ai_config")
+    .select("assistant_name, consultancy_name, methodology, plans_payment, tone, onboarding_completed")
+    .eq("company_id", companyId)
+    .maybeSingle();
+  return data ? { ...BN_AI_CONFIG, ...data } : BN_AI_CONFIG;
+}
+
+function companyAiSystem(config: CompanyAiConfig) {
+  return `
+CONFIGURACAO WHITE-LABEL DA EMPRESA:
+- Nome da IA/assistente: ${clean(config.assistant_name || "BNITO")}
+- Nome da consultoria/app: ${clean(config.consultancy_name || "BN Performance Training")}
+- Tom desejado: ${clean(config.tone || "tecnico, direto, humano e seguro")}
+- Metodologia proprietaria da empresa: ${config.methodology ? clean(config.methodology).slice(0, 4000) : "Usar a Metodologia BN raiz deste prompt como fallback."}
+- Planos/pagamentos/posicionamento: ${config.plans_payment ? clean(config.plans_payment).slice(0, 2500) : "Nao informado; nao inventar dados comerciais."}
+
+Use essa configuracao para nomes, tom e contexto da empresa. Se a metodologia da empresa conflitar com seguranca, dor, biblioteca de exercicios ou linhas vermelhas BN, preserve a regra mais conservadora.
+`.trim();
 }
 
 async function loadExerciseCatalog(
@@ -767,6 +808,7 @@ serve(async (req) => {
       notes,
     } = await req.json();
 
+    const aiConfig = await loadCompanyAiConfig(supabase, (company_id as string | null) ?? null);
     const exerciseCatalog = await loadExerciseCatalog(supabase, (company_id as string | null) ?? null);
     const exerciseCatalogText = formatExerciseCatalog(exerciseCatalog);
     const presetKey = selectMethodologyPreset(
@@ -862,7 +904,7 @@ INSTRUÇÕES:
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 8000,
-        system: SYSTEM_PROMPT,
+        system: `${SYSTEM_PROMPT}\n\n${companyAiSystem(aiConfig)}`,
         messages: [{ role: "user", content: clean(athleteContext) }],
       }),
     });

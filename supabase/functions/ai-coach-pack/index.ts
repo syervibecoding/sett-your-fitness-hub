@@ -46,6 +46,15 @@ interface StrengthCatalog {
   exercises: ExerciseCatalogEntry[];
 }
 
+interface CompanyAiConfig {
+  assistant_name: string;
+  consultancy_name: string | null;
+  methodology: string | null;
+  plans_payment: string | null;
+  tone: string | null;
+  onboarding_completed: boolean;
+}
+
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -54,6 +63,15 @@ const MODEL = Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-4-5-20250929";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const BN_AI_CONFIG: CompanyAiConfig = {
+  assistant_name: "BNITO",
+  consultancy_name: "BN Performance Training",
+  methodology: null,
+  plans_payment: null,
+  tone: null,
+  onboarding_completed: false,
 };
 
 const modes: Record<Modality, { title: string; system: string; output: string }> = {
@@ -132,6 +150,45 @@ function parseJson(text: string) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function loadUserCompanyId(auth: AuthContext): Promise<string | null> {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: auth.authHeader } },
+  });
+  const { data: member } = await supabase
+    .from("company_members")
+    .select("company_id")
+    .eq("user_id", auth.userId)
+    .limit(1)
+    .maybeSingle();
+  return (member?.company_id as string | undefined) ?? null;
+}
+
+async function loadCompanyAiConfig(auth: AuthContext, companyId: string | null | undefined): Promise<CompanyAiConfig> {
+  if (!companyId) return BN_AI_CONFIG;
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: auth.authHeader } },
+  });
+  const { data } = await supabase
+    .from("company_ai_config")
+    .select("assistant_name, consultancy_name, methodology, plans_payment, tone, onboarding_completed")
+    .eq("company_id", companyId)
+    .maybeSingle();
+  return data ? { ...BN_AI_CONFIG, ...data } : BN_AI_CONFIG;
+}
+
+function companyAiSystem(config: CompanyAiConfig) {
+  return `
+CONFIGURACAO WHITE-LABEL DA EMPRESA:
+- Nome da IA: ${cleanText(config.assistant_name || "BNITO", 200)}
+- Consultoria/app: ${cleanText(config.consultancy_name || "BN Performance Training", 300)}
+- Tom: ${cleanText(config.tone || "tecnico, pratico, humano e seguro", 500)}
+- Metodologia proprietaria: ${config.methodology ? cleanText(config.methodology, 4000) : "Usar Metodologia BN como fallback."}
+- Planos/pagamento/contexto comercial: ${config.plans_payment ? cleanText(config.plans_payment, 2500) : "Nao informado; nao inventar."}
+
+Use esses nomes e tom nas respostas. Se houver conflito entre metodologia configurada e seguranca, dor, biblioteca ou linhas vermelhas, preserve a regra mais conservadora.
+`.trim();
 }
 
 async function requireUser(req: Request): Promise<AuthContext | null> {
@@ -335,9 +392,11 @@ serve(async (req) => {
 
     let strengthCatalog: StrengthCatalog | null = null;
     let strengthInstructions = "";
+    let companyId = await loadUserCompanyId(user);
 
     if (body.modality === "strength") {
       strengthCatalog = await loadStrengthCatalog(user);
+      companyId = strengthCatalog.company_id || companyId;
       strengthInstructions = `
 ${BN_STRENGTH_METHODOLOGY}
 
@@ -353,6 +412,7 @@ REGRA OBRIGATORIA DE PRESCRICAO:
 - A prescricao deve representar como o treino ficara no app, com cada item mapeavel para um cadastro real.
 `;
     }
+    const aiConfig = await loadCompanyAiConfig(user, companyId);
 
     const prompt = `
 MODULO: ${mode.title}
@@ -387,7 +447,7 @@ REGRAS GERAIS:
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 4500,
-        system: mode.system,
+        system: `${mode.system}\n\n${companyAiSystem(aiConfig)}`,
         messages: [{ role: "user", content: prompt }],
       }),
     });

@@ -49,6 +49,24 @@ function aiErrorResponse(status: number) {
 
 type FrameRef = { frameId: string; vista: string };
 
+interface CompanyAiConfig {
+  assistant_name: string;
+  consultancy_name: string | null;
+  methodology: string | null;
+  plans_payment: string | null;
+  tone: string | null;
+  onboarding_completed: boolean;
+}
+
+const BN_AI_CONFIG: CompanyAiConfig = {
+  assistant_name: "BNITO",
+  consultancy_name: "BN Performance Training",
+  methodology: null,
+  plans_payment: null,
+  tone: null,
+  onboarding_completed: false,
+};
+
 type OhsCompensationDefinition = {
   key: string;
   label: string;
@@ -195,7 +213,7 @@ function inferOhsCompensation(assessmentJson: any, definition: OhsCompensationDe
 
 function ensureFrameFindings(assessmentJson: any, frameRefs: FrameRef[]) {
   const current = Array.isArray(assessmentJson?.frame_findings) ? assessmentJson.frame_findings : [];
-  const byId = new Map(current.map((item: any) => [item?.frameId, item]));
+  const byId = new Map<string, any>(current.map((item: any) => [item?.frameId, item]));
   return frameRefs.map((frame) => ({
     frameId: frame.frameId,
     vista: byId.get(frame.frameId)?.vista || frame.vista,
@@ -255,6 +273,29 @@ function normalizeAssessmentJson(assessmentJson: any, frameRefs: FrameRef[]) {
     report_sections: assessmentJson.report_sections || buildReportSections(assessmentJson),
     prescription_context,
   };
+}
+
+async function loadCompanyAiConfig(supabase: any, companyId: string | null | undefined): Promise<CompanyAiConfig> {
+  if (!companyId) return BN_AI_CONFIG;
+  const { data } = await supabase
+    .from("company_ai_config")
+    .select("assistant_name, consultancy_name, methodology, plans_payment, tone, onboarding_completed")
+    .eq("company_id", companyId)
+    .maybeSingle();
+  return data ? { ...BN_AI_CONFIG, ...data } : BN_AI_CONFIG;
+}
+
+function companyAiSystem(config: CompanyAiConfig) {
+  return `
+CONFIGURACAO WHITE-LABEL DA EMPRESA:
+- Nome da IA: ${clean(config.assistant_name || "BNITO")}
+- Consultoria/app: ${clean(config.consultancy_name || "BN Performance Training")}
+- Tom do relatorio: ${clean(config.tone || "tecnico, acolhedor, direto e seguro")}
+- Metodologia proprietaria: ${config.methodology ? clean(config.methodology).slice(0, 4000) : "Usar Metodologia BN como fallback."}
+- Planos/pagamento/contexto comercial: ${config.plans_payment ? clean(config.plans_payment).slice(0, 2000) : "Nao informado; nao incluir no laudo."}
+
+Use essa configuracao para nome da consultoria, tom e contexto. Para avaliacao funcional, mantenha achados objetivos e nao diagnostique; se a metodologia configurada conflitar com seguranca, preserve a regra mais conservadora.
+`.trim();
 }
 
 // ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
@@ -745,11 +786,13 @@ ${imageContent.length > 0
   : "Sem imagens nesta avaliação. Gere uma leitura conservadora baseada somente nos dados informados; use frame_findings como array vazio e marque baixa confiança nos achados visuais."}
     `.trim();
     imageContent.push({ type: "text", text: anamneseText });
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const aiConfig = await loadCompanyAiConfig(supabaseAdmin, (company_id as string | null) ?? null);
 
     const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: MODEL, max_tokens: 8000, system: SYSTEM_PROMPT, messages: [{ role: "user", content: imageContent }] }),
+      body: JSON.stringify({ model: MODEL, max_tokens: 8000, system: `${SYSTEM_PROMPT}\n\n${companyAiSystem(aiConfig)}`, messages: [{ role: "user", content: imageContent }] }),
     });
 
     if (!aiResponse.ok) return aiErrorResponse(aiResponse.status);
@@ -773,8 +816,7 @@ ${imageContent.length > 0
 
     // Persiste só no fluxo de fotos (assessment_id presente). No vídeo, o frontend grava após edição.
     if (assessment_id) {
-      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-      await supabase.from("functional_assessments").upsert({
+      await supabaseAdmin.from("functional_assessments").upsert({
         id: assessment_id, company_id, student_id,
         queixa_principal: clean(queixa_principal), historico_lesoes: clean(historico_lesoes),
         modalidade: clean(modalidade), nivel: clean(nivel),
