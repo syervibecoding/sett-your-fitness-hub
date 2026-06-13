@@ -1,4 +1,4 @@
-project_id = "cxesecxyrndveookvlzz"
+project_id = "zshrcgbyhzxpnlccssyz"
 
 [functions.public-registration]
 verify_jwt = false
