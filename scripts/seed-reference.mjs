@@ -27,9 +27,8 @@ if (!url || !key) {
 }
 
 const GLOBAL_TABLES = ["muscle_groups", "exercise_library", "exercise_muscle_targets"];
-const COMPANY_TABLES = ["plans", "student_categories", "form_fields", "company_exercise_volumes",
-  "role_permissions", "message_templates", "whatsapp_labels", "platform_settings",
-  "automation_flows", "automation_flow_nodes", "automation_flow_edges"];
+// Curado: só o que é valioso e seguro. Pula platform_settings (branding) e automation_* (nós corrompidos / baixo valor).
+const COMPANY_TABLES = ["plans", "form_fields", "whatsapp_labels", "role_permissions"];
 
 const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 
@@ -66,6 +65,8 @@ const tgAll = repair(t.exercise_muscle_targets ?? [], ["id", "exercise_id", "mus
 const mgIds = new Set(mg.map((r) => r.id));
 
 // 1) Globais (ordem de FK). muscle_groups -> exercise_library -> exercise_muscle_targets.
+// SKIP_GLOBAL=1 pula esta parte (use quando os globais já foram semeados — não é idempotente p/ ids reparados).
+if (!process.env.SKIP_GLOBAL) {
 imported.muscle_groups = await upsert("muscle_groups", mg);
 
 let exRows = exAll.filter((r) => !r.muscle_group_id || mgIds.has(r.muscle_group_id));
@@ -77,11 +78,13 @@ imported.exercise_library = await upsert("exercise_library", exRows);
 const exIds = new Set(exRows.map((r) => r.id));
 const targets = tgAll.filter((r) => exIds.has(r.exercise_id) && (!r.muscle_group_id || mgIds.has(r.muscle_group_id)));
 imported.exercise_muscle_targets = await upsert("exercise_muscle_targets", targets);
+}
 
 // 2) Por empresa (só com TARGET_COMPANY_ID)
 if (targetCompanyId) {
   for (const table of COMPANY_TABLES) {
-    const rows = (t[table] ?? []).map((r) => (r.company_id ? { ...r, company_id: targetCompanyId } : r));
+    // repara id corrompido e força a empresa alvo
+    const rows = repair(t[table] ?? [], ["id"]).map((r) => ({ ...r, company_id: targetCompanyId }));
     imported[table] = await upsert(table, rows);
   }
 } else {

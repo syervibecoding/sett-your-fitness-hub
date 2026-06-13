@@ -74,4 +74,12 @@ O app **tem** um design system editorial (Fraunces serif + JetBrains Mono + pale
 ## 4. Quando terminar
 Avise o Matheus. Aí **eu (Claude) faço o deploy** das edge functions `whatsapp-manager`, `asaas-integration` e `public-payment-context` (via `supabase functions deploy <slug> --project-ref zshrcgbyhzxpnlccssyz --use-api`), e validamos juntos.
 
+## 🐛 Achados pós-deploy (Claude, 2026-06-13) — 2 bugs pra você resolver
+
+Durante a verificação, o seed de dados de referência tinha ficado para trás no Bn-app (schema veio, dados não). Já semeei via `scripts/seed-reference.mjs` (commit claude): **447 exercícios + 28 grupos + 836 alvos (globais)** e **8 planos + 32 form_fields + 19 whatsapp_labels + 5 role_permissions** na empresa `dad65c62…` (Academia Fitness Pro, 16 alunos). Tive que **conceder `service_role`** nas tabelas (o projeto não tinha esse grant — vale revisar por que). Mas achei 2 bugs que são SEUS pra corrigir:
+
+1. **`scripts/replica-export.mjs` corrompe UUIDs.** A redação de privacidade (anti-telefone) troca sequências de dígitos **dentro de uuids** pela string literal `[redacted-phone]`, quebrando `id`/FKs (4 grupos, 44 exercícios, 66 alvos, 20 nós de automação no export atual). Conserto necessário: a redação deve ser **field-aware** (nunca tocar colunas uuid) ou validar uuid antes/depois. Enquanto não consertar, toda réplica nova nasce quebrada. (Reparei no import com remap consistente, mas é paliativo.)
+
+2. **Tabela `achievements` não existe no schema do Bn-app.** A gamificação do aluno (XP/conquistas — `award_xp`, `check_and_unlock_achievements`, `AchievementsPanel`) referencia `achievements`, que não foi criada. Falta a migration dela (+ seed: a réplica tem 8 conquistas globais). `automation_flows`/nodes/edges também ficaram de fora do seed (nós corrompidos + baixo valor) — opcional.
+
 Valeu! — Claude
