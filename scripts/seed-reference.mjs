@@ -14,6 +14,7 @@
 //   e os 14 exercícios company-scoped.
 import { createClient } from "@supabase/supabase-js";
 import { readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 
 const INPUT_PATH = process.env.REPLICA_INPUT_PATH ?? "replica/non-personal-config.json";
 const url = process.env.TARGET_SUPABASE_URL;
@@ -25,7 +26,7 @@ if (!url || !key) {
   process.exit(1);
 }
 
-const GLOBAL_TABLES = ["muscle_groups", "exercise_library", "exercise_muscle_targets", "achievements"];
+const GLOBAL_TABLES = ["muscle_groups", "exercise_library", "exercise_muscle_targets"];
 const COMPANY_TABLES = ["plans", "student_categories", "form_fields", "company_exercise_volumes",
   "role_permissions", "message_templates", "whatsapp_labels", "platform_settings",
   "automation_flows", "automation_flow_nodes", "automation_flow_edges"];
@@ -51,16 +52,31 @@ const payload = JSON.parse(await readFile(INPUT_PATH, "utf8"));
 const t = payload.tables ?? {};
 const imported = {};
 
-// 1) Globais (na ordem de FK). Para exercise_library, sem company alvo => só os globais.
-for (const table of GLOBAL_TABLES) {
-  let rows = t[table] ?? [];
-  if (table === "exercise_library" && !targetCompanyId) {
-    rows = rows.filter((r) => !r.company_id); // só globais
-  } else if (table === "exercise_library" && targetCompanyId) {
-    rows = rows.map((r) => (r.company_id ? { ...r, company_id: targetCompanyId } : r));
-  }
-  imported[table] = await upsert(table, rows);
-}
+// Reparo: a redação do export corrompeu uuids (trocou dígitos por "[redacted-phone]").
+// Substitui qualquer valor não-uuid por um uuid NOVO, de forma CONSISTENTE entre tabelas
+// (mesma string corrompida -> mesmo uuid novo), preservando as FKs internas.
+const isUuid = (v) => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+const uuidMap = new Map();
+const fixId = (v) => { if (v == null || isUuid(v)) return v; if (!uuidMap.has(v)) uuidMap.set(v, randomUUID()); return uuidMap.get(v); };
+const repair = (rows, fields) => rows.map((r) => { const c = { ...r }; for (const f of fields) if (c[f] != null) c[f] = fixId(c[f]); return c; });
+
+const mg = repair(t.muscle_groups ?? [], ["id"]);
+const exAll = repair(t.exercise_library ?? [], ["id", "muscle_group_id", "company_id"]);
+const tgAll = repair(t.exercise_muscle_targets ?? [], ["id", "exercise_id", "muscle_group_id"]);
+const mgIds = new Set(mg.map((r) => r.id));
+
+// 1) Globais (ordem de FK). muscle_groups -> exercise_library -> exercise_muscle_targets.
+imported.muscle_groups = await upsert("muscle_groups", mg);
+
+let exRows = exAll.filter((r) => !r.muscle_group_id || mgIds.has(r.muscle_group_id));
+if (!targetCompanyId) exRows = exRows.filter((r) => !r.company_id);                       // só globais
+else exRows = exRows.map((r) => (r.company_id ? { ...r, company_id: targetCompanyId } : r));
+imported.exercise_library = await upsert("exercise_library", exRows);
+
+// targets só dos exercícios/grupos que realmente inserimos (evita violar FK)
+const exIds = new Set(exRows.map((r) => r.id));
+const targets = tgAll.filter((r) => exIds.has(r.exercise_id) && (!r.muscle_group_id || mgIds.has(r.muscle_group_id)));
+imported.exercise_muscle_targets = await upsert("exercise_muscle_targets", targets);
 
 // 2) Por empresa (só com TARGET_COMPANY_ID)
 if (targetCompanyId) {
