@@ -477,7 +477,7 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
         protocol_hint: activeProtocol.hint,
         expected_movements: [...activeProtocol.vistas],
         total_compensacoes: frames.reduce((s, fr) => s + fr.findings.filter(x => x.descricao.trim()).length, 0),
-      } as JsonObject;
+      } as unknown as JsonObject;
       const fallbackReport = typeof aiAnalysis?.relatorio_para_aluno === "string" ? aiAnalysis.relatorio_para_aluno : "";
       const { data: assessment, error: e1 } = await videoDb
         .from("functional_assessments")

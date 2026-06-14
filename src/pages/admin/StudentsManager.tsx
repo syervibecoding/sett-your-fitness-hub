@@ -259,7 +259,7 @@ export default function StudentsManager() {
     setSaving(true);
     const startDate = new Date();
     const endDate = addWeeks(startDate, plan.duration_weeks);
-    const { error } = await supabase.from("enrollments").insert({
+    const { error } = await supabase.from("enrollments" as any).insert({
       student_id: s.id, plan_id: s.selected_plan_id, trainer_id: s.assigned_trainer_id,
       start_date: format(startDate, "yyyy-MM-dd"), end_date: format(endDate, "yyyy-MM-dd"),
       created_by: session.user.id, status: "awaiting_training", company_id: effectiveCompanyId,

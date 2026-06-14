@@ -41,7 +41,7 @@ export function useStudentTimeline(studentId: string | null) {
         (data ?? []).forEach((e: any) => out.push({ id: `aval-${e.id}`, kind: "avaliacao", date: pickDate(e.evaluation_date, e.created_at), title: "Avaliação funcional", subtitle: e.type || undefined }));
       }),
       safe(async () => {
-        const { data } = await supabase.from("training_cycles").select("id, cycle_number, name, objective, created_at, start_date").eq("student_id", studentId);
+        const { data } = await supabase.from("training_cycles" as any).select("id, cycle_number, name, objective, created_at, start_date").eq("student_id", studentId);
         (data ?? []).forEach((c: any) => out.push({ id: `presc-${c.id}`, kind: "prescricao", date: pickDate(c.created_at, c.start_date), title: `Prescrição — Ciclo ${c.cycle_number ?? ""}`.trim(), subtitle: c.name || c.objective || undefined }));
       }),
       safe(async () => {

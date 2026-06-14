@@ -507,7 +507,7 @@ function extractFlags(flags: any, type: "red" | "yellow") {
 }
 
 function detectPainRegions(text: string) {
-  const regions = [
+  const regions: Array<[string, string[]]> = [
     ["joelho", ["joelho", "patelar"]],
     ["lombar", ["lombar", "coluna", "ciatico", "ciatica"]],
     ["ombro", ["ombro", "manguito"]],

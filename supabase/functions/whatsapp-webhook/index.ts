@@ -76,6 +76,8 @@ async function applyLabel(adminClient: any, companyId: string, chatId: string, l
 }
 
 // ─── EXECUTE FLOW (with session support) ───
+type FlowEdge = { target: string; handle?: string; label?: string };
+
 async function executeFlow(
   adminClient: any, companyId: string, remoteJid: string, chatId: string,
   instanceName: string, evoUrl: string, evoHeaders: Record<string, string>,
@@ -89,7 +91,7 @@ async function executeFlow(
   const nodes: any[] = nodesRes.data || [];
   const edges: any[] = edgesRes.data || [];
 
-  const adjacency: Record<string, Array<{ target: string; handle?: string; label?: string }>> = {};
+  const adjacency: Record<string, FlowEdge[]> = {};
   for (const e of edges) {
     if (!adjacency[e.source_node_id]) adjacency[e.source_node_id] = [];
     adjacency[e.source_node_id].push({ target: e.target_node_id, handle: e.source_handle || undefined, label: e.label || undefined });
@@ -140,7 +142,7 @@ async function executeFlow(
       if (menuText.trim()) await sendText(evoUrl, instanceName, evoHeaders, remoteJid, menuText, adminClient, chatId);
 
       // Menu also pauses for user response — create session
-      const nextEdges = adjacency[currentId] || [];
+      const nextEdges: FlowEdge[] = adjacency[currentId] || [];
       if (nextEdges.length > 0) {
         await adminClient.from("flow_sessions").update({ status: "cancelled", updated_at: new Date().toISOString() })
           .eq("chat_id", chatId).eq("status", "waiting_response");
@@ -160,11 +162,11 @@ async function executeFlow(
     }
 
     // Move to next node
-    const nextEdges = adjacency[currentId] || [];
+    const nextEdges: FlowEdge[] = adjacency[currentId] || [];
     if (nextEdges.length === 0) { currentId = null; }
     else if (nodeType === "condition") {
-      const falsePath = nextEdges.find(e => e.handle === "false" || e.label === "Não");
-      const truePath = nextEdges.find(e => e.handle === "true" || e.label === "Sim");
+      const falsePath = nextEdges.find((e: FlowEdge) => e.handle === "false" || e.label === "Não");
+      const truePath = nextEdges.find((e: FlowEdge) => e.handle === "true" || e.label === "Sim");
       currentId = (isStudentContact ? truePath?.target : falsePath?.target) || nextEdges[0].target;
     } else {
       currentId = nextEdges[0].target;

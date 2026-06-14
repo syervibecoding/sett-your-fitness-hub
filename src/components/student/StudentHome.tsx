@@ -196,7 +196,9 @@ export function StudentHome({
       <div>
         <p className="text-eyebrow mb-3">Explorar</p>
         <div className="grid grid-cols-2 gap-3">
-          {NAV_ITEMS.map(({ view, label, icon: Icon, sub }) => {
+          {NAV_ITEMS.map((item) => {
+            const { view, label, icon: Icon } = item;
+            const sub = "sub" in item ? item.sub : undefined;
             const isToday = view === "treino" && !!todayWorkout;
             return (
               <button key={view} onClick={() => onNavigate(view)} className="text-left group">

@@ -95,7 +95,6 @@ export default function AppearanceSettings() {
         text_color: textColor,
         platform_title: platformTitle,
         logo_url: logoUrl,
-        updated_by: user?.id,
         updated_at: new Date().toISOString(),
         company_id: effectiveCompanyId,
       };

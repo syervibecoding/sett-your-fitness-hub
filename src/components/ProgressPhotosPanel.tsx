@@ -62,7 +62,7 @@ export function ProgressPhotosPanel({
       return;
     }
 
-    const rows = ((data || []) as ProgressPhoto[]);
+    const rows = ((data || []) as unknown as ProgressPhoto[]);
     const signed = await Promise.all(
       rows.map(async (photo) => {
         const { data: signedData } = await supabase.storage
