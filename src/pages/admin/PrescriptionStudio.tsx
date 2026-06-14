@@ -312,6 +312,19 @@ export default function PrescriptionStudio() {
         status: "active",
       });
 
+      // Publica AUTOMATICAMENTE o treino de força no app do aluno (materializa em workouts → aba "Treino").
+      // Cardio (running_plans) e nutrição (nutrition_plans) já são persistidos pelas próprias edges e
+      // aparecem como abas condicionais no app do aluno automaticamente — não precisam de materialização.
+      if (strengthPlan && studentId && companyId) {
+        try {
+          const r = await publishStrengthPlanToStudent({ plan: strengthPlan, studentId, companyId, createdBy: user?.id ?? null });
+          setPublished({ workoutsCreated: r.workoutsCreated, createdEnrollment: r.createdEnrollment });
+        } catch (pubErr: any) {
+          // Não derruba a geração: a prescrição foi criada; só a materialização do treino falhou.
+          setError(`Prescrição gerada, mas falhou ao publicar o treino no app do aluno: ${pubErr?.message || "erro"}. Use o botão "Publicar treino no app do aluno".`);
+        }
+      }
+
     } catch (e: any) {
       setError(e.message);
     }

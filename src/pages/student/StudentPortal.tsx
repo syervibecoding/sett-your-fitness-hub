@@ -20,6 +20,8 @@ import { useRestTimer } from "@/components/student/RestTimer";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { WeeklyBar } from "@/components/student/WeeklyBar";
 import { StudentHome } from "@/components/student/StudentHome";
+import { NutritionPlanView } from "@/components/student/NutritionPlanView";
+import { CardioPlanView } from "@/components/student/CardioPlanView";
 import { StudentCalendar } from "@/components/student/StudentCalendar";
 import { StudentHistory } from "@/components/student/StudentHistory";
 import { WorkoutHeader } from "@/components/student/WorkoutHeader";
@@ -32,12 +34,12 @@ import { calculateStreak } from "@/lib/streakCalculator";
 import { ExternalActivitiesList } from "@/components/student/ExternalActivitiesList";
 import { AnnouncementsFeed } from "@/components/student/AnnouncementsFeed";
 import { BodyMeasurements } from "@/components/student/BodyMeasurements";
-import type { Gender } from "@/components/student/BodyAvatar";
+import type { Gender } from "@/components/student/BodyMeasurements";
 import { Megaphone, Activity } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 
-type ActiveView = "home" | "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos" | "medidas";
+type ActiveView = "home" | "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos" | "medidas" | "nutricao" | "corrida" | "natacao" | "ciclismo";
 
 
 interface WorkoutExercise {
@@ -106,6 +108,9 @@ export default function StudentPortal() {
   const [workoutSessions, setWorkoutSessions] = useState<any[]>([]);
   const [weeklyGoal, setWeeklyGoal] = useState<number>(3);
   const [activeEnrollmentId, setActiveEnrollmentId] = useState<string | null>(null);
+  // Prescrições por modalidade (abas condicionais): nutrição + esportes de cardio existentes.
+  const [hasNutrition, setHasNutrition] = useState(false);
+  const [runningSports, setRunningSports] = useState<Set<string>>(new Set());
   
 
   const selectedWorkout = selectedCycle?.workouts.find(w => w.id === selectedWorkoutId) || selectedCycle?.workouts[0] || null;
@@ -136,6 +141,19 @@ export default function StudentPortal() {
     setCompanyId(student.company_id);
     setGender((student as any).gender === "male" || (student as any).gender === "female" ? (student as any).gender : null);
     setWeeklyGoal((student as any).weekly_workout_goal || 3);
+
+    // Detecta quais prescrições existem para mostrar as abas condicionais (nutrição/corrida/natação/ciclismo).
+    // RLS já permite o aluno ler nutrition_plans e running_plans próprios.
+    {
+      const [{ count: nutriCount }, { data: runs }] = await Promise.all([
+        (supabase as any).from("nutrition_plans").select("id", { count: "exact", head: true }).eq("student_id", student.id),
+        supabase.from("running_plans").select("sport").eq("student_id", student.id),
+      ]);
+      setHasNutrition((nutriCount ?? 0) > 0);
+      const sports = new Set<string>();
+      (runs ?? []).forEach((r: any) => { if (r.sport) sports.add(String(r.sport).toLowerCase()); });
+      setRunningSports(sports);
+    }
 
 
     if (student.company_id) {
@@ -575,6 +593,11 @@ export default function StudentPortal() {
 
   const isSessionForCurrentWorkout = session.isActive && session.activeSession?.workoutId === selectedWorkout?.id;
 
+  // Modalidades de cardio disponíveis (running_plans.sport). Corrida engloba triathlon.
+  const hasCorrida = runningSports.has("corrida") || runningSports.has("triathlon");
+  const hasNatacao = runningSports.has("natacao") || runningSports.has("natação");
+  const hasCiclismo = runningSports.has("ciclismo");
+
   const viewTitles: Record<ActiveView, string> = {
     home: "MEU TREINO",
     treino: "TREINO",
@@ -584,6 +607,10 @@ export default function StudentPortal() {
     atividades: "ATIVIDADES",
     avisos: "AVISOS",
     medidas: "MEDIDAS",
+    nutricao: "DICAS NUTRICIONAIS",
+    corrida: "CORRIDA",
+    natacao: "NATAÇÃO",
+    ciclismo: "CICLISMO",
   };
 
 
@@ -658,10 +685,20 @@ export default function StudentPortal() {
                 <MonthlyLeaderboard companyId={companyId} />
               </div>
             ) : null}
+            hasNutrition={hasNutrition}
+            hasCorrida={hasCorrida}
+            hasNatacao={hasNatacao}
+            hasCiclismo={hasCiclismo}
             onNavigate={handleNavigate}
           />
 
         )}
+
+        {/* PRESCRIÇÕES — abas condicionais (só aparecem quando o treinador publicou a modalidade) */}
+        {activeView === "nutricao" && studentId && <NutritionPlanView studentId={studentId} />}
+        {activeView === "corrida" && studentId && <CardioPlanView studentId={studentId} sport="corrida" />}
+        {activeView === "natacao" && studentId && <CardioPlanView studentId={studentId} sport="natacao" />}
+        {activeView === "ciclismo" && studentId && <CardioPlanView studentId={studentId} sport="ciclismo" />}
 
 
         {/* TREINO VIEW */}

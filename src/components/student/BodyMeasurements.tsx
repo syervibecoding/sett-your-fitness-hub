@@ -17,7 +17,19 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
-import { BodyAvatar, type Gender, type BodyMeasurementValues } from "./BodyAvatar";
+export type Gender = "male" | "female";
+export interface BodyMeasurementValues {
+  neck?: number | null;
+  shoulder?: number | null;
+  chest?: number | null;
+  waist?: number | null;
+  abdomen?: number | null;
+  hip?: number | null;
+  arm?: number | null;
+  forearm?: number | null;
+  thigh?: number | null;
+  calf?: number | null;
+}
 import { ProgressPhotosPanel } from "@/components/ProgressPhotosPanel";
 
 interface BodyMeasurementsProps {
@@ -98,11 +110,6 @@ export function BodyMeasurements({ studentId, companyId, gender, onGenderChange 
     return v;
   }, [form]);
 
-  const heightNum = useMemo(() => {
-    const n = heightCm ? parseFloat(heightCm.replace(",", ".")) : NaN;
-    return Number.isFinite(n) && n > 0 ? n : null;
-  }, [heightCm]);
-
   const handleSaveGender = async (g: Gender) => {
     setSavingGender(true);
     const { error } = await supabase.from("students").update({ gender: g }).eq("id", studentId);
@@ -178,16 +185,16 @@ export function BodyMeasurements({ studentId, companyId, gender, onGenderChange 
     );
   }
 
-  // Gender must be chosen before showing the avatar / form.
+  // Gênero precisa ser escolhido antes de exibir o formulário de medidas.
   if (!gender) {
     return (
       <Card className="bg-card border-border">
         <CardContent className="p-6 space-y-4 text-center">
           <Ruler className="h-9 w-9 text-primary mx-auto" />
           <div>
-            <h3 className="font-bold text-foreground font-sans">Escolha o gênero do avatar</h3>
+            <h3 className="font-bold text-foreground font-sans">Escolha o gênero</h3>
             <p className="text-sm text-muted-foreground font-sans mt-1">
-              Usamos como referência para ajustar o boneco de medidas.
+              Usamos como referência para as suas medidas e treino.
             </p>
           </div>
           <div className="flex gap-3 justify-center">
@@ -210,7 +217,7 @@ export function BodyMeasurements({ studentId, companyId, gender, onGenderChange 
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider">
-              Avatar de Medidas
+              Gênero e altura
             </h3>
             <div className="flex gap-1">
               {(["female", "male"] as Gender[]).map((g) => (
@@ -227,10 +234,7 @@ export function BodyMeasurements({ studentId, companyId, gender, onGenderChange 
               ))}
             </div>
           </div>
-          <div className="flex justify-center">
-            <BodyAvatar gender={gender} measurements={liveValues} heightCm={heightNum} className="h-[360px] w-auto" />
-          </div>
-          <div className="flex items-center justify-center gap-2 mt-1">
+          <div className="flex items-center justify-center gap-2">
             <Label className="text-xs font-sans">Altura (cm)</Label>
             <Input
               type="number" inputMode="decimal" step="0.5" min="0"
@@ -240,9 +244,6 @@ export function BodyMeasurements({ studentId, companyId, gender, onGenderChange 
               className="h-8 w-24 text-center" placeholder="175"
             />
           </div>
-          <p className="text-center text-[11px] text-muted-foreground font-sans">
-            O boneco se ajusta em largura (circunferências) e altura.
-          </p>
         </CardContent>
       </Card>
 

@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Dumbbell, BarChart3, CalendarDays, History, Activity, Megaphone, Ruler, Play, Moon, ArrowRight } from "lucide-react";
+import { Dumbbell, BarChart3, CalendarDays, History, Activity, Megaphone, Ruler, Play, Moon, ArrowRight, Utensils, Footprints, Waves, Bike } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -31,18 +31,29 @@ interface StudentHomeProps {
   streak: number;
   goalEditor?: React.ReactNode;
   achievementsPanel?: React.ReactNode;
-  onNavigate: (view: "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos" | "medidas") => void;
+  // Abas de prescrição condicionais: só aparecem se a prescrição correspondente existir no app do aluno.
+  hasNutrition?: boolean;
+  hasCorrida?: boolean;
+  hasNatacao?: boolean;
+  hasCiclismo?: boolean;
+  onNavigate: (view: StudentNavView) => void;
 }
 
-const NAV_ITEMS = [
+export type StudentNavView =
+  | "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos" | "medidas"
+  | "nutricao" | "corrida" | "natacao" | "ciclismo";
+
+type NavItem = { view: StudentNavView; label: string; icon: typeof Dumbbell; sub?: string };
+
+const NAV_ITEMS: readonly NavItem[] = [
   { view: "treino", label: "Treino", icon: Dumbbell },
   { view: "stats", label: "Estatísticas", icon: BarChart3, sub: "Volume e força" },
   { view: "calendario", label: "Calendário", icon: CalendarDays, sub: "Histórico mensal" },
   { view: "historico", label: "Histórico", icon: History },
   { view: "atividades", label: "Atividades", icon: Activity, sub: "Corrida, natação e mais" },
   { view: "avisos", label: "Avisos", icon: Megaphone, sub: "Mural do treinador" },
-  { view: "medidas", label: "Medidas", icon: Ruler, sub: "Circunferências e avatar" },
-] as const;
+  { view: "medidas", label: "Medidas", icon: Ruler, sub: "Circunferências" },
+];
 
 export function StudentHome({
   studentName,
@@ -59,13 +70,26 @@ export function StudentHome({
   streak,
   goalEditor,
   achievementsPanel,
+  hasNutrition,
+  hasCorrida,
+  hasNatacao,
+  hasCiclismo,
   onNavigate,
 }: StudentHomeProps) {
   const firstName = studentName.split(" ")[0];
   const todayLabel = format(new Date(), "EEEE · dd 'de' MMMM", { locale: ptBR });
   const todayWorkout = selectedCycle?.workouts.find((w) => w.day_of_week === currentDayOfWeek) ?? null;
 
-  const subFor = (view: typeof NAV_ITEMS[number]["view"], fallback?: string) => {
+  // Abas de prescrição que só aparecem quando o treinador publicou aquela modalidade.
+  const prescriptionItems: NavItem[] = [
+    hasNutrition ? { view: "nutricao", label: "Dicas Nutricionais", icon: Utensils, sub: "Plano alimentar" } : null,
+    hasCorrida ? { view: "corrida", label: "Corrida", icon: Footprints, sub: "Plano de corrida" } : null,
+    hasNatacao ? { view: "natacao", label: "Natação", icon: Waves, sub: "Plano de natação" } : null,
+    hasCiclismo ? { view: "ciclismo", label: "Ciclismo", icon: Bike, sub: "Plano de ciclismo" } : null,
+  ].filter(Boolean) as NavItem[];
+  const navItems: NavItem[] = [...NAV_ITEMS, ...prescriptionItems];
+
+  const subFor = (view: StudentNavView, fallback?: string) => {
     if (view === "treino") return workoutCount > 0 ? `${workoutCount} treinos disponíveis` : "Ver treinos do ciclo";
     if (view === "historico") return totalSessions > 0 ? `${totalSessions} sessões` : "Sessões passadas";
     return fallback ?? "";
@@ -196,9 +220,9 @@ export function StudentHome({
       <div>
         <p className="text-eyebrow mb-3">Explorar</p>
         <div className="grid grid-cols-2 gap-3">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const { view, label, icon: Icon } = item;
-            const sub = "sub" in item ? item.sub : undefined;
+            const sub = item.sub;
             const isToday = view === "treino" && !!todayWorkout;
             return (
               <button key={view} onClick={() => onNavigate(view)} className="text-left group">
