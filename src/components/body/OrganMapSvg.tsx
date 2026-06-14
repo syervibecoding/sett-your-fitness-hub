@@ -20,7 +20,7 @@ export interface OrganMapSvgProps {
   className?: string;
 }
 
-const ORGAN_LABELS: Record<OrganId, string> = {
+export const ORGAN_LABELS: Record<OrganId, string> = {
   brain: "Cérebro",
   heart: "Coração",
   lungs: "Pulmões",
@@ -30,6 +30,10 @@ const ORGAN_LABELS: Record<OrganId, string> = {
   kidneys: "Rins",
   bladder: "Bexiga",
 };
+
+export const ORGAN_IDS: OrganId[] = [
+  "brain", "heart", "lungs", "liver", "stomach", "intestines", "kidneys", "bladder",
+];
 
 const DEFAULT_FILL = "#c9d0ce";
 const ACTIVE_FILL = "#7fb886";
