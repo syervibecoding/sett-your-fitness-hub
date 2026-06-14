@@ -27,6 +27,7 @@ import {
   formatPrescriptionIntegrationSummary,
 } from "@/lib/prescriptionIntegration";
 import { readEdgeError } from "@/lib/edgeError";
+import { publishStrengthPlanToStudent } from "@/lib/publishStrengthPlan";
 
 type Modality = "musculacao" | "corrida" | "natacao" | "ciclismo" | "nutricao";
 type GenStatus = "idle" | "generating" | "done" | "error";
@@ -68,6 +69,9 @@ export default function PrescriptionStudio() {
   const [generating, setGenerating]   = useState(false);
   const [error, setError]             = useState("");
   const [pdfs, setPdfs]               = useState<any[]>([]);
+  // Publicação do treino de força para o app do aluno.
+  const [publishing, setPublishing]   = useState(false);
+  const [published, setPublished]     = useState<{ workoutsCreated: number; createdEnrollment: boolean } | null>(null);
 
   // ── Gate de auth ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -168,7 +172,7 @@ export default function PrescriptionStudio() {
     const st: Record<string, GenStatus> = {};
     modalities.forEach(m => st[m] = "idle");
     setStatus(st);
-    setResults({});
+    setResults({}); setPublished(null);
 
     const newResults: Record<string, any> = {};
     let strengthPlan: any = null;
@@ -312,6 +316,21 @@ export default function PrescriptionStudio() {
       setError(e.message);
     }
     setGenerating(false);
+  }
+
+  // ── Publica o treino de força gerado para o app do aluno ────────────────
+  async function publishToStudent() {
+    if (!results.musculacao || !studentId || !companyId) return;
+    setPublishing(true); setError(""); setPublished(null);
+    try {
+      const r = await publishStrengthPlanToStudent({
+        plan: results.musculacao, studentId, companyId, createdBy: user?.id ?? null,
+      });
+      setPublished({ workoutsCreated: r.workoutsCreated, createdEnrollment: r.createdEnrollment });
+    } catch (e: any) {
+      setError(e?.message || "Falha ao publicar o treino para o aluno.");
+    }
+    setPublishing(false);
   }
 
   // ── Gera os PDFs separados ──────────────────────────────────────────────
@@ -653,6 +672,24 @@ export default function PrescriptionStudio() {
                   <Button onClick={downloadPDFs} className="w-full bg-[#8B7355] hover:bg-[#8B7355]/90 mt-2">
                     <Download className="h-4 w-4 mr-2" /> Baixar PDFs separados ({Object.keys(results).length})
                   </Button>
+
+                  {/* Publica o treino de força no app do aluno (o PDF/IA sozinho NÃO aparece pro aluno). */}
+                  {results.musculacao && (
+                    <>
+                      <Button onClick={publishToStudent} disabled={publishing} variant="outline"
+                        className="w-full border-[#1B2B4A] text-[#1B2B4A] hover:bg-[#1B2B4A]/5">
+                        {publishing
+                          ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Publicando…</>
+                          : <><Dumbbell className="h-4 w-4 mr-2" /> Publicar treino no app do aluno</>}
+                      </Button>
+                      {published && (
+                        <p className="text-xs text-green-600 flex items-center gap-1.5">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Treino publicado ({published.workoutsCreated} sessões){published.createdEnrollment ? " · matrícula criada" : ""}. O aluno já vê no app dele.
+                        </p>
+                      )}
+                    </>
+                  )}
                   {pdfs.length > 0 && (
                     <div className="grid grid-cols-2 gap-2 mt-2">
                       {pdfs.map(p => (
