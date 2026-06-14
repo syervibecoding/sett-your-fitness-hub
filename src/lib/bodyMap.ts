@@ -94,6 +94,34 @@ export const LIBRARY_GROUP_TO_REGION: Record<string, BodyRegionId> = (() => {
 // Grupos da biblioteca que NÃO são regiões anatômicas (categorias) — vão num filtro "Outros".
 export const NON_REGION_LIBRARY_GROUPS = ["alongamento", "mobilidade", "cardio"];
 
+// Mapa das 14 regiões -> slugs da lib react-muscle-highlighter (1:1). Fonte única.
+export const REGION_TO_SLUG: Record<BodyRegionId, string> = {
+  chest: "chest",
+  shoulders: "deltoids",
+  biceps: "biceps",
+  triceps: "triceps",
+  forearm: "forearm",
+  abs: "abs",
+  trapezius: "trapezius",
+  back: "upper-back",
+  lower_back: "lower-back",
+  glutes: "gluteal",
+  quads: "quadriceps",
+  hamstrings: "hamstring",
+  adductors: "adductors",
+  calves: "calves",
+};
+
+const SLUG_TO_REGION: Record<string, BodyRegionId> = (() => {
+  const m: Record<string, BodyRegionId> = {};
+  (Object.keys(REGION_TO_SLUG) as BodyRegionId[]).forEach((r) => { m[REGION_TO_SLUG[r]] = r; });
+  return m;
+})();
+
+export function regionForSlug(slug?: string | null): BodyRegionId | null {
+  return slug ? (SLUG_TO_REGION[slug] ?? null) : null;
+}
+
 export function regionForLibraryGroup(muscleGroup: string | null | undefined): BodyRegionId | null {
   if (!muscleGroup) return null;
   return LIBRARY_GROUP_TO_REGION[muscleGroup.trim().toLowerCase()] ?? null;
