@@ -154,6 +154,10 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
   const { role } = useAuth();
   const location = useLocation();
   const params = useParams();
+  // useParams() devolve um OBJETO NOVO a cada render — usar `params` direto nas deps de
+  // useEffect/useCallback causava loop infinito (efeito rodava todo render → setState → render...).
+  // paramsKey é estável por VALOR (string), então as deps só mudam quando os params realmente mudam.
+  const paramsKey = JSON.stringify(params ?? {});
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -208,7 +212,8 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
     } finally {
       setLoading(false);
     }
-  }, [loading, location.pathname, messages, pageLabel, params]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, location.pathname, messages, pageLabel, paramsKey]);
 
   useEffect(() => {
     if (!shouldShow) return;
@@ -253,7 +258,8 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
     return () => {
       active = false;
     };
-  }, [location.pathname, missionCacheKey, pageLabel, params, shouldShow]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, missionCacheKey, pageLabel, paramsKey, shouldShow]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
