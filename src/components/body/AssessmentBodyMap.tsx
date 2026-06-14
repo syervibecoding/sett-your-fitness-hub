@@ -6,11 +6,8 @@ import { BodyMap } from "./BodyMap";
 import { assessmentToBodyRegions } from "@/lib/assessmentBodyMap";
 import { BODY_REGION_LABELS, type BodyRegionId, type LimitationType, type RegionLimitation } from "@/lib/bodyMap";
 
-const TYPE_COLOR: Record<LimitationType, string> = {
-  muscular: "#f59e0b",  // âmbar
-  articular: "#3b82f6", // azul
-  neural: "#a855f7",    // roxo
-};
+// Boneco da avaliação: as limitações detectadas pela IA aparecem em VERMELHO.
+const ASSESS_RED = "#ef4444";
 const TYPE_LABEL: Record<LimitationType, string> = {
   muscular: "Muscular", articular: "Articular", neural: "Neural",
 };
@@ -35,12 +32,7 @@ export function AssessmentBodyMap({ assessmentJson, gender = "male" }: { assessm
   if (limits.length === 0) return null;
 
   const activeRegions = Array.from(byRegion.keys());
-  const getRegionFill = (id: BodyRegionId) => {
-    const l = byRegion.get(id);
-    return l ? TYPE_COLOR[l.type] : undefined;
-  };
-
-  const usedTypes = Array.from(new Set(limits.map((l) => l.type)));
+  const getRegionFill = (id: BodyRegionId) => (byRegion.has(id) ? ASSESS_RED : undefined);
 
   return (
     <Card className="bg-card border-border">
@@ -53,20 +45,15 @@ export function AssessmentBodyMap({ assessmentJson, gender = "male" }: { assessm
           getRegionFill={getRegionFill}
           activeRegions={activeRegions}
           footer={
-            <div className="flex items-center justify-center gap-3 flex-wrap mt-1">
-              {usedTypes.map((t) => (
-                <span key={t} className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: TYPE_COLOR[t] }} />
-                  {TYPE_LABEL[t]}
-                </span>
-              ))}
+            <div className="flex items-center justify-center gap-1.5 mt-1 text-[11px] text-muted-foreground">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: ASSESS_RED }} /> Limitação detectada na avaliação
             </div>
           }
         />
         <div className="mt-3 space-y-1.5">
           {Array.from(byRegion.entries()).map(([region, l]) => (
             <div key={region} className="flex items-start gap-2 text-xs">
-              <span className="h-2.5 w-2.5 rounded-full mt-1 shrink-0" style={{ background: TYPE_COLOR[l.type] }} />
+              <span className="h-2.5 w-2.5 rounded-full mt-1 shrink-0" style={{ background: ASSESS_RED }} />
               <div className="min-w-0">
                 <span className="font-medium text-foreground">{BODY_REGION_LABELS[region]}</span>
                 <span className="text-muted-foreground"> · {TYPE_LABEL[l.type]}{l.severity ? ` (${l.severity})` : ""}</span>

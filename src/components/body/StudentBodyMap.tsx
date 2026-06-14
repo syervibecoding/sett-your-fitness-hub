@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 
 const TYPE_COLOR: Record<LimitationType, string> = { muscular: "#f59e0b", articular: "#3b82f6", neural: "#a855f7" };
 const TYPE_LABEL: Record<LimitationType, string> = { muscular: "Muscular", articular: "Articular", neural: "Neural" };
+// Cor da região NO BONECO é por ORIGEM: azul = marcado manualmente; vermelho = veio da avaliação.
+const SOURCE_COLOR: Record<"manual" | "assessment", string> = { manual: "#3b82f6", assessment: "#ef4444" };
 const TYPES: LimitationType[] = ["muscular", "articular", "neural"];
 const SEVERITIES = ["leve", "moderada", "severa"] as const;
 
@@ -76,7 +78,11 @@ export function StudentBodyMap({ studentId }: { studentId: string }) {
   for (const region of Object.keys(manual)) byRegion.set(region as BodyRegionId, manual[region]);
   const items = Array.from(byRegion.values());
 
-  const getRegionFill = (id: BodyRegionId) => (byRegion.has(id) ? TYPE_COLOR[byRegion.get(id)!.type] : undefined);
+  const getRegionFill = (id: BodyRegionId) => {
+    if (id === editing) return SOURCE_COLOR.manual;          // azul imediato ao clicar p/ marcar
+    const m = byRegion.get(id);
+    return m ? SOURCE_COLOR[m.source] : undefined;           // azul = manual, vermelho = avaliação
+  };
 
   const openEditor = (region: BodyRegionId) => {
     const cur = byRegion.get(region);
@@ -109,7 +115,6 @@ export function StudentBodyMap({ studentId }: { studentId: string }) {
     return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
   }
 
-  const usedTypes = Array.from(new Set(items.map((i) => i.type)));
   const editingIsManual = editing ? manual[editing]?.source === "manual" : false;
 
   return (
@@ -123,16 +128,12 @@ export function StudentBodyMap({ studentId }: { studentId: string }) {
         <BodyMap
           gender={gender}
           getRegionFill={getRegionFill}
-          activeRegions={Array.from(byRegion.keys())}
+          activeRegions={[...Array.from(byRegion.keys()), ...(editing && !byRegion.has(editing) ? [editing] : [])]}
           onRegionClick={openEditor}
           footer={
-            <div className="flex items-center justify-center gap-3 flex-wrap mt-1">
-              {(usedTypes.length ? usedTypes : TYPES).map((t) => (
-                <span key={t} className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: TYPE_COLOR[t] }} />
-                  {TYPE_LABEL[t]}
-                </span>
-              ))}
+            <div className="flex items-center justify-center gap-3 flex-wrap mt-1 text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: SOURCE_COLOR.manual }} /> Marcado por você</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: SOURCE_COLOR.assessment }} /> Da avaliação</span>
             </div>
           }
         />
@@ -189,7 +190,7 @@ export function StudentBodyMap({ studentId }: { studentId: string }) {
           <div className="mt-3 space-y-1.5">
             {items.map((l) => (
               <button key={l.region} onClick={() => openEditor(l.region)} className="w-full flex items-start gap-2 text-xs text-left hover:bg-muted/40 rounded px-1.5 py-1">
-                <span className="h-2.5 w-2.5 rounded-full mt-1 shrink-0" style={{ background: TYPE_COLOR[l.type] }} />
+                <span className="h-2.5 w-2.5 rounded-full mt-1 shrink-0" style={{ background: SOURCE_COLOR[l.source] }} />
                 <div className="min-w-0 flex-1">
                   <span className="font-medium text-foreground">{BODY_REGION_LABELS[l.region]}</span>
                   <span className="text-muted-foreground"> · {TYPE_LABEL[l.type]}{l.severity ? ` (${l.severity})` : ""}</span>
