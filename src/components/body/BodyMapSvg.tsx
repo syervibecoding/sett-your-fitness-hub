@@ -1,7 +1,6 @@
-// Boneco anatômico com regiões musculares clicáveis (frente/costas) — arte do GPT.
-// API estável combinada com o contrato src/lib/bodyMap.ts: BodyMapSvgProps (view, onRegionClick,
-// getRegionFill, activeRegions, className) e os 14 ids de região. (Removido o "use client"
-// do Next — este projeto é Vite/React.)
+// Boneco anatômico com regiões musculares clicáveis (frente/costas) — arte do GPT v2.
+// Correções desta versão: adutores na parte interna das coxas (sem ilusão de "3 pernas"),
+// corpo mais largo/cheio, viewBox maior. API estável (contrato src/lib/bodyMap.ts).
 import type { KeyboardEvent } from "react";
 import type { BodyRegionId } from "@/lib/bodyMap";
 
@@ -30,17 +29,17 @@ const REGION_LABELS: Record<BodyRegionId, string> = {
   calves: "Panturrilhas",
 };
 
-const DEFAULT_REGION_FILL = "#c9d0ce";
-const ACTIVE_REGION_FILL = "#78b983";
+const DEFAULT_REGION_FILL = "#bec7c5";
+const ACTIVE_REGION_FILL = "#77b981";
 const BODY_FILL = "#fbfcfc";
-const BODY_STROKE = "#b9c1bf";
-const DETAIL_STROKE = "#e5eaea";
+const BODY_STROKE = "#b7c0be";
+const DETAIL_STROKE = "#e3e8e7";
 const REGION_STROKE = "#ffffff";
 const ACTIVE_STROKE = "#137c2f";
 const HOVER_STROKE = "#15803d";
 
 const BODY_OUTLINE_PATH =
-  "M96 78 C89 88 75 91 63 99 C50 108 45 128 41 154 C37 181 34 204 29 225 C26 238 31 247 39 247 C46 247 50 241 51 229 C54 207 58 184 63 163 C66 149 69 138 74 130 C76 156 79 181 83 207 C86 229 89 251 90 269 C79 285 73 306 70 332 C67 363 61 394 57 430 C54 456 50 481 46 505 C52 511 63 511 69 504 C76 466 82 430 88 390 C91 371 96 349 101 329 C105 350 107 372 108 395 C109 429 110 468 113 506 C118 511 122 511 127 506 C130 468 131 429 132 395 C133 372 135 350 139 329 C144 349 149 371 152 390 C158 430 164 466 171 504 C177 511 188 511 194 505 C190 481 186 456 183 430 C179 394 173 363 170 332 C167 306 161 285 150 269 C151 251 154 229 157 207 C161 181 164 156 166 130 C171 138 174 149 177 163 C182 184 186 207 189 229 C190 241 194 247 201 247 C209 247 214 238 211 225 C206 204 203 181 199 154 C195 128 190 108 177 99 C165 91 151 88 144 78 C138 84 130 87 120 87 C110 87 102 84 96 78 Z";
+  "M126 74 C117 91 96 94 77 103 C59 112 49 131 43 164 C37 200 31 229 23 260 C20 274 25 285 36 285 C46 285 52 278 55 263 C62 231 67 202 74 176 C78 158 84 144 91 136 C93 170 97 204 101 238 C104 264 109 287 113 304 C101 324 94 351 91 383 C88 419 82 458 75 514 C83 525 99 524 104 510 C113 469 119 429 122 390 C124 360 128 332 133 313 C138 350 140 394 140 516 C146 522 154 522 160 516 C160 394 162 350 167 313 C172 332 176 360 178 390 C181 429 187 469 196 510 C201 524 217 525 225 514 C218 458 212 419 209 383 C206 351 199 324 187 304 C191 287 196 264 199 238 C203 204 207 170 209 136 C216 144 222 158 226 176 C233 202 238 231 245 263 C248 278 254 285 264 285 C275 285 280 274 277 260 C269 229 263 200 257 164 C251 131 241 112 223 103 C204 94 183 91 174 74 C168 82 159 87 150 87 C141 87 132 82 126 74 Z";
 
 type RegionRenderProps = {
   attrs: (id: BodyRegionId) => {
@@ -62,6 +61,7 @@ type RegionRenderProps = {
     vectorEffect: "non-scaling-stroke";
     strokeLinejoin: "round";
     strokeLinecap: "round";
+    paintOrder: "stroke";
   };
 };
 
@@ -83,10 +83,11 @@ export function BodyMapSvg({
     className: "region-shape",
     fill: fillFor(id),
     stroke: isActive(id) ? ACTIVE_STROKE : REGION_STROKE,
-    strokeWidth: isActive(id) ? 1.8 : 1.05,
+    strokeWidth: isActive(id) ? 1.7 : 1.05,
     vectorEffect: "non-scaling-stroke" as const,
     strokeLinejoin: "round" as const,
     strokeLinecap: "round" as const,
+    paintOrder: "stroke" as const,
   });
 
   const attrs = (id: BodyRegionId) => ({
@@ -109,15 +110,17 @@ export function BodyMapSvg({
   return (
     <svg
       className={["body-map-svg", className].filter(Boolean).join(" ")}
-      viewBox="0 0 240 520"
+      viewBox="0 0 300 560"
       width="100%"
-      height="auto"
+      height="100%"
       role="img"
       aria-label={`Mapa anatômico muscular - ${view === "front" ? "frente" : "costas"}`}
       xmlns="http://www.w3.org/2000/svg"
       preserveAspectRatio="xMidYMid meet"
       shapeRendering="geometricPrecision"
     >
+      <title>Mapa anatômico muscular - {view === "front" ? "frente" : "costas"}</title>
+
       <style>{`
         .body-map-svg {
           display: block;
@@ -139,7 +142,7 @@ export function BodyMapSvg({
         }
 
         .body-map-region:hover .region-shape {
-          opacity: 0.9;
+          opacity: 0.92;
           stroke: ${HOVER_STROKE};
           stroke-width: 2;
         }
@@ -172,20 +175,20 @@ function BodyBase({ view }: { view: "front" | "back" }) {
     <g aria-hidden="true" pointerEvents="none">
       <path d={BODY_OUTLINE_PATH} fill={BODY_FILL} stroke="none" />
 
-      <ellipse cx="120" cy="40" rx="21" ry="26" fill={BODY_FILL} stroke="none" />
+      <ellipse cx="150" cy="43" rx="24" ry="30" fill={BODY_FILL} stroke="none" />
 
       <path
-        d="M103 62 C107 76 112 83 120 83 C128 83 133 76 137 62 L139 86 C133 91 127 94 120 94 C113 94 107 91 101 86 Z"
+        d="M130 66 C134 80 141 88 150 88 C159 88 166 80 170 66 L173 96 C166 102 158 105 150 105 C142 105 134 102 127 96 Z"
         fill={BODY_FILL}
         stroke="none"
       />
 
       {view === "back" && (
         <path
-          d="M116 82 C117 126 117 171 116 219 C116 240 113 258 108 273 M124 82 C123 126 123 171 124 219 C124 240 127 258 132 273"
+          d="M145 86 C146 130 146 179 145 234 C145 263 141 287 134 308 M155 86 C154 130 154 179 155 234 C155 263 159 287 166 308"
           fill="none"
           stroke={DETAIL_STROKE}
-          strokeWidth="1.1"
+          strokeWidth="1.15"
           strokeLinecap="round"
           vectorEffect="non-scaling-stroke"
         />
@@ -197,10 +200,19 @@ function BodyBase({ view }: { view: "front" | "back" }) {
 function BodyLinework({ view }: { view: "front" | "back" }) {
   return (
     <g aria-hidden="true" pointerEvents="none">
-      <ellipse cx="120" cy="40" rx="21" ry="26" fill="none" stroke={BODY_STROKE} strokeWidth="1.6" vectorEffect="non-scaling-stroke" />
+      <ellipse
+        cx="150"
+        cy="43"
+        rx="24"
+        ry="30"
+        fill="none"
+        stroke={BODY_STROKE}
+        strokeWidth="1.7"
+        vectorEffect="non-scaling-stroke"
+      />
 
       <path
-        d="M103 62 C107 76 112 83 120 83 C128 83 133 76 137 62"
+        d="M130 66 C134 80 141 88 150 88 C159 88 166 80 170 66"
         fill="none"
         stroke={BODY_STROKE}
         strokeWidth="1.35"
@@ -212,7 +224,7 @@ function BodyLinework({ view }: { view: "front" | "back" }) {
         d={BODY_OUTLINE_PATH}
         fill="none"
         stroke={BODY_STROKE}
-        strokeWidth="1.75"
+        strokeWidth="1.85"
         strokeLinejoin="round"
         strokeLinecap="round"
         vectorEffect="non-scaling-stroke"
@@ -226,12 +238,68 @@ function BodyLinework({ view }: { view: "front" | "back" }) {
 function FrontLinework() {
   return (
     <g>
-      <path d="M91 103 C101 95 111 94 120 102 C129 94 139 95 149 103" fill="none" stroke={DETAIL_STROKE} strokeWidth="1.2" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      <path d="M120 104 C120 136 120 174 120 235" fill="none" stroke={DETAIL_STROKE} strokeWidth="1.15" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      <path d="M96 157 C103 162 112 164 120 164 C128 164 137 162 144 157 M99 186 C106 190 113 191 120 191 C127 191 134 190 141 186 M101 213 C108 217 114 218 120 218 C126 218 132 217 139 213" fill="none" stroke={DETAIL_STROKE} strokeWidth="1" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      <path d="M90 270 C102 282 113 287 120 287 C127 287 138 282 150 270" fill="none" stroke={DETAIL_STROKE} strokeWidth="1.2" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      <path d="M101 329 C95 352 91 375 88 399 M139 329 C145 352 149 375 152 399" fill="none" stroke={DETAIL_STROKE} strokeWidth="1" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      <path d="M79 394 C84 401 90 404 97 403 M143 403 C150 404 156 401 161 394" fill="none" stroke={DETAIL_STROKE} strokeWidth="1" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      <path
+        d="M103 116 C116 105 134 104 150 118 C166 104 184 105 197 116"
+        fill="none"
+        stroke={DETAIL_STROKE}
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <path
+        d="M150 116 C150 151 150 195 150 268"
+        fill="none"
+        stroke={DETAIL_STROKE}
+        strokeWidth="1.15"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <path
+        d="M122 163 C131 168 141 170 150 170 C159 170 169 168 178 163 M124 192 C132 197 141 199 150 199 C159 199 168 197 176 192 M126 223 C134 227 142 229 150 229 C158 229 166 227 174 223"
+        fill="none"
+        stroke={DETAIL_STROKE}
+        strokeWidth="1"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <path
+        d="M113 304 C126 317 139 323 150 323 C161 323 174 317 187 304"
+        fill="none"
+        stroke={DETAIL_STROKE}
+        strokeWidth="1.15"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <path
+        d="M150 288 C145 326 144 378 147 424 M150 288 C155 326 156 378 153 424"
+        fill="none"
+        stroke={BODY_FILL}
+        strokeWidth="4.25"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <path
+        d="M150 288 C145 326 144 378 147 424 M150 288 C155 326 156 378 153 424"
+        fill="none"
+        stroke={DETAIL_STROKE}
+        strokeWidth="0.95"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <path
+        d="M108 396 C115 404 123 407 132 405 M168 405 C177 407 185 404 192 396"
+        fill="none"
+        stroke={DETAIL_STROKE}
+        strokeWidth="1"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
     </g>
   );
 }
@@ -239,12 +307,68 @@ function FrontLinework() {
 function BackLinework() {
   return (
     <g>
-      <path d="M120 83 C120 112 120 145 120 181 C120 215 120 248 120 281" fill="none" stroke={DETAIL_STROKE} strokeWidth="1.2" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      <path d="M91 116 C102 124 111 128 120 128 C129 128 138 124 149 116" fill="none" stroke={DETAIL_STROKE} strokeWidth="1.1" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      <path d="M82 134 C93 144 105 151 117 155 M158 134 C147 144 135 151 123 155" fill="none" stroke={DETAIL_STROKE} strokeWidth="1" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      <path d="M94 263 C105 274 114 280 120 280 C126 280 135 274 146 263" fill="none" stroke={DETAIL_STROKE} strokeWidth="1.1" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      <path d="M89 320 C98 346 101 374 96 402 M151 320 C142 346 139 374 144 402" fill="none" stroke={DETAIL_STROKE} strokeWidth="1" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      <path d="M78 394 C84 403 90 406 98 403 M142 403 C150 406 156 403 162 394" fill="none" stroke={DETAIL_STROKE} strokeWidth="1" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      <path
+        d="M150 88 C150 121 150 159 150 205 C150 244 150 283 150 318"
+        fill="none"
+        stroke={DETAIL_STROKE}
+        strokeWidth="1.15"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <path
+        d="M103 123 C119 134 135 140 150 140 C165 140 181 134 197 123"
+        fill="none"
+        stroke={DETAIL_STROKE}
+        strokeWidth="1.1"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <path
+        d="M92 139 C107 153 126 163 145 169 M208 139 C193 153 174 163 155 169"
+        fill="none"
+        stroke={DETAIL_STROKE}
+        strokeWidth="1"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <path
+        d="M117 294 C130 306 142 313 150 314 C158 313 170 306 183 294"
+        fill="none"
+        stroke={DETAIL_STROKE}
+        strokeWidth="1.1"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <path
+        d="M150 304 C145 343 144 382 147 425 M150 304 C155 343 156 382 153 425"
+        fill="none"
+        stroke={BODY_FILL}
+        strokeWidth="4.25"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <path
+        d="M150 304 C145 343 144 382 147 425 M150 304 C155 343 156 382 153 425"
+        fill="none"
+        stroke={DETAIL_STROKE}
+        strokeWidth="0.95"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+
+      <path
+        d="M108 397 C115 406 124 409 133 406 M167 406 C176 409 185 406 192 397"
+        fill="none"
+        stroke={DETAIL_STROKE}
+        strokeWidth="1"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
     </g>
   );
 }
@@ -254,56 +378,58 @@ function FrontRegions({ attrs, shape }: RegionRenderProps) {
     <g>
       <g {...attrs("shoulders")}>
         <title>{REGION_LABELS.shoulders}</title>
-        <path {...shape("shoulders")} d="M83 92 C70 95 60 105 56 121 C58 130 67 135 80 138 C85 128 89 110 83 92 Z" />
-        <path {...shape("shoulders")} d="M157 92 C170 95 180 105 184 121 C182 130 173 135 160 138 C155 128 151 110 157 92 Z" />
+        <path {...shape("shoulders")} d="M82 101 C68 104 57 115 53 132 C55 145 67 153 83 154 C94 144 99 122 93 109 C90 104 87 102 82 101 Z" />
+        <path {...shape("shoulders")} d="M218 101 C232 104 243 115 247 132 C245 145 233 153 217 154 C206 144 201 122 207 109 C210 104 213 102 218 101 Z" />
       </g>
 
       <g {...attrs("chest")}>
         <title>{REGION_LABELS.chest}</title>
-        <path {...shape("chest")} d="M88 108 C98 100 111 99 119 108 L118 149 C104 149 92 143 83 130 C83 121 85 113 88 108 Z" />
-        <path {...shape("chest")} d="M152 108 C142 100 129 99 121 108 L122 149 C136 149 148 143 157 130 C157 121 155 113 152 108 Z" />
+        <path {...shape("chest")} d="M101 115 C116 103 137 104 149 119 C147 140 134 157 115 161 C102 155 93 142 89 126 C92 121 96 118 101 115 Z" />
+        <path {...shape("chest")} d="M199 115 C184 103 163 104 151 119 C153 140 166 157 185 161 C198 155 207 142 211 126 C208 121 204 118 199 115 Z" />
       </g>
 
       <g {...attrs("biceps")}>
         <title>{REGION_LABELS.biceps}</title>
-        <path {...shape("biceps")} d="M58 128 C50 140 45 160 43 188 C50 192 58 187 63 174 C68 157 67 139 58 128 Z" />
-        <path {...shape("biceps")} d="M182 128 C190 140 195 160 197 188 C190 192 182 187 177 174 C172 157 173 139 182 128 Z" />
+        <path {...shape("biceps")} d="M57 135 C48 149 42 172 40 202 C48 207 58 201 64 185 C70 164 69 146 57 135 Z" />
+        <path {...shape("biceps")} d="M243 135 C252 149 258 172 260 202 C252 207 242 201 236 185 C230 164 231 146 243 135 Z" />
       </g>
 
       <g {...attrs("forearm")}>
         <title>{REGION_LABELS.forearm}</title>
-        <path {...shape("forearm")} d="M43 187 C36 206 31 228 30 245 C35 252 44 250 48 238 C54 220 58 200 56 187 Z" />
-        <path {...shape("forearm")} d="M197 187 C204 206 209 228 210 245 C205 252 196 250 192 238 C186 220 182 200 184 187 Z" />
+        <path {...shape("forearm")} d="M40 199 C32 219 25 247 25 271 C31 282 43 280 49 264 C56 242 61 216 58 199 Z" />
+        <path {...shape("forearm")} d="M260 199 C268 219 275 247 275 271 C269 282 257 280 251 264 C244 242 239 216 242 199 Z" />
       </g>
 
       <g {...attrs("abs")}>
         <title>{REGION_LABELS.abs}</title>
-        <path {...shape("abs")} d="M101 151 C106 148 113 148 118 153 L117 176 C112 179 106 179 101 175 Z" />
-        <path {...shape("abs")} d="M122 153 C127 148 134 148 139 151 L139 175 C134 179 128 179 123 176 Z" />
-        <path {...shape("abs")} d="M101 180 C106 177 113 177 118 181 L118 205 C113 208 106 208 101 204 Z" />
-        <path {...shape("abs")} d="M122 181 C127 177 134 177 139 180 L139 204 C134 208 127 208 122 205 Z" />
-        <path {...shape("abs")} d="M103 209 C108 207 114 207 118 211 L118 235 C114 239 108 239 103 235 Z" />
-        <path {...shape("abs")} d="M122 211 C126 207 132 207 137 209 L137 235 C132 239 126 239 122 235 Z" />
-        <path {...shape("abs")} d="M88 150 C96 162 99 181 99 207 C99 223 96 238 91 250 C84 224 81 184 88 150 Z" />
-        <path {...shape("abs")} d="M152 150 C144 162 141 181 141 207 C141 223 144 238 149 250 C156 224 159 184 152 150 Z" />
+        <path {...shape("abs")} d="M125 160 C133 156 142 157 148 164 L147 190 C140 194 132 194 125 188 Z" />
+        <path {...shape("abs")} d="M152 164 C158 157 167 156 175 160 L175 188 C168 194 160 194 153 190 Z" />
+        <path {...shape("abs")} d="M125 195 C132 191 141 191 148 197 L148 224 C141 229 132 228 125 222 Z" />
+        <path {...shape("abs")} d="M152 197 C159 191 168 191 175 195 L175 222 C168 228 159 229 152 224 Z" />
+        <path {...shape("abs")} d="M128 229 C134 226 142 227 148 232 L148 261 C142 267 134 266 128 259 Z" />
+        <path {...shape("abs")} d="M152 232 C158 227 166 226 172 229 L172 259 C166 266 158 267 152 261 Z" />
+        <path {...shape("abs")} d="M106 154 C116 171 121 196 121 229 C121 249 117 268 110 283 C100 252 96 194 106 154 Z" />
+        <path {...shape("abs")} d="M194 154 C184 171 179 196 179 229 C179 249 183 268 190 283 C200 252 204 194 194 154 Z" />
       </g>
 
       <g {...attrs("quads")}>
         <title>{REGION_LABELS.quads}</title>
-        <path {...shape("quads")} d="M89 273 C80 291 76 317 77 348 C78 374 84 395 92 405 C100 388 105 358 105 327 C105 303 99 285 89 273 Z" />
-        <path {...shape("quads")} d="M151 273 C160 291 164 317 163 348 C162 374 156 395 148 405 C140 388 135 358 135 327 C135 303 141 285 151 273 Z" />
+        <path {...shape("quads")} d="M94 303 C84 325 82 362 89 396 C94 419 105 430 116 419 C127 394 132 352 127 319 C119 309 105 303 94 303 Z" />
+        <path {...shape("quads")} d="M206 303 C216 325 218 362 211 396 C206 419 195 430 184 419 C173 394 168 352 173 319 C181 309 195 303 206 303 Z" />
+        <path {...shape("quads")} d="M119 309 C127 325 130 355 126 386 C123 407 118 421 110 429 C109 386 110 341 119 309 Z" />
+        <path {...shape("quads")} d="M181 309 C173 325 170 355 174 386 C177 407 182 421 190 429 C191 386 190 341 181 309 Z" />
       </g>
 
       <g {...attrs("adductors")}>
         <title>{REGION_LABELS.adductors}</title>
-        <path {...shape("adductors")} d="M106 276 C113 290 117 313 118 344 C113 340 107 322 104 299 C102 287 102 280 106 276 Z" />
-        <path {...shape("adductors")} d="M134 276 C127 290 123 313 122 344 C127 340 133 322 136 299 C138 287 138 280 134 276 Z" />
+        <path {...shape("adductors")} d="M132 306 C141 320 145 344 144 371 C141 389 134 405 125 417 C126 376 124 334 132 306 Z" />
+        <path {...shape("adductors")} d="M168 306 C159 320 155 344 156 371 C159 389 166 405 175 417 C174 376 176 334 168 306 Z" />
       </g>
 
       <g {...attrs("calves")}>
         <title>{REGION_LABELS.calves}</title>
-        <path {...shape("calves")} d="M87 392 C76 419 69 461 68 493 C74 501 83 498 87 484 C95 452 98 418 92 395 Z" />
-        <path {...shape("calves")} d="M153 392 C164 419 171 461 172 493 C166 501 157 498 153 484 C145 452 142 418 148 395 Z" />
+        <path {...shape("calves")} d="M107 394 C94 422 87 467 87 504 C94 514 106 512 112 494 C122 456 121 419 113 397 Z" />
+        <path {...shape("calves")} d="M193 394 C206 422 213 467 213 504 C206 514 194 512 188 494 C178 456 179 419 187 397 Z" />
       </g>
     </g>
   );
@@ -314,55 +440,55 @@ function BackRegions({ attrs, shape }: RegionRenderProps) {
     <g>
       <g {...attrs("shoulders")}>
         <title>{REGION_LABELS.shoulders}</title>
-        <path {...shape("shoulders")} d="M83 92 C70 95 60 105 56 121 C59 130 68 135 81 137 C86 126 89 109 83 92 Z" />
-        <path {...shape("shoulders")} d="M157 92 C170 95 180 105 184 121 C181 130 172 135 159 137 C154 126 151 109 157 92 Z" />
+        <path {...shape("shoulders")} d="M82 101 C68 104 57 115 53 132 C55 145 67 153 83 154 C94 143 99 122 93 109 C90 104 87 102 82 101 Z" />
+        <path {...shape("shoulders")} d="M218 101 C232 104 243 115 247 132 C245 145 233 153 217 154 C206 143 201 122 207 109 C210 104 213 102 218 101 Z" />
       </g>
 
       <g {...attrs("trapezius")}>
         <title>{REGION_LABELS.trapezius}</title>
-        <path {...shape("trapezius")} d="M104 75 C110 88 116 96 120 103 C124 96 130 88 136 75 C141 93 149 109 160 122 C146 126 132 122 120 114 C108 122 94 126 80 122 C91 109 99 93 104 75 Z" />
-        <path {...shape("trapezius")} d="M96 112 C105 120 113 126 120 137 C127 126 135 120 144 112 C140 136 132 153 120 164 C108 153 100 136 96 112 Z" />
+        <path {...shape("trapezius")} d="M129 75 C137 94 144 108 150 119 C156 108 163 94 171 75 C176 99 187 116 203 131 C183 136 166 131 150 119 C134 131 117 136 97 131 C113 116 124 99 129 75 Z" />
+        <path {...shape("trapezius")} d="M119 123 C132 134 142 146 150 164 C158 146 168 134 181 123 C177 151 166 175 150 190 C134 175 123 151 119 123 Z" />
       </g>
 
       <g {...attrs("back")}>
         <title>{REGION_LABELS.back}</title>
-        <path {...shape("back")} d="M80 122 C96 128 110 140 117 158 C113 188 106 216 96 241 C84 231 75 210 73 185 C71 160 74 139 80 122 Z" />
-        <path {...shape("back")} d="M160 122 C144 128 130 140 123 158 C127 188 134 216 144 241 C156 231 165 210 167 185 C169 160 166 139 160 122 Z" />
+        <path {...shape("back")} d="M95 128 C116 136 136 153 145 177 C141 211 132 248 119 279 C101 265 89 237 87 203 C85 171 88 146 95 128 Z" />
+        <path {...shape("back")} d="M205 128 C184 136 164 153 155 177 C159 211 168 248 181 279 C199 265 211 237 213 203 C215 171 212 146 205 128 Z" />
       </g>
 
       <g {...attrs("triceps")}>
         <title>{REGION_LABELS.triceps}</title>
-        <path {...shape("triceps")} d="M58 128 C50 141 45 160 43 188 C50 192 58 188 63 174 C68 157 67 139 58 128 Z" />
-        <path {...shape("triceps")} d="M182 128 C190 141 195 160 197 188 C190 192 182 188 177 174 C172 157 173 139 182 128 Z" />
+        <path {...shape("triceps")} d="M57 135 C48 150 42 172 40 202 C48 207 58 202 64 185 C70 164 69 146 57 135 Z" />
+        <path {...shape("triceps")} d="M243 135 C252 150 258 172 260 202 C252 207 242 202 236 185 C230 164 231 146 243 135 Z" />
       </g>
 
       <g {...attrs("forearm")}>
         <title>{REGION_LABELS.forearm}</title>
-        <path {...shape("forearm")} d="M43 187 C36 207 31 228 30 245 C35 252 44 250 48 238 C54 220 58 200 56 187 Z" />
-        <path {...shape("forearm")} d="M197 187 C204 207 209 228 210 245 C205 252 196 250 192 238 C186 220 182 200 184 187 Z" />
+        <path {...shape("forearm")} d="M40 199 C32 220 25 247 25 271 C31 282 43 280 49 264 C56 242 61 216 58 199 Z" />
+        <path {...shape("forearm")} d="M260 199 C268 220 275 247 275 271 C269 282 257 280 251 264 C244 242 239 216 242 199 Z" />
       </g>
 
       <g {...attrs("lower_back")}>
         <title>{REGION_LABELS.lower_back}</title>
-        <path {...shape("lower_back")} d="M98 229 C106 238 113 243 120 245 C127 243 134 238 142 229 L147 263 C139 276 129 282 120 284 C111 282 101 276 93 263 Z" />
+        <path {...shape("lower_back")} d="M119 268 C131 280 141 286 150 288 C159 286 169 280 181 268 L187 304 C176 319 163 327 150 329 C137 327 124 319 113 304 Z" />
       </g>
 
       <g {...attrs("glutes")}>
         <title>{REGION_LABELS.glutes}</title>
-        <path {...shape("glutes")} d="M91 272 C102 266 114 270 120 284 C116 304 105 318 89 322 C81 307 80 286 91 272 Z" />
-        <path {...shape("glutes")} d="M149 272 C138 266 126 270 120 284 C124 304 135 318 151 322 C159 307 160 286 149 272 Z" />
+        <path {...shape("glutes")} d="M115 307 C129 300 143 306 150 323 C145 347 132 364 112 367 C102 349 101 321 115 307 Z" />
+        <path {...shape("glutes")} d="M185 307 C171 300 157 306 150 323 C155 347 168 364 188 367 C198 349 199 321 185 307 Z" />
       </g>
 
       <g {...attrs("hamstrings")}>
         <title>{REGION_LABELS.hamstrings}</title>
-        <path {...shape("hamstrings")} d="M88 317 C79 345 77 379 90 405 C101 383 106 347 104 318 C98 315 93 315 88 317 Z" />
-        <path {...shape("hamstrings")} d="M152 317 C161 345 163 379 150 405 C139 383 134 347 136 318 C142 315 147 315 152 317 Z" />
+        <path {...shape("hamstrings")} d="M111 360 C99 389 97 421 111 442 C126 418 132 386 127 354 C121 353 116 355 111 360 Z" />
+        <path {...shape("hamstrings")} d="M189 360 C201 389 203 421 189 442 C174 418 168 386 173 354 C179 353 184 355 189 360 Z" />
       </g>
 
       <g {...attrs("calves")}>
         <title>{REGION_LABELS.calves}</title>
-        <path {...shape("calves")} d="M88 393 C76 418 69 459 69 492 C75 501 85 498 90 482 C98 445 98 417 91 395 Z" />
-        <path {...shape("calves")} d="M152 393 C164 418 171 459 171 492 C165 501 155 498 150 482 C142 445 142 417 149 395 Z" />
+        <path {...shape("calves")} d="M108 397 C94 424 88 468 88 504 C95 514 108 512 114 492 C123 452 121 421 113 399 Z" />
+        <path {...shape("calves")} d="M192 397 C206 424 212 468 212 504 C205 514 192 512 186 492 C177 452 179 421 187 399 Z" />
       </g>
     </g>
   );
