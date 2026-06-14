@@ -7,6 +7,7 @@ type StudentBnitoAction = "ask" | "brief" | "weekly_contact" | "contextual";
 interface AuthContext {
   authHeader: string;
   userId: string;
+  email: string | null;
 }
 
 interface StudentBnitoRequest {
@@ -316,7 +317,11 @@ async function requireUser(req: Request): Promise<AuthContext | null> {
   const token = authHeader.replace("Bearer ", "");
   const { data, error } = await supabase.auth.getClaims(token);
   if (error || !data?.claims || typeof data.claims.sub !== "string") return null;
-  return { authHeader, userId: data.claims.sub };
+  return {
+    authHeader,
+    userId: data.claims.sub,
+    email: typeof data.claims.email === "string" ? data.claims.email : null,
+  };
 }
 
 function userClient(auth: AuthContext) {
@@ -345,20 +350,71 @@ function isDateInside(date: Date, start?: string | null, end?: string | null) {
   return Number.isFinite(startTime) && Number.isFinite(endTime) && now >= startTime && now <= endTime;
 }
 
-async function loadStudentContext(auth: AuthContext) {
-  const supabase = userClient(auth);
+function fallbackStudentContext(auth: AuthContext, pageContext?: Record<string, unknown>) {
+  const today = new Date();
+  return {
+    today: { iso: today.toISOString().slice(0, 10), day_of_week: today.getDay() },
+    student: null,
+    company: null,
+    available_plans: [],
+    enrollment: null,
+    anamnese: null,
+    assessment: null,
+    active_cycle: null,
+    todays_workout: null,
+    workouts_in_cycle: [],
+    recent_logs: [],
+    recent_sessions: [],
+    recent_announcements: [],
+    external_activities: [],
+    body_measurements: [],
+    recent_feedback: [],
+    achievements_earned: [],
+    auth_context: {
+      user_id: auth.userId,
+      email: auth.email,
+      student_resolution: "not_linked",
+    },
+    page_context: pageContext ?? null,
+  };
+}
+
+async function resolveStudentForAuth(supabase: any, auth: AuthContext) {
+  const selectFields = "id, full_name, company_id, gender, birth_date, weekly_workout_goal, notes, status";
+  const { data: byUserId, error: userIdError } = await supabase
+    .from("students")
+    .select(selectFields)
+    .eq("user_id", auth.userId)
+    .maybeSingle();
+
+  if (userIdError) throw new Error(`Falha ao carregar aluno: ${userIdError.message}`);
+  if (byUserId) return byUserId;
+
+  if (auth.email) {
+    const { data: byEmail, error: emailError } = await supabase
+      .from("students")
+      .select(selectFields)
+      .ilike("email", auth.email)
+      .limit(1);
+
+    if (emailError) throw new Error(`Falha ao carregar aluno por email: ${emailError.message}`);
+    if (Array.isArray(byEmail) && byEmail[0]) return byEmail[0];
+  }
+
+  return null;
+}
+
+async function loadStudentContext(auth: AuthContext, opts: { allowMissingStudent?: boolean; pageContext?: Record<string, unknown> } = {}) {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   const today = new Date();
   const todayIso = today.toISOString().slice(0, 10);
   const todayDow = today.getDay();
 
-  const { data: student, error: studentError } = await supabase
-    .from("students")
-    .select("id, full_name, company_id, gender, birth_date, weekly_workout_goal, notes, status")
-    .eq("user_id", auth.userId)
-    .maybeSingle();
-
-  if (studentError) throw new Error(`Falha ao carregar aluno: ${studentError.message}`);
-  if (!student) throw new Error("Aluno nao encontrado para este usuario.");
+  const student = await resolveStudentForAuth(supabase, auth);
+  if (!student) {
+    if (opts.allowMissingStudent) return fallbackStudentContext(auth, opts.pageContext);
+    throw new Error("Aluno nao encontrado para este usuario.");
+  }
 
   const [
     { data: company },
@@ -547,6 +603,56 @@ function localGuard(question: string) {
   };
 }
 
+function localActionFallback(action: StudentBnitoAction, studentContext: any, pageContext?: Record<string, unknown>) {
+  const pageLabel = cleanText(pageContext?.page_label || pageContext?.pathname || "esta tela", 120);
+  const firstName = cleanText(studentContext?.student?.full_name || "", 120).split(/\s+/).filter(Boolean)[0] || null;
+  const greeting = firstName ? `${firstName}, ` : "";
+
+  if (action === "brief") {
+    const workout = studentContext?.todays_workout;
+    const focus = workout?.title
+      ? `olhe o treino "${cleanText(workout.title, 80)}" e faça a primeira execução com técnica limpa`
+      : "abra seu treino do dia e faça a primeira execução com técnica limpa";
+    return {
+      answer: `${greeting}missão rápida: ${focus}. Antes de aumentar carga ou ritmo, confira respiração, amplitude sem dor e controle do movimento.`,
+      topic: "treino",
+      urgency: "normal",
+      student_action: "Faça uma série mais leve e mande vídeo para a equipe se quiser correção.",
+      handoff_to_team: false,
+      team_alert: { should_alert: false, title: null, message: null, severity: "info" },
+      contextual_helper: null,
+      weekly_contact_message: null,
+      follow_up_question: null,
+    };
+  }
+
+  if (action === "contextual") {
+    return {
+      answer: `${greeting}em ${pageLabel}, foque no próximo passo simples e registre o que fizer para a equipe acompanhar.`,
+      topic: "app",
+      urgency: "normal",
+      student_action: "Confira o plano desta tela e registre uma ação real de hoje.",
+      handoff_to_team: false,
+      team_alert: { should_alert: false, title: null, message: null, severity: "info" },
+      contextual_helper: `Em ${pageLabel}, confira o que está pendente e registre uma ação real de hoje.`,
+      weekly_contact_message: null,
+      follow_up_question: null,
+    };
+  }
+
+  return {
+    answer: `${greeting}passando para saber como foi o treino: teve alguma dificuldade ou quer mandar um vídeo para correção?`,
+    topic: "treino",
+    urgency: "normal",
+    student_action: "Responda com a maior dificuldade da semana ou envie um vídeo de execução.",
+    handoff_to_team: false,
+    team_alert: { should_alert: false, title: null, message: null, severity: "info" },
+    contextual_helper: null,
+    weekly_contact_message: "Como foi o treino essa semana? Se algum exercício ficou estranho, manda um vídeo que a equipe consegue te orientar melhor.",
+    follow_up_question: "Qual exercício mais te gerou dúvida ou dificuldade?",
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
@@ -584,7 +690,10 @@ serve(async (req) => {
           .map((message) => ({ role: message.role as ChatRole, content: cleanText(message.content, 700) }))
       : [];
 
-    const studentContext = await loadStudentContext(auth);
+    const studentContext = await loadStudentContext(auth, {
+      allowMissingStudent: action === "brief" || action === "contextual",
+      pageContext: body.page_context,
+    });
     const picked = pickModel(action, question);
     const aiConfig = await loadCompanyAiConfig(studentContext.student?.company_id as string | undefined);
 
@@ -644,6 +753,22 @@ ${OUTPUT_SCHEMA}
 
     if (!response.ok) {
       const details = await response.text();
+      if (action === "brief" || action === "contextual" || action === "weekly_contact") {
+        return jsonResponse({
+          result: localActionFallback(action, studentContext, body.page_context),
+          team_alert_created: false,
+          team_alert: null,
+          model_tier: "local_fallback",
+          fallback_reason: `AI request failed: ${response.status}`,
+          generated_at: new Date().toISOString(),
+          context_loaded: {
+            has_student: !!studentContext.student,
+            has_anamnese: !!studentContext.anamnese,
+            has_assessment: !!studentContext.assessment,
+            has_todays_workout: !!studentContext.todays_workout,
+          },
+        });
+      }
       return jsonResponse({ error: "AI request failed", details }, response.status);
     }
 
