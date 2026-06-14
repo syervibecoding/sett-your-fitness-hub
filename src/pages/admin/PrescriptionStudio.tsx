@@ -26,6 +26,7 @@ import {
   buildPrescriptionIntegration,
   formatPrescriptionIntegrationSummary,
 } from "@/lib/prescriptionIntegration";
+import { readEdgeError } from "@/lib/edgeError";
 
 type Modality = "musculacao" | "corrida" | "natacao" | "ciclismo" | "nutricao";
 type GenStatus = "idle" | "generating" | "done" | "error";
@@ -205,7 +206,7 @@ export default function PrescriptionStudio() {
             bnito_orchestration: orchestrationCtx,
           },
         });
-        if (e || data?.error) throw new Error(e?.message || data?.error);
+        if (e || data?.error) throw new Error((await readEdgeError(e, data)) || "Falha na geração.");
         strengthPlan = data?.plan; newResults.musculacao = data?.plan;
         setResults({ ...newResults }); setStatus(s => ({ ...s, musculacao: "done" }));
       }
@@ -240,7 +241,7 @@ export default function PrescriptionStudio() {
             bnito_orchestration: orchestrationCtx,
           },
         });
-        if (e || data?.error) throw new Error(e?.message || data?.error);
+        if (e || data?.error) throw new Error((await readEdgeError(e, data)) || "Falha na geração.");
         cardioPlans[mod] = data?.plan; newResults[mod] = data?.plan;
         setResults({ ...newResults }); setStatus(s => ({ ...s, [mod]: "done" }));
       }
@@ -285,7 +286,7 @@ export default function PrescriptionStudio() {
             bnito_orchestration: orchestrationCtx,
           },
         });
-        if (e || data?.error) throw new Error(e?.message || data?.error);
+        if (e || data?.error) throw new Error((await readEdgeError(e, data)) || "Falha na geração.");
         newResults.nutricao = data?.plan;
         setResults({ ...newResults }); setStatus(s => ({ ...s, nutricao: "done" }));
       }
