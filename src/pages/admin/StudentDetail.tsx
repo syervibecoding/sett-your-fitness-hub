@@ -15,6 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { StudentTimeline } from "@/components/admin/StudentTimeline";
+import { StudentFilesPanel } from "@/components/admin/StudentFilesPanel";
+import { WeeklyContactToggle } from "@/components/admin/WeeklyContactToggle";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Mail, Phone, Cake, CalendarDays, Dumbbell, Plus, CalendarIcon, MapPin, CreditCard, MessageCircle, Pencil, DollarSign, Upload, Image, Mic, FileText, Download, Square, MicOff, RefreshCw, ExternalLink, Copy, Link, Check, Trash2, UserPlus, BarChart3, Clock, CheckCircle2, Edit } from "lucide-react";
 import { format, parseISO, eachDayOfInterval, addWeeks, addDays, isValid } from "date-fns";
@@ -848,10 +851,21 @@ export default function StudentDetail() {
             <TabsTrigger value="financial" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
             <TabsTrigger value="evaluations" className="text-xs sm:text-sm">Avaliações</TabsTrigger>
             <TabsTrigger value="progress" className="text-xs sm:text-sm">Progresso</TabsTrigger>
+            <TabsTrigger value="hub" className="text-xs sm:text-sm">Visão 360</TabsTrigger>
           </TabsList>
 
-
-
+          {/* ===== VISÃO 360 (linha do tempo + pasta + contato semanal) ===== */}
+          <TabsContent value="hub" className="space-y-5">
+            {id && student?.company_id && (
+              <>
+                <WeeklyContactToggle studentId={id} initial={(student as { weekly_contact_enabled?: boolean })?.weekly_contact_enabled} />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <StudentTimeline studentId={id} />
+                  <StudentFilesPanel studentId={id} companyId={student.company_id} />
+                </div>
+              </>
+            )}
+          </TabsContent>
 
           {/* ===== VISÃO GERAL ===== */}
           <TabsContent value="overview">
