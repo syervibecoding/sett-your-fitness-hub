@@ -58,6 +58,14 @@ interface CompanyAiConfig {
   onboarding_completed: boolean;
 }
 
+interface AiDecisionLogInput {
+  student_id: string | null | undefined;
+  company_id: string | null | undefined;
+  source: "prescricao" | "avaliacao" | "bnito";
+  summary: string;
+  payload: Record<string, unknown>;
+}
+
 const BN_AI_CONFIG: CompanyAiConfig = {
   assistant_name: "BNITO",
   consultancy_name: "BN Performance Training",
@@ -296,6 +304,20 @@ CONFIGURACAO WHITE-LABEL DA EMPRESA:
 
 Use essa configuracao para nome da consultoria, tom e contexto. Para avaliacao funcional, mantenha achados objetivos e nao diagnostique; se a metodologia configurada conflitar com seguranca, preserve a regra mais conservadora.
 `.trim();
+}
+
+async function writeAiDecisionLog(supabase: any, input: AiDecisionLogInput) {
+  if (!input.company_id) return;
+  const { error } = await supabase.from("ai_decision_logs").insert({
+    student_id: input.student_id ?? null,
+    company_id: input.company_id,
+    source: input.source,
+    summary: clean(input.summary).slice(0, 1000),
+    payload: input.payload ?? {},
+  });
+  if (error) {
+    console.warn("ai_decision_logs insert skipped:", error.message);
+  }
 }
 
 // ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
@@ -812,6 +834,25 @@ ${imageContent.length > 0
       frameFindings = assessmentJson.frame_findings || [];
     } catch {
       reportText = "Análise concluída. Revise os achados por frame e ajuste se necessário.";
+    }
+
+    if (assessmentJson) {
+      const presentCompensations = Array.isArray(assessmentJson.ohs_compensations)
+        ? assessmentJson.ohs_compensations.filter((item: any) => item?.presente)
+        : [];
+      await writeAiDecisionLog(supabaseAdmin, {
+        student_id,
+        company_id,
+        source: "avaliacao",
+        summary: `${presentCompensations.length} compensações OHS presentes; protocolo ${clean(assessmentJson.direcionamento_protocolo || "nao informado")}.`,
+        payload: {
+          assessment_id: assessment_id ?? null,
+          ohs_compensations: assessmentJson.ohs_compensations ?? [],
+          report_sections: assessmentJson.report_sections ?? null,
+          prescription_context: assessmentJson.prescription_context ?? null,
+          red_yellow_flags: assessmentJson.red_yellow_flags ?? [],
+        },
+      });
     }
 
     // Persiste só no fluxo de fotos (assessment_id presente). No vídeo, o frontend grava após edição.

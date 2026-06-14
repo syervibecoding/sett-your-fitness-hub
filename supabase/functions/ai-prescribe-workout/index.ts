@@ -42,6 +42,11 @@ interface ExerciseCatalogEntry {
   name: string;
   description: string | null;
   muscle_group: string | null;
+  contraindications: string[];
+  regressions: string[];
+  progressions: string[];
+  equivalent_substitutes: string[];
+  pain_limitation_tags: string[];
   targets: Array<{
     muscle_group: string;
     role: string | null;
@@ -70,6 +75,14 @@ interface CompanyAiConfig {
   plans_payment: string | null;
   tone: string | null;
   onboarding_completed: boolean;
+}
+
+interface AiDecisionLogInput {
+  student_id: string | null | undefined;
+  company_id: string | null | undefined;
+  source: "prescricao" | "avaliacao" | "bnito";
+  summary: string;
+  payload: Record<string, unknown>;
 }
 
 const BN_AI_CONFIG: CompanyAiConfig = {
@@ -188,6 +201,24 @@ Use essa configuracao para nomes, tom e contexto da empresa. Se a metodologia da
 `.trim();
 }
 
+async function writeAiDecisionLog(supabase: any, input: AiDecisionLogInput) {
+  if (!input.company_id) return;
+  const { error } = await supabase.from("ai_decision_logs").insert({
+    student_id: input.student_id ?? null,
+    company_id: input.company_id,
+    source: input.source,
+    summary: clean(input.summary).slice(0, 1000),
+    payload: input.payload ?? {},
+  });
+  if (error) {
+    console.warn("ai_decision_logs insert skipped:", error.message);
+  }
+}
+
+function asTextArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((item) => String(item ?? "").trim()).filter(Boolean) : [];
+}
+
 async function loadExerciseCatalog(
   supabase: any,
   companyId: string | null,
@@ -211,7 +242,7 @@ async function loadExerciseCatalog(
   const exerciseRows = (exercises ?? []) as any[];
   const exerciseIds = exerciseRows.map((exercise) => exercise.id as string).filter(Boolean);
 
-  const [targetsResult, groupsResult, overridesResult] = await Promise.all([
+  const [targetsResult, groupsResult, overridesResult, metadataResult] = await Promise.all([
     exerciseIds.length
       ? supabase
           .from("exercise_muscle_targets")
@@ -226,11 +257,20 @@ async function loadExerciseCatalog(
           .eq("company_id", companyId)
           .in("exercise_id", exerciseIds)
       : Promise.resolve({ data: [], error: null }),
+    exerciseIds.length
+      ? supabase
+          .from("exercise_metadata")
+          .select("exercise_id, contraindications, regressions, progressions, equivalent_substitutes, pain_limitation_tags")
+          .in("exercise_id", exerciseIds)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (targetsResult.error) throw new Error(`Falha ao carregar alvos musculares: ${targetsResult.error.message}`);
   if (groupsResult.error) throw new Error(`Falha ao carregar grupos musculares: ${groupsResult.error.message}`);
   if (overridesResult.error) throw new Error(`Falha ao carregar volumes da empresa: ${overridesResult.error.message}`);
+  if (metadataResult.error) {
+    console.warn("exercise_metadata skipped:", metadataResult.error.message);
+  }
 
   const groupNames = new Map<string, string>();
   for (const group of ((groupsResult.data ?? []) as any[])) {
@@ -260,6 +300,25 @@ async function loadExerciseCatalog(
     targetsByExercise.set(exerciseId, targets);
   }
 
+  const metadataByExercise = new Map<string, {
+    contraindications: string[];
+    regressions: string[];
+    progressions: string[];
+    equivalent_substitutes: string[];
+    pain_limitation_tags: string[];
+  }>();
+  if (!metadataResult.error) {
+    for (const row of ((metadataResult.data ?? []) as any[])) {
+      metadataByExercise.set(row.exercise_id as string, {
+        contraindications: asTextArray(row.contraindications),
+        regressions: asTextArray(row.regressions),
+        progressions: asTextArray(row.progressions),
+        equivalent_substitutes: asTextArray(row.equivalent_substitutes),
+        pain_limitation_tags: asTextArray(row.pain_limitation_tags),
+      });
+    }
+  }
+
   return {
     company_id: companyId,
     total: exerciseRows.length,
@@ -268,6 +327,11 @@ async function loadExerciseCatalog(
       name: exercise.name as string,
       description: (exercise.description as string | null) ?? null,
       muscle_group: (exercise.muscle_group as string | null) ?? null,
+      contraindications: metadataByExercise.get(exercise.id as string)?.contraindications ?? [],
+      regressions: metadataByExercise.get(exercise.id as string)?.regressions ?? [],
+      progressions: metadataByExercise.get(exercise.id as string)?.progressions ?? [],
+      equivalent_substitutes: metadataByExercise.get(exercise.id as string)?.equivalent_substitutes ?? [],
+      pain_limitation_tags: metadataByExercise.get(exercise.id as string)?.pain_limitation_tags ?? [],
       targets: targetsByExercise.get(exercise.id as string) ?? [],
     })),
   };
@@ -294,6 +358,11 @@ function formatExerciseCatalog(catalog: ExerciseCatalog) {
           )
           .join("; "),
         description: exercise.description ? clean(exercise.description).slice(0, 120) : undefined,
+        contraindications: exercise.contraindications.length ? exercise.contraindications.join("; ") : undefined,
+        regressions: exercise.regressions.length ? exercise.regressions.join("; ") : undefined,
+        progressions: exercise.progressions.length ? exercise.progressions.join("; ") : undefined,
+        equivalent_substitutes: exercise.equivalent_substitutes.length ? exercise.equivalent_substitutes.join(", ") : undefined,
+        pain_limitation_tags: exercise.pain_limitation_tags.length ? exercise.pain_limitation_tags.join("; ") : undefined,
       })),
     },
     20000,
@@ -399,6 +468,23 @@ function hasAdvancedMethod(plan: unknown) {
   return /(drop[- ]?set|cluster[- ]?set|piramide|up[- ]?set|rest[- ]?pause|bi[- ]?set|tri[- ]?set)/.test(text);
 }
 
+function collectPlanExercises(plan: unknown) {
+  if (!isRecord(plan) || !Array.isArray(plan.workouts)) return [];
+  return plan.workouts.flatMap((workout) => {
+    if (!isRecord(workout) || !Array.isArray(workout.exercises)) return [];
+    return workout.exercises.filter(isRecord);
+  });
+}
+
+function metadataMatchesRisk(exercise: ExerciseCatalogEntry | undefined, riskText: string) {
+  if (!exercise) return false;
+  const metadataText = normalizeText([exercise.contraindications, exercise.pain_limitation_tags]);
+  if (!metadataText) return false;
+  return ["joelho", "lombar", "ombro", "tornozelo", "quadril"].some(
+    (term) => riskText.includes(term) && metadataText.includes(term),
+  );
+}
+
 function hasPhase(plan: unknown, phase: string) {
   if (!isRecord(plan) || !Array.isArray(plan.workouts)) return false;
   return plan.workouts.some((workout) =>
@@ -465,6 +551,7 @@ function validatePrescriptionPlan(args: {
   const levelText = normalizeText(args.fitnessLevel);
   const objectiveText = normalizeText(args.objective);
   const painActive = /(dor|eva\s*[4-9]|eva\s*10|joelho|lombar|ombro|tornozelo|quadril|lesao|lesoes)/.test(riskText);
+  const exerciseMap = new Map(args.catalog.exercises.map((exercise) => [exercise.id, exercise]));
 
   if ((levelText.includes("inic") || painActive) && hasAdvancedMethod(args.plan)) {
     add({
@@ -534,6 +621,24 @@ function validatePrescriptionPlan(args: {
       recommendation: "Manter dor <=3, reduzir amplitude/carga/braco de momento em padroes dolorosos e sinalizar professor se houver piora.",
       source: "anamnese",
     });
+
+    for (const exercise of collectPlanExercises(args.plan)) {
+      const exerciseId = typeof exercise.exercise_id === "string" ? exercise.exercise_id : "";
+      const catalogExercise = exerciseMap.get(exerciseId);
+      if (!metadataMatchesRisk(catalogExercise, riskText)) continue;
+
+      add({
+        severity: "warning",
+        code: "exercise_metadata_pain_match",
+        message: `${catalogExercise?.name ?? "Exercicio"} tem metadado sensivel para a dor/limitacao informada.`,
+        recommendation: [
+          catalogExercise?.regressions?.[0] ? `Regressao sugerida: ${catalogExercise.regressions[0]}.` : null,
+          catalogExercise?.equivalent_substitutes?.[0] ? `Substituto equivalente: ${catalogExercise.equivalent_substitutes[0]}.` : null,
+          "Revisar amplitude, carga, tolerancia e sinais de piora antes de salvar.",
+        ].filter(Boolean).join(" "),
+        source: "biblioteca",
+      });
+    }
   }
 
   return {
@@ -971,6 +1076,20 @@ INSTRUÇÕES:
       suggested_message: planJson.bnito_after_generation?.suggested_message
         || "Sua prescrição nova já está pronta no app. Dá uma olhada com calma e me chama por aqui se quiser tirar dúvida de execução.",
     };
+
+    await writeAiDecisionLog(supabase, {
+      student_id,
+      company_id,
+      source: "prescricao",
+      summary: `Preset ${selectedPreset.label}; validador ${preSaveValidation.status}; ${preSaveValidation.warnings.length} avisos; ${preSaveValidation.blockers.length} bloqueios.`,
+      payload: {
+        methodology_preset: planJson.methodology_preset,
+        validator: preSaveValidation,
+        library_policy: planJson.library_policy,
+        biomechanical_notes: planJson.biomechanical_notes ?? null,
+        bnito_after_generation: planJson.bnito_after_generation ?? null,
+      },
+    });
 
     if (preSaveValidation.status === "blocked") {
       return new Response(

@@ -37,6 +37,14 @@ interface CompanyAiConfig {
   onboarding_completed: boolean;
 }
 
+interface AiDecisionLogInput {
+  student_id: string | null | undefined;
+  company_id: string | null | undefined;
+  source: "prescricao" | "avaliacao" | "bnito";
+  summary: string;
+  payload: Record<string, unknown>;
+}
+
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -123,6 +131,21 @@ async function loadCompanyAiConfig(companyId: string | null | undefined): Promis
     .eq("company_id", companyId)
     .maybeSingle();
   return data ? { ...BN_AI_CONFIG, ...data } : BN_AI_CONFIG;
+}
+
+async function writeAiDecisionLog(input: AiDecisionLogInput) {
+  if (!input.company_id) return;
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const { error } = await supabase.from("ai_decision_logs").insert({
+    student_id: input.student_id ?? null,
+    company_id: input.company_id,
+    source: input.source,
+    summary: cleanText(input.summary, 1000),
+    payload: input.payload ?? {},
+  });
+  if (error) {
+    console.warn("ai_decision_logs insert skipped:", error.message);
+  }
 }
 
 function cleanConfigText(value: unknown, maxLength = 4000) {
@@ -421,17 +444,40 @@ ${OUTPUT_SCHEMA}
     const data = (await response.json()) as AnthropicResponse;
     const text = data.content?.find((block) => block.type === "text")?.text || "";
     const parsed = parseJson(text);
+    const result = parsed.result ?? {
+      summary: "BNITO respondeu em texto livre porque o JSON veio incompleto.",
+      answer: parsed.raw,
+      service_reply: null,
+      suggestions: [],
+      volume_review: [],
+      context_flags: [],
+      questions_to_professor: [],
+    };
+
+    await writeAiDecisionLog({
+      student_id: (cycleContext.enrollment?.student_id as string | undefined) ?? null,
+      company_id: companyId,
+      source: "bnito",
+      summary: cleanText(
+        typeof result === "object" && result && "summary" in result
+          ? (result as { summary?: unknown }).summary
+          : `BNITO ${action}`,
+        1000,
+      ),
+      payload: {
+        action,
+        model_tier: picked.tier,
+        result,
+        context_loaded: {
+          has_cycle: !!cycleContext.cycle,
+          has_anamnese: !!cycleContext.anamnese,
+          has_assessment: !!cycleContext.assessment,
+        },
+      },
+    });
 
     return jsonResponse({
-      result: parsed.result ?? {
-        summary: "BNITO respondeu em texto livre porque o JSON veio incompleto.",
-        answer: parsed.raw,
-        service_reply: null,
-        suggestions: [],
-        volume_review: [],
-        context_flags: [],
-        questions_to_professor: [],
-      },
+      result,
       raw: parsed.result ? undefined : parsed.raw,
       model_tier: picked.tier,
       generated_at: new Date().toISOString(),

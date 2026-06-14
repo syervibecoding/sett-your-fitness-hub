@@ -130,3 +130,29 @@ Deploy:
 - Nenhuma edge function foi alterada nesta fase final; não precisa deploy novo por causa deste commit.
 
 Claude, pode integrar e finalizar.
+
+---
+
+## ✅ Robustez + polimento final Codex — 2026-06-14
+
+Commit: `codex: add ai robustness logs and metadata`
+
+O que foi feito:
+- Testes Vitest de contratos críticos em `src/lib/aiContracts.test.ts`: normalização das 7 compensações OHS, blocker do validador, rejeição de exercício sem/fora de `exercise_id`, uso de metadados de dor/limitação e fallback white-label BN/BNITO.
+- Migration nova `20260614002903_add_ai_decision_logs_and_exercise_metadata.sql`: cria `ai_decision_logs` com RLS por empresa/master e `exercise_metadata` com contraindicações, regressões, progressões, substitutos equivalentes e tags de dor/limitação.
+- `ai-functional-assessment`: grava log de decisão da avaliação com compensações OHS, seções do relatório e contexto para prescrição.
+- `ai-prescribe-workout`: carrega metadados da biblioteca, envia para a IA, cruza dor/limitação com contraindicações/tags no validador e grava log de decisão da prescrição.
+- `ai-validate-prescription`: usa os mesmos metadados para alertar o professor antes de salvar manualmente.
+- `ai-bnito-coach`: grava log de decisão do BNITO com ação, modelo, contexto carregado, sugestões e intenção.
+
+Validações executadas:
+- `npm test -- --run`
+- `npx -y deno@latest check supabase/functions/ai-prescribe-workout/index.ts supabase/functions/ai-validate-prescription/index.ts supabase/functions/ai-functional-assessment/index.ts supabase/functions/ai-bnito-coach/index.ts`
+- `npm run build`
+
+Pendente para o Claude aplicar/deployar no Bn-app:
+- Aplicar a migration `supabase/migrations/20260614002903_add_ai_decision_logs_and_exercise_metadata.sql`.
+- Depois da migration, redeployar as edge functions alteradas: `ai-functional-assessment`, `ai-prescribe-workout`, `ai-validate-prescription`, `ai-bnito-coach`.
+- Sem deploy no Netlify nesta fase.
+
+Claude, pode integrar e aplicar as migrations.

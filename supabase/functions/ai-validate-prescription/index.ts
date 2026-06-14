@@ -24,6 +24,11 @@ interface ExerciseCatalogEntry {
   id: string;
   name: string;
   muscle_group: string | null;
+  contraindications: string[];
+  regressions: string[];
+  progressions: string[];
+  equivalent_substitutes: string[];
+  pain_limitation_tags: string[];
   targets: Array<{ muscle_group: string; volume_percentage: number | null }>;
 }
 
@@ -43,6 +48,10 @@ function isRecord(value: unknown): value is Record<string, any> {
 function normalizeText(value: unknown) {
   const raw = typeof value === "string" ? value : JSON.stringify(value ?? {});
   return clean(raw).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function asTextArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((item) => String(item ?? "").trim()).filter(Boolean) : [];
 }
 
 async function requireUser(req: Request) {
@@ -71,7 +80,7 @@ async function loadExerciseCatalog(supabase: any, companyId: string | null) {
 
   const exerciseRows = (exercises ?? []) as any[];
   const exerciseIds = exerciseRows.map((exercise) => exercise.id as string).filter(Boolean);
-  const [targetsResult, groupsResult] = await Promise.all([
+  const [targetsResult, groupsResult, metadataResult] = await Promise.all([
     exerciseIds.length
       ? supabase
           .from("exercise_muscle_targets")
@@ -79,10 +88,19 @@ async function loadExerciseCatalog(supabase: any, companyId: string | null) {
           .in("exercise_id", exerciseIds)
       : Promise.resolve({ data: [], error: null }),
     supabase.from("muscle_groups").select("id, name"),
+    exerciseIds.length
+      ? supabase
+          .from("exercise_metadata")
+          .select("exercise_id, contraindications, regressions, progressions, equivalent_substitutes, pain_limitation_tags")
+          .in("exercise_id", exerciseIds)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (targetsResult.error) throw new Error(`Falha ao carregar alvos musculares: ${targetsResult.error.message}`);
   if (groupsResult.error) throw new Error(`Falha ao carregar grupos musculares: ${groupsResult.error.message}`);
+  if (metadataResult.error) {
+    console.warn("exercise_metadata skipped:", metadataResult.error.message);
+  }
 
   const groupNames = new Map<string, string>();
   for (const group of ((groupsResult.data ?? []) as any[])) groupNames.set(group.id as string, group.name as string);
@@ -98,10 +116,34 @@ async function loadExerciseCatalog(supabase: any, companyId: string | null) {
     targetsByExercise.set(exerciseId, targets);
   }
 
+  const metadataByExercise = new Map<string, {
+    contraindications: string[];
+    regressions: string[];
+    progressions: string[];
+    equivalent_substitutes: string[];
+    pain_limitation_tags: string[];
+  }>();
+  if (!metadataResult.error) {
+    for (const row of ((metadataResult.data ?? []) as any[])) {
+      metadataByExercise.set(row.exercise_id as string, {
+        contraindications: asTextArray(row.contraindications),
+        regressions: asTextArray(row.regressions),
+        progressions: asTextArray(row.progressions),
+        equivalent_substitutes: asTextArray(row.equivalent_substitutes),
+        pain_limitation_tags: asTextArray(row.pain_limitation_tags),
+      });
+    }
+  }
+
   return exerciseRows.map((exercise) => ({
     id: exercise.id as string,
     name: exercise.name as string,
     muscle_group: (exercise.muscle_group as string | null) ?? null,
+    contraindications: metadataByExercise.get(exercise.id as string)?.contraindications ?? [],
+    regressions: metadataByExercise.get(exercise.id as string)?.regressions ?? [],
+    progressions: metadataByExercise.get(exercise.id as string)?.progressions ?? [],
+    equivalent_substitutes: metadataByExercise.get(exercise.id as string)?.equivalent_substitutes ?? [],
+    pain_limitation_tags: metadataByExercise.get(exercise.id as string)?.pain_limitation_tags ?? [],
     targets: targetsByExercise.get(exercise.id as string) ?? [],
   }));
 }
@@ -163,6 +205,23 @@ function extractOhsCompensations(assessmentContext: unknown) {
   return (Array.isArray(direct) ? direct : Array.isArray(nested) ? nested : []).filter((item) => isRecord(item) && item.presente);
 }
 
+function collectPlanExercises(plan: unknown) {
+  if (!isRecord(plan) || !Array.isArray(plan.workouts)) return [];
+  return plan.workouts.flatMap((workout) => {
+    if (!isRecord(workout) || !Array.isArray(workout.exercises)) return [];
+    return workout.exercises.filter(isRecord);
+  });
+}
+
+function metadataMatchesRisk(exercise: ExerciseCatalogEntry | undefined, riskText: string) {
+  if (!exercise) return false;
+  const metadataText = normalizeText([exercise.contraindications, exercise.pain_limitation_tags]);
+  if (!metadataText) return false;
+  return ["joelho", "lombar", "ombro", "tornozelo", "quadril"].some(
+    (term) => riskText.includes(term) && metadataText.includes(term),
+  );
+}
+
 function validatePrescription(args: {
   plan: unknown;
   catalog: ExerciseCatalogEntry[];
@@ -206,6 +265,7 @@ function validatePrescription(args: {
   const levelText = normalizeText(args.fitness_level);
   const objectiveText = normalizeText(args.objective);
   const painActive = /(dor|eva\s*[4-9]|eva\s*10|joelho|lombar|ombro|tornozelo|quadril|lesao|lesoes)/.test(text);
+  const exerciseMap = new Map(args.catalog.map((exercise) => [exercise.id, exercise]));
 
   if (Number(args.block_number || 1) < 2 && /(pliometr|salto|jump|hop|bound)/.test(text)) {
     add({
@@ -272,6 +332,24 @@ function validatePrescription(args: {
       recommendation: "Nao progredir padrao doloroso; reduzir amplitude/carga/braco de momento e avisar o professor se houver piora.",
       source: "anamnese",
     });
+
+    for (const exercise of collectPlanExercises(args.plan)) {
+      const exerciseId = typeof exercise.exercise_id === "string" ? exercise.exercise_id : "";
+      const catalogExercise = exerciseMap.get(exerciseId);
+      if (!metadataMatchesRisk(catalogExercise, text)) continue;
+
+      add({
+        severity: "warning",
+        code: "exercise_metadata_pain_match",
+        message: `${catalogExercise?.name ?? "Exercicio"} tem metadado sensivel para a dor/limitacao informada.`,
+        recommendation: [
+          catalogExercise?.regressions?.[0] ? `Regressao sugerida: ${catalogExercise.regressions[0]}.` : null,
+          catalogExercise?.equivalent_substitutes?.[0] ? `Substituto equivalente: ${catalogExercise.equivalent_substitutes[0]}.` : null,
+          "Revisar amplitude, carga, tolerancia e sinais de piora antes de salvar.",
+        ].filter(Boolean).join(" "),
+        source: "biblioteca",
+      });
+    }
   }
 
   return {
