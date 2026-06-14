@@ -88,7 +88,6 @@ const managementItems = [
   { title: "Aparência", url: "/admin/appearance", icon: Palette },
   { title: "Mural", url: "/admin/announcements", icon: Megaphone },
   { title: "Evasão", url: "/admin/evasao", icon: Activity },
-  { title: "Config IA", url: "/admin/configuracao-ia", icon: Sparkles },
 ];
 
 
@@ -323,15 +322,7 @@ export function AppSidebar() {
                           <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/ia`}>
                             <NavLink to={`${exercisePrefix}/ia`} end>
                               <BrainCircuit className="h-4 w-4" />
-                              <span>Central IA</span>
-                            </NavLink>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/avaliacao`}>
-                            <NavLink to={`${exercisePrefix}/avaliacao`} end>
-                            <Activity className="h-4 w-4" />
-                            <span>Avaliação Funcional</span>
+                              <span>Central de IA</span>
                             </NavLink>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>

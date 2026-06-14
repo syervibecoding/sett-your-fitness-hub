@@ -40,7 +40,6 @@ const Announcements = lazy(() => import("./pages/admin/Announcements"));
 const UnifiedPrescriber = lazy(() => import("./pages/admin/UnifiedPrescriber"));
 const PrescriptionStudio = lazy(() => import("./pages/admin/PrescriptionStudio"));
 const FunctionalAssessment = lazy(() => import("./pages/admin/FunctionalAssessment"));
-const AICoachHub = lazy(() => import("./pages/admin/AICoachHub"));
 const CompanyOnboarding = lazy(() => import("./components/admin/CompanyOnboarding"));
 const StudentHub = lazy(() => import("./pages/admin/StudentHub"));
 const Evasao = lazy(() => import("./pages/admin/Evasao"));
@@ -210,7 +209,7 @@ const App = () => (
           <Route path="/admin/workout/:cycleId" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><WorkoutBuilder /></FeatureRoute>} />
           <Route path="/admin/prescricao" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><UnifiedPrescriber /></FeatureRoute>} />
           <Route path="/admin/studio" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><PrescriptionStudio /></FeatureRoute>} />
-          <Route path="/admin/ia" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><AICoachHub /></FeatureRoute>} />
+          <Route path="/admin/ia" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><CompanyOnboarding /></FeatureRoute>} />
           <Route path="/admin/avaliacao" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><FunctionalAssessment /></FeatureRoute>} />
           <Route path="/admin/aluno/:id" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasStudents"><StudentHub /></FeatureRoute>} />
           <Route path="/admin/evasao" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasStudents"><Evasao /></FeatureRoute>} />
@@ -235,7 +234,7 @@ const App = () => (
           <Route path="/coordinator/workout/:cycleId" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutBuilder /></FeatureRoute>} />
           <Route path="/coordinator/prescricao" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><UnifiedPrescriber /></FeatureRoute>} />
           <Route path="/coordinator/studio" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><PrescriptionStudio /></FeatureRoute>} />
-          <Route path="/coordinator/ia" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><AICoachHub /></FeatureRoute>} />
+          <Route path="/coordinator/ia" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><CompanyOnboarding /></FeatureRoute>} />
           <Route path="/coordinator/avaliacao" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><FunctionalAssessment /></FeatureRoute>} />
           <Route path="/coordinator/whatsapp" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasWhatsApp"><WhatsAppSettings /></FeatureRoute>} />
           <Route path="/coordinator/whatsapp-chat" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasWhatsApp"><WhatsAppChat /></FeatureRoute>} />
@@ -259,7 +258,7 @@ const App = () => (
           <Route path="/trainer/workout/:cycleId" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutBuilder /></FeatureRoute>} />
           <Route path="/trainer/prescricao" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><UnifiedPrescriber /></FeatureRoute>} />
           <Route path="/trainer/studio" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><PrescriptionStudio /></FeatureRoute>} />
-          <Route path="/trainer/ia" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><AICoachHub /></FeatureRoute>} />
+          <Route path="/trainer/ia" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><CompanyOnboarding /></FeatureRoute>} />
           <Route path="/trainer/avaliacao" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><FunctionalAssessment /></FeatureRoute>} />
           <Route path="/trainer/whatsapp" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasWhatsApp"><WhatsAppSettings /></FeatureRoute>} />
           <Route path="/trainer/whatsapp-chat" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasWhatsApp"><WhatsAppChat /></FeatureRoute>} />
