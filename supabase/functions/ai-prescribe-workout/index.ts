@@ -710,6 +710,178 @@ function validatePrescriptionPlan(args: {
   };
 }
 
+function exerciseText(exercise: ExerciseCatalogEntry) {
+  return normalizeText([
+    exercise.name,
+    exercise.description,
+    exercise.muscle_group,
+    exercise.targets.map((target) => target.muscle_group).join(" "),
+    exercise.pain_limitation_tags.join(" "),
+  ].join(" "));
+}
+
+function pickCatalogExercise(
+  catalog: ExerciseCatalog,
+  keywords: string[],
+  usedIds: Set<string>,
+  riskText: string,
+): ExerciseCatalogEntry | null {
+  const normalizedKeywords = keywords.map(normalizeText).filter(Boolean);
+  const riskTerms = ["joelho", "lombar", "ombro", "tornozelo", "quadril"].filter((term) => riskText.includes(term));
+  const scored = catalog.exercises.map((exercise) => {
+    const text = exerciseText(exercise);
+    const metadataText = normalizeText([exercise.contraindications, exercise.pain_limitation_tags]);
+    const riskPenalty = riskTerms.some((term) => metadataText.includes(term)) ? 8 : 0;
+    const usedPenalty = usedIds.has(exercise.id) ? 4 : 0;
+    const score = normalizedKeywords.reduce((sum, keyword) => sum + (text.includes(keyword) ? 3 : 0), 0) - riskPenalty - usedPenalty;
+    return { exercise, score };
+  }).sort((a, b) => b.score - a.score);
+
+  return scored.find((item) => item.score > -4)?.exercise || catalog.exercises.find((exercise) => !usedIds.has(exercise.id)) || catalog.exercises[0] || null;
+}
+
+type FallbackExerciseSpec = {
+  phase: string;
+  keywords: string[];
+  sets: number;
+  reps: string;
+  rest: number;
+  rir: string;
+  cue: string;
+  note: string;
+  tempo?: string;
+};
+
+function fallbackExercise(
+  catalog: ExerciseCatalog,
+  usedIds: Set<string>,
+  riskText: string,
+  params: FallbackExerciseSpec & { order: number },
+) {
+  const exercise = pickCatalogExercise(catalog, params.keywords, usedIds, riskText);
+  if (!exercise) return null;
+  usedIds.add(exercise.id);
+  return {
+    phase: params.phase,
+    exercise_id: exercise.id,
+    exercise_name: exercise.name,
+    library_exercise_name: exercise.name,
+    muscle_group: exercise.muscle_group || exercise.targets[0]?.muscle_group || "geral",
+    sets: params.sets,
+    reps: params.reps,
+    load_percent_1rm: null,
+    rir: params.rir,
+    rest_seconds: params.rest,
+    tempo: params.tempo || "3010",
+    exercise_order: params.order,
+    cues: params.cue,
+    biomechanical_note: params.note,
+    regression: exercise.regressions[0] || "Reduzir amplitude/carga e manter dor <= 3.",
+    progression: exercise.progressions[0] || "Progredir reps antes de carga, mantendo técnica.",
+  };
+}
+
+function buildEmergencyFallbackPlan(args: {
+  catalog: ExerciseCatalog;
+  presetKey: string;
+  selectedPreset: typeof METHODOLOGY_PRESETS[keyof typeof METHODOLOGY_PRESETS];
+  studentName: unknown;
+  objective: unknown;
+  fitnessLevel: unknown;
+  daysPerWeek: unknown;
+  restrictions: unknown;
+  assessmentContext: unknown;
+  prescriptionIntegration: unknown;
+  bnitoOrchestration: unknown;
+  fallbackReason: string;
+}) {
+  const days = Math.min(4, Math.max(2, Number(args.daysPerWeek) || 3));
+  const riskText = normalizeText({
+    restrictions: args.restrictions,
+    assessmentContext: args.assessmentContext,
+    prescriptionIntegration: args.prescriptionIntegration,
+  });
+  const kneeRisk = riskText.includes("joelho") || riskText.includes("valgo");
+  const backRisk = riskText.includes("lombar") || riskText.includes("butt") || riskText.includes("retrovers");
+  const usedIds = new Set<string>();
+
+  const makeWorkout = (name: string, day: number, focus: string, specs: FallbackExerciseSpec[]) => ({
+    name,
+    day_of_week: day,
+    duration_min: 50,
+    split_focus: focus,
+    exercises: specs
+      .map((spec, index) => fallbackExercise(args.catalog, usedIds, riskText, { ...spec, order: index + 1 }))
+      .filter(Boolean),
+    volume_load_estimate: "Conservador; usar RIR 2-4 e dor <= 3.",
+    notes: "Plano de emergência gerado sem Anthropic: revisar antes de publicar se houver dor importante ou restrição clínica.",
+  });
+
+  const workouts = [
+    makeWorkout("Treino A - Base tecnica de membros inferiores", 1, "mobilidade, core, controle de quadril e força global leve", [
+      { phase: "mobilidade", keywords: ["mobilidade tornozelo quadril", "alongamento", "tornozelo", "quadril"], sets: 2, reps: "8-10", rest: 30, rir: "4", cue: "Amplitude sem dor e respiração calma.", note: kneeRisk ? "Preparar tornozelo/quadril para reduzir estresse no joelho." : "Preparar amplitude antes da força." },
+      { phase: "ativacao_core", keywords: ["prancha", "dead bug", "core", "pallof"], sets: 2, reps: "20-30s", rest: 45, rir: "3-4", cue: "Trave costelas e pelve, sem prender o ar.", note: "Aumenta estabilidade lombo-pélvica antes da carga." },
+      { phase: "ativacao_especifica", keywords: ["gluteo medio", "gluteo", "abducao", "mini band"], sets: 2, reps: "12-15", rest: 45, rir: "3", cue: "Joelho alinhado ao pé, sem colapsar.", note: kneeRisk ? "Prioriza controle de valgo dinâmico." : "Ativa quadril para padrões de agachar." },
+      { phase: "controle_motor", keywords: ["agachamento", "goblet", "squat", "caixa"], sets: 2, reps: "8-10", rest: 60, rir: "3-4", cue: "Desça até onde mantém pelve e joelho alinhados.", note: backRisk ? "Limitar amplitude para manter coluna neutra." : "Reforça padrão técnico antes de carga." },
+      { phase: "forca_global", keywords: backRisk ? ["leg press", "hack", "maquina", "agachamento"] : ["agachamento", "leg press", "goblet", "squat"], sets: 3, reps: "8-10", rest: 90, rir: "2-3", cue: "Empurre o chão sem perder alinhamento.", note: "Força global com margem de segurança." },
+      { phase: "forca_especifica", keywords: ["posterior", "mesa flexora", "isquiotibiais", "gluteo"], sets: 2, reps: "10-12", rest: 75, rir: "2-3", cue: "Controle a volta e evite compensar lombar.", note: "Equilibra cadeia posterior para proteger joelho/quadril." },
+    ]),
+    makeWorkout("Treino B - Postura, puxar e empurrar", 3, "mobilidade torácica, escápula, puxar e empurrar técnico", [
+      { phase: "mobilidade", keywords: ["mobilidade toracica", "ombro", "shoulder", "toracica"], sets: 2, reps: "8-10", rest: 30, rir: "4", cue: "Movimento suave, sem forçar amplitude.", note: "Prepara ombro e coluna torácica para membros superiores." },
+      { phase: "ativacao_core", keywords: ["pallof", "prancha", "core", "dead bug"], sets: 2, reps: "20-30s", rest: 45, rir: "3-4", cue: "Mantenha tronco estável.", note: "Estabilidade para puxadas e empurradas." },
+      { phase: "ativacao_especifica", keywords: ["escapula", "face pull", "rotador", "manguito"], sets: 2, reps: "12-15", rest: 45, rir: "3", cue: "Ombros longe das orelhas.", note: "Melhora controle escapular." },
+      { phase: "controle_motor", keywords: ["remada", "row", "puxada"], sets: 2, reps: "10", rest: 60, rir: "3", cue: "Puxe com cotovelos, sem jogar tronco.", note: "Ensina trajetória e controle escapular." },
+      { phase: "forca_global", keywords: ["supino", "press", "empurrar", "chest"], sets: 3, reps: "8-10", rest: 90, rir: "2-3", cue: "Escápulas firmes e punho neutro.", note: "Empurrar global com controle." },
+      { phase: "forca_especifica", keywords: ["remada", "puxada", "costas", "dorsal"], sets: 3, reps: "8-12", rest: 90, rir: "2-3", cue: "Controle a volta sem perder postura.", note: "Equilibra ombro e postura." },
+    ]),
+    makeWorkout("Treino C - Corpo inteiro e unilateral leve", 5, "integração full body, unilateral e acessórios", [
+      { phase: "mobilidade", keywords: ["mobilidade quadril", "tornozelo", "alongamento"], sets: 2, reps: "8-10", rest: 30, rir: "4", cue: "Busque amplitude confortável.", note: "Abre movimento antes do unilateral." },
+      { phase: "ativacao_core", keywords: ["bird dog", "perdigueiro", "core", "prancha"], sets: 2, reps: "8-10 por lado", rest: 45, rir: "3-4", cue: "Quadril parado e coluna neutra.", note: "Controle anti-rotação." },
+      { phase: "controle_motor", keywords: ["afundo", "lunge", "step", "unilateral"], sets: 2, reps: "8 por lado", rest: 60, rir: "3-4", cue: "Joelho acompanha o pé.", note: kneeRisk ? "Usar amplitude curta e sem dor." : "Integra equilíbrio e controle." },
+      { phase: "forca_global", keywords: backRisk ? ["hip thrust", "gluteo", "ponte"] : ["terra romeno", "rdl", "levantamento", "hip hinge"], sets: 3, reps: "8-10", rest: 90, rir: "2-3", cue: "Dobre quadril sem arredondar lombar.", note: "Fortalece cadeia posterior com controle." },
+      { phase: "forca_global", keywords: ["remada", "puxada", "costas"], sets: 3, reps: "10-12", rest: 75, rir: "2-3", cue: "Postura alta e controle de escápulas.", note: "Complementa postura e tronco." },
+      { phase: "forca_especifica", keywords: ["panturrilha", "calf", "abdomen", "core"], sets: 2, reps: "12-15", rest: 60, rir: "2-3", cue: "Controle total da fase excêntrica.", note: "Acessório leve para suporte do ciclo." },
+    ]),
+  ].slice(0, days);
+
+  return {
+    cycle_name: `Plano BN emergencial - ${clean(args.studentName || "Aluno")}`,
+    objective: clean(args.objective || "base tecnica e consistencia"),
+    duration_weeks: 6,
+    block: "1",
+    methodology_preset: {
+      key: args.presetKey,
+      label: args.selectedPreset.label,
+      why_selected: "Fallback sem Anthropic; selecionado por objetivo, nivel, restricoes e avaliacao.",
+    },
+    generated_by: "bn_emergency_fallback",
+    fallback_reason: args.fallbackReason,
+    biomechanical_notes: "Plano conservador com técnica antes de carga, controle motor, RIR 2-4, sem pliometria e sem métodos avançados.",
+    workouts,
+    library_policy: {
+      only_library_exercises: true,
+      catalog_count: args.catalog.total,
+      gaps: [],
+    },
+    periodization_blocks: [
+      { weeks: "1-2", stimulus: "base tecnica e tolerancia", methods: ["sem metodos avancados"], progression_rule: "Aumentar reps dentro da faixa mantendo RIR 3-4 e dor <= 3." },
+      { weeks: "3-4", stimulus: "progressao conservadora", methods: ["progressao dupla"], progression_rule: "Aumentar 1 serie em exercicios estaveis ou carga leve se tecnica estiver limpa." },
+      { weeks: "5-6", stimulus: "consolidacao", methods: ["piramide leve apenas se tecnica estavel"], progression_rule: "Consolidar cargas, sem falha, e preparar reavaliacao." },
+    ],
+    weekly_structure: `${workouts.length} sessões/semana alternadas, evitando dias consecutivos de MMII pesado.`,
+    progression_protocol: "Progredir reps antes de carga; regredir amplitude/carga se dor > 3 ou perda técnica.",
+    warnings: [
+      "Plano emergencial gerado sem chamada Anthropic; professor deve revisar antes de usar em caso de dor importante.",
+      "Sem pliometria e sem métodos avançados no início do ciclo.",
+    ],
+    bnito_after_generation: {
+      intent: "notify_student_prescription_ready",
+      question_to_teacher: "Quer que eu avise o aluno que a prescrição foi feita?",
+      suggested_message: "Sua prescrição nova já está pronta no app. Comece leve, priorize técnica e me chame se quiser tirar dúvida de execução.",
+    },
+  };
+}
+
 // ─── SYSTEM PROMPT — METODOLOGIA BN MUSCULAÇÃO ───────────────────────────────
 const SYSTEM_PROMPT = `
 Você é o Expert de BN Musculação/Força e Biomecânica da BN Performance Training.
@@ -940,11 +1112,6 @@ INSTRUÇÃO DE SAÍDA — APENAS JSON VÁLIDO, SEM TEXTO ADICIONAL
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  if (!ANTHROPIC_API_KEY) {
-    return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY não configurada. Adicione o segredo para usar a IA." }), {
-      status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
   const claims = await requireUser(req);
   if (!claims) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -1064,34 +1231,68 @@ INSTRUÇÕES:
 16. Não explique a metodologia fora dos campos do JSON; priorize fechar JSON válido completo.
     `.trim();
 
-    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 16000,
-        system: `${SYSTEM_PROMPT}\n\n${companyAiSystem(aiConfig)}`,
-        messages: [{ role: "user", content: clean(athleteContext) }],
-      }),
-    });
+    let planJson: any = null;
+    let fallbackReason: string | null = null;
 
-    if (!aiResponse.ok) return aiErrorResponse(aiResponse.status);
+    if (ANTHROPIC_API_KEY) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 65000);
+        const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            max_tokens: 16000,
+            system: `${SYSTEM_PROMPT}\n\n${companyAiSystem(aiConfig)}`,
+            messages: [{ role: "user", content: clean(athleteContext) }],
+          }),
+        });
+        clearTimeout(timeoutId);
 
-    const aiData = await aiResponse.json();
-    const rawText = aiData.content?.[0]?.text ?? "";
+        if (!aiResponse.ok) {
+          const details = await aiResponse.text().catch(() => "");
+          fallbackReason = `anthropic_${aiResponse.status}: ${details.slice(0, 240)}`;
+          console.warn("ai-prescribe-workout emergency fallback", fallbackReason);
+        } else {
+          const aiData = await aiResponse.json();
+          const rawText = aiData.content?.[0]?.text ?? "";
+          try {
+            planJson = JSON.parse(rawText.replace(/```json|```/g, "").trim());
+          } catch {
+            fallbackReason = `json_parse_failed: ${rawText.slice(0, 240)}`;
+            console.warn("ai-prescribe-workout emergency fallback", fallbackReason);
+          }
+        }
+      } catch (error) {
+        fallbackReason = `anthropic_error: ${error instanceof Error ? error.message : String(error)}`;
+        console.warn("ai-prescribe-workout emergency fallback", fallbackReason);
+      }
+    } else {
+      fallbackReason = "anthropic_key_missing";
+      console.warn("ai-prescribe-workout emergency fallback", fallbackReason);
+    }
 
-    let planJson = null;
-    try {
-      planJson = JSON.parse(rawText.replace(/```json|```/g, "").trim());
-    } catch {
-      return new Response(
-        JSON.stringify({ error: "Falha ao parsear JSON", raw: rawText.slice(0, 500) }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!planJson) {
+      planJson = buildEmergencyFallbackPlan({
+        catalog: exerciseCatalog,
+        presetKey,
+        selectedPreset,
+        studentName: student_name,
+        objective,
+        fitnessLevel: fitness_level,
+        daysPerWeek: days_per_week,
+        restrictions,
+        assessmentContext: assessment_context,
+        prescriptionIntegration: prescription_integration,
+        bnitoOrchestration: bnito_orchestration,
+        fallbackReason: fallbackReason || "anthropic_unavailable",
+      });
     }
 
     const libraryValidation = validatePlanLibraryUsage(
