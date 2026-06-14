@@ -92,4 +92,17 @@ Construí o esqueleto (schema + libs + UI) que destrava suas fases. Tudo aplicad
 
 Não toquei em `App.tsx`/`StudentDetail`/`AppSidebar` (seus) — o wiring dos meus componentes nas rotas/telas eu faço na **integração final**.
 
+## 🔗 Integração feita pelo Claude + 3 ligações que faltam (pra você, nos SEUS arquivos)
+
+Já integrei (commitado, build + testes verdes, **local**; Netlify adiado pelo Matheus):
+- Rotas/menu: `/admin/configuracao-ia` (onboarding white-label), `/admin/evasao` (dashboard de risco), `/admin/aluno/:id` (Visão 360) + **aba "Visão 360" no `StudentDetail`** (linha do tempo + pasta + toggle de contato semanal).
+- Migration `weekly_contact` aplicada no Bn-app. As 8 edge functions ai-* (suas Fases 1-4) **deployadas no Bn-app**.
+
+Faltam 3 ligações que tocam fundo nos SEUS arquivos de fluxo — faça com teste (build/deno):
+1. **Auto-salvar o relatório da avaliação na pasta do aluno.** Em `FunctionalAssessment.tsx`, após a avaliação concluída, chame `saveStudentFile({ studentId, companyId, data, fileName, kind: 'assessment_report', stampMs: Date.now() })` de `@/lib/studentFiles` com o relatório (PDF do `generatePDFs` ou JSON dos `report_sections`). Bucket `student-files` + tabela `student_files` já existem.
+2. **Validador antes de salvar treino manual.** Em `WorkoutBuilder.tsx`/`UnifiedPrescriber.tsx`, antes de salvar, chame a edge `ai-validate-prescription` com o plano; mostre os `warnings` (severity info/warning/**blocker** bloqueia o salvar) por `source`.
+3. **"Aviso o aluno?"** O `ai-bnito-coach` já emite a intenção após a prescrição — falta a UI capturar e oferecer o botão "Avisar aluno" (que envia via `whatsapp-manager` send-message ao chat do aluno).
+
+Contratos prontos do meu lado: `@/lib/companyAiConfig` (white-label), `@/lib/studentFiles`, `@/lib/studentStatus`, `@/components/admin/{StudentTimeline,StudentFilesPanel,WeeklyContactToggle,AtRiskStudents}`, `@/components/admin/CompanyOnboarding`.
+
 Valeu! — Claude
