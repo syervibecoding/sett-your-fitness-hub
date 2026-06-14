@@ -41,6 +41,9 @@ const UnifiedPrescriber = lazy(() => import("./pages/admin/UnifiedPrescriber"));
 const PrescriptionStudio = lazy(() => import("./pages/admin/PrescriptionStudio"));
 const FunctionalAssessment = lazy(() => import("./pages/admin/FunctionalAssessment"));
 const AICoachHub = lazy(() => import("./pages/admin/AICoachHub"));
+const CompanyOnboarding = lazy(() => import("./components/admin/CompanyOnboarding"));
+const StudentHub = lazy(() => import("./pages/admin/StudentHub"));
+const Evasao = lazy(() => import("./pages/admin/Evasao"));
 
 const CoordinatorDashboard = lazy(() => import("./pages/coordinator/CoordinatorDashboard"));
 const TrainerDashboard = lazy(() => import("./pages/trainer/TrainerDashboard"));
@@ -209,6 +212,9 @@ const App = () => (
           <Route path="/admin/studio" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><PrescriptionStudio /></FeatureRoute>} />
           <Route path="/admin/ia" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><AICoachHub /></FeatureRoute>} />
           <Route path="/admin/avaliacao" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><FunctionalAssessment /></FeatureRoute>} />
+          <Route path="/admin/aluno/:id" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasStudents"><StudentHub /></FeatureRoute>} />
+          <Route path="/admin/evasao" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasStudents"><Evasao /></FeatureRoute>} />
+          <Route path="/admin/configuracao-ia" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasDashboard"><CompanyOnboarding /></FeatureRoute>} />
           <Route path="/admin/announcements" element={<ProtectedRoute allowedRoles={["admin"]}><Announcements /></ProtectedRoute>} />
           <Route path="/coordinator/announcements" element={<ProtectedRoute allowedRoles={["coordinator"]}><Announcements /></ProtectedRoute>} />
 

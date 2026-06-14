@@ -87,6 +87,8 @@ const managementItems = [
   { title: "Agenda", url: "/admin/agenda", icon: CalendarDays },
   { title: "Aparência", url: "/admin/appearance", icon: Palette },
   { title: "Mural", url: "/admin/announcements", icon: Megaphone },
+  { title: "Evasão", url: "/admin/evasao", icon: Activity },
+  { title: "Config IA", url: "/admin/configuracao-ia", icon: Sparkles },
 ];
 
 
