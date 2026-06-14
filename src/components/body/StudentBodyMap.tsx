@@ -10,7 +10,7 @@ import { Loader2, Trash2, Pencil, X } from "lucide-react";
 import { BodyMap } from "./BodyMap";
 import { assessmentToBodyRegions } from "@/lib/assessmentBodyMap";
 import {
-  BODY_REGION_LABELS, type BodyRegionId, type LimitationType,
+  BODY_REGION_LABELS, normalizeGender, type BodyRegionId, type LimitationType,
 } from "@/lib/bodyMap";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +30,7 @@ interface Draft { type: LimitationType; severity: string; note: string }
 
 export function StudentBodyMap({ studentId }: { studentId: string }) {
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [gender, setGender] = useState<"male" | "female">("male");
   const [manual, setManual] = useState<Record<string, Merged>>({});
   const [assess, setAssess] = useState<Merged[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,8 +40,9 @@ export function StudentBodyMap({ studentId }: { studentId: string }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: st } = await supabase.from("students").select("company_id").eq("id", studentId).maybeSingle();
+    const { data: st } = await supabase.from("students").select("company_id, gender").eq("id", studentId).maybeSingle();
     setCompanyId((st as any)?.company_id ?? null);
+    setGender(normalizeGender((st as any)?.gender) ?? "male");
 
     const { data: lims } = await (supabase as any)
       .from("student_body_limitations")
@@ -119,6 +121,7 @@ export function StudentBodyMap({ studentId }: { studentId: string }) {
         </div>
 
         <BodyMap
+          gender={gender}
           getRegionFill={getRegionFill}
           activeRegions={Array.from(byRegion.keys())}
           onRegionClick={openEditor}

@@ -16,7 +16,7 @@ const TYPE_LABEL: Record<LimitationType, string> = {
 };
 const SEV_RANK: Record<string, number> = { severa: 3, moderada: 2, leve: 1 };
 
-export function AssessmentBodyMap({ assessmentJson }: { assessmentJson: unknown }) {
+export function AssessmentBodyMap({ assessmentJson, gender = "male" }: { assessmentJson: unknown; gender?: "male" | "female" }) {
   const limits = useMemo<RegionLimitation[]>(() => {
     try { return assessmentToBodyRegions(assessmentJson) || []; } catch { return []; }
   }, [assessmentJson]);
@@ -49,6 +49,7 @@ export function AssessmentBodyMap({ assessmentJson }: { assessmentJson: unknown 
           Mapa de limitações
         </h3>
         <BodyMap
+          gender={gender}
           getRegionFill={getRegionFill}
           activeRegions={activeRegions}
           footer={

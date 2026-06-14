@@ -21,8 +21,9 @@ import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 import VideoAssessment from "@/components/VideoAssessment";
 import { saveStudentFile } from "@/lib/studentFiles";
 import { AssessmentBodyMap } from "@/components/body/AssessmentBodyMap";
+import { normalizeGender } from "@/lib/bodyMap";
 
-interface Student { id: string; full_name: string; }
+interface Student { id: string; full_name: string; gender?: string | null; }
 
 const IMAGE_SLOTS: { key: string; label: string }[] = [
   { key: "image_postura_frente", label: "Postura — Frontal" },
@@ -75,7 +76,7 @@ export default function FunctionalAssessment() {
     setCompanyId(effectiveCompanyId);
     (async () => {
       const { data: list } = await supabase.from("students")
-        .select("id, full_name").eq("company_id", effectiveCompanyId).order("full_name");
+        .select("id, full_name, gender").eq("company_id", effectiveCompanyId).order("full_name");
       setStudents(list || []);
     })();
   }, [effectiveCompanyId]);
@@ -420,7 +421,7 @@ export default function FunctionalAssessment() {
                       )}
                     </div>
                   )}
-                  <AssessmentBodyMap assessmentJson={json} />
+                  <AssessmentBodyMap assessmentJson={json} gender={normalizeGender(student?.gender) ?? "male"} />
                   {json?.direcionamento_protocolo?.protocolo && (
                     <div className="rounded border border-line p-3">
                       <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground mb-1">Direcionamento de protocolo</p>

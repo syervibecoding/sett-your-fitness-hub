@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, BrainCircuit, Sparkles, MessageCircle, Loader2, AlertCircle } from "lucide-react";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 import { BodyMap } from "@/components/body/BodyMap";
-import { regionForLibraryGroup, BODY_REGION_LABELS, type BodyRegionId } from "@/lib/bodyMap";
+import { regionForLibraryGroup, normalizeGender, BODY_REGION_LABELS, type BodyRegionId } from "@/lib/bodyMap";
 
 interface Exercise {
   id: string;
@@ -143,7 +143,7 @@ export default function WorkoutBuilder() {
   const [bodyRegion, setBodyRegion] = useState<BodyRegionId | null>(null);
   const [videoModal, setVideoModal] = useState<{ type: "path" | "url"; value: string } | null>(null);
   const [saving, setSaving] = useState(false);
-  const [cycleInfo, setCycleInfo] = useState<{ cycle_number: number; student_name: string; student_id?: string; company_id?: string | null } | null>(null);
+  const [cycleInfo, setCycleInfo] = useState<{ cycle_number: number; student_name: string; student_id?: string; company_id?: string | null; gender?: "male" | "female" } | null>(null);
   const [showVolume, setShowVolume] = useState(true);
   const [bnitoQuestion, setBnitoQuestion] = useState("");
   const [bnitoLoading, setBnitoLoading] = useState<"review" | "ask" | null>(null);
@@ -178,7 +178,7 @@ export default function WorkoutBuilder() {
       if (enrollment) {
         const { data: student } = await supabase
           .from("students")
-          .select("full_name")
+          .select("full_name, gender")
           .eq("id", enrollment.student_id)
           .single();
         setCycleInfo({
@@ -186,6 +186,7 @@ export default function WorkoutBuilder() {
           student_name: student?.full_name || "Aluno",
           student_id: enrollment.student_id,
           company_id: data.company_id || enrollment.company_id,
+          gender: normalizeGender((student as any)?.gender) ?? "male",
         });
       }
     }
@@ -1078,6 +1079,7 @@ export default function WorkoutBuilder() {
                 Selecione pelo boneco{bodyRegion ? ` · ${BODY_REGION_LABELS[bodyRegion]}` : ""}
               </p>
               <BodyMap
+                gender={cycleInfo?.gender ?? "male"}
                 onRegionClick={(id) => setBodyRegion((cur) => (cur === id ? null : id))}
                 activeRegions={bodyRegion ? [bodyRegion] : []}
                 getRegionFill={(id) => (id === bodyRegion ? "hsl(var(--primary))" : undefined)}
