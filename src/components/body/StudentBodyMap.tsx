@@ -1,0 +1,211 @@
+// Boneco do PERFIL do aluno (admin): SEMPRE visível (vazio se não houver dado), mostra as
+// limitações da última avaliação funcional E permite PREENCHIMENTO MANUAL pelo professor
+// (clicar numa região → tipo/gravidade/nota → salva em student_body_limitations).
+import { useEffect, useState, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2, Trash2, Pencil, X } from "lucide-react";
+import { BodyMap } from "./BodyMap";
+import { assessmentToBodyRegions } from "@/lib/assessmentBodyMap";
+import {
+  BODY_REGION_LABELS, type BodyRegionId, type LimitationType,
+} from "@/lib/bodyMap";
+import { cn } from "@/lib/utils";
+
+const TYPE_COLOR: Record<LimitationType, string> = { muscular: "#f59e0b", articular: "#3b82f6", neural: "#a855f7" };
+const TYPE_LABEL: Record<LimitationType, string> = { muscular: "Muscular", articular: "Articular", neural: "Neural" };
+const TYPES: LimitationType[] = ["muscular", "articular", "neural"];
+const SEVERITIES = ["leve", "moderada", "severa"] as const;
+
+interface Merged {
+  region: BodyRegionId;
+  type: LimitationType;
+  severity?: string | null;
+  note?: string | null;
+  source: "manual" | "assessment";
+}
+interface Draft { type: LimitationType; severity: string; note: string }
+
+export function StudentBodyMap({ studentId }: { studentId: string }) {
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [manual, setManual] = useState<Record<string, Merged>>({});
+  const [assess, setAssess] = useState<Merged[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<BodyRegionId | null>(null);
+  const [draft, setDraft] = useState<Draft>({ type: "muscular", severity: "", note: "" });
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data: st } = await supabase.from("students").select("company_id").eq("id", studentId).maybeSingle();
+    setCompanyId((st as any)?.company_id ?? null);
+
+    const { data: lims } = await (supabase as any)
+      .from("student_body_limitations")
+      .select("region, type, severity, note")
+      .eq("student_id", studentId);
+    const m: Record<string, Merged> = {};
+    (lims ?? []).forEach((l: any) => { m[l.region] = { region: l.region, type: l.type, severity: l.severity, note: l.note, source: "manual" }; });
+    setManual(m);
+
+    const { data: a } = await supabase
+      .from("functional_assessments")
+      .select("assessment_json")
+      .eq("student_id", studentId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    let regs: Merged[] = [];
+    try {
+      regs = ((a as any)?.assessment_json ? assessmentToBodyRegions((a as any).assessment_json) : [])
+        .map((r) => ({ region: r.region, type: r.type, severity: r.severity, note: r.note, source: "assessment" as const }));
+    } catch { regs = []; }
+    setAssess(regs);
+    setLoading(false);
+  }, [studentId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Merge: avaliação primeiro, manual sobrescreve por região.
+  const byRegion = new Map<BodyRegionId, Merged>();
+  for (const r of assess) if (!byRegion.has(r.region)) byRegion.set(r.region, r);
+  for (const region of Object.keys(manual)) byRegion.set(region as BodyRegionId, manual[region]);
+  const items = Array.from(byRegion.values());
+
+  const getRegionFill = (id: BodyRegionId) => (byRegion.has(id) ? TYPE_COLOR[byRegion.get(id)!.type] : undefined);
+
+  const openEditor = (region: BodyRegionId) => {
+    const cur = byRegion.get(region);
+    setDraft({ type: cur?.type ?? "muscular", severity: cur?.severity ?? "", note: cur?.note ?? "" });
+    setEditing(region);
+  };
+
+  const saveDraft = async () => {
+    if (!editing || !companyId) return;
+    setSaving(true);
+    await (supabase as any).from("student_body_limitations").upsert({
+      student_id: studentId, company_id: companyId, region: editing,
+      type: draft.type, severity: draft.severity || null, note: draft.note.trim() || null,
+      source: "manual", updated_at: new Date().toISOString(),
+    }, { onConflict: "student_id,region" });
+    setSaving(false);
+    setEditing(null);
+    await load();
+  };
+
+  const removeRegion = async (region: BodyRegionId) => {
+    setSaving(true);
+    await (supabase as any).from("student_body_limitations").delete().eq("student_id", studentId).eq("region", region);
+    setSaving(false);
+    setEditing(null);
+    await load();
+  };
+
+  if (loading) {
+    return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+  }
+
+  const usedTypes = Array.from(new Set(items.map((i) => i.type)));
+  const editingIsManual = editing ? manual[editing]?.source === "manual" : false;
+
+  return (
+    <Card className="bg-card border-border">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-mono-data font-semibold text-muted-foreground uppercase tracking-wider">Mapa de limitações</h3>
+          <span className="text-[11px] text-muted-foreground">Clique numa região para marcar</span>
+        </div>
+
+        <BodyMap
+          getRegionFill={getRegionFill}
+          activeRegions={Array.from(byRegion.keys())}
+          onRegionClick={openEditor}
+          footer={
+            <div className="flex items-center justify-center gap-3 flex-wrap mt-1">
+              {(usedTypes.length ? usedTypes : TYPES).map((t) => (
+                <span key={t} className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: TYPE_COLOR[t] }} />
+                  {TYPE_LABEL[t]}
+                </span>
+              ))}
+            </div>
+          }
+        />
+
+        {/* Editor inline da região clicada */}
+        {editing && (
+          <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-foreground">{BODY_REGION_LABELS[editing]}</p>
+              <button onClick={() => setEditing(null)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground mb-1">Tipo</p>
+              <div className="flex gap-1.5">
+                {TYPES.map((t) => (
+                  <button key={t} type="button" onClick={() => setDraft((d) => ({ ...d, type: t }))}
+                    className={cn("px-2.5 py-1 rounded-md text-xs border transition-colors",
+                      draft.type === t ? "text-white border-transparent" : "text-muted-foreground border-border hover:bg-muted/50")}
+                    style={draft.type === t ? { background: TYPE_COLOR[t] } : undefined}>
+                    {TYPE_LABEL[t]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-[11px] text-muted-foreground mb-1">Gravidade</p>
+              <div className="flex gap-1.5">
+                {SEVERITIES.map((s) => (
+                  <button key={s} type="button" onClick={() => setDraft((d) => ({ ...d, severity: d.severity === s ? "" : s }))}
+                    className={cn("px-2.5 py-1 rounded-md text-xs border capitalize transition-colors",
+                      draft.severity === s ? "bg-primary text-primary-foreground border-transparent" : "text-muted-foreground border-border hover:bg-muted/50")}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Textarea value={draft.note} onChange={(e) => setDraft((d) => ({ ...d, note: e.target.value }))}
+              placeholder="Observação (opcional): ex. dor anterior do joelho ao agachar." className="min-h-[60px]" />
+            <div className="flex items-center justify-between">
+              {editingIsManual ? (
+                <Button variant="ghost" size="sm" className="text-destructive" disabled={saving} onClick={() => removeRegion(editing)}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Remover
+                </Button>
+              ) : <span />}
+              <Button size="sm" disabled={saving} onClick={saveDraft}>
+                {saving ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null} Salvar
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Lista das limitações */}
+        {items.length > 0 ? (
+          <div className="mt-3 space-y-1.5">
+            {items.map((l) => (
+              <button key={l.region} onClick={() => openEditor(l.region)} className="w-full flex items-start gap-2 text-xs text-left hover:bg-muted/40 rounded px-1.5 py-1">
+                <span className="h-2.5 w-2.5 rounded-full mt-1 shrink-0" style={{ background: TYPE_COLOR[l.type] }} />
+                <div className="min-w-0 flex-1">
+                  <span className="font-medium text-foreground">{BODY_REGION_LABELS[l.region]}</span>
+                  <span className="text-muted-foreground"> · {TYPE_LABEL[l.type]}{l.severity ? ` (${l.severity})` : ""}</span>
+                  <span className={cn("ml-1.5 text-[9px] uppercase tracking-wide rounded px-1",
+                    l.source === "manual" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+                    {l.source === "manual" ? "manual" : "avaliação"}
+                  </span>
+                  {l.note && <p className="text-[11px] text-muted-foreground">{l.note}</p>}
+                </div>
+                <Pencil className="h-3 w-3 text-muted-foreground mt-1 shrink-0" />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground text-center mt-3">
+            Informação ainda não inserida — gere uma avaliação funcional ou clique numa região para marcar manualmente.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
