@@ -63,6 +63,10 @@ interface BnitoResult {
   context_flags?: Array<{ source?: string; flag?: string; impact?: string }>;
   volume_review?: Array<{ muscle_group?: string; weekly_sets?: number; status?: string; note?: string }>;
   questions_to_professor?: string[];
+  next_intent?: {
+    type?: string;
+    question_to_teacher?: string | null;
+  };
 }
 
 interface BnitoResponse {
@@ -87,6 +91,21 @@ interface MuscleTarget {
   muscle_group_id: string;
   role: string;
   volume_percentage: number;
+}
+
+interface ValidationWarning {
+  severity?: "info" | "warning" | "blocker";
+  code?: string;
+  message?: string;
+  recommendation?: string;
+  source?: string;
+}
+
+interface PrescriptionValidationResult {
+  status?: "ok" | "warnings" | "blocked";
+  blockers?: ValidationWarning[];
+  warnings?: ValidationWarning[];
+  volume_review?: Array<{ muscle_group?: string; weekly_sets?: number; status?: string; note?: string }>;
 }
 
 const WORKOUT_LABELS = ["A", "B", "C", "D", "E", "F", "G"];
@@ -126,6 +145,8 @@ export default function WorkoutBuilder() {
   const [bnitoQuestion, setBnitoQuestion] = useState("");
   const [bnitoLoading, setBnitoLoading] = useState<"review" | "ask" | null>(null);
   const [bnitoResponse, setBnitoResponse] = useState<BnitoResponse | null>(null);
+  const [validationResult, setValidationResult] = useState<PrescriptionValidationResult | null>(null);
+  const [notifyingStudent, setNotifyingStudent] = useState(false);
 
   // Muscle targets for all exercises in library (cached)
   const [muscleTargets, setMuscleTargets] = useState<MuscleTarget[]>([]);
@@ -289,6 +310,23 @@ export default function WorkoutBuilder() {
       return;
     }
     setSaving(true);
+    setValidationResult(null);
+
+    const validation = await validateBeforeSave();
+    if (!validation) {
+      setSaving(false);
+      return;
+    }
+    const blockerCount = (validation.blockers || []).length;
+    if (blockerCount > 0 || validation.status === "blocked") {
+      setSaving(false);
+      toast({
+        title: "BNITO bloqueou o salvamento",
+        description: "Resolva os pontos críticos do validador antes de salvar.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     for (const workout of workouts) {
       const payload = {
@@ -320,6 +358,57 @@ export default function WorkoutBuilder() {
     setSaving(false);
     toast({ title: "Todos os treinos salvos!" });
     navigate(returnTo);
+  };
+
+  const validateBeforeSave = async (): Promise<PrescriptionValidationResult | null> => {
+    try {
+      const plan = {
+        cycle_name: cycleInfo ? `Ciclo ${cycleInfo.cycle_number}` : "Treino manual",
+        duration_weeks: 6,
+        objective: "manual",
+        workouts: workouts.map((workout, workoutIndex) => ({
+          name: workout.title,
+          description: workout.description,
+          day_of_week: workoutIndex + 1,
+          exercises: workout.exercises.map((exercise, exerciseIndex) => ({
+            phase: "forca_global",
+            exercise_id: exercise.exercise_id,
+            exercise_name: exercise.exercise_name,
+            muscle_group: exercise.muscle_group,
+            sets: Number.parseInt(exercise.sets, 10) || 0,
+            reps: exercise.reps,
+            rest_seconds: Number.parseInt(exercise.rest, 10) || 0,
+            exercise_order: exerciseIndex + 1,
+            notes: exercise.notes,
+            set_types: exercise.set_types || [],
+          })),
+        })),
+      };
+      const { data, error } = await supabase.functions.invoke<{ result?: PrescriptionValidationResult; error?: string }>("ai-validate-prescription", {
+        body: {
+          company_id: cycleInfo?.company_id,
+          objective: "manual",
+          fitness_level: "intermediario",
+          block_number: 1,
+          plan,
+        },
+      });
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+      const result = data?.result || { status: "ok", warnings: [], blockers: [] };
+      setValidationResult(result);
+      const warningsCount = (result.warnings || []).length;
+      if (warningsCount > 0) {
+        toast({
+          title: "Validador encontrou avisos",
+          description: `${warningsCount} ponto(s) para revisar antes/depois de salvar.`,
+        });
+      }
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro inesperado";
+      toast({ title: "Falha no validador", description: message, variant: "destructive" });
+      return null;
+    }
   };
 
   // Volume calculation
@@ -426,6 +515,54 @@ export default function WorkoutBuilder() {
   };
 
   const bnitoResult = bnitoResponse?.result;
+  const shouldOfferStudentNotice = bnitoResult?.next_intent?.type === "notify_student_prescription_ready";
+  const allValidationWarnings = [
+    ...(validationResult?.blockers || []),
+    ...(validationResult?.warnings || []),
+  ];
+  const validationWarningsBySource = allValidationWarnings.reduce<Record<string, ValidationWarning[]>>((acc, warning) => {
+    const source = warning.source || "geral";
+    acc[source] = acc[source] || [];
+    acc[source].push(warning);
+    return acc;
+  }, {});
+
+  const notifyStudent = async (message?: string) => {
+    if (!cycleInfo?.student_id || !cycleInfo.company_id) {
+      toast({ title: "Aluno sem contexto de WhatsApp", variant: "destructive" });
+      return;
+    }
+    setNotifyingStudent(true);
+    try {
+      const { data: chat, error: chatError } = await (supabase as any)
+        .from("whatsapp_chats")
+        .select("id, remote_jid")
+        .eq("company_id", cycleInfo.company_id)
+        .eq("student_id", cycleInfo.student_id)
+        .order("last_message_at", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+      if (chatError) throw new Error(chatError.message);
+      if (!chat?.remote_jid) throw new Error("Aluno sem chat do WhatsApp vinculado.");
+      const content = message || `Oi, ${cycleInfo.student_name}! Sua prescrição foi atualizada no app. Dá uma olhada e me chama se quiser tirar dúvida de execução.`;
+      const { data, error } = await supabase.functions.invoke("whatsapp-manager", {
+        body: {
+          action: "send-message",
+          companyId: cycleInfo.company_id,
+          chatId: chat.id,
+          remoteJid: chat.remote_jid,
+          content,
+        },
+      });
+      if (error || (data as any)?.error) throw new Error((data as any)?.details || (data as any)?.error || error?.message);
+      toast({ title: "Aluno avisado", description: "Mensagem enviada pelo WhatsApp." });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Erro inesperado";
+      toast({ title: "Falha ao avisar aluno", description: errorMessage, variant: "destructive" });
+    } finally {
+      setNotifyingStudent(false);
+    }
+  };
 
   return (
     <>
@@ -837,10 +974,57 @@ export default function WorkoutBuilder() {
                         </ul>
                       </div>
                     )}
+
+                    {shouldOfferStudentNotice && (
+                      <div className="rounded-md border border-navy/20 bg-navy/5 p-3 text-xs font-sans">
+                        <p className="font-semibold text-foreground">
+                          {bnitoResult.next_intent?.question_to_teacher || "Quer que eu avise o aluno que a prescrição foi feita?"}
+                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="mt-2 w-full"
+                          onClick={() => notifyStudent()}
+                          disabled={notifyingStudent}
+                        >
+                          {notifyingStudent ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MessageCircle className="h-4 w-4 mr-2" />}
+                          Avisar aluno
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            {allValidationWarnings.length > 0 && (
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-primary text-sm flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    Validador pré-salvar
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {Object.entries(validationWarningsBySource).map(([source, warnings]) => (
+                    <div key={source} className="rounded-md border border-border p-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground font-sans">{source}</p>
+                      <div className="mt-2 space-y-2">
+                        {warnings.map((warning, idx) => (
+                          <div key={`${warning.code || warning.message}-${idx}`} className="text-xs font-sans">
+                            <Badge variant={warning.severity === "blocker" ? "destructive" : "outline"} className="mb-1 text-[10px]">
+                              {warning.severity || "warning"}
+                            </Badge>
+                            <p className="text-foreground">{warning.message}</p>
+                            {warning.recommendation && <p className="text-muted-foreground">{warning.recommendation}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>

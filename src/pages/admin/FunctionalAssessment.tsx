@@ -17,6 +17,7 @@ import {
 import { Loader2, Upload, X, ClipboardCheck, AlertCircle } from "lucide-react";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 import VideoAssessment from "@/components/VideoAssessment";
+import { saveStudentFile } from "@/lib/studentFiles";
 
 interface Student { id: string; full_name: string; }
 
@@ -131,10 +132,40 @@ export default function FunctionalAssessment() {
       });
       if (e || data?.error) throw new Error(data?.error || e?.message);
       setResult(data);
+      await saveAssessmentReport(data);
     } catch (err: any) {
       setError(err.message || "Erro ao gerar avaliação.");
     }
     setLoading(false);
+  }
+
+  async function saveAssessmentReport(data: any) {
+    if (!studentId || !companyId || !data) return;
+    const reportPayload = {
+      student_id: studentId,
+      student_name: student?.full_name,
+      assessment_id: data.id ?? data.assessment_id ?? null,
+      report_text: data.report_text ?? null,
+      report_sections: data.assessment_json?.report_sections ?? null,
+      prescription_context: data.assessment_json?.prescription_context ?? null,
+      generated_at: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(reportPayload, null, 2)], { type: "application/json" });
+    const safeName = (student?.full_name || "aluno").replace(/[^\w.\-]+/g, "_");
+    const { error: fileError } = await saveStudentFile({
+      studentId,
+      companyId,
+      data: blob,
+      fileName: `avaliacao-funcional-${safeName}.json`,
+      kind: "assessment_report",
+      contentType: "application/json",
+      stampMs: Date.now(),
+      metadata: {
+        source: "FunctionalAssessment",
+        assessment_id: reportPayload.assessment_id,
+      },
+    });
+    if (fileError) setError(`Avaliação gerada, mas não consegui salvar na pasta do aluno: ${fileError}`);
   }
 
   const json = result?.assessment_json;
@@ -189,7 +220,10 @@ export default function FunctionalAssessment() {
                 companyId={companyId}
                 assessmentContext={assessmentContext}
                 onComplete={(_, videoResult) => {
-                  if (videoResult) setResult(videoResult);
+                  if (videoResult) {
+                    setResult(videoResult);
+                    void saveAssessmentReport(videoResult);
+                  }
                 }}
               />
             )}

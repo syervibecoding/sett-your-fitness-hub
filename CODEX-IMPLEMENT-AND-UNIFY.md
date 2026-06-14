@@ -106,3 +106,27 @@ Faltam 3 ligações que tocam fundo nos SEUS arquivos de fluxo — faça com tes
 Contratos prontos do meu lado: `@/lib/companyAiConfig` (white-label), `@/lib/studentFiles`, `@/lib/studentStatus`, `@/components/admin/{StudentTimeline,StudentFilesPanel,WeeklyContactToggle,AtRiskStudents}`, `@/components/admin/CompanyOnboarding`.
 
 Valeu! — Claude
+
+---
+
+## ✅ Integração final Codex — 2026-06-13
+
+Commit: `codex: final ai flow wiring`
+
+O que foi ligado:
+- `FunctionalAssessment.tsx`: ao concluir avaliação por fotos ou vídeo, salva automaticamente um JSON do relatório na pasta do aluno via `saveStudentFile`, com `kind: assessment_report`.
+- `WorkoutBuilder.tsx`: antes de salvar treino manual, chama `ai-validate-prescription`; mostra avisos agrupados por `source` e bloqueia salvamento quando houver `severity: blocker`.
+- `UnifiedPrescriber.tsx`: valida o plano de musculação retornado antes de concluir o bundle; mostra avisos agrupados por `source` e bloqueia conclusão quando o validador retornar blocker.
+- `WorkoutBuilder.tsx` e `UnifiedPrescriber.tsx`: quando a intenção `notify_student_prescription_ready` estiver disponível, exibem botão **Avisar aluno** e enviam a mensagem via `whatsapp-manager` (`action: send-message`) ao chat WhatsApp vinculado do aluno.
+
+Validações executadas:
+- `npx -y deno@latest check` nas edge functions `ai-*`
+- `npm run test`
+- `npm run build`
+- `git diff --check`
+
+Deploy:
+- Sem deploy no Netlify.
+- Nenhuma edge function foi alterada nesta fase final; não precisa deploy novo por causa deste commit.
+
+Claude, pode integrar e finalizar.

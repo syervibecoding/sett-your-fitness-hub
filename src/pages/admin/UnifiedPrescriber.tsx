@@ -20,7 +20,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Loader2, CheckCircle2, Circle, AlertCircle, Dumbbell, Activity,
-  ChevronDown, ChevronUp, ClipboardCheck,
+  ChevronDown, ChevronUp, ClipboardCheck, MessageCircle,
 } from "lucide-react";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 import {
@@ -44,6 +44,19 @@ interface Anamnese {
 }
 type Modality = "musculacao" | "corrida";
 type GenStatus = "idle" | "generating" | "done" | "error";
+interface ValidationWarning {
+  severity?: "info" | "warning" | "blocker";
+  code?: string;
+  message?: string;
+  recommendation?: string;
+  source?: string;
+}
+interface PrescriptionValidationResult {
+  status?: "ok" | "warnings" | "blocked";
+  blockers?: ValidationWarning[];
+  warnings?: ValidationWarning[];
+  volume_review?: Array<{ muscle_group?: string; weekly_sets?: number; status?: string; note?: string }>;
+}
 
 const DEFAULT_ANAMNESE: Anamnese = {
   age: "", body_fat_percent: "", objective: "performance",
@@ -70,6 +83,8 @@ export default function UnifiedPrescriber() {
   const [results, setResults]       = useState<Record<Modality, any>>({ musculacao: null, corrida: null });
   const [generating, setGenerating] = useState(false);
   const [error, setError]           = useState("");
+  const [validationResult, setValidationResult] = useState<PrescriptionValidationResult | null>(null);
+  const [notifyingStudent, setNotifyingStudent] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -187,10 +202,62 @@ export default function UnifiedPrescriber() {
     return data.id;
   }
 
+  async function validateStrengthPlan(plan: any, anamneseContext: any, functionalAssessmentContext: any): Promise<PrescriptionValidationResult | null> {
+    const { data, error: e } = await supabase.functions.invoke<{ result?: PrescriptionValidationResult; error?: string }>("ai-validate-prescription", {
+      body: {
+        company_id: companyId,
+        student_id: studentId,
+        objective: anamnese.objective,
+        fitness_level: anamnese.activity_level,
+        block_number: 1,
+        plan,
+        anamnese_context: anamneseContext,
+        assessment_context: functionalAssessmentContext,
+      },
+    });
+    if (e || data?.error) throw new Error(data?.error || e?.message);
+    const result = data?.result || { status: "ok", warnings: [], blockers: [] };
+    setValidationResult(result);
+    return result;
+  }
+
+  async function notifyStudent(message?: string) {
+    if (!studentId || !companyId) return;
+    setNotifyingStudent(true);
+    setError("");
+    try {
+      const { data: chat, error: chatError } = await (supabase as any)
+        .from("whatsapp_chats")
+        .select("id, remote_jid")
+        .eq("company_id", companyId)
+        .eq("student_id", studentId)
+        .order("last_message_at", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+      if (chatError) throw new Error(chatError.message);
+      if (!chat?.remote_jid) throw new Error("Aluno sem chat do WhatsApp vinculado.");
+      const content = message || `Oi, ${student?.full_name || "tudo bem"}! Sua prescrição nova já está pronta no app. Dá uma olhada e me chama se quiser tirar dúvida de execução.`;
+      const { data, error } = await supabase.functions.invoke("whatsapp-manager", {
+        body: {
+          action: "send-message",
+          companyId,
+          chatId: chat.id,
+          remoteJid: chat.remote_jid,
+          content,
+        },
+      });
+      if (error || (data as any)?.error) throw new Error((data as any)?.details || (data as any)?.error || error?.message);
+    } catch (err: any) {
+      setError(err.message || "Erro ao avisar aluno.");
+    } finally {
+      setNotifyingStudent(false);
+    }
+  }
+
   async function generate() {
     if (!studentId || !companyId) { setError("Selecione um aluno."); return; }
     if (modalities.size === 0) { setError("Selecione ao menos uma prescrição."); return; }
-    setGenerating(true); setError("");
+    setGenerating(true); setError(""); setValidationResult(null);
     setStatus({ musculacao: "idle", corrida: "idle" });
     setResults({ musculacao: null, corrida: null });
 
@@ -246,6 +313,14 @@ export default function UnifiedPrescriber() {
         });
         if (e || data?.error) throw new Error(data?.error || e?.message);
         strengthPlan = data?.plan; strengthPlanId = data?.id ?? null;
+        const validation = await validateStrengthPlan(
+          strengthPlan,
+          { ...anamnese, id: savedAnamneseId },
+          assessmentCtx,
+        );
+        if (validation?.status === "blocked" || (validation?.blockers || []).length > 0) {
+          throw new Error("Validador bloqueou a prescrição de musculação. Revise os pontos críticos antes de concluir.");
+        }
         setResults(r => ({ ...r, musculacao: data?.plan }));
         setStatus(s => ({ ...s, musculacao: "done" }));
       }
@@ -359,6 +434,18 @@ export default function UnifiedPrescriber() {
     if (s === "error")      return <AlertCircle className="h-4 w-4 text-destructive" />;
     return <Circle className="h-4 w-4 text-muted-foreground" />;
   };
+  const allValidationWarnings = [
+    ...(validationResult?.blockers || []),
+    ...(validationResult?.warnings || []),
+  ];
+  const validationWarningsBySource = allValidationWarnings.reduce<Record<string, ValidationWarning[]>>((acc, warning) => {
+    const source = warning.source || "geral";
+    acc[source] = acc[source] || [];
+    acc[source].push(warning);
+    return acc;
+  }, {});
+  const noticeIntent = results.musculacao?.bnito_after_generation;
+  const shouldOfferStudentNotice = noticeIntent?.intent === "notify_student_prescription_ready";
 
   return (
     <>
@@ -598,6 +685,30 @@ export default function UnifiedPrescriber() {
 
                 {error && <p className="text-sm text-destructive mt-3">{error}</p>}
 
+                {allValidationWarnings.length > 0 && (
+                  <div className="mt-4 rounded-lg border border-line p-3 text-xs">
+                    <p className="mb-2 font-medium text-foreground">Validador pré-salvar</p>
+                    <div className="space-y-2">
+                      {Object.entries(validationWarningsBySource).map(([source, warnings]) => (
+                        <div key={source} className="rounded border border-line p-2">
+                          <p className="text-eyebrow">{source}</p>
+                          <div className="mt-1 space-y-2">
+                            {warnings.map((warning, idx) => (
+                              <div key={`${warning.code || warning.message}-${idx}`}>
+                                <Badge variant={warning.severity === "blocker" ? "destructive" : "outline"} className="mb-1 text-[10px]">
+                                  {warning.severity || "warning"}
+                                </Badge>
+                                <p className="text-foreground">{warning.message}</p>
+                                {warning.recommendation && <p className="text-muted-foreground">{warning.recommendation}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <Button className="w-full mt-4" onClick={generate} disabled={generating || modalities.size === 0}>
                   {generating
                     ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando prescrições…</>
@@ -629,6 +740,23 @@ export default function UnifiedPrescriber() {
                           </div>
                         ))}
                       </div>
+                      {shouldOfferStudentNotice && (
+                        <div className="mt-3 rounded border border-navy/20 bg-navy/5 p-3">
+                          <p className="text-xs font-medium text-foreground">
+                            {noticeIntent?.question_to_teacher || "Quer que eu avise o aluno que a prescrição foi feita?"}
+                          </p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="mt-2"
+                            onClick={() => notifyStudent(noticeIntent?.suggested_message)}
+                            disabled={notifyingStudent}
+                          >
+                            {notifyingStudent ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageCircle className="mr-2 h-4 w-4" />}
+                            Avisar aluno
+                          </Button>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 )}
