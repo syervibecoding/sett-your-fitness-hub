@@ -247,6 +247,32 @@ function asTextArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map((item) => String(item ?? "").trim()).filter(Boolean) : [];
 }
 
+function chunkArray<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+async function selectByExerciseIdChunks(
+  supabase: any,
+  table: string,
+  columns: string,
+  exerciseIds: string[],
+  options: { companyId?: string | null; chunkSize?: number } = {},
+) {
+  const rows: any[] = [];
+  for (const ids of chunkArray(exerciseIds, options.chunkSize ?? 80)) {
+    let query = supabase.from(table).select(columns).in("exercise_id", ids);
+    if (options.companyId) query = query.eq("company_id", options.companyId);
+    const { data, error } = await query;
+    if (error) return { data: rows, error };
+    rows.push(...((data ?? []) as any[]));
+  }
+  return { data: rows, error: null };
+}
+
 async function loadExerciseCatalog(
   supabase: any,
   companyId: string | null,
@@ -272,24 +298,30 @@ async function loadExerciseCatalog(
 
   const [targetsResult, groupsResult, overridesResult, metadataResult] = await Promise.all([
     exerciseIds.length
-      ? supabase
-          .from("exercise_muscle_targets")
-          .select("exercise_id, muscle_group_id, role, volume_percentage")
-          .in("exercise_id", exerciseIds)
+      ? selectByExerciseIdChunks(
+          supabase,
+          "exercise_muscle_targets",
+          "exercise_id, muscle_group_id, role, volume_percentage",
+          exerciseIds,
+        )
       : Promise.resolve({ data: [], error: null }),
     supabase.from("muscle_groups").select("id, name"),
     companyId && exerciseIds.length
-      ? supabase
-          .from("company_exercise_volumes")
-          .select("exercise_id, muscle_group_id, volume_percentage")
-          .eq("company_id", companyId)
-          .in("exercise_id", exerciseIds)
+      ? selectByExerciseIdChunks(
+          supabase,
+          "company_exercise_volumes",
+          "exercise_id, muscle_group_id, volume_percentage",
+          exerciseIds,
+          { companyId },
+        )
       : Promise.resolve({ data: [], error: null }),
     exerciseIds.length
-      ? supabase
-          .from("exercise_metadata")
-          .select("exercise_id, contraindications, regressions, progressions, equivalent_substitutes, pain_limitation_tags")
-          .in("exercise_id", exerciseIds)
+      ? selectByExerciseIdChunks(
+          supabase,
+          "exercise_metadata",
+          "exercise_id, contraindications, regressions, progressions, equivalent_substitutes, pain_limitation_tags",
+          exerciseIds,
+        )
       : Promise.resolve({ data: [], error: null }),
   ]);
 
@@ -1027,6 +1059,8 @@ INSTRUÇÕES:
 12. Retorne exercise_id em todos os itens de treino.
 13. Ao final, inclua bnito_after_generation com a intenção: "Quer que eu avise o aluno que a prescrição foi feita?"
 14. Retorne APENAS o JSON, sem texto adicional, sem markdown.
+15. Seja compacto: no máximo 6 exercícios por sessão, textos de cues/notas com até 140 caracteres, sem parágrafos longos.
+16. Não explique a metodologia fora dos campos do JSON; priorize fechar JSON válido completo.
     `.trim();
 
     const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
@@ -1038,7 +1072,7 @@ INSTRUÇÕES:
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 8000,
+        max_tokens: 16000,
         system: `${SYSTEM_PROMPT}\n\n${companyAiSystem(aiConfig)}`,
         messages: [{ role: "user", content: clean(athleteContext) }],
       }),

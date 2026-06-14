@@ -6,6 +6,7 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const MODEL = Deno.env.get("ANTHROPIC_MODEL_FAST") || Deno.env.get("ANTHROPIC_MODEL") || "claude-haiku-4-5-20251001";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -506,30 +507,46 @@ INSTRUÇÕES:
 9. SUBSTITUIÇÕES: em cada dica e no campo "substitutions", ofereça 2-3 trocas usando SÓ alimentos que o aluno gosta; NUNCA inclua os que ele rejeitou.
 10. Use porções aproximadas e linguagem prática ("um punhado", "uma porção de", "um pão"), sem gramas/calorias exatas no nível da refeição. Você NÃO substitui nutricionista; havendo condição clínica ou red flag, oriente procurar profissional com CRN.
 11. Verifique TODAS as linhas vermelhas antes de prescrever; se o resultado integrado apontar baixa recuperação, dor ou red/yellow flags, reduza agressividade do déficit/superávit e destaque acompanhamento profissional.
-12. Retorne APENAS o JSON, sem texto adicional
+12. Retorne APENAS o JSON, sem texto adicional.
+13. Seja compacto: 4 a 6 dicas nutricionais, até 4 suplementos, até 5 substituições e frases curtas.
+14. Priorize JSON válido completo; não escreva cardápio fechado nem explicações longas.
     `.trim();
 
-    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-4-5-20250929",
-        max_tokens: 8000,
-        system: `${SYSTEM_PROMPT}\n\n${companyAiSystem(aiConfig)}`,
-        messages: [{ role: "user", content: clean(athleteContext) }],
-      }),
-    });
+    let rawText = "";
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 55000);
+      const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: 5000,
+          system: `${SYSTEM_PROMPT}\n\n${companyAiSystem(aiConfig)}`,
+          messages: [{ role: "user", content: clean(athleteContext) }],
+        }),
+      });
+      clearTimeout(timeout);
 
-    const aiData = await aiResponse.json();
-    const rawText = aiData.content?.[0]?.text ?? "";
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text().catch(() => "");
+        console.warn("ai-nutrition-plan fallback: Anthropic non-2xx", aiResponse.status, errorText.slice(0, 300));
+      } else {
+        const aiData = await aiResponse.json();
+        rawText = aiData.content?.[0]?.text ?? "";
+      }
+    } catch (error) {
+      console.warn("ai-nutrition-plan fallback: Anthropic timeout/error", error instanceof Error ? error.message : String(error));
+    }
 
     let planJson = null;
     try {
-      planJson = JSON.parse(rawText.replace(/```json|```/g, "").trim());
+      planJson = rawText ? JSON.parse(rawText.replace(/```json|```/g, "").trim()) : null;
     } catch {
       planJson = fallbackNutritionPlan(input, rawText);
     }
