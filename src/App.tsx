@@ -76,7 +76,7 @@ const PageLoader = () => (
 
 
 function RootRoute() {
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, signOut } = useAuth();
   if (loading) return <PageLoader />;
   if (!user) return <Landing />;
   if (role === "master") return <Navigate to="/master" replace />;
@@ -86,9 +86,17 @@ function RootRoute() {
   if (role === "student") return <Navigate to="/aluno" replace />;
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center space-y-4">
+      <div className="text-center space-y-4 max-w-md px-6">
         <h2 className="font-display text-3xl text-navy italic">Aguardando liberação</h2>
-        <p className="text-muted-foreground">Sua conta ainda não possui um papel atribuído.</p>
+        <p className="text-muted-foreground">
+          A conta <span className="font-medium text-foreground">{user.email}</span> ainda não possui um papel atribuído.
+        </p>
+        <button
+          onClick={() => signOut()}
+          className="mt-2 inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+        >
+          Sair e entrar com outra conta
+        </button>
       </div>
     </div>
   );
