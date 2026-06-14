@@ -34,7 +34,7 @@ export function RestTimer({ restSeconds, onComplete }: RestTimerProps) {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [isRunning, remaining, onComplete]);
 
-  const progress = ((restSeconds - remaining) / restSeconds) * 100;
+  const progress = restSeconds > 0 ? ((restSeconds - remaining) / restSeconds) * 100 : 0;
 
   if (remaining <= 0) {
     return (
@@ -70,11 +70,26 @@ export function RestTimer({ restSeconds, onComplete }: RestTimerProps) {
   );
 }
 
+// O campo "rest" da prescrição é texto livre ("90s", "1min", "2'", "1:30", "60").
+// parseInt cru tratava "1min" como 1 segundo. Este parser cobre os formatos reais.
+export function parseRestSeconds(restStr: string | number | null | undefined): number {
+  if (typeof restStr === "number" && isFinite(restStr)) return Math.max(1, Math.round(restStr));
+  const s = String(restStr ?? "").trim().toLowerCase();
+  if (!s) return 60;
+  const mmss = s.match(/^(\d+):([0-5]?\d)$/);            // 1:30
+  if (mmss) return Math.max(1, parseInt(mmss[1]) * 60 + parseInt(mmss[2]));
+  const min = s.match(/(\d+(?:[.,]\d+)?)\s*(?:min|m|')/); // 1min, 2', 1.5 min
+  if (min) return Math.max(1, Math.round(parseFloat(min[1].replace(",", ".")) * 60));
+  const sec = s.match(/(\d+)/);                           // 90s, 60 seg, 90
+  if (sec) return Math.max(1, parseInt(sec[1]));
+  return 60;
+}
+
 export function useRestTimer() {
   const [activeRest, setActiveRest] = useState<{ exerciseIdx: number; setNum: number; seconds: number } | null>(null);
 
   const startRest = useCallback((exerciseIdx: number, setNum: number, restStr: string) => {
-    const seconds = parseInt(restStr) || 60;
+    const seconds = parseRestSeconds(restStr);
     setActiveRest({ exerciseIdx, setNum, seconds });
   }, []);
 

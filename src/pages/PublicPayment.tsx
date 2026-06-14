@@ -290,6 +290,16 @@ export default function PublicPayment() {
       toast({ title: "Preencha todos os dados do cartão", variant: "destructive" });
       return;
     }
+    // Valida validade antes de enviar — 3 dígitos no ano viravam recusa genérica do Asaas.
+    if (cardForm.expiryYear.length !== 2 && cardForm.expiryYear.length !== 4) {
+      toast({ title: "Ano de validade inválido", description: "Use 2 ou 4 dígitos (ex.: 28 ou 2028).", variant: "destructive" });
+      return;
+    }
+    const expMonthNum = parseInt(cardForm.expiryMonth, 10);
+    if (!(expMonthNum >= 1 && expMonthNum <= 12)) {
+      toast({ title: "Mês de validade inválido", description: "Use um mês entre 01 e 12.", variant: "destructive" });
+      return;
+    }
     if (!cardForm.email || !cpfDigits || !cepDigits || !phoneDigits) {
       toast({ title: "Preencha email, CPF, CEP e telefone do titular", variant: "destructive" });
       return;

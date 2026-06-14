@@ -23,11 +23,13 @@ export function AtRiskStudents() {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
+    // Sem empresa efetiva (master fora do company-view), não lista global de todas as empresas.
+    if (!effectiveCompanyId) { setRows([]); setLoading(false); return; }
     setLoading(true);
     try {
-      let sq = supabase.from("students").select("id, full_name, status").neq("status", "inactive");
-      if (effectiveCompanyId) sq = sq.eq("company_id", effectiveCompanyId);
-      const { data: students } = await sq;
+      const { data: students } = await supabase
+        .from("students" as any).select("id, full_name, status")
+        .neq("status", "inactive").eq("company_id", effectiveCompanyId);
       const ids = (students ?? []).map((s: any) => s.id);
       if (ids.length === 0) { setRows([]); setLoading(false); return; }
 
@@ -35,7 +37,7 @@ export function AtRiskStudents() {
         supabase.from("payments").select("student_id, status").in("student_id", ids).not("status", "in", `(${PAID.map((s) => `"${s}"`).join(",")})`),
         supabase.from("workout_sessions").select("student_id, completed_at").in("student_id", ids).eq("status", "completed"),
         supabase.from("whatsapp_chats").select("id, student_id").in("student_id", ids),
-        supabase.from("training_cycles").select("student_id, end_date, status").in("student_id", ids).eq("status", "active"),
+        supabase.from("training_cycles" as any).select("student_id, end_date, status").in("student_id", ids).eq("status", "active"),
       ]);
 
       const overdue = new Set((pays ?? []).map((p: any) => p.student_id));
@@ -44,7 +46,8 @@ export function AtRiskStudents() {
       const chatByStudent: Record<string, string> = {};
       (chats ?? []).forEach((c: any) => { chatByStudent[c.student_id] = c.id; });
       const cycleEnd: Record<string, string> = {};
-      (cycles ?? []).forEach((c: any) => { if (c.end_date) cycleEnd[c.student_id] = c.end_date; });
+      const activeCycle = new Set<string>();
+      (cycles ?? []).forEach((c: any) => { activeCycle.add(c.student_id); if (c.end_date) cycleEnd[c.student_id] = c.end_date; });
 
       const now = Date.now();
       const out: RiskRow[] = [];
@@ -54,7 +57,7 @@ export function AtRiskStudents() {
         const end = cycleEnd[s.id];
         const cycleEndsInDays = end ? Math.ceil((new Date(end).getTime() - now) / 86400000) : null;
         const signals = {
-          baseStatus: s.status, hasAnamnesis: true, hasAssessment: true, hasActiveWorkout: !!end,
+          baseStatus: s.status, hasAnamnesis: true, hasAssessment: true, hasActiveWorkout: activeCycle.has(s.id),
           daysSinceLastTraining: daysSince, paymentOverdue: overdue.has(s.id), cycleEndsInDays,
         };
         const status = deriveStudentStatus(signals);

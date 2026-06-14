@@ -349,24 +349,26 @@ export default function StudentPortal() {
     const logsToSave = Object.values(logs).filter(l => l.workout_id === workoutId && (l.weight > 0 || l.reps_done > 0 || l.completed));
 
     let hadError = false;
-    for (const log of logsToSave) {
-      const existing = allLogs.find(
-        l => l.workout_id === log.workout_id && l.exercise_index === log.exercise_index && l.set_number === log.set_number && l.session_date === todayStr
-      );
-      const payload = {
-        weight: log.weight,
-        reps_done: log.reps_done,
-        set_type: log.set_type || 'normal',
-        rpe: log.rpe || null,
-        completed: log.completed || false,
-      };
-      const { error } = existing
-        ? await supabase.from("workout_logs").update(payload).eq("id", existing.id)
-        : await supabase.from("workout_logs").insert({
-            workout_id: log.workout_id, exercise_index: log.exercise_index,
-            set_number: log.set_number, ...payload,
-            student_id: studentId, company_id: companyId, session_date: todayStr,
-          });
+    // Upsert idempotente: o índice único (student_id,workout_id,exercise_index,set_number,session_date)
+    // garante que reenviar a mesma série atualiza em vez de duplicar — à prova do autosave/online/finish
+    // disparando em paralelo (antes isso duplicava porque `allLogs` ficava stale após cada insert).
+    const rows = logsToSave.map(log => ({
+      student_id: studentId,
+      company_id: companyId,
+      workout_id: log.workout_id,
+      exercise_index: log.exercise_index,
+      set_number: log.set_number,
+      session_date: todayStr,
+      weight: log.weight,
+      reps_done: log.reps_done,
+      set_type: log.set_type || 'normal',
+      rpe: log.rpe || null,
+      completed: log.completed || false,
+    }));
+    if (rows.length > 0) {
+      const { error } = await supabase
+        .from("workout_logs" as any)
+        .upsert(rows, { onConflict: "student_id,workout_id,exercise_index,set_number,session_date" });
       if (error) { hadError = true; console.error("Erro ao salvar carga:", error); }
     }
     if (!silent) setSavingLogs(false);
@@ -619,6 +621,7 @@ export default function StudentPortal() {
               companyId={companyId}
               enrollmentId={activeEnrollmentId}
               enrollmentEndDate={enrollmentInfo.end_date}
+              whatsappUrl={companyWhatsapp ? `https://wa.me/${companyWhatsapp}` : null}
             />
           </div>
         )}
@@ -750,7 +753,7 @@ export default function StudentPortal() {
 
                         <div className="flex items-center justify-between">
                           <h3 className="text-lg text-foreground font-sans font-semibold">{selectedWorkout.title}</h3>
-                          <Button size="sm" onClick={saveCurrentLogs} disabled={savingLogs}>
+                          <Button size="sm" onClick={() => saveCurrentLogs()} disabled={savingLogs}>
                             <Save className="h-3.5 w-3.5 mr-1" />
                             {savingLogs ? "Salvando..." : "Salvar"}
                           </Button>
@@ -803,7 +806,7 @@ export default function StudentPortal() {
                           ))}
                         </div>
 
-                        <Button className="w-full" onClick={saveCurrentLogs} disabled={savingLogs}>
+                        <Button className="w-full" onClick={() => saveCurrentLogs()} disabled={savingLogs}>
                           <Save className="h-4 w-4 mr-2" />
                           {savingLogs ? "Salvando..." : "Salvar Todas as Cargas"}
                         </Button>
@@ -906,6 +909,7 @@ export default function StudentPortal() {
           totalSetsPrescribed={session.summary.totalSetsPrescribed}
           exercises={session.summary.exercisesSummary}
           formatTime={session.formatTime}
+          whatsappUrl={companyWhatsapp ? `https://wa.me/${companyWhatsapp}` : null}
         />
       )}
 

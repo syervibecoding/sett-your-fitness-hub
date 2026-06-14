@@ -8,6 +8,8 @@
 // ============================================================================
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useMaster } from "@/contexts/MasterContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,19 +88,21 @@ export default function UnifiedPrescriber() {
   const [validationResult, setValidationResult] = useState<PrescriptionValidationResult | null>(null);
   const [notifyingStudent, setNotifyingStudent] = useState(false);
 
+  // Empresa efetiva: master usa a empresa que está visualizando (MasterContext); staff usa a sua.
+  // (Antes filtrava por company_members → master sem linha ficava travado, telas não carregavam.)
+  const { companyId: authCompanyId, role } = useAuth();
+  const { viewingCompany, isViewingCompany } = useMaster();
+  const effectiveCompanyId = role === "master" ? (isViewingCompany ? viewingCompany?.id ?? null : null) : authCompanyId ?? null;
+
   useEffect(() => {
+    if (!effectiveCompanyId) { setCompanyId(null); setStudents([]); return; }
+    setCompanyId(effectiveCompanyId);
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: m } = await supabase.from("company_members")
-        .select("company_id").eq("user_id", user.id).limit(1).maybeSingle();
-      if (!m) return;
-      setCompanyId(m.company_id);
       const { data: list } = await supabase.from("students")
-        .select("id, full_name").eq("company_id", m.company_id).order("full_name");
+        .select("id, full_name").eq("company_id", effectiveCompanyId).order("full_name");
       setStudents(list || []);
     })();
-  }, []);
+  }, [effectiveCompanyId]);
 
   useEffect(() => {
     if (!studentId) return;
@@ -273,9 +277,10 @@ export default function UnifiedPrescriber() {
         .from("functional_assessments").select("id, assessment_json, report_text, created_at")
         .eq("student_id", studentId).order("created_at", { ascending: false })
         .limit(1).maybeSingle();
-      const assessmentCtx = latestAssessment?.assessment_json
+      const assessmentJson = latestAssessment?.assessment_json;
+      const assessmentCtx = assessmentJson && typeof assessmentJson === "object" && !Array.isArray(assessmentJson)
         ? {
-            ...latestAssessment.assessment_json,
+            ...(assessmentJson as Record<string, unknown>),
             report_text: latestAssessment.report_text,
             id: latestAssessment.id,
             created_at: latestAssessment.created_at,

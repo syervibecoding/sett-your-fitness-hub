@@ -18,9 +18,11 @@ export interface StudentFile {
 
 const BUCKET = "student-files";
 
-function buildPath(companyId: string, studentId: string, fileName: string, stampMs: number): string {
+function buildPath(companyId: string, studentId: string, fileName: string, stampMs: number, stableName?: boolean): string {
   const safe = fileName.replace(/[^\w.\-]+/g, "_");
-  return `${companyId}/${studentId}/${stampMs}-${safe}`;
+  // stableName: path determinístico por aluno → o upsert sobrescreve (ex.: 1 laudo atual por aluno).
+  // Sem ele, prefixa o timestamp → mantém histórico (ex.: mídias do WhatsApp).
+  return stableName ? `${companyId}/${studentId}/${safe}` : `${companyId}/${studentId}/${stampMs}-${safe}`;
 }
 
 /**
@@ -36,9 +38,10 @@ export async function saveStudentFile(opts: {
   source?: string;
   contentType?: string;
   stampMs: number;
+  stableName?: boolean;
   metadata?: Record<string, unknown>;
 }): Promise<{ error: string | null; path?: string }> {
-  const path = buildPath(opts.companyId, opts.studentId, opts.fileName, opts.stampMs);
+  const path = buildPath(opts.companyId, opts.studentId, opts.fileName, opts.stampMs, opts.stableName);
 
   const { error: upErr } = await supabase.storage
     .from(BUCKET)

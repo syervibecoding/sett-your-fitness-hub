@@ -55,6 +55,20 @@ export default function CompanyOnboarding() {
     else toast.success(complete ? "Configuração concluída!" : "Rascunho salvo");
   };
 
+  // Sem empresa efetiva (master fora do company-view): não deixa preencher uma config "fantasma"
+  // que só falharia no submit — orienta a entrar numa empresa primeiro.
+  if (!effectiveCompanyId) {
+    return (
+      <div className="max-w-2xl mx-auto py-16 text-center space-y-2">
+        <Sparkles className="h-6 w-6 text-primary mx-auto" />
+        <h1 className="font-display text-2xl text-foreground">Selecione uma empresa</h1>
+        <p className="text-sm text-muted-foreground">
+          Entre no painel de uma empresa para configurar a IA assistente dela.
+        </p>
+      </div>
+    );
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   }

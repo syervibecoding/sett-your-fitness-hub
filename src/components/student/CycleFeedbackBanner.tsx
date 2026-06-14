@@ -9,12 +9,15 @@ interface Props {
   companyId: string;
   enrollmentId: string | null;
   enrollmentEndDate: string | null;
+  whatsappUrl?: string | null;
 }
 
-const WHATSAPP_FEEDBACK_URL = "https://wa.me/message/GZWXMSEEKWGII1";
+// Fallback BN — usado só quando a empresa do aluno não tem WhatsApp configurado (white-label).
+const WHATSAPP_FEEDBACK_FALLBACK = "https://wa.me/message/GZWXMSEEKWGII1";
 const DISMISS_KEY = (id: string) => `cycle_feedback_dismissed_${id}`;
 
-export function CycleFeedbackBanner({ enrollmentId, enrollmentEndDate }: Props) {
+export function CycleFeedbackBanner({ enrollmentId, enrollmentEndDate, whatsappUrl }: Props) {
+  const feedbackUrl = whatsappUrl || WHATSAPP_FEEDBACK_FALLBACK;
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
@@ -47,7 +50,7 @@ export function CycleFeedbackBanner({ enrollmentId, enrollmentEndDate }: Props) 
           </p>
           <Button
             size="sm"
-            onClick={() => window.open(WHATSAPP_FEEDBACK_URL, "_blank")}
+            onClick={() => window.open(feedbackUrl, "_blank")}
             className="mt-3 h-8"
           >
             Falar com o treinador no WhatsApp

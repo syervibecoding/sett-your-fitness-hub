@@ -11,6 +11,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useMaster } from "@/contexts/MasterContext";
 import {
   Loader2, Copy, CheckCircle2, Circle, AlertCircle, Send, Download, Wand2,
   Dumbbell, Activity, Waves, Bike, Apple, FileText,
@@ -39,6 +41,11 @@ const MODALITIES: { id: Modality; icon: any; label: string; sub: string }[] = [
 
 export default function PrescriptionStudio() {
   const nav = useNavigate();
+  // Empresa efetiva: master usa a empresa visualizada (MasterContext); staff usa a sua.
+  // (Antes filtrava por company_members → master sem linha ficava travado.)
+  const { user, companyId: authCompanyId, role, loading: authLoading } = useAuth();
+  const { viewingCompany, isViewingCompany } = useMaster();
+  const effectiveCompanyId = role === "master" ? (isViewingCompany ? viewingCompany?.id ?? null : null) : authCompanyId ?? null;
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [students, setStudents]   = useState<{ id: string; name: string; email?: string | null }[]>([]);
@@ -61,23 +68,26 @@ export default function PrescriptionStudio() {
   const [error, setError]             = useState("");
   const [pdfs, setPdfs]               = useState<any[]>([]);
 
-  // ── Carrega empresa + alunos ────────────────────────────────────────────
+  // ── Gate de auth ─────────────────────────────────────────────────────────
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) { nav("/auth"); return; }
+    setAuthChecked(true);
+  }, [authLoading, user, nav]);
+
+  // ── Carrega alunos da empresa efetiva ─────────────────────────────────────
+  useEffect(() => {
+    if (!effectiveCompanyId) { setCompanyId(null); setStudents([]); return; }
+    setCompanyId(effectiveCompanyId);
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { nav("/auth"); return; }
-      setAuthChecked(true);
-      const { data: m } = await db.from("company_members").select("company_id").eq("user_id", user.id).limit(1).maybeSingle();
-      if (!m) return;
-      setCompanyId(m.company_id);
       const { data: list } = await supabase
         .from("students")
         .select("id, full_name, email")
-        .eq("company_id", m.company_id)
+        .eq("company_id", effectiveCompanyId)
         .order("full_name");
       setStudents((list || []).map((s: any) => ({ id: s.id, name: s.full_name, email: s.email })));
     })();
-  }, []);
+  }, [effectiveCompanyId]);
 
   // ── Carrega anamnese + avaliação ao trocar aluno ────────────────────────
   useEffect(() => {

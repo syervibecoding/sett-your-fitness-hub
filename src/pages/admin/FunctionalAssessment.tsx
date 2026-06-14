@@ -6,6 +6,8 @@
 // ============================================================================
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useMaster } from "@/contexts/MasterContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,19 +62,22 @@ export default function FunctionalAssessment() {
   const [error, setError]         = useState("");
   const [result, setResult]       = useState<any>(null);
 
+  // Resolve a empresa do jeito que o app usa de fato: master usa a empresa que está
+  // "visualizando" (MasterContext); staff usa a própria. (Antes filtrava por company_members,
+  // o que deixava o master SEM linha em company_members travado — telas não carregavam.)
+  const { companyId: authCompanyId, role } = useAuth();
+  const { viewingCompany, isViewingCompany } = useMaster();
+  const effectiveCompanyId = role === "master" ? (isViewingCompany ? viewingCompany?.id ?? null : null) : authCompanyId ?? null;
+
   useEffect(() => {
+    if (!effectiveCompanyId) { setCompanyId(null); setStudents([]); return; }
+    setCompanyId(effectiveCompanyId);
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: m } = await supabase.from("company_members")
-        .select("company_id").eq("user_id", user.id).limit(1).maybeSingle();
-      if (!m) return;
-      setCompanyId(m.company_id);
       const { data: list } = await supabase.from("students")
-        .select("id, full_name").eq("company_id", m.company_id).order("full_name");
+        .select("id, full_name").eq("company_id", effectiveCompanyId).order("full_name");
       setStudents(list || []);
     })();
-  }, []);
+  }, [effectiveCompanyId]);
 
   useEffect(() => {
     if (!studentId) { setResult(null); return; }
@@ -82,7 +87,10 @@ export default function FunctionalAssessment() {
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
       setResult(data ?? null);
       if (data) {
-        const composition = data.assessment_json?.composicao_corporal ?? {};
+        const assessmentJson = data.assessment_json;
+        const composition = assessmentJson && typeof assessmentJson === "object" && !Array.isArray(assessmentJson)
+          ? ((assessmentJson as Record<string, unknown>).composicao_corporal as Record<string, unknown> | undefined) ?? {}
+          : {};
         setForm({
           queixa_principal: data.queixa_principal ?? "",
           historico_lesoes: data.historico_lesoes ?? "",
@@ -160,6 +168,7 @@ export default function FunctionalAssessment() {
       kind: "assessment_report",
       contentType: "application/json",
       stampMs: Date.now(),
+      stableName: true, // 1 laudo atual por aluno — re-gerar sobrescreve em vez de empilhar duplicados
       metadata: {
         source: "FunctionalAssessment",
         assessment_id: reportPayload.assessment_id,
