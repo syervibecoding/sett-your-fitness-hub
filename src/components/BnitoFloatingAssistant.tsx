@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { readEdgeError } from "@/lib/edgeError";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type BnitoMessage = {
@@ -207,7 +208,8 @@ export function BnitoAssistantProvider({ children }: { children: ReactNode }) {
     setMessages((current) => [...current, createMessage("user", trimmed)]);
 
     try {
-      const { data, error } = await supabase.functions.invoke<BnitoResponse>("ai-bnito-coach", {
+      // Nunca deixa a UI "travar" no spinner: corta em 60s se a edge não responder.
+      const invokePromise = supabase.functions.invoke<BnitoResponse>("ai-bnito-coach", {
         body: {
           action: "ask",
           cycle_id: cycleId,
@@ -234,15 +236,23 @@ export function BnitoAssistantProvider({ children }: { children: ReactNode }) {
           },
         },
       });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("__timeout__")), 60000),
+      );
+      const { data, error } = await Promise.race([invokePromise, timeoutPromise]);
 
-      if (error) throw new Error(error.message);
+      // Mostra a CAUSA REAL (a edge repassa o erro da Anthropic em error.context), não só "non-2xx".
+      if (error) throw new Error((await readEdgeError(error, data)) || error.message);
       if (!data) throw new Error("resposta vazia");
       if (data.error) throw new Error(data.details || data.error);
 
       setMessages((current) => [...current, createMessage("assistant", formatBnitoResponse(data))]);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "erro inesperado";
-      setMessages((current) => [...current, createMessage("assistant", getUnavailableMessage(message))]);
+      const raw = error instanceof Error ? error.message : "erro inesperado";
+      const message = raw === "__timeout__"
+        ? "O BNITO demorou demais para responder e a requisicao foi cancelada. Tente de novo em instantes."
+        : getUnavailableMessage(raw);
+      setMessages((current) => [...current, createMessage("assistant", message)]);
     } finally {
       setLoading(false);
     }

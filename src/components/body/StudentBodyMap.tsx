@@ -115,6 +115,8 @@ export function StudentBodyMap({ studentId }: { studentId: string }) {
           <span className="text-[11px] text-muted-foreground">Clique numa região para marcar</span>
         </div>
 
+        <div className="lg:flex lg:gap-4 lg:items-start">
+          <div className="lg:flex-1 lg:min-w-0">
         <BodyMap
           gender={gender}
           getRegionFill={getRegionFill}
@@ -127,9 +129,10 @@ export function StudentBodyMap({ studentId }: { studentId: string }) {
             </div>
           }
         />
+          </div>
 
         {editing && (
-          <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3">
+          <div className="mt-3 lg:mt-0 lg:w-72 lg:shrink-0 rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-foreground">{BODY_REGION_LABELS[editing]}</p>
               <button onClick={() => setEditing(null)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
@@ -172,6 +175,7 @@ export function StudentBodyMap({ studentId }: { studentId: string }) {
             </div>
           </div>
         )}
+        </div>
 
         {items.length > 0 ? (
           <div className="mt-3 space-y-1.5">
