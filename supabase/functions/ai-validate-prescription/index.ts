@@ -55,6 +55,24 @@ function asTextArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map((item) => String(item ?? "").trim()).filter(Boolean) : [];
 }
 
+function chunkArray<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+async function selectByExerciseIdChunks(supabase: any, table: string, columns: string, exerciseIds: string[]) {
+  const rows: any[] = [];
+  for (const ids of chunkArray(exerciseIds, 80)) {
+    const { data, error } = await supabase.from(table).select(columns).in("exercise_id", ids);
+    if (error) return { data: rows, error };
+    rows.push(...((data ?? []) as any[]));
+  }
+  return { data: rows, error: null };
+}
+
 async function requireUser(req: Request) {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return null;
@@ -83,17 +101,21 @@ async function loadExerciseCatalog(supabase: any, companyId: string | null) {
   const exerciseIds = exerciseRows.map((exercise) => exercise.id as string).filter(Boolean);
   const [targetsResult, groupsResult, metadataResult] = await Promise.all([
     exerciseIds.length
-      ? supabase
-          .from("exercise_muscle_targets")
-          .select("exercise_id, muscle_group_id, volume_percentage")
-          .in("exercise_id", exerciseIds)
+      ? selectByExerciseIdChunks(
+          supabase,
+          "exercise_muscle_targets",
+          "exercise_id, muscle_group_id, volume_percentage",
+          exerciseIds,
+        )
       : Promise.resolve({ data: [], error: null }),
     supabase.from("muscle_groups").select("id, name"),
     exerciseIds.length
-      ? supabase
-          .from("exercise_metadata")
-          .select("exercise_id, contraindications, regressions, progressions, equivalent_substitutes, pain_limitation_tags")
-          .in("exercise_id", exerciseIds)
+      ? selectByExerciseIdChunks(
+          supabase,
+          "exercise_metadata",
+          "exercise_id, contraindications, regressions, progressions, equivalent_substitutes, pain_limitation_tags",
+          exerciseIds,
+        )
       : Promise.resolve({ data: [], error: null }),
   ]);
 
@@ -363,6 +385,31 @@ function validatePrescription(args: {
   };
 }
 
+async function resolveValidationCompanyId(supabase: any, claims: any, body: any) {
+  if (body.company_id || body.student_id) {
+    const authz = await assertTenantAccess(supabase, claims, {
+      companyId: body.company_id,
+      studentId: body.student_id,
+    });
+    return authz.companyId;
+  }
+
+  const userId = typeof claims?.sub === "string" ? claims.sub : null;
+  if (!userId) throw new HttpError(401, "Unauthorized");
+
+  const [{ data: isMaster, error: masterError }, { data: userCompanyId, error: companyError }] = await Promise.all([
+    supabase.rpc("has_role", { _user_id: userId, _role: "master" }),
+    supabase.rpc("get_user_company_id", { _user_id: userId }),
+  ]);
+
+  if (masterError) throw new HttpError(503, `Falha ao validar permissões do usuário: ${masterError.message}`);
+  if (companyError) throw new HttpError(503, `Falha ao resolver empresa do usuário: ${companyError.message}`);
+  if (userCompanyId) return userCompanyId as string;
+  if (isMaster) return null;
+
+  throw new HttpError(400, "Empresa não informada para validar a prescrição.");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
@@ -373,8 +420,8 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-    const authz = await assertTenantAccess(supabase, claims, { companyId: body.company_id, studentId: body.student_id });
-    const catalog = await loadExerciseCatalog(supabase, authz.companyId);
+    const companyId = await resolveValidationCompanyId(supabase, claims, body);
+    const catalog = await loadExerciseCatalog(supabase, companyId);
     const result = validatePrescription({
       plan: body.plan ?? { workouts: body.workouts ?? [] },
       catalog,

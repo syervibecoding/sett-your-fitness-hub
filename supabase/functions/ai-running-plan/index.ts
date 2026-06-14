@@ -493,6 +493,7 @@ INSTRUÇÕES:
       id: planId,
       company_id: authorizedCompanyId,
       student_id,
+      name: planJson.plan_name || `Plano de ${sport || "corrida"}`,
       plan_name: planJson.plan_name,
       sport: planJson.sport,
       goal: clean(goal),

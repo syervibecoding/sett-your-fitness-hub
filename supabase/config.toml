@@ -18,6 +18,9 @@ verify_jwt = false
 [functions.ai-nutrition-plan]
 verify_jwt = false
 
+[functions.ai-validate-prescription]
+verify_jwt = false
+
 [functions.ai-functional-assessment]
 verify_jwt = false
 
