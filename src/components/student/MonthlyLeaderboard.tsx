@@ -27,7 +27,7 @@ export function MonthlyLeaderboard({ companyId }: { companyId: string | null }) 
     if (!companyId) { setLoading(false); return; }
     (async () => {
       setLoading(true);
-      const { data } = await supabase.rpc("get_monthly_leaderboard", { _company_id: companyId });
+      const { data } = await (supabase as any).rpc("get_monthly_leaderboard", { _company_id: companyId });
       if (!on) return;
       const row: any = Array.isArray(data) ? data[0] : data;
       setTop3((row?.top3 as LbEntry[]) ?? []);

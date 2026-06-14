@@ -78,7 +78,7 @@ export function BodyMeasurements({ studentId, companyId, gender, onGenderChange 
       });
       setForm(next);
     }
-    const { data: st } = await supabase.from("students").select("height_cm").eq("id", studentId).maybeSingle();
+    const { data: st } = await (supabase as any).from("students").select("height_cm").eq("id", studentId).maybeSingle();
     if (st && (st as any).height_cm != null) setHeightCm(String((st as any).height_cm));
     setLoading(false);
   };
@@ -117,7 +117,7 @@ export function BodyMeasurements({ studentId, companyId, gender, onGenderChange 
   const saveHeight = async (value: string) => {
     const n = value ? parseFloat(value.replace(",", ".")) : NaN;
     const h = Number.isFinite(n) && n > 0 ? n : null;
-    await supabase.from("students").update({ height_cm: h }).eq("id", studentId);
+    await (supabase as any).from("students").update({ height_cm: h }).eq("id", studentId);
   };
 
   const handleSave = async () => {
