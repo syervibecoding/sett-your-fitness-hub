@@ -5,7 +5,7 @@
 //
 // Props: studentId, companyId, onComplete(assessmentId)
 // ============================================================================
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { Loader2, Video, Camera, Plus, X, Save, Sparkles, RefreshCw, SkipBack, SkipForward, Eye, Maximize2 } from "lucide-react";
@@ -178,11 +178,14 @@ interface AiFunctionalAssessmentResponse {
   frame_findings?: AiFrameFinding[];
 }
 
-export default function VideoAssessment({ studentId, companyId, assessmentContext, onComplete }: {
+export default function VideoAssessment({ studentId, companyId, assessmentContext, onComplete, initialVideoUrl, onInitialVideoConsumed }: {
   studentId: string;
   companyId: string;
   assessmentContext?: AssessmentContext;
   onComplete?: (id: string, result?: VideoAssessmentResult) => void;
+  // Vídeo vindo do WhatsApp (handshake do chat → Studio): carrega e extrai frames automaticamente.
+  initialVideoUrl?: string | null;
+  onInitialVideoConsumed?: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoLoaded, setVideoLoaded] = useState(false);
@@ -378,6 +381,43 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
 
     await extractAutoFrames(video, activeProtocol);
   }
+
+  // ── Carrega vídeo a partir de uma URL (ex.: vídeo recebido no WhatsApp) ───
+  // fetch→blob→objectURL evita o canvas-taint de URLs cross-origin (o objectURL é same-origin),
+  // permitindo o captureFrame (canvas.toBlob) funcionar. data:URL base64 também passa direto.
+  async function loadVideoFromUrl(remoteUrl: string) {
+    setError("");
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      const res = await fetch(remoteUrl);
+      if (!res.ok) throw new Error(`Não foi possível baixar o vídeo (HTTP ${res.status}).`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      video.src = url;
+      await new Promise<void>((resolve, reject) => {
+        const onLoad = () => { cleanup(); resolve(); };
+        const onErr = () => { cleanup(); reject(new Error("Falha ao carregar o vídeo.")); };
+        const cleanup = () => { video.removeEventListener("loadedmetadata", onLoad); video.removeEventListener("error", onErr); };
+        video.addEventListener("loadedmetadata", onLoad);
+        video.addEventListener("error", onErr);
+      });
+      setVideoLoaded(true);
+      await extractAutoFrames(video, activeProtocol);
+    } catch (err: any) {
+      setError(err?.message || "Falha ao carregar o vídeo do WhatsApp. Abra o vídeo no chat antes de enviar para a avaliação.");
+    }
+  }
+
+  // Recebe o vídeo do WhatsApp via prop (uma única vez) e dispara a extração.
+  const initialVideoHandledRef = useRef(false);
+  useEffect(() => {
+    if (initialVideoUrl && !initialVideoHandledRef.current) {
+      initialVideoHandledRef.current = true;
+      loadVideoFromUrl(initialVideoUrl).finally(() => onInitialVideoConsumed?.());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialVideoUrl]);
 
   // ── Captura frame manual (treinador pausa onde quiser) ───────────────────
   async function captureManual() {

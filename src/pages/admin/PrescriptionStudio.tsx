@@ -9,7 +9,7 @@
 // Instalar:  npm i jspdf
 // ============================================================================
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
@@ -28,6 +28,8 @@ import {
 } from "@/lib/prescriptionIntegration";
 import { readEdgeError } from "@/lib/edgeError";
 import { publishStrengthPlanToStudent } from "@/lib/publishStrengthPlan";
+import { openStudentChat } from "@/lib/studentChat";
+import { toast } from "sonner";
 
 type Modality = "musculacao" | "corrida" | "natacao" | "ciclismo" | "nutricao";
 type GenStatus = "idle" | "generating" | "done" | "error";
@@ -72,6 +74,9 @@ export default function PrescriptionStudio() {
   // Publicação do treino de força para o app do aluno.
   const [publishing, setPublishing]   = useState(false);
   const [published, setPublished]     = useState<{ workoutsCreated: number; createdEnrollment: boolean } | null>(null);
+  // Vídeo vindo do WhatsApp (handshake do chat → Studio) para a Avaliação Funcional.
+  const [pendingVideoUrl, setPendingVideoUrl] = useState<string | null>(null);
+  const location = useLocation();
 
   // ── Gate de auth ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -79,6 +84,19 @@ export default function PrescriptionStudio() {
     if (!user) { nav("/auth"); return; }
     setAuthChecked(true);
   }, [authLoading, user, nav]);
+
+  // Handshake do WhatsAppChat: "Usar na avaliação" navega pra cá com { studentId, videoUrl }.
+  // Seleciona o aluno, abre a aba de Avaliação e injeta o vídeo no VideoAssessment.
+  useEffect(() => {
+    const st = location.state as { studentId?: string; videoUrl?: string } | null;
+    if (st?.studentId) {
+      setStudentId(st.studentId);
+      setTab("avaliacao");
+      if (st.videoUrl) setPendingVideoUrl(st.videoUrl);
+      nav(location.pathname, { replace: true, state: null }); // consome o state (evita reinjeção)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Carrega alunos da empresa efetiva ─────────────────────────────────────
   useEffect(() => {
@@ -133,8 +151,8 @@ export default function PrescriptionStudio() {
   });
 
   // ── Gera link de anamnese para enviar ao aluno ──────────────────────────
-  async function createInvite() {
-    if (!studentId || !companyId) return;
+  async function createInvite(): Promise<string | null> {
+    if (!studentId || !companyId) return null;
     setCreatingInvite(true);
     const token = crypto.randomUUID().replace(/-/g, "");
     const { data: { user } } = await supabase.auth.getUser();
@@ -145,11 +163,32 @@ export default function PrescriptionStudio() {
     if (inviteError) {
       setError(inviteError.message);
       setCreatingInvite(false);
-      return;
+      return null;
     }
     const link = `${window.location.origin}/anamnese-convite/${token}`;
     setInviteLink(link);
     setCreatingInvite(false);
+    return link;
+  }
+
+  // Empresa efetiva → prefixo de rota do chat (mesma regra do resto do app).
+  const chatRoutePrefix = role === "master" && isViewingCompany ? "admin" : (role || "admin");
+
+  // Envia o link da anamnese DIRETO no WhatsApp do aluno (abre o chat com a mensagem pronta).
+  async function sendAnamneseWhatsApp() {
+    if (!studentId) return;
+    const link = inviteLink || (await createInvite());
+    if (!link) return;
+    const nome = (student?.name || "").trim().split(/\s+/)[0] || "";
+    const message = `Oi, ${nome}! Pra eu montar seu plano do jeito certo, responde essa anamnese rapidinha (leva uns minutos): ${link}`;
+    const { data: chat } = await supabase.from("whatsapp_chats").select("id").eq("student_id", studentId).limit(1).maybeSingle();
+    openStudentChat({
+      navigate: nav,
+      routePrefix: chatRoutePrefix,
+      chatId: (chat as any)?.id ?? null,
+      message,
+      onNoChat: (m) => { void navigator.clipboard?.writeText(m); toast.success("Sem conversa no WhatsApp — link da anamnese copiado."); },
+    });
   }
   function copyLink() {
     navigator.clipboard.writeText(inviteLink);
@@ -407,14 +446,20 @@ export default function PrescriptionStudio() {
             </div>
           )}
           {studentId && (
-            <div className="grid gap-2 sm:grid-cols-2">
-              <Button onClick={createInviteAndCopy} disabled={creatingInvite} className="bg-[#1B2B4A] hover:bg-[#1B2B4A]/90">
-                {creatingInvite ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : inviteLink ? <Copy className="h-4 w-4 mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-                {inviteLink ? (copying ? "Link copiado" : "Copiar anamnese") : "Gerar link de anamnese"}
+            <div className="space-y-2">
+              <Button onClick={sendAnamneseWhatsApp} disabled={creatingInvite} className="w-full bg-[#25D366] hover:bg-[#25D366]/90 text-white">
+                {creatingInvite ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                Enviar anamnese no WhatsApp
               </Button>
-              <Button onClick={() => setTab("prescricao")} variant="outline">
-                <Wand2 className="h-4 w-4 mr-2" /> Fazer prescrição
-              </Button>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button onClick={createInviteAndCopy} disabled={creatingInvite} variant="outline">
+                  {creatingInvite ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : inviteLink ? <Copy className="h-4 w-4 mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+                  {inviteLink ? (copying ? "Link copiado" : "Copiar anamnese") : "Gerar link de anamnese"}
+                </Button>
+                <Button onClick={() => setTab("prescricao")} variant="outline">
+                  <Wand2 className="h-4 w-4 mr-2" /> Fazer prescrição
+                </Button>
+              </div>
             </div>
           )}
           {inviteLink && (
@@ -505,6 +550,8 @@ export default function PrescriptionStudio() {
             <VideoAssessment
               studentId={studentId}
               companyId={companyId!}
+              initialVideoUrl={pendingVideoUrl}
+              onInitialVideoConsumed={() => setPendingVideoUrl(null)}
               onComplete={(id, videoResult) => {
                 setAssessmentId(id);
                 if (videoResult) {

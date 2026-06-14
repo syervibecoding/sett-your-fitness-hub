@@ -13,14 +13,14 @@ import {
   Send, Search, User, MessageSquare, Users,
   Paperclip, Filter, AlertTriangle, DollarSign, Calendar, Clock,
   Download, MailOpen, Mail, UserPlus, Pencil, Check, X, Image, Mic,
-  MessageCircle, ChevronDown, Tag, Trash2, Reply,
+  MessageCircle, ChevronDown, Tag, Trash2, Reply, Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, differenceInDays } from "date-fns";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { interpolateTemplate } from "@/lib/templateVars";
 
 type Chat = {
@@ -88,6 +88,9 @@ export default function WhatsAppChat() {
   const effectiveCompanyId = userRole === "master" ? (isViewingCompany ? viewingCompany?.id : null) : companyId;
   const [chats, setChats] = useState<Chat[]>([]);
   const location = useLocation();
+  const navigate = useNavigate();
+  // Prefixo de rota para mandar o vídeo da avaliação pro Studio (master visualizando = admin).
+  const studioRoutePrefix = userRole === "master" && isViewingCompany ? "admin" : (userRole || "admin");
   // Chat alvo vindo do CRM/dashboard (navigate("/admin/whatsapp-chat", { state: { chatId, prefillMessage } }))
   const pendingChatIdRef = useRef<string | null>((location.state as { chatId?: string } | null)?.chatId ?? null);
   // Mensagem pronta (rascunho) vinda de aniversário/renovação/anamnese — pré-preenche a caixa de texto, NÃO envia sozinha.
@@ -943,7 +946,22 @@ export default function WhatsAppChat() {
                             {mediaSrc && isImage ? (
                               <img src={mediaSrc} alt="Imagem" className="rounded max-w-full max-h-64 mb-1 cursor-pointer" onClick={() => window.open(mediaSrc!, "_blank")} onError={() => handleMediaError(msg)} />
                             ) : mediaSrc && isVideo ? (
-                              <video src={mediaSrc} controls className="rounded max-w-full max-h-64 mb-1" onError={() => handleMediaError(msg)} />
+                              <div className="mb-1">
+                                <video src={mediaSrc} controls className="rounded max-w-full max-h-64" onError={() => handleMediaError(msg)} />
+                                {msg.source !== "outgoing" && (
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    className="mt-1.5 w-full h-7 text-xs"
+                                    onClick={() => {
+                                      if (!selectedChat?.student_id) { toast.error("Vincule um aluno a esta conversa primeiro."); return; }
+                                      navigate(`/${studioRoutePrefix}/studio`, { state: { studentId: selectedChat.student_id, videoUrl: mediaSrc } });
+                                    }}
+                                  >
+                                    <Activity className="h-3.5 w-3.5 mr-1" /> Usar na avaliação
+                                  </Button>
+                                )}
+                              </div>
                             ) : mediaSrc && isAudio ? (
                               <audio src={mediaSrc} controls className="max-w-full mb-1" onError={() => handleMediaError(msg)} />
                             ) : mediaSrc && isMedia ? (
