@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { assertTenantAccess, HttpError } from "../_shared/tenant-auth.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -742,6 +743,10 @@ serve(async (req) => {
       expected_movements = [],
     } = await req.json();
 
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const authz = await assertTenantAccess(supabaseAdmin, claims, { companyId: company_id, studentId: student_id });
+    const authorizedCompanyId = authz.companyId;
+
     // Monta o conteúdo de imagens, rotulando cada uma com vista + frameId
     const imageContent: any[] = [];
     const frameRefs: FrameRef[] = [];
@@ -808,8 +813,7 @@ ${imageContent.length > 0
   : "Sem imagens nesta avaliação. Gere uma leitura conservadora baseada somente nos dados informados; use frame_findings como array vazio e marque baixa confiança nos achados visuais."}
     `.trim();
     imageContent.push({ type: "text", text: anamneseText });
-    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-    const aiConfig = await loadCompanyAiConfig(supabaseAdmin, (company_id as string | null) ?? null);
+    const aiConfig = await loadCompanyAiConfig(supabaseAdmin, authorizedCompanyId);
 
     const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -842,7 +846,7 @@ ${imageContent.length > 0
         : [];
       await writeAiDecisionLog(supabaseAdmin, {
         student_id,
-        company_id,
+        company_id: authorizedCompanyId,
         source: "avaliacao",
         summary: `${presentCompensations.length} compensações OHS presentes; protocolo ${clean(assessmentJson.direcionamento_protocolo || "nao informado")}.`,
         payload: {
@@ -858,7 +862,7 @@ ${imageContent.length > 0
     // Persiste só no fluxo de fotos (assessment_id presente). No vídeo, o frontend grava após edição.
     if (assessment_id) {
       await supabaseAdmin.from("functional_assessments").upsert({
-        id: assessment_id, company_id, student_id,
+        id: assessment_id, company_id: authorizedCompanyId, student_id,
         queixa_principal: clean(queixa_principal), historico_lesoes: clean(historico_lesoes),
         modalidade: clean(modalidade), nivel: clean(nivel),
         ai_raw_response: rawText, report_text: reportText, assessment_json: assessmentJson, status: "completed",
@@ -878,7 +882,7 @@ ${imageContent.length > 0
   } catch (e) {
     console.error(e);
     return new Response(JSON.stringify({ error: (e as Error).message }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: e instanceof HttpError ? e.status : 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

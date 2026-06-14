@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { assertTenantAccess, HttpError } from "../_shared/tenant-auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -372,7 +373,8 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-    const catalog = await loadExerciseCatalog(supabase, (body.company_id as string | null) ?? null);
+    const authz = await assertTenantAccess(supabase, claims, { companyId: body.company_id, studentId: body.student_id });
+    const catalog = await loadExerciseCatalog(supabase, authz.companyId);
     const result = validatePrescription({
       plan: body.plan ?? { workouts: body.workouts ?? [] },
       catalog,
@@ -383,17 +385,9 @@ serve(async (req) => {
       block_number: body.block_number,
     });
 
-    return jsonResponse({
-      result,
-      bnito_intent: result.status === "blocked"
-        ? null
-        : {
-            type: "notify_student_prescription_ready",
-            question_to_teacher: "Quer que eu avise o aluno que a prescrição foi feita?",
-          },
-    });
+    return jsonResponse({ result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";
-    return jsonResponse({ error: message }, 500);
+    return jsonResponse({ error: message }, error instanceof HttpError ? error.status : 500);
   }
 });

@@ -8,11 +8,12 @@ const corsHeaders = {
 
 const ASAAS_API_KEY = Deno.env.get("ASAAS_API_KEY")!;
 const ASAAS_BASE_URL = "https://api.asaas.com/v3";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-const supabaseAdmin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-);
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 async function asaasFetch(path: string, options: RequestInit = {}) {
   const res = await fetch(`${ASAAS_BASE_URL}${path}`, {
@@ -33,6 +34,56 @@ async function asaasFetch(path: string, options: RequestInit = {}) {
     throw new Error(msg);
   }
   return data;
+}
+
+async function requireAdminTenant(req: Request, body: any) {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) throw new Error("Unauthorized");
+
+  const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const token = authHeader.replace("Bearer ", "");
+  const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
+  if (claimsError || !claimsData?.claims?.sub) throw new Error("Unauthorized");
+  const userId = claimsData.claims.sub as string;
+
+  const [{ data: hasMaster }, { data: hasAdmin }, { data: hasCoord }, { data: userCompanyId }] = await Promise.all([
+    supabaseAdmin.rpc("has_role", { _user_id: userId, _role: "master" }),
+    supabaseAdmin.rpc("has_role", { _user_id: userId, _role: "admin" }),
+    supabaseAdmin.rpc("has_role", { _user_id: userId, _role: "coordinator" }),
+    supabaseAdmin.rpc("get_user_company_id", { _user_id: userId }),
+  ]);
+  if (!hasMaster && !hasAdmin && !hasCoord) throw new Error("Forbidden");
+
+  let targetCompanyId = typeof body.companyId === "string" && body.companyId ? body.companyId : null;
+  if (targetCompanyId && !UUID_RE.test(targetCompanyId)) throw new Error("companyId inválido.");
+
+  if (body.studentId) {
+    const { data: student } = await supabaseAdmin
+      .from("students")
+      .select("company_id")
+      .eq("id", body.studentId)
+      .maybeSingle();
+    if (!student?.company_id) throw new Error("Aluno não encontrado.");
+    if (targetCompanyId && targetCompanyId !== student.company_id) throw new Error("Forbidden: student/company mismatch.");
+    targetCompanyId = student.company_id;
+  }
+
+  if (body.paymentId) {
+    const { data: payment } = await supabaseAdmin
+      .from("payments")
+      .select("company_id")
+      .eq("asaas_payment_id", body.paymentId)
+      .maybeSingle();
+    if (!payment?.company_id) throw new Error("Pagamento local não encontrado.");
+    if (targetCompanyId && targetCompanyId !== payment.company_id) throw new Error("Forbidden: payment/company mismatch.");
+    targetCompanyId = payment.company_id;
+  }
+
+  if (!targetCompanyId) throw new Error("Selecione uma empresa.");
+  if (!hasMaster && targetCompanyId !== userCompanyId) throw new Error("Forbidden: company mismatch.");
+  return { companyId: targetCompanyId };
 }
 
 async function createCustomer(body: any) {
@@ -753,6 +804,11 @@ Deno.serve(async (req) => {
 
   try {
     const { action, ...body } = await req.json();
+    const adminActions = new Set(["create-customer", "update-customer", "create-invoice", "sync-payments"]);
+    if (adminActions.has(action)) {
+      const tenant = await requireAdminTenant(req, body);
+      body.companyId = body.companyId || tenant.companyId;
+    }
 
     let result;
     switch (action) {
@@ -789,8 +845,9 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error("Edge function error:", error);
+    const message = error instanceof Error ? error.message : "Erro interno";
     return new Response(
-      JSON.stringify({ error: error.message || "Erro interno" }),
+      JSON.stringify({ error: message }),
       {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

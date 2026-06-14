@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { assertTenantAccess, HttpError } from "../_shared/tenant-auth.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -344,7 +345,9 @@ serve(async (req) => {
       bundle_id,
     } = input;
 
-    const aiConfig = await loadCompanyAiConfig(supabase, (company_id as string | null) ?? null);
+    const authz = await assertTenantAccess(supabase, claims, { companyId: company_id, studentId: student_id });
+    const authorizedCompanyId = authz.companyId;
+    const aiConfig = await loadCompanyAiConfig(supabase, authorizedCompanyId);
 
     // Monta contexto do atleta
     const athleteContext = `
@@ -461,7 +464,7 @@ INSTRUÇÕES:
     const planId = crypto.randomUUID();
     await supabase.from("running_plans").insert({
       id: planId,
-      company_id,
+      company_id: authorizedCompanyId,
       student_id,
       plan_name: planJson.plan_name,
       sport: planJson.sport,
@@ -489,7 +492,7 @@ INSTRUÇÕES:
     const message = e instanceof Error ? e.message : "Erro inesperado";
     return new Response(
       JSON.stringify({ error: message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: e instanceof HttpError ? e.status : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

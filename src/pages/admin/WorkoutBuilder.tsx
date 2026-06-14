@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, BrainCircuit, Sparkles, MessageCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, BrainCircuit, Sparkles, MessageCircle, Loader2, AlertCircle } from "lucide-react";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 
 interface Exercise {
@@ -362,10 +362,39 @@ export default function WorkoutBuilder() {
 
   const validateBeforeSave = async (): Promise<PrescriptionValidationResult | null> => {
     try {
+      let objective = "manual";
+      let fitnessLevel = "intermediario";
+      let anamneseContext: any = null;
+      let assessmentContext: any = null;
+
+      if (cycleInfo?.student_id) {
+        const [{ data: anamnese }, { data: assessment }] = await Promise.all([
+          supabase
+            .from("student_anamneses")
+            .select("*")
+            .eq("student_id", cycleInfo.student_id)
+            .maybeSingle(),
+          supabase
+            .from("functional_assessments")
+            .select("nivel, assessment_json, report_text, created_at")
+            .eq("student_id", cycleInfo.student_id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ]);
+        anamneseContext = anamnese ?? null;
+        assessmentContext = assessment?.assessment_json
+          ? { assessment_json: assessment.assessment_json, report_text: assessment.report_text, nivel: assessment.nivel }
+          : null;
+        objective = (anamnese as any)?.objective || (anamnese as any)?.cardio_goal || "manual";
+        const months = Number((anamnese as any)?.experience_months ?? 0);
+        fitnessLevel = assessment?.nivel || (months > 0 && months < 6 ? "iniciante" : months >= 18 ? "avancado" : "intermediario");
+      }
+
       const plan = {
         cycle_name: cycleInfo ? `Ciclo ${cycleInfo.cycle_number}` : "Treino manual",
         duration_weeks: 6,
-        objective: "manual",
+        objective,
         workouts: workouts.map((workout, workoutIndex) => ({
           name: workout.title,
           description: workout.description,
@@ -387,8 +416,11 @@ export default function WorkoutBuilder() {
       const { data, error } = await supabase.functions.invoke<{ result?: PrescriptionValidationResult; error?: string }>("ai-validate-prescription", {
         body: {
           company_id: cycleInfo?.company_id,
-          objective: "manual",
-          fitness_level: "intermediario",
+          student_id: cycleInfo?.student_id,
+          objective,
+          fitness_level: fitnessLevel,
+          anamnese_context: anamneseContext,
+          assessment_context: assessmentContext,
           block_number: 1,
           plan,
         },

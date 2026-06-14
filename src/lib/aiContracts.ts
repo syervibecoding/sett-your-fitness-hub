@@ -5,7 +5,7 @@ export const OHS_COMPENSATION_KEYS = [
   "butt_wink",
   "pelvic_drop_trendelenburg",
   "shoulder_protraction_kyphosis",
-  "arm_asymmetry",
+  "overhead_arm_asymmetry",
 ] as const;
 
 export type OhsCompensationKey = (typeof OHS_COMPENSATION_KEYS)[number];
@@ -17,7 +17,7 @@ export const OHS_COMPENSATION_LABELS: Record<OhsCompensationKey, string> = {
   butt_wink: "Retroversão pélvica / butt wink",
   pelvic_drop_trendelenburg: "Drop de pelve / Trendelenburg funcional",
   shoulder_protraction_kyphosis: "Protrusão de ombro / cifose torácica",
-  arm_asymmetry: "Assimetria de braços no overhead",
+  overhead_arm_asymmetry: "Assimetria de braços no overhead",
 };
 
 export type WarningSeverity = "info" | "warning" | "blocker";

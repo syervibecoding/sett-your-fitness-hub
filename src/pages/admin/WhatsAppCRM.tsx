@@ -28,6 +28,10 @@ type CRMStudent = {
   chatId?: string;
   hasWorkout?: boolean;
   hasPendingPayment?: boolean;
+  planName?: string;
+  dueDate?: string | null;
+  planValue?: number | null;
+  daysRemaining?: number | null;
 };
 
 type Category = {
@@ -106,7 +110,7 @@ export default function WhatsAppCRM() {
     const studentIds = studentsData.map((s) => s.id);
     let enrollmentsQuery = supabase
       .from("enrollments")
-      .select("id, student_id, status")
+      .select("id, student_id, status, end_date, plans(name, price)")
       .in("student_id", studentIds)
       .eq("status", "active");
     if (effectiveCompanyId) enrollmentsQuery = enrollmentsQuery.eq("company_id", effectiveCompanyId);
@@ -128,7 +132,7 @@ export default function WhatsAppCRM() {
 
     let paymentsQuery = supabase
       .from("payments")
-      .select("id, student_id, status")
+      .select("id, student_id, status, value, due_date")
       .in("student_id", studentIds)
       .not("status", "in", '("RECEIVED","CONFIRMED","RECEIVED_IN_CASH")');
     if (effectiveCompanyId) paymentsQuery = paymentsQuery.eq("company_id", effectiveCompanyId);
@@ -141,6 +145,12 @@ export default function WhatsAppCRM() {
       const enrollment = (enrollments || []).find((e) => e.student_id === s.id);
       const cycle = enrollment ? (cycles || []).find((c) => c.enrollment_id === enrollment.id) : null;
       const hasWorkout = cycle ? workoutCycles.has(cycle.id) : false;
+      const pendingPayment = (payments || []).find((p) => p.student_id === s.id);
+      const dueDate = pendingPayment?.due_date || enrollment?.end_date || null;
+      const dueTime = dueDate ? new Date(`${dueDate}T00:00:00`).getTime() : NaN;
+      const daysRemaining = Number.isFinite(dueTime)
+        ? Math.ceil((dueTime - Date.now()) / 86400000)
+        : null;
       return {
         id: s.id,
         full_name: s.full_name,
@@ -150,6 +160,10 @@ export default function WhatsAppCRM() {
         chatId: studentChatMap[s.id],
         hasWorkout,
         hasPendingPayment: pendingPayStudents.has(s.id),
+        planName: (enrollment?.plans as any)?.name || "",
+        dueDate,
+        planValue: Number(pendingPayment?.value ?? (enrollment?.plans as any)?.price ?? 0) || null,
+        daysRemaining,
       };
     });
 
@@ -241,6 +255,7 @@ export default function WhatsAppCRM() {
   const handleBroadcast = async () => {
     const recipients = broadcastRecipients;
     if (recipients.length === 0 || !broadcastMsg.trim()) return;
+    if (!effectiveCompanyId) { toast.error("Selecione uma empresa antes de disparar mensagens"); return; }
     setBroadcasting(true);
     setBroadcastSent(0);
     try {
@@ -256,7 +271,14 @@ export default function WhatsAppCRM() {
       for (const r of recipients) {
         const remoteJid = r.chatId ? jidByChat[r.chatId] : null;
         if (!remoteJid) { failed++; setBroadcastSent((n) => n + 1); continue; }
-        const content = interpolateTemplate(broadcastMsg, { nome: r.full_name, primeiro_nome: r.full_name.split(" ")[0] || "" });
+        const content = interpolateTemplate(broadcastMsg, {
+          nome: r.full_name,
+          primeiro_nome: r.full_name.split(" ")[0] || "",
+          plano: r.planName || "",
+          vencimento: r.dueDate || "",
+          valor: r.planValue != null ? r.planValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "",
+          dias_restantes: r.daysRemaining != null ? String(r.daysRemaining) : "",
+        });
         try {
           const res = await fetch(url, { method: "POST", headers, body: JSON.stringify({ action: "send-message", companyId: effectiveCompanyId, remoteJid, content, chatId: r.chatId }) });
           if (res.ok) sent++; else failed++;

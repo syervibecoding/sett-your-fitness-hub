@@ -198,16 +198,49 @@ Use esses nomes e tom. Se houver conflito entre metodologia configurada e segura
 
 function isPainReport(question: string, parsed: unknown) {
   const text = normalizeText(`${question}\n${compact(parsed, 2000)}`);
-  return /(dor|doendo|machuc|lesao|joelho|lombar|ombro|tornozelo|quadril|formig|tontura|peito|falta de ar|desmaio|edema|inchaco)/.test(text);
+  const educationalOnly = /\b(como|o que|qual|quais)\b.{0,50}\b(evitar|prevenir|melhorar|alongar)\b/.test(text);
+  const directSymptom = /\b(estou|to|tô|senti|sinto|sentindo|fiquei|ficou|doeu|doendo|machuquei|lesionei|travei|piorou|inchou|formigou)\b/.test(text);
+  const bodyPain = /\bdor\s+(no|na|nos|nas|em|de)\s+(joelho|lombar|costas|ombro|tornozelo|quadril|peito|panturrilha|canela|coluna)\b/.test(text);
+  const redFlag = /\b(formig|tontura|peito|falta de ar|desmaio|edema|inchaco|inchaço|perda de forca|perda de força)\b/.test(text);
+  const injury = /\b(machuc|lesa|lesao|lesão|torci|rompi|estiramento)\b/.test(text);
+  if (educationalOnly && !directSymptom && !redFlag && !injury) return false;
+  return directSymptom || bodyPain || redFlag || injury;
 }
 
 async function createPainAlert(studentContext: any, question: string, result: any) {
   if (!studentContext?.student?.id || !studentContext?.student?.company_id) return null;
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const enrollmentId = studentContext.enrollment?.id ?? null;
   const severity = result?.urgency === "parar_e_avisar" ? "critical" : "warning";
   const title = result?.team_alert?.title || "BNITO: aluno relatou dor/sintoma";
   const message = result?.team_alert?.message
     || `Aluno ${studentContext.student.full_name || ""} relatou: ${cleanText(question, 600)}`;
+  if (enrollmentId) {
+    const { data: existing, error: existingError } = await supabase
+      .from("admin_alerts")
+      .select("id")
+      .eq("company_id", studentContext.student.company_id)
+      .eq("enrollment_id", enrollmentId)
+      .eq("type", "student_pain_report")
+      .is("resolved_at", null)
+      .maybeSingle();
+    if (existingError) return { error: existingError.message };
+    if (existing?.id) {
+      const { data, error } = await supabase
+        .from("admin_alerts")
+        .update({
+          severity,
+          title,
+          message,
+          action_url: `/admin/students/${studentContext.student.id}`,
+        })
+        .eq("id", existing.id)
+        .select("id")
+        .maybeSingle();
+      if (error) return { error: error.message };
+      return { id: data?.id ?? existing.id, updated: true };
+    }
+  }
   const { data, error } = await supabase
     .from("admin_alerts")
     .insert({
@@ -216,6 +249,7 @@ async function createPainAlert(studentContext: any, question: string, result: an
       severity,
       target_role: "coordinator",
       student_id: studentContext.student.id,
+      enrollment_id: enrollmentId,
       title,
       message,
       action_url: `/admin/students/${studentContext.student.id}`,
@@ -428,6 +462,7 @@ async function loadStudentContext(auth: AuthContext) {
     available_plans: (availablePlans || []).slice(0, 10),
     enrollment: enrollment
       ? {
+          id: enrollment.id,
           status: enrollment.status,
           start_date: enrollment.start_date,
           end_date: enrollment.end_date,
@@ -612,12 +647,26 @@ ${OUTPUT_SCHEMA}
         severity: result.urgency === "parar_e_avisar" ? "critical" : "warning",
       };
       alertRecord = await createPainAlert(studentContext, question, result);
+      result.team_alert_created = !!alertRecord?.id;
+      if (!alertRecord?.id) {
+        result.answer = "Entendi o relato de dor/sintoma. Pegue mais leve ou pare o padrão doloroso agora e avise seu treinador diretamente pelo app ou WhatsApp, porque não consegui registrar o alerta automático para a equipe.";
+        result.student_action = "Avise a equipe diretamente antes de continuar esse padrão de treino.";
+        return jsonResponse({
+          error: "Falha ao registrar alerta para a equipe.",
+          result,
+          team_alert_created: false,
+          team_alert_error: alertRecord?.error || "alert_not_created",
+          model_tier: picked.tier,
+          generated_at: new Date().toISOString(),
+        }, 502);
+      }
     }
 
     return jsonResponse({
       result,
       raw: parsed.result ? undefined : parsed.raw,
-      team_alert_created: alertRecord,
+      team_alert_created: painReport ? !!alertRecord?.id : false,
+      team_alert: alertRecord,
       model_tier: picked.tier,
       generated_at: new Date().toISOString(),
       context_loaded: {
