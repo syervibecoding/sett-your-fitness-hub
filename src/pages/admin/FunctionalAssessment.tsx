@@ -20,6 +20,7 @@ import { Loader2, Upload, X, ClipboardCheck, AlertCircle } from "lucide-react";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 import VideoAssessment from "@/components/VideoAssessment";
 import { saveStudentFile } from "@/lib/studentFiles";
+import { AssessmentBodyMap } from "@/components/body/AssessmentBodyMap";
 
 interface Student { id: string; full_name: string; }
 
@@ -419,6 +420,7 @@ export default function FunctionalAssessment() {
                       )}
                     </div>
                   )}
+                  <AssessmentBodyMap assessmentJson={json} />
                   {json?.direcionamento_protocolo?.protocolo && (
                     <div className="rounded border border-line p-3">
                       <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground mb-1">Direcionamento de protocolo</p>

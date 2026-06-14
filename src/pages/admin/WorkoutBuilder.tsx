@@ -15,6 +15,8 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, BrainCircuit, Sparkles, MessageCircle, Loader2, AlertCircle } from "lucide-react";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
+import { BodyMap } from "@/components/body/BodyMap";
+import { regionForLibraryGroup, BODY_REGION_LABELS, type BodyRegionId } from "@/lib/bodyMap";
 
 interface Exercise {
   id: string;
@@ -138,6 +140,7 @@ export default function WorkoutBuilder() {
   const [libraryExercises, setLibraryExercises] = useState<Exercise[]>([]);
   const [libSearch, setLibSearch] = useState("");
   const [libGroup, setLibGroup] = useState("all");
+  const [bodyRegion, setBodyRegion] = useState<BodyRegionId | null>(null);
   const [videoModal, setVideoModal] = useState<{ type: "path" | "url"; value: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [cycleInfo, setCycleInfo] = useState<{ cycle_number: number; student_name: string; student_id?: string; company_id?: string | null } | null>(null);
@@ -476,7 +479,8 @@ export default function WorkoutBuilder() {
   const filteredLib = libraryExercises.filter((ex) => {
     const matchSearch = ex.name.toLowerCase().includes(libSearch.toLowerCase());
     const matchGroup = libGroup === "all" || ex.muscle_group === libGroup;
-    return matchSearch && matchGroup;
+    const matchRegion = !bodyRegion || regionForLibraryGroup(ex.muscle_group) === bodyRegion;
+    return matchSearch && matchGroup && matchRegion;
   });
 
   const getEmbedUrl = (url: string) => {
@@ -1068,6 +1072,30 @@ export default function WorkoutBuilder() {
             <DialogTitle className="text-primary">BIBLIOTECA DE EXERCÍCIOS</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Seleção visual por região (boneco anatômico) */}
+            <details className="rounded-lg border border-border bg-secondary/30">
+              <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium text-foreground">
+                Selecionar pelo boneco{bodyRegion ? ` · ${BODY_REGION_LABELS[bodyRegion]}` : ""}
+              </summary>
+              <div className="p-3 pt-1">
+                <BodyMap
+                  onRegionClick={(id) => setBodyRegion((cur) => (cur === id ? null : id))}
+                  activeRegions={bodyRegion ? [bodyRegion] : []}
+                  getRegionFill={(id) => (id === bodyRegion ? "hsl(var(--primary))" : undefined)}
+                  svgClassName="h-[240px]"
+                  footer={
+                    bodyRegion ? (
+                      <button type="button" onClick={() => setBodyRegion(null)} className="text-xs text-primary underline">
+                        Limpar filtro ({BODY_REGION_LABELS[bodyRegion]})
+                      </button>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground">Clique num músculo para filtrar os exercícios.</span>
+                    )
+                  }
+                />
+              </div>
+            </details>
+
             <div className="flex gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
