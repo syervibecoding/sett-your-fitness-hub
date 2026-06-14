@@ -368,71 +368,331 @@ const CTX_LABEL: Record<string, string> = {
   treino: "dia de treino", descanso: "descanso", pre_treino: "pré-treino", pos_treino: "pós-treino",
 };
 
+// ── Helpers de layout exclusivos da Nutrição ────────────────────────────────
+
+// Mede a altura que um bloco de texto vai ocupar (sem desenhar) — para paginação
+// segura de cards (evita cortar no fim da página).
+function measureLines(doc: jsPDF, text: string, maxW: number, fontSize: number, lh: number): number {
+  if (!text) return 0;
+  doc.setFontSize(fontSize);
+  return doc.splitTextToSize(sanitize(text), maxW).length * lh;
+}
+
+// Banner energético navy: caixa preenchida + pílulas de macro + linha de hidratação.
+function energyBanner(doc: jsPDF, es: any, y: number): number {
+  const w = W(doc);
+  const innerW = w - MARGIN * 2;
+  const pills: [string, string][] = [
+    [`${asText(first(es.target_kcal, "—"))}`, "kcal / dia"],
+    [`${asText(first(es.protein_total_g, "—"))} g`, "Proteína"],
+    [`${asText(first(es.carbs_total_g, "—"))} g`, "Carboidrato"],
+    [`${asText(first(es.fat_total_g, "—"))} g`, "Gordura"],
+  ];
+  const subParts = [
+    es.tmb_kcal != null ? `TMB ${asText(es.tmb_kcal)} kcal` : "",
+    es.get_kcal != null ? `GET ${asText(es.get_kcal)} kcal` : "",
+    es.deficit_surplus_percent != null
+      ? `${Number(es.deficit_surplus_percent) >= 0 ? "Superavit +" : "Deficit "}${asText(es.deficit_surplus_percent)}%`
+      : "",
+  ].filter(Boolean).join("   ·   ");
+  const hydration = es.hydration_ml != null ? `${asText(es.hydration_ml)} ml` : "";
+
+  const hasFooter = !!(subParts || hydration);
+  const bannerH = 14 + 22 + (hasFooter ? 9 : 4);
+  y = ensure(doc, y, bannerH + 2);
+
+  // Caixa navy
+  doc.setFillColor(...NAVY);
+  doc.roundedRect(MARGIN, y, innerW, bannerH, 3, 3, "F");
+  doc.setFillColor(...BEGE);
+  doc.roundedRect(MARGIN, y, 2.2, bannerH, 3, 3, "F");
+
+  // Eyebrow
+  doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...BEGE_L);
+  doc.text("ALVO ENERGETICO DIARIO", MARGIN + 7, y + 9);
+
+  // Pílulas claras arredondadas
+  const padX = 6;
+  const gap = 3;
+  const pillW = (innerW - padX * 2 - gap * (pills.length - 1)) / pills.length;
+  const pillY = y + 13;
+  const pillH = 21;
+  pills.forEach(([val, lbl], i) => {
+    const px = MARGIN + padX + i * (pillW + gap);
+    doc.setFillColor(...BEGE_L);
+    doc.roundedRect(px, pillY, pillW, pillH, 2.5, 2.5, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...NAVY);
+    doc.text(String(val), px + pillW / 2, pillY + 10, { align: "center" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(6.6); doc.setTextColor(...BEGE);
+    doc.text(String(lbl), px + pillW / 2, pillY + 16.5, { align: "center" });
+  });
+
+  // Rodapé do banner: contexto energético + hidratação
+  if (hasFooter) {
+    const footY = pillY + pillH + 5.5;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(200, 190, 170);
+    if (subParts) doc.text(subParts, MARGIN + 7, footY);
+    if (hydration) {
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...BEGE_L);
+      doc.text(`Hidratacao  ${hydration}`, w - MARGIN - 7, footY, { align: "right" });
+    }
+  }
+
+  return y + bannerH + 5;
+}
+
+// 3 cards lado a lado do ciclo de carboidratos (alto=verde, moderado=bege, descanso=cinza).
+function carbCyclingCards(doc: jsPDF, cc: any, y: number): number {
+  const w = W(doc);
+  const innerW = w - MARGIN * 2;
+  const defs: { lbl: string; kcal: any; carbs: any; fill: [number, number, number]; accent: [number, number, number] }[] = [
+    { lbl: "Dia Alto", kcal: first(cc.high_day_kcal, cc.high_kcal), carbs: first(cc.high_day_carbs_g, cc.high_carbs_g, cc.high), fill: [231, 244, 238], accent: GREEN },
+    { lbl: "Moderado", kcal: first(cc.moderate_day_kcal, cc.moderate_kcal), carbs: first(cc.moderate_day_carbs_g, cc.moderate_carbs_g, cc.moderate), fill: BEGE_L, accent: BEGE },
+    { lbl: "Descanso", kcal: first(cc.rest_day_kcal, cc.rest_kcal), carbs: first(cc.rest_day_carbs_g, cc.rest_carbs_g, cc.rest), fill: LIGHT, accent: GRAY },
+  ];
+  const cardH = 26;
+  const gap = 3;
+  const cw = (innerW - gap * 2) / 3;
+  y = ensure(doc, y, cardH + 2);
+  defs.forEach((d, i) => {
+    const x = MARGIN + i * (cw + gap);
+    doc.setFillColor(...d.fill);
+    doc.roundedRect(x, y, cw, cardH, 2.5, 2.5, "F");
+    doc.setFillColor(...d.accent);
+    doc.roundedRect(x, y, cw, 1.6, 0.8, 0.8, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...NAVY);
+    doc.text(d.lbl, x + 4, y + 8);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...d.accent);
+    const kcalStr = d.kcal != null ? `${asText(d.kcal)}` : "—";
+    doc.text(kcalStr, x + 4, y + 16.5);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(6.4); doc.setTextColor(...GRAY);
+    doc.text("kcal", x + 4 + doc.getTextWidth(kcalStr) + 1.5, y + 16.5);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...TEXT);
+    doc.text(d.carbs != null ? `${asText(d.carbs)} g de carboidrato` : "carboidrato conforme treino", x + 4, y + 22);
+  });
+  return y + cardH + 5;
+}
+
+// Chip preenchido e arredondado (verde p/ exemplos, âmbar p/ evitar). Quebra de linha automática.
+function drawChips(
+  doc: jsPDF, items: string[], x: number, y: number, maxW: number,
+  fill: [number, number, number], fg: [number, number, number]
+): number {
+  const chipH = 5.6;
+  const padX = 2.4;
+  const gap = 2;
+  const lh = chipH + 2;
+  let cx = x;
+  let cy = y;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(6.8);
+  items.forEach((raw) => {
+    const txt = sanitize(raw).replace(/^[•\-–]\s*/, "").trim();
+    if (!txt) return;
+    const tw = doc.getTextWidth(txt);
+    const chipW = tw + padX * 2;
+    if (cx + chipW > x + maxW && cx > x) { cx = x; cy += lh; }
+    cy = ensure(doc, cy, chipH);
+    doc.setFillColor(...fill);
+    doc.roundedRect(cx, cy - chipH + 1.4, chipW, chipH, 1.6, 1.6, "F");
+    doc.setTextColor(...fg);
+    doc.text(txt, cx + padX, cy - 0.6);
+    cx += chipW + gap;
+  });
+  return cy + 2;
+}
+
+// Card de "momento" para nutrition_tips: faixa-título navy (branca) + corpo bege-claro + chips.
+function tipCard(doc: jsPDF, t: any, y: number): number {
+  const w = W(doc);
+  const innerW = w - MARGIN * 2;
+  const bodyX = MARGIN + 5;
+  const bodyMaxW = innerW - 10;
+
+  const title = `${asText(first(t.title, t.titulo, "Dica"))}`;
+  const timing = t.timing ? asText(t.timing) : "";
+  const goal = first(t.goal, t.objetivo);
+  const howMuch = first(t.how_much, t.quantidade_aproximada);
+  const exs = (t.examples || t.exemplos || []).map(asText).filter(Boolean);
+  const av = (t.avoid || t.evitar || []).map(asText).filter(Boolean);
+
+  // Pré-medir altura do corpo
+  let bodyH = 4;
+  if (goal != null) bodyH += measureLines(doc, `Objetivo: ${asText(goal)}`, bodyMaxW, 8, 4.2);
+  if (howMuch != null) bodyH += measureLines(doc, `Quanto: ${asText(howMuch)}`, bodyMaxW, 8, 4.2);
+  if (exs.length) bodyH += 4.5 + Math.ceil(exs.length / 3) * 7.6;
+  if (av.length) bodyH += 4.5 + Math.ceil(av.length / 3) * 7.6;
+  bodyH += 3;
+
+  const headerH = 9;
+  const totalH = headerH + bodyH;
+  y = ensure(doc, y, totalH + 3);
+
+  // Corpo bege-claro
+  doc.setFillColor(...BEGE_L);
+  doc.roundedRect(MARGIN, y, innerW, totalH, 2.5, 2.5, "F");
+  // Faixa-título navy
+  doc.setFillColor(...NAVY);
+  doc.roundedRect(MARGIN, y, innerW, headerH, 2.5, 2.5, "F");
+  doc.rect(MARGIN, y + headerH - 3, innerW, 3, "F");
+  doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(255, 255, 255);
+  doc.text(title, MARGIN + 5, y + 6);
+  if (timing) {
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...BEGE_L);
+    doc.text(timing, w - MARGIN - 5, y + 6, { align: "right" });
+  }
+
+  let cy = y + headerH + 5;
+  if (goal != null) {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...BEGE);
+    doc.text("OBJETIVO", bodyX, cy);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...TEXT);
+    cy = wrapText(doc, asText(goal), bodyX + 16, cy, bodyMaxW - 16, 4.2) + 1;
+  }
+  if (howMuch != null) {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...BEGE);
+    doc.text("QUANTO", bodyX, cy);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...TEXT);
+    cy = wrapText(doc, asText(howMuch), bodyX + 16, cy, bodyMaxW - 16, 4.2) + 1;
+  }
+  if (exs.length) {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(6.8); doc.setTextColor(...GREEN);
+    doc.text("EXEMPLOS", bodyX, cy + 2.5);
+    cy = drawChips(doc, exs, bodyX, cy + 6.5, bodyMaxW, [221, 240, 231], [13, 92, 64]);
+  }
+  if (av.length) {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(6.8); doc.setTextColor(...AMBER);
+    doc.text("EVITAR", bodyX, cy + 2.5);
+    cy = drawChips(doc, av, bodyX, cy + 6.5, bodyMaxW, AMBER_L, [150, 90, 25]);
+  }
+
+  return y + totalH + 4;
+}
+
+// Timeline vertical de blocos periodizados: faixa navy por bloco + foco/estratégia.
+function periodizedBlocks(doc: jsPDF, blocks: any[], y: number): number {
+  const w = W(doc);
+  const innerW = w - MARGIN * 2;
+  blocks.forEach((b: any, idx: number) => {
+    const weeks = asText(first(b.weeks, b.semanas, `Bloco ${idx + 1}`));
+    const load = asText(first(b.training_load, b.carga, ""));
+    const focus = asText(first(b.nutrition_focus, b.foco, ""));
+    const carb = asText(first(b.carb_strategy, b.estrategia_carbo, ""));
+    const recovery = asText(first(b.recovery_priority, b.prioridade_recuperacao, ""));
+
+    const detailParts = [
+      focus ? `Foco: ${focus}` : "",
+      carb ? `Carbo: ${carb}` : "",
+      recovery ? `Recuperacao: ${recovery}` : "",
+    ].filter(Boolean).join("   ·   ");
+
+    const detailH = detailParts ? measureLines(doc, detailParts, innerW - 12, 7.5, 4) : 0;
+    const headerH = 8;
+    const totalH = headerH + (detailH ? detailH + 4 : 2);
+    y = ensure(doc, y, totalH + 2);
+
+    // Trilho da timeline (faixa bege fina à esquerda)
+    doc.setFillColor(...BEGE);
+    doc.rect(MARGIN, y, 2, totalH, "F");
+    // Faixa navy do bloco
+    doc.setFillColor(...NAVY);
+    doc.roundedRect(MARGIN + 2, y, innerW - 2, headerH, 1.5, 1.5, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(255, 255, 255);
+    doc.text(`Semanas ${weeks}`, MARGIN + 6, y + 5.4);
+    if (load) {
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...BEGE_L);
+      doc.text(load, w - MARGIN - 4, y + 5.4, { align: "right" });
+    }
+    if (detailParts) {
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...TEXT);
+      wrapText(doc, detailParts, MARGIN + 6, y + headerH + 4, innerW - 12, 4);
+    }
+    y += totalH + 2.5;
+  });
+  return y + 2;
+}
+
+// Callout colorido com bullets curtos (quebra texto longo em itens por linha/ponto-e-vírgula).
+function bulletCallout(doc: jsPDF, title: string, val: any, y: number, accent: [number, number, number], fill: [number, number, number]): number {
+  const w = W(doc);
+  const innerW = w - MARGIN * 2;
+  const bodyMaxW = innerW - 12;
+
+  // Normaliza para lista de bullets curtos
+  let items: string[];
+  if (Array.isArray(val)) {
+    items = val.map(asText).filter(Boolean);
+  } else {
+    const raw = asText(val);
+    items = raw.split(/\n|(?<=[.;])\s+(?=[A-ZÀ-Ý])/).map((s) => s.trim()).filter(Boolean);
+    if (items.length <= 1) items = raw.split(/;\s*/).map((s) => s.trim()).filter(Boolean);
+  }
+  if (!items.length) return y;
+
+  // Pré-medir
+  let bodyH = 0;
+  const measured = items.map((it) => {
+    const h = measureLines(doc, `–  ${it}`, bodyMaxW, 8, 4.3);
+    bodyH += h + 1.2;
+    return h;
+  });
+  const headerH = 8;
+  const totalH = headerH + bodyH + 4;
+  y = ensure(doc, y, totalH + 3);
+
+  doc.setFillColor(...fill);
+  doc.roundedRect(MARGIN, y, innerW, totalH, 2.5, 2.5, "F");
+  doc.setFillColor(...accent);
+  doc.roundedRect(MARGIN, y, 2.2, totalH, 2.5, 2.5, "F");
+  doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...accent);
+  doc.text(sanitize(title).toUpperCase(), MARGIN + 6, y + 5.6);
+
+  let cy = y + headerH + 4;
+  items.forEach((it) => {
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...TEXT);
+    cy = wrapText(doc, `–  ${it}`, MARGIN + 6, cy, bodyMaxW, 4.3) + 1.2;
+  });
+  return y + totalH + 4;
+}
+
 export function generateNutritionPDF(plan: any, meta: PDFMeta): jsPDF {
   const doc = new jsPDF();
   const w = W(doc);
   header(doc, "Plano Nutricional", asText(first(plan.plan_name, "Orientações práticas")), meta);
   let y = 42;
 
-  // Resumo energético
+  // Banner energético — caixa navy preenchida com pílulas de macro + hidratação
   const es = plan.energy_summary;
-  if (es) {
-    y = statCards(doc, [
-      [`${asText(first(es.target_kcal, "—"))}`, "kcal/dia"],
-      [`${asText(first(es.protein_total_g, "—"))}g`, "Proteína"],
-      [`${asText(first(es.carbs_total_g, "—"))}g`, "Carboidrato"],
-      [`${asText(first(es.fat_total_g, "—"))}g`, "Gordura"],
-    ], y);
-    const sub = [
-      es.tmb_kcal ? `TMB ${asText(es.tmb_kcal)}` : "",
-      es.get_kcal ? `GET ${asText(es.get_kcal)}` : "",
-      es.deficit_surplus_percent != null ? `${Number(es.deficit_surplus_percent) >= 0 ? "+" : ""}${asText(es.deficit_surplus_percent)}%` : "",
-      es.hydration_ml ? `Água ${asText(es.hydration_ml)}ml` : "",
-    ].filter(Boolean).join("   ·   ");
-    if (sub) { doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...GRAY); doc.text(sub, MARGIN, y); y += 6; }
+  if (es && typeof es === "object") {
+    y = energyBanner(doc, es, y);
   }
 
-  // Carb cycling (formatado, não JSON cru)
+  // Ciclo de carboidratos — 3 cards lado a lado (alto/moderado/descanso)
   const cc = plan.carb_cycling;
-  if (cc && typeof cc === "object") {
+  if (cc && typeof cc === "object" && !Array.isArray(cc)) {
     y = sectionTitle(doc, "Ciclo de carboidratos", y);
-    const rows: [string, any, any][] = [
-      ["Dia alto / treino duplo", cc.high_day_kcal, cc.high_day_carbs_g],
-      ["Dia moderado", cc.moderate_day_kcal, cc.moderate_day_carbs_g],
-      ["Dia de descanso", cc.rest_day_kcal, cc.rest_day_carbs_g],
-    ];
-    rows.forEach(([lbl, kcal, carbs]) => {
-      if (kcal == null && carbs == null) return;
-      y = ensure(doc, y, 6);
-      doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...NAVY);
-      doc.text(`•  ${lbl}`, MARGIN + 2, y);
-      doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...TEXT);
-      doc.text(`${kcal != null ? asText(kcal) + " kcal" : ""}${carbs != null ? "  ·  " + asText(carbs) + "g CHO" : ""}`, w - MARGIN, y, { align: "right" });
-      y += 5;
-    });
-    y += 2;
-  } else if (typeof cc === "string") {
+    y = carbCyclingCards(doc, cc, y);
+  } else if (typeof cc === "string" && cc.trim()) {
+    y = sectionTitle(doc, "Ciclo de carboidratos", y);
     y = calloutBox(doc, cc, y, "info");
   }
 
-  // Orientações por momento (schema BN: nutrition_tips — sem cardápio fechado)
+  // Orientações por momento — cada dica = 1 card de momento com chips
   const tips = plan.nutrition_tips || plan.tips || [];
   if (Array.isArray(tips) && tips.length) {
     y = sectionTitle(doc, "Orientações por momento", y);
     tips.forEach((t: any) => {
-      y = ensure(doc, y, 12);
-      doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...NAVY);
-      doc.text(`${asText(first(t.title, t.titulo, "Dica"))}${t.timing ? "  ·  " + asText(t.timing) : ""}`, MARGIN + 2, y);
-      y += 5;
-      doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...TEXT);
-      if (t.goal || t.objetivo) y = wrapText(doc, `Objetivo: ${asText(first(t.goal, t.objetivo))}`, MARGIN + 4, y, w - MARGIN * 2 - 6, 4.2);
-      if (t.how_much || t.quantidade_aproximada) y = wrapText(doc, `Quanto: ${asText(first(t.how_much, t.quantidade_aproximada))}`, MARGIN + 4, y, w - MARGIN * 2 - 6, 4.2);
-      const exs = (t.examples || t.exemplos || []).map(asText).filter(Boolean);
-      if (exs.length) { doc.setTextColor(...GREEN); y = wrapText(doc, `Exemplos: ${exs.join("; ")}`, MARGIN + 4, y, w - MARGIN * 2 - 6, 4); doc.setTextColor(...TEXT); }
-      const av = (t.avoid || t.evitar || []).map(asText).filter(Boolean);
-      if (av.length) { doc.setTextColor(...AMBER); y = wrapText(doc, `Evitar: ${av.join(", ")}`, MARGIN + 4, y, w - MARGIN * 2 - 6, 4); doc.setTextColor(...TEXT); }
-      y += 3;
+      if (!t || typeof t !== "object") return;
+      y = tipCard(doc, t, y);
     });
+    y += 1;
+  }
+
+  // Periodização nutricional — timeline de blocos
+  const blocks = plan.periodized_blocks;
+  if (Array.isArray(blocks) && blocks.length) {
+    y = sectionTitle(doc, "Periodização nutricional", y);
+    y = periodizedBlocks(doc, blocks.filter((b: any) => b && typeof b === "object"), y);
   }
 
   // Refeições do dia (quando a IA retornar cardápio estruturado)
@@ -440,6 +700,7 @@ export function generateNutritionPDF(plan: any, meta: PDFMeta): jsPDF {
   if (Array.isArray(meals) && meals.length) {
     y = sectionTitle(doc, "Plano alimentar do dia", y);
     meals.forEach((m: any) => {
+      if (!m || typeof m !== "object") return;
       y = ensure(doc, y, 10);
       doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...NAVY);
       const ctx = m.context ? ` (${CTX_LABEL[m.context] || asText(m.context)})` : "";
@@ -459,47 +720,78 @@ export function generateNutritionPDF(plan: any, meta: PDFMeta): jsPDF {
     });
   }
 
-  // Suplementação
+  // Suplementação — cards limpos
   const supp = plan.supplementation;
   if (Array.isArray(supp) && supp.length) {
     y = sectionTitle(doc, "Suplementação", y);
+    const innerW = w - MARGIN * 2;
     supp.forEach((s: any) => {
-      y = ensure(doc, y, 7);
-      doc.setFont("helvetica", "bold"); doc.setFontSize(8.2); doc.setTextColor(...NAVY);
-      doc.text(`•  ${asText(first(s.supplement, s.nome))}${s.dose ? " — " + asText(s.dose) : ""}`, MARGIN + 2, y);
-      y += 4.2;
+      if (!s || typeof s !== "object") return;
+      const name = `${asText(first(s.supplement, s.nome, "Suplemento"))}`;
+      const dose = s.dose ? asText(s.dose) : "";
       const line = [s.timing ? asText(s.timing) : "", s.reason ? asText(s.reason) : ""].filter(Boolean).join("  ·  ");
-      if (line) { doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...GRAY); y = wrapText(doc, `↳ ${line}`, MARGIN + 5, y, w - MARGIN * 2 - 7, 3.8) + 0.8; }
-    });
-    y += 2;
-  }
-
-  // Substituições
-  const subs = plan.substitutions;
-  if (Array.isArray(subs) && subs.length) {
-    y = sectionTitle(doc, "Substituições inteligentes", y);
-    subs.forEach((s: any) => {
-      y = ensure(doc, y, 6);
-      doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...NAVY);
-      y = wrapText(doc, asText(first(s.original, s.de)), MARGIN + 2, y, w - MARGIN * 2 - 4, 4.2);
-      doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...GREEN);
-      y = wrapText(doc, `↔ ${asText(first(s.alternatives, s.alternativas))}`, MARGIN + 5, y, w - MARGIN * 2 - 7, 3.8) + 1.5;
+      const lineH = line ? measureLines(doc, line, innerW - 14, 7.2, 3.9) : 0;
+      const cardH = 9 + (lineH ? lineH + 2 : 1);
+      y = ensure(doc, y, cardH + 2);
+      doc.setFillColor(...LIGHT);
+      doc.roundedRect(MARGIN, y, innerW, cardH, 2, 2, "F");
+      doc.setFillColor(...NAVY);
+      doc.roundedRect(MARGIN, y, 2, cardH, 2, 2, "F");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8.4); doc.setTextColor(...NAVY);
+      doc.text(name, MARGIN + 6, y + 6);
+      if (dose) {
+        doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...AMBER);
+        const dw = doc.getTextWidth(dose) + 6;
+        doc.setFillColor(...AMBER_L);
+        doc.roundedRect(w - MARGIN - dw - 2, y + 2, dw, 5.6, 1.4, 1.4, "F");
+        doc.text(dose, w - MARGIN - 2 - dw / 2, y + 5.8, { align: "center" });
+      }
+      if (line) {
+        doc.setFont("helvetica", "normal"); doc.setFontSize(7.2); doc.setTextColor(...GRAY);
+        wrapText(doc, line, MARGIN + 6, y + 11, innerW - 12, 3.9);
+      }
+      y += cardH + 3;
     });
     y += 1;
   }
 
-  // Protocolos
-  const protos: [string, any][] = [
-    ["Protocolo pré-prova / corrida longa", plan.pre_race_gi_protocol],
-    ["Estratégia intra-treino", plan.intra_workout_protocol],
-    ["Ajustes nos dias de descanso", plan.rest_day_adjustments],
-    ["Observações gerais", first(plan.general_notes, plan.observations)],
+  // Substituições inteligentes — cards limpos (original -> alternativas em verde)
+  const subs = plan.substitutions;
+  if (Array.isArray(subs) && subs.length) {
+    y = sectionTitle(doc, "Substituições inteligentes", y);
+    const innerW = w - MARGIN * 2;
+    subs.forEach((s: any) => {
+      if (!s || typeof s !== "object") return;
+      const orig = asText(first(s.original, s.de, "—"));
+      const altsRaw = first(s.alternatives, s.alternativas);
+      const alts = Array.isArray(altsRaw) ? altsRaw.map(asText).filter(Boolean) : (altsRaw != null ? [asText(altsRaw)] : []);
+      const altLine = alts.join("  ·  ");
+      const altH = altLine ? measureLines(doc, altLine, innerW - 14, 7.5, 4) : 0;
+      const cardH = 8 + (altH ? altH + 2 : 1);
+      y = ensure(doc, y, cardH + 2);
+      doc.setFillColor(...BEGE_L);
+      doc.roundedRect(MARGIN, y, innerW, cardH, 2, 2, "F");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...NAVY);
+      doc.text(orig, MARGIN + 5, y + 5.6);
+      if (altLine) {
+        doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...GREEN);
+        wrapText(doc, `em vez disso: ${altLine}`, MARGIN + 5, y + 10.5, innerW - 10, 4);
+      }
+      y += cardH + 3;
+    });
+    y += 1;
+  }
+
+  // Protocolos longos — callouts coloridos com bullets curtos
+  const protos: { lbl: string; val: any; accent: [number, number, number]; fill: [number, number, number] }[] = [
+    { lbl: "Protocolo pré-prova / corrida longa", val: plan.pre_race_gi_protocol, accent: NAVY, fill: LIGHT },
+    { lbl: "Estratégia intra-treino", val: plan.intra_workout_protocol, accent: GREEN, fill: [231, 244, 238] },
+    { lbl: "Ajustes nos dias de descanso", val: plan.rest_day_adjustments, accent: BEGE, fill: BEGE_L },
+    { lbl: "Observações gerais", val: first(plan.general_notes, plan.observations), accent: AMBER, fill: AMBER_L },
   ];
-  protos.forEach(([lbl, val]) => {
-    if (!val) return;
-    y = sectionTitle(doc, lbl, y);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...TEXT);
-    y = wrapText(doc, asText(val), MARGIN + 2, y, w - MARGIN * 2 - 4) + 3;
+  protos.forEach(({ lbl, val, accent, fill }) => {
+    if (val == null || (Array.isArray(val) && !val.length) || (typeof val === "string" && !val.trim())) return;
+    y = bulletCallout(doc, lbl, val, y, accent, fill);
   });
 
   y = warningsBlock(doc, plan.warnings, y);

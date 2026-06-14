@@ -88,8 +88,10 @@ export default function WhatsAppChat() {
   const effectiveCompanyId = userRole === "master" ? (isViewingCompany ? viewingCompany?.id : null) : companyId;
   const [chats, setChats] = useState<Chat[]>([]);
   const location = useLocation();
-  // Chat alvo vindo do CRM (navigate("/admin/whatsapp-chat", { state: { chatId } }))
+  // Chat alvo vindo do CRM/dashboard (navigate("/admin/whatsapp-chat", { state: { chatId, prefillMessage } }))
   const pendingChatIdRef = useRef<string | null>((location.state as { chatId?: string } | null)?.chatId ?? null);
+  // Mensagem pronta (rascunho) vinda de aniversário/renovação/anamnese — pré-preenche a caixa de texto, NÃO envia sozinha.
+  const pendingPrefillRef = useRef<string | null>((location.state as { prefillMessage?: string } | null)?.prefillMessage ?? null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const selectedChatIdRef = useRef<string | null>(null);
   useEffect(() => { selectedChatIdRef.current = selectedChatId; }, [selectedChatId]);
@@ -433,6 +435,11 @@ export default function WhatsAppChat() {
     if (pendingChatIdRef.current && chats.some((c) => c.id === pendingChatIdRef.current)) {
       setSelectedChatId(pendingChatIdRef.current);
       pendingChatIdRef.current = null;
+      // Aplica o rascunho pronto (aniversário/renovação/etc.) uma única vez, sem enviar.
+      if (pendingPrefillRef.current) {
+        setNewMessage(pendingPrefillRef.current);
+        pendingPrefillRef.current = null;
+      }
     }
   }, [chats]);
   useEffect(() => { if (selectedChatId) loadMessages(selectedChatId); }, [selectedChatId, loadMessages]);

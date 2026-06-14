@@ -5,11 +5,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Cake, Dumbbell, UserCheck, CalendarDays, AlertTriangle, Bell, Check } from "lucide-react";
-import { differenceInDays, setYear } from "date-fns";
+import { Cake, Dumbbell, UserCheck, CalendarDays, AlertTriangle, Bell, Check, MessageCircle } from "lucide-react";
+import { toast } from "sonner";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
+import { buildStudentChatMap, openStudentChat, birthdayMessage } from "@/lib/studentChat";
 
-interface Birthday { full_name: string; birth_date: string; daysUntil: number; student_id: string; }
+interface Birthday { full_name: string; birth_date: string; student_id: string; isToday: boolean; day: number; }
 interface MissingWorkout { student_name: string; student_id: string; cycle_number: number; cycle_id: string; start_date: string; end_date: string; trainer_name?: string; }
 interface AwaitingTrainingDate { student_name: string; student_id: string; enrollment_id: string; trainer_name?: string; }
 interface AwaitingTrainer { student_name: string; student_id: string; }
@@ -74,20 +75,17 @@ async function fetchAlerts(
     (profiles || []).forEach((p: any) => { trainerMap[p.user_id] = p.full_name || "—"; });
   }
 
-  // Birthdays
+  // Aniversariantes do MÊS atual (usa 'T00:00:00' para evitar o drift de fuso já conhecido no projeto).
   const birthdays: Birthday[] = [];
+  const curMonth = today.getMonth();
+  const curDay = today.getDate();
   (results[0].data || []).forEach((s: any) => {
     if (!s.birth_date) return;
-    const bd = new Date(s.birth_date);
-    const thisYear = setYear(bd, today.getFullYear());
-    let diff = differenceInDays(thisYear, today);
-    if (diff < 0) {
-      const nextYear = setYear(bd, today.getFullYear() + 1);
-      diff = differenceInDays(nextYear, today);
-    }
-    if (diff <= 30) birthdays.push({ full_name: s.full_name, birth_date: s.birth_date, daysUntil: diff, student_id: s.id });
+    const bd = new Date(`${s.birth_date}T00:00:00`);
+    if (bd.getMonth() !== curMonth) return;
+    birthdays.push({ full_name: s.full_name, birth_date: s.birth_date, student_id: s.id, day: bd.getDate(), isToday: bd.getDate() === curDay });
   });
-  birthdays.sort((a, b) => a.daysUntil - b.daysUntil);
+  birthdays.sort((a, b) => a.day - b.day);
 
   let awaitingTrainer: AwaitingTrainer[] = [];
   let awaitingTrainingDate: AwaitingTrainingDate[] = [];
@@ -253,6 +251,22 @@ export function DashboardAlerts({ trainerId }: Props) {
 
   const goToStudent = (studentId: string) => navigate(`/${routePrefix}/students/${studentId}`);
 
+  // Mapa aluno→conversa para o botão de mensagem de aniversário (abre o chat com a mensagem pronta).
+  const { data: studentChatMap } = useQuery({
+    queryKey: ["student-chat-map", effectiveCompanyId ?? "all"],
+    queryFn: () => buildStudentChatMap(effectiveCompanyId),
+    staleTime: 60_000,
+  });
+  const sendBirthday = (studentId: string, fullName: string) => {
+    openStudentChat({
+      navigate,
+      routePrefix: (routePrefix as string) || "admin",
+      chatId: studentChatMap?.[studentId],
+      message: birthdayMessage(fullName),
+      onNoChat: (m) => { void navigator.clipboard?.writeText(m); toast.success("Sem conversa no WhatsApp — mensagem de aniversário copiada."); },
+    });
+  };
+
   const hasContent = pendingActions.length > 0 || birthdays.length > 0 || missingWorkouts.length > 0 || awaitingTrainer.length > 0 || awaitingTrainingDate.length > 0 || missingEnrollment.length > 0 || incompleteBilling.length > 0;
   if (!hasContent) return null;
 
@@ -416,17 +430,27 @@ export function DashboardAlerts({ trainerId }: Props) {
         <Card className="bg-card border-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-primary text-lg flex items-center gap-2">
-              <Cake className="h-5 w-5" />ANIVERSÁRIOS
+              <Cake className="h-5 w-5" />ANIVERSÁRIOS DO MÊS
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2 max-h-[200px] overflow-auto">
+            <div className="space-y-2 max-h-[260px] overflow-auto">
               {birthdays.map((b, i) => (
                 <div key={i} className={`${itemClass} bg-secondary/50 border border-border`} onClick={() => goToStudent(b.student_id)}>
-                  <p className="text-sm font-sans text-foreground">{b.full_name}</p>
-                  <span className={`text-xs font-sans font-medium px-2 py-0.5 rounded ${b.daysUntil === 0 ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
-                    {b.daysUntil === 0 ? "🎉 Hoje!" : `em ${b.daysUntil}d`}
-                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-sans text-foreground truncate">{b.full_name}</p>
+                    <span className={`text-xs font-sans font-medium ${b.isToday ? "text-primary" : "text-muted-foreground"}`}>
+                      {b.isToday ? "🎉 Hoje!" : `dia ${b.day}`}
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs shrink-0 border-primary/40 text-primary hover:bg-primary/5"
+                    onClick={(e) => { e.stopPropagation(); sendBirthday(b.student_id, b.full_name); }}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5 mr-1" /> Mensagem
+                  </Button>
                 </div>
               ))}
             </div>

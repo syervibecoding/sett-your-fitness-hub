@@ -2,12 +2,16 @@ import { lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, TrendingUp, RefreshCw, Clock, UserX, Timer, RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, TrendingUp, RefreshCw, Clock, UserX, Timer, RotateCcw, MessageCircle } from "lucide-react";
 import { format, addDays } from "date-fns";
+import { toast } from "sonner";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
+import { AtRiskStudents } from "@/components/admin/AtRiskStudents";
 import { useMaster } from "@/contexts/MasterContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import { buildStudentChatMap, openStudentChat, renewalMessage } from "@/lib/studentChat";
 
 const LazyChart = lazy(() => import("recharts").then(mod => ({
   default: ({ data, colors }: { data: { name: string; count: number }[]; colors: string[] }) => (
@@ -165,6 +169,24 @@ export default function AdminDashboard() {
     staleTime: 60_000,
   });
 
+  // Mapa aluno→conversa para os botões "Renovar agora" (abre o chat com a mensagem pronta).
+  const { data: studentChatMap } = useQuery({
+    queryKey: ["student-chat-map", effectiveCompanyId ?? "all"],
+    queryFn: () => buildStudentChatMap(effectiveCompanyId),
+    staleTime: 60_000,
+  });
+
+  const handleRenew = (studentId: string, fullName?: string, planName?: string, daysLeft?: number) => {
+    const message = renewalMessage({ fullName, planName, daysLeft, studentId, overdue: typeof daysLeft === "number" && daysLeft <= 0 });
+    openStudentChat({
+      navigate,
+      routePrefix: (routePrefix as string) || "admin",
+      chatId: studentChatMap?.[studentId],
+      message,
+      onNoChat: (m) => { void navigator.clipboard?.writeText(m); toast.success("Sem conversa no WhatsApp — mensagem de renovação copiada."); },
+    });
+  };
+
   const stats = data?.stats ?? { totalStudents: 0, pendingStudents: 0, awaitingRenewalStudents: 0, inactiveStudents: 0, trainers: 0 };
   const planChart = data?.planChart ?? [];
   const expiringContracts = data?.expiringContracts ?? [];
@@ -263,12 +285,22 @@ export default function AdminDashboard() {
                             <p className="text-muted-foreground/70 text-[11px] font-sans">Treinador: {trainerMap[contract.trainer_id]}</p>
                           )}
                         </div>
-                        <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
-                          daysLeft <= 7 ? "bg-destructive/20 text-destructive" :
-                          daysLeft <= 15 ? "bg-warning/20 text-warning" : "bg-primary/20 text-primary"
-                        }`}>
-                          {daysLeft}d restantes
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
+                            daysLeft <= 7 ? "bg-destructive/20 text-destructive" :
+                            daysLeft <= 15 ? "bg-warning/20 text-warning" : "bg-primary/20 text-primary"
+                          }`}>
+                            {daysLeft}d restantes
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs border-primary/40 text-primary hover:bg-primary/5"
+                            onClick={(e) => { e.stopPropagation(); handleRenew(contract.student_id, contract.students?.full_name, contract.plans?.name, daysLeft); }}
+                          >
+                            <MessageCircle className="h-3.5 w-3.5 mr-1" /> Renovar agora
+                          </Button>
+                        </div>
                       </div>
                     );
                   })}
@@ -279,6 +311,9 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* EVASÃO embutida na dashboard (antes era a rota separada /admin/evasao). */}
+        <AtRiskStudents />
 
         <Card className="bg-card border-border">
           <CardHeader>
