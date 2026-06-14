@@ -18,8 +18,12 @@ export interface BodyMeasurementValues {
 interface BodyAvatarProps {
   gender: Gender;
   measurements: BodyMeasurementValues;
+  heightCm?: number | null;
   className?: string;
 }
+
+// Altura de referência (cm) por gênero — base neutra para escalar verticalmente.
+const REF_HEIGHT: Record<Gender, number> = { male: 175, female: 162 };
 
 // Reference circumferences (cm) used as the "neutral" baseline for each gender.
 const REFERENCE: Record<Gender, Record<keyof BodyMeasurementValues, number>> = {
@@ -53,10 +57,18 @@ function smooth(points: { x: number; y: number }[]): string {
   return d;
 }
 
-export function BodyAvatar({ gender, measurements, className }: BodyAvatarProps) {
+export function BodyAvatar({ gender, measurements, heightCm, className }: BodyAvatarProps) {
   const cx = 120;
   const base = BASE[gender];
   const ref = REFERENCE[gender];
+
+  // Escala vertical pela altura (largura já vem das circunferências). Pivô no centro do corpo.
+  const hFactor = heightCm && heightCm > 0 ? clamp(heightCm / REF_HEIGHT[gender], 0.9, 1.12) : 1;
+  const PIVOT = 255;
+  const bodyTransform = `matrix(1,0,0,${hFactor.toFixed(4)},0,${(PIVOT * (1 - hFactor)).toFixed(2)})`;
+  // Cabeça fica fora do scale (continua redonda) e acompanha o topo do pescoço escalado.
+  const neckTopScaled = PIVOT * (1 - hFactor) + hFactor * 58;
+  const headCy = neckTopScaled - 18;
 
   const half = useMemo(() => {
     const factor = (key: keyof BodyMeasurementValues) => {
@@ -111,12 +123,13 @@ export function BodyAvatar({ gender, measurements, className }: BodyAvatarProps)
 
   return (
     <svg
-      viewBox="0 0 240 470"
+      viewBox="0 -12 240 512"
       className={className}
       role="img"
-      aria-label={`Avatar de medidas (${gender === "male" ? "masculino" : "feminino"})`}
+      aria-label={`Avatar de medidas (${gender === "male" ? "masculino" : "feminino"}${heightCm ? `, ${heightCm} cm` : ""})`}
     >
-      <g fill={fill} fillOpacity={0.13} stroke={fill} strokeOpacity={0.5} strokeWidth={2} strokeLinejoin="round">
+      {/* Corpo: escalado verticalmente pela altura */}
+      <g fill={fill} fillOpacity={0.13} stroke={fill} strokeOpacity={0.5} strokeWidth={2} strokeLinejoin="round" transform={bodyTransform}>
         {/* Legs (behind) */}
         <rect x={legCenterL - half.thigh} y={254} width={half.thigh * 2} height={114} rx={half.thigh * 0.7} />
         <rect x={legCenterR - half.thigh} y={254} width={half.thigh * 2} height={114} rx={half.thigh * 0.7} />
@@ -134,10 +147,10 @@ export function BodyAvatar({ gender, measurements, className }: BodyAvatarProps)
 
         {/* Neck */}
         <rect x={cx - half.neck} y={58} width={half.neck * 2} height={26} rx={half.neck * 0.5} />
-
-        {/* Head */}
-        <circle cx={cx} cy={40} r={base.headR} />
       </g>
+
+      {/* Head (fora do scale → continua redonda; sem rosto) */}
+      <circle cx={cx} cy={headCy} r={base.headR} fill={fill} fillOpacity={0.13} stroke={fill} strokeOpacity={0.5} strokeWidth={2} />
     </svg>
   );
 }

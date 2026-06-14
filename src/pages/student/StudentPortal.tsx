@@ -15,6 +15,7 @@ import { WorkoutTimer } from "@/components/student/WorkoutTimer";
 import { WorkoutSummary } from "@/components/student/WorkoutSummary";
 import { ExerciseCard } from "@/components/student/ExerciseCard";
 import { StatsCharts } from "@/components/student/StatsCharts";
+import { VolumeInsights } from "@/components/student/VolumeInsights";
 import { useRestTimer } from "@/components/student/RestTimer";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { WeeklyBar } from "@/components/student/WeeklyBar";
@@ -828,7 +829,10 @@ export default function StudentPortal() {
 
         {/* STATS VIEW */}
         {activeView === "stats" && (
-          <StatsCharts allLogs={allLogs} cycles={cycles} todayStr={todayStr} />
+          <div className="space-y-4">
+            <VolumeInsights allLogs={allLogs} cycles={cycles} />
+            <StatsCharts allLogs={allLogs} cycles={cycles} todayStr={todayStr} />
+          </div>
         )}
 
         {/* CALENDARIO VIEW */}

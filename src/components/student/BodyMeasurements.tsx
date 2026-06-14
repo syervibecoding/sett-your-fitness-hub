@@ -58,6 +58,7 @@ export function BodyMeasurements({ studentId, companyId, gender, onGenderChange 
   const [measuredAt, setMeasuredAt] = useState(todayStr());
   const [notes, setNotes] = useState("");
   const [metric, setMetric] = useState<keyof BodyMeasurementValues>("waist");
+  const [heightCm, setHeightCm] = useState<string>("");
 
   const loadHistory = async () => {
     const { data } = await supabase
@@ -77,6 +78,8 @@ export function BodyMeasurements({ studentId, companyId, gender, onGenderChange 
       });
       setForm(next);
     }
+    const { data: st } = await supabase.from("students").select("height_cm").eq("id", studentId).maybeSingle();
+    if (st && (st as any).height_cm != null) setHeightCm(String((st as any).height_cm));
     setLoading(false);
   };
 
@@ -95,6 +98,11 @@ export function BodyMeasurements({ studentId, companyId, gender, onGenderChange 
     return v;
   }, [form]);
 
+  const heightNum = useMemo(() => {
+    const n = heightCm ? parseFloat(heightCm.replace(",", ".")) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [heightCm]);
+
   const handleSaveGender = async (g: Gender) => {
     setSavingGender(true);
     const { error } = await supabase.from("students").update({ gender: g }).eq("id", studentId);
@@ -104,6 +112,12 @@ export function BodyMeasurements({ studentId, companyId, gender, onGenderChange 
       return;
     }
     onGenderChange(g);
+  };
+
+  const saveHeight = async (value: string) => {
+    const n = value ? parseFloat(value.replace(",", ".")) : NaN;
+    const h = Number.isFinite(n) && n > 0 ? n : null;
+    await supabase.from("students").update({ height_cm: h }).eq("id", studentId);
   };
 
   const handleSave = async () => {
@@ -214,10 +228,20 @@ export function BodyMeasurements({ studentId, companyId, gender, onGenderChange 
             </div>
           </div>
           <div className="flex justify-center">
-            <BodyAvatar gender={gender} measurements={liveValues} className="h-[360px] w-auto" />
+            <BodyAvatar gender={gender} measurements={liveValues} heightCm={heightNum} className="h-[360px] w-auto" />
+          </div>
+          <div className="flex items-center justify-center gap-2 mt-1">
+            <Label className="text-xs font-sans">Altura (cm)</Label>
+            <Input
+              type="number" inputMode="decimal" step="0.5" min="0"
+              value={heightCm}
+              onChange={(e) => setHeightCm(e.target.value)}
+              onBlur={(e) => saveHeight(e.target.value)}
+              className="h-8 w-24 text-center" placeholder="175"
+            />
           </div>
           <p className="text-center text-[11px] text-muted-foreground font-sans">
-            O boneco se ajusta em largura conforme você digita as circunferências.
+            O boneco se ajusta em largura (circunferências) e altura.
           </p>
         </CardContent>
       </Card>

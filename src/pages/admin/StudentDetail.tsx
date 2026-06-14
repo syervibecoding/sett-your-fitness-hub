@@ -41,6 +41,7 @@ import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 // Heavy children loaded only when their tab is opened (chunk size win)
 const WorkoutAnalysis = lazy(() => import("@/components/trainer/WorkoutAnalysis").then(m => ({ default: m.WorkoutAnalysis })));
 const TrainerWeeklyBar = lazy(() => import("@/components/trainer/TrainerWeeklyBar").then(m => ({ default: m.TrainerWeeklyBar })));
+const StudentVolumePanel = lazy(() => import("@/components/trainer/StudentVolumePanel").then(m => ({ default: m.StudentVolumePanel })));
 const MuscleRadar = lazy(() => import("@/components/student/MuscleRadar").then(m => ({ default: m.MuscleRadar })));
 
 
@@ -1323,6 +1324,7 @@ export default function StudentDetail() {
             <Suspense fallback={<TabFallback />}>
               <TrainerWeeklyBar studentId={id!} />
               <WorkoutAnalysis studentId={id!} />
+              <StudentVolumePanel studentId={id!} />
             </Suspense>
           </TabsContent>
 
