@@ -332,11 +332,6 @@ Retorne EXATAMENTE este JSON sem texto adicional, sem markdown:
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  if (!ANTHROPIC_API_KEY) {
-    return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY não configurada. Adicione o segredo para usar a IA." }), {
-      status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
   const claims = await requireUser(req);
   if (!claims) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -441,35 +436,63 @@ INSTRUÇÕES:
 10. Retorne APENAS o JSON conforme instruído, sem texto adicional
     `.trim();
 
-    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 12000,
-        system: `${SYSTEM_PROMPT}\n\n${companyAiSystem(aiConfig)}`,
-        messages: [{ role: "user", content: clean(athleteContext) }],
-      }),
-    });
+    let planJson: any = null;
+    let rawText = "";
+    let fallbackReason = "";
 
-    if (!aiResponse.ok) return aiErrorResponse(aiResponse.status);
+    if (ANTHROPIC_API_KEY) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 65000);
+        const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            max_tokens: 12000,
+            system: `${SYSTEM_PROMPT}\n\n${companyAiSystem(aiConfig)}`,
+            messages: [{ role: "user", content: clean(athleteContext) }],
+          }),
+        });
+        clearTimeout(timeoutId);
 
-    const aiData = await aiResponse.json();
-    const rawText = aiData.content?.[0]?.text ?? "";
+        if (!aiResponse.ok) {
+          const details = await aiResponse.text().catch(() => "");
+          fallbackReason = `anthropic_${aiResponse.status}: ${details.slice(0, 240)}`;
+          console.warn("ai-running-plan fallback", fallbackReason);
+        } else {
+          const aiData = await aiResponse.json();
+          rawText = aiData.content?.[0]?.text ?? "";
+          try {
+            const cleaned = rawText.replace(/```json|```/g, "").trim();
+            planJson = JSON.parse(cleaned);
+          } catch {
+            fallbackReason = `json_parse_failed: ${rawText.slice(0, 240)}`;
+            console.warn("ai-running-plan fallback", fallbackReason);
+          }
+        }
+      } catch (error) {
+        fallbackReason = `anthropic_error: ${error instanceof Error ? error.message : String(error)}`;
+        console.warn("ai-running-plan fallback", fallbackReason);
+      }
+    } else {
+      fallbackReason = "anthropic_key_missing";
+      console.warn("ai-running-plan fallback", fallbackReason);
+    }
 
-    // Parse do JSON
-    let planJson = null;
-    try {
-      const cleaned = rawText.replace(/```json|```/g, "").trim();
-      planJson = JSON.parse(cleaned);
-    } catch {
-      planJson = fallbackCardioPlan(input, rawText);
+    if (!planJson) {
+      planJson = fallbackCardioPlan(input, fallbackReason || rawText);
+      planJson.generated_by = "bn_cardio_fallback";
+      planJson.fallback_reason = fallbackReason || "anthropic_unavailable";
     }
     planJson = normalizeCardioPlan(planJson, input, rawText);
+    const persistedPlanName = clean(planJson.plan_name || `Plano de ${sport || "corrida"}`);
+    planJson.plan_name = persistedPlanName;
     if (prescription_integration) {
       planJson.prescription_integration = {
         readiness: prescription_integration.readiness ?? null,
@@ -493,8 +516,8 @@ INSTRUÇÕES:
       id: planId,
       company_id: authorizedCompanyId,
       student_id,
-      name: planJson.plan_name || `Plano de ${sport || "corrida"}`,
-      plan_name: planJson.plan_name,
+      name: persistedPlanName,
+      plan_name: persistedPlanName,
       sport: planJson.sport,
       goal: clean(goal),
       weeks: planJson.weeks,
@@ -508,7 +531,7 @@ INSTRUÇÕES:
       model: planJson.model,
       anamnese_id: anamnese_id ?? null,
       bundle_id: bundle_id ?? null,
-    });
+    }).throwOnError();
 
     return new Response(
       JSON.stringify({ id: planId, plan: planJson }),
