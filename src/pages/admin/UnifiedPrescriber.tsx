@@ -71,6 +71,27 @@ const DEFAULT_ANAMNESE: Anamnese = {
   stress_score: "", sleep_quality: "", injuries: "", notes: "",
 };
 
+// supabase.functions.invoke entrega erro non-2xx como FunctionsHttpError com o body em err.context
+// (uma Response). Aqui lemos esse body p/ mostrar a causa real — e, quando é um BLOQUEIO do validador
+// (ex.: a IA usou exercício fora da biblioteca), uma mensagem amigável em vez de "Edge Function non-2xx".
+async function describeInvokeFailure(
+  e: any, data: any,
+): Promise<{ message: string; validator?: PrescriptionValidationResult } | null> {
+  if (!e && !data?.error) return null;
+  let body: any = null;
+  try { if (e?.context && typeof e.context.json === "function") body = await e.context.json(); } catch { /* ignore */ }
+  const validator = (body?.validator ?? data?.validator) as PrescriptionValidationResult | undefined;
+  const blockers = validator?.blockers ?? [];
+  if (validator?.status === "blocked" || blockers.length > 0) {
+    const reasons = blockers.map((b) => b.message || b.recommendation || b.code).filter(Boolean);
+    return {
+      message: `Prescrição bloqueada pelo validador: ${reasons.join(" · ") || "a IA usou exercício(s) fora da biblioteca cadastrada"}. Gere novamente ou ajuste a biblioteca de exercícios.`,
+      validator,
+    };
+  }
+  return { message: body?.error || data?.error || e?.message || "Falha na geração." };
+}
+
 export default function UnifiedPrescriber() {
   const [companyId, setCompanyId]   = useState<string | null>(null);
   const [students, setStudents]     = useState<Student[]>([]);
@@ -219,7 +240,11 @@ export default function UnifiedPrescriber() {
         assessment_context: functionalAssessmentContext,
       },
     });
-    if (e || data?.error) throw new Error(data?.error || e?.message);
+    if (e || data?.error) {
+      const f = await describeInvokeFailure(e, data);
+      if (f?.validator) setValidationResult(f.validator);
+      throw new Error(f?.message || data?.error || e?.message || "Falha na geração.");
+    }
     const result = data?.result || { status: "ok", warnings: [], blockers: [] };
     setValidationResult(result);
     return result;
@@ -316,7 +341,11 @@ export default function UnifiedPrescriber() {
             bnito_orchestration: orchestrationCtx,
           },
         });
-        if (e || data?.error) throw new Error(data?.error || e?.message);
+        if (e || data?.error) {
+      const f = await describeInvokeFailure(e, data);
+      if (f?.validator) setValidationResult(f.validator);
+      throw new Error(f?.message || data?.error || e?.message || "Falha na geração.");
+    }
         strengthPlan = data?.plan; strengthPlanId = data?.id ?? null;
         const validation = await validateStrengthPlan(
           strengthPlan,
@@ -324,7 +353,8 @@ export default function UnifiedPrescriber() {
           assessmentCtx,
         );
         if (validation?.status === "blocked" || (validation?.blockers || []).length > 0) {
-          throw new Error("Validador bloqueou a prescrição de musculação. Revise os pontos críticos antes de concluir.");
+          const reasons = (validation?.blockers || []).map((b) => b.message || b.recommendation || b.code).filter(Boolean);
+          throw new Error(`Prescrição de musculação bloqueada pelo validador: ${reasons.join(" · ") || "revise os pontos críticos"}.`);
         }
         setResults(r => ({ ...r, musculacao: data?.plan }));
         setStatus(s => ({ ...s, musculacao: "done" }));
@@ -364,7 +394,11 @@ export default function UnifiedPrescriber() {
             bnito_orchestration: orchestrationCtx,
           },
         });
-        if (e || data?.error) throw new Error(data?.error || e?.message);
+        if (e || data?.error) {
+      const f = await describeInvokeFailure(e, data);
+      if (f?.validator) setValidationResult(f.validator);
+      throw new Error(f?.message || data?.error || e?.message || "Falha na geração.");
+    }
         runningPlanId = data?.id ?? null;
         setResults(r => ({ ...r, corrida: data?.plan }));
         setStatus(s => ({ ...s, corrida: "done" }));
