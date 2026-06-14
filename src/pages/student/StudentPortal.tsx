@@ -25,6 +25,7 @@ import { StudentHistory } from "@/components/student/StudentHistory";
 import { WorkoutHeader } from "@/components/student/WorkoutHeader";
 import { WeeklyGoalEditor } from "@/components/student/WeeklyGoalEditor";
 import { AchievementsPanel } from "@/components/student/AchievementsPanel";
+import { MonthlyLeaderboard } from "@/components/student/MonthlyLeaderboard";
 
 import { CycleFeedbackBanner } from "@/components/student/CycleFeedbackBanner";
 import { calculateStreak } from "@/lib/streakCalculator";
@@ -651,7 +652,12 @@ export default function StudentPortal() {
             weeklyGoal={weeklyGoal}
             streak={streak}
             goalEditor={studentId ? <WeeklyGoalEditor studentId={studentId} currentGoal={weeklyGoal} onSaved={setWeeklyGoal} /> : null}
-            achievementsPanel={studentId ? <AchievementsPanel studentId={studentId} /> : null}
+            achievementsPanel={studentId ? (
+              <div className="space-y-4">
+                <AchievementsPanel studentId={studentId} />
+                <MonthlyLeaderboard companyId={companyId} />
+              </div>
+            ) : null}
             onNavigate={handleNavigate}
           />
 
