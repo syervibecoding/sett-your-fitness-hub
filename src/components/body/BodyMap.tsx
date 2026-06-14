@@ -17,7 +17,8 @@ interface BodyMapProps {
 }
 
 export function BodyMap({
-  getRegionFill, activeRegions, onRegionClick, initialView = "front", footer, svgClassName, className,
+  getRegionFill, activeRegions, onRegionClick, initialView = "front", footer,
+  svgClassName = "h-[340px] w-auto", className,
 }: BodyMapProps) {
   const [view, setView] = useState<"front" | "back">(initialView);
 
@@ -43,7 +44,7 @@ export function BodyMap({
         onRegionClick={onRegionClick}
         getRegionFill={getRegionFill}
         activeRegions={activeRegions}
-        className={cn("h-[300px] w-auto", svgClassName)}
+        className={svgClassName}
       />
       {footer}
     </div>

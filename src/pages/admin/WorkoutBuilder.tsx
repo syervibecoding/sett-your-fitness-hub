@@ -1072,29 +1072,27 @@ export default function WorkoutBuilder() {
             <DialogTitle className="text-primary">BIBLIOTECA DE EXERCÍCIOS</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Seleção visual por região (boneco anatômico) */}
-            <details className="rounded-lg border border-border bg-secondary/30">
-              <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium text-foreground">
-                Selecionar pelo boneco{bodyRegion ? ` · ${BODY_REGION_LABELS[bodyRegion]}` : ""}
-              </summary>
-              <div className="p-3 pt-1">
-                <BodyMap
-                  onRegionClick={(id) => setBodyRegion((cur) => (cur === id ? null : id))}
-                  activeRegions={bodyRegion ? [bodyRegion] : []}
-                  getRegionFill={(id) => (id === bodyRegion ? "hsl(var(--primary))" : undefined)}
-                  svgClassName="h-[240px]"
-                  footer={
-                    bodyRegion ? (
-                      <button type="button" onClick={() => setBodyRegion(null)} className="text-xs text-primary underline">
-                        Limpar filtro ({BODY_REGION_LABELS[bodyRegion]})
-                      </button>
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground">Clique num músculo para filtrar os exercícios.</span>
-                    )
-                  }
-                />
-              </div>
-            </details>
+            {/* Seleção visual por região (boneco anatômico) — sempre visível */}
+            <div className="rounded-lg border border-border bg-secondary/30 p-3">
+              <p className="text-xs font-medium text-foreground mb-1 text-center">
+                Selecione pelo boneco{bodyRegion ? ` · ${BODY_REGION_LABELS[bodyRegion]}` : ""}
+              </p>
+              <BodyMap
+                onRegionClick={(id) => setBodyRegion((cur) => (cur === id ? null : id))}
+                activeRegions={bodyRegion ? [bodyRegion] : []}
+                getRegionFill={(id) => (id === bodyRegion ? "hsl(var(--primary))" : undefined)}
+                svgClassName="h-[380px] w-auto"
+                footer={
+                  bodyRegion ? (
+                    <button type="button" onClick={() => setBodyRegion(null)} className="text-xs text-primary underline">
+                      Limpar filtro ({BODY_REGION_LABELS[bodyRegion]})
+                    </button>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground">Clique num músculo para filtrar os exercícios.</span>
+                  )
+                }
+              />
+            </div>
 
             <div className="flex gap-3">
               <div className="relative flex-1">

@@ -42,6 +42,7 @@ import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 const WorkoutAnalysis = lazy(() => import("@/components/trainer/WorkoutAnalysis").then(m => ({ default: m.WorkoutAnalysis })));
 const TrainerWeeklyBar = lazy(() => import("@/components/trainer/TrainerWeeklyBar").then(m => ({ default: m.TrainerWeeklyBar })));
 const StudentVolumePanel = lazy(() => import("@/components/trainer/StudentVolumePanel").then(m => ({ default: m.StudentVolumePanel })));
+const StudentAssessmentBodyMap = lazy(() => import("@/components/body/StudentAssessmentBodyMap").then(m => ({ default: m.StudentAssessmentBodyMap })));
 const MuscleRadar = lazy(() => import("@/components/student/MuscleRadar").then(m => ({ default: m.MuscleRadar })));
 
 
@@ -1462,7 +1463,10 @@ export default function StudentDetail() {
           </TabsContent>
 
           {/* ===== AVALIAÇÕES ===== */}
-          <TabsContent value="evaluations">
+          <TabsContent value="evaluations" className="space-y-4">
+            <Suspense fallback={<TabFallback />}>
+              <StudentAssessmentBodyMap studentId={id!} />
+            </Suspense>
             <Card className="bg-card border-border">
               <CardHeader>
                 <CardTitle className="text-primary text-lg flex items-center gap-2">
