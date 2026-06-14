@@ -76,6 +76,15 @@ interface CompanyAiConfig {
   plans_payment: string | null;
   tone: string | null;
   onboarding_completed: boolean;
+  owner_credentials: string | null;
+  niche_audience: string | null;
+  exercise_preferences: string | null;
+  progression_model: string | null;
+  assessment_protocol: string | null;
+  red_lines: string | null;
+  communication_style: string | null;
+  nutrition_scope: string | null;
+  ethical_limits: string | null;
 }
 
 interface AiDecisionLogInput {
@@ -93,6 +102,15 @@ const BN_AI_CONFIG: CompanyAiConfig = {
   plans_payment: null,
   tone: null,
   onboarding_completed: false,
+  owner_credentials: null,
+  niche_audience: null,
+  exercise_preferences: null,
+  progression_model: null,
+  assessment_protocol: null,
+  red_lines: null,
+  communication_style: null,
+  nutrition_scope: null,
+  ethical_limits: null,
 };
 
 const METHODOLOGY_PRESETS = {
@@ -183,7 +201,7 @@ async function loadCompanyAiConfig(supabase: any, companyId: string | null | und
   if (!companyId) return BN_AI_CONFIG;
   const { data } = await supabase
     .from("company_ai_config")
-    .select("assistant_name, consultancy_name, methodology, plans_payment, tone, onboarding_completed")
+    .select("assistant_name, consultancy_name, methodology, plans_payment, tone, onboarding_completed, owner_credentials, niche_audience, exercise_preferences, progression_model, assessment_protocol, red_lines, communication_style, nutrition_scope, ethical_limits")
     .eq("company_id", companyId)
     .maybeSingle();
   return data ? { ...BN_AI_CONFIG, ...data } : BN_AI_CONFIG;
@@ -195,10 +213,19 @@ CONFIGURACAO WHITE-LABEL DA EMPRESA:
 - Nome da IA/assistente: ${clean(config.assistant_name || "BNITO")}
 - Nome da consultoria/app: ${clean(config.consultancy_name || "BN Performance Training")}
 - Tom desejado: ${clean(config.tone || "tecnico, direto, humano e seguro")}
+- Credenciais/voz do dono: ${config.owner_credentials ? clean(config.owner_credentials).slice(0, 2000) : "Nao informado; nao inventar autoridade."}
+- Publico/nicho atendido: ${config.niche_audience ? clean(config.niche_audience).slice(0, 2000) : "Nao informado; usar contexto real do aluno."}
 - Metodologia proprietaria da empresa: ${config.methodology ? clean(config.methodology).slice(0, 4000) : "Usar a Metodologia BN raiz deste prompt como fallback."}
+- Preferencias de exercicios/biblioteca: ${config.exercise_preferences ? clean(config.exercise_preferences).slice(0, 2500) : "Seguir biblioteca do app e metodologia BN."}
+- Modelo de progressao: ${config.progression_model ? clean(config.progression_model).slice(0, 2500) : "Periodizacao BN de 6 semanas com ajustes a cada 2 semanas."}
+- Protocolo de avaliacao: ${config.assessment_protocol ? clean(config.assessment_protocol).slice(0, 2500) : "Usar avaliacao funcional BN e dados recebidos."}
+- Linhas vermelhas da empresa: ${config.red_lines ? clean(config.red_lines).slice(0, 2500) : "Seguir linhas vermelhas BN de dor, seguranca e biblioteca."}
+- Estilo de comunicacao: ${config.communication_style ? clean(config.communication_style).slice(0, 1500) : "Tecnico, direto, humano e seguro."}
+- Escopo nutricional: ${config.nutrition_scope ? clean(config.nutrition_scope).slice(0, 1500) : "Nao usar para prescricao de treino salvo como contexto de rotina."}
+- Limites eticos: ${config.ethical_limits ? clean(config.ethical_limits).slice(0, 2500) : "Nao diagnosticar, nao prometer resultado e nao ultrapassar escopo profissional."}
 - Planos/pagamentos/posicionamento: ${config.plans_payment ? clean(config.plans_payment).slice(0, 2500) : "Nao informado; nao inventar dados comerciais."}
 
-Use essa configuracao para nomes, tom e contexto da empresa. Se a metodologia da empresa conflitar com seguranca, dor, biblioteca de exercicios ou linhas vermelhas BN, preserve a regra mais conservadora.
+Use essa configuracao para nomes, tom, selecao de exercicios, progressao e contexto da empresa. Se metodologia, preferencias ou tom conflitarem com seguranca, dor, biblioteca de exercicios, limites eticos ou linhas vermelhas BN, preserve a regra mais conservadora.
 `.trim();
 }
 

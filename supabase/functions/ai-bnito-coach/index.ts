@@ -35,6 +35,15 @@ interface CompanyAiConfig {
   plans_payment: string | null;
   tone: string | null;
   onboarding_completed: boolean;
+  owner_credentials: string | null;
+  niche_audience: string | null;
+  exercise_preferences: string | null;
+  progression_model: string | null;
+  assessment_protocol: string | null;
+  red_lines: string | null;
+  communication_style: string | null;
+  nutrition_scope: string | null;
+  ethical_limits: string | null;
 }
 
 interface AiDecisionLogInput {
@@ -64,6 +73,15 @@ const BN_AI_CONFIG: CompanyAiConfig = {
   plans_payment: null,
   tone: null,
   onboarding_completed: false,
+  owner_credentials: null,
+  niche_audience: null,
+  exercise_preferences: null,
+  progression_model: null,
+  assessment_protocol: null,
+  red_lines: null,
+  communication_style: null,
+  nutrition_scope: null,
+  ethical_limits: null,
 };
 
 const BNITO_SYSTEM = `
@@ -127,7 +145,7 @@ async function loadCompanyAiConfig(companyId: string | null | undefined): Promis
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   const { data } = await supabase
     .from("company_ai_config")
-    .select("assistant_name, consultancy_name, methodology, plans_payment, tone, onboarding_completed")
+    .select("assistant_name, consultancy_name, methodology, plans_payment, tone, onboarding_completed, owner_credentials, niche_audience, exercise_preferences, progression_model, assessment_protocol, red_lines, communication_style, nutrition_scope, ethical_limits")
     .eq("company_id", companyId)
     .maybeSingle();
   return data ? { ...BN_AI_CONFIG, ...data } : BN_AI_CONFIG;
@@ -158,10 +176,19 @@ CONFIGURACAO WHITE-LABEL DA EMPRESA:
 - Nome da IA: ${cleanConfigText(config.assistant_name || "BNITO", 200)}
 - Consultoria/app: ${cleanConfigText(config.consultancy_name || "BN Performance Training", 300)}
 - Tom: ${cleanConfigText(config.tone || "tecnico, direto, parceiro e seguro", 500)}
+- Credenciais/voz do dono: ${config.owner_credentials ? cleanConfigText(config.owner_credentials, 2000) : "Nao informado; nao inventar autoridade."}
+- Publico/nicho atendido: ${config.niche_audience ? cleanConfigText(config.niche_audience, 2000) : "Nao informado; use o contexto real do aluno/professor."}
 - Metodologia proprietaria: ${config.methodology ? cleanConfigText(config.methodology, 4000) : "Usar Metodologia BN como fallback."}
+- Preferencias de exercicios/biblioteca: ${config.exercise_preferences ? cleanConfigText(config.exercise_preferences, 2500) : "Usar biblioteca e regras BN quando aplicavel."}
+- Modelo de progressao: ${config.progression_model ? cleanConfigText(config.progression_model, 2500) : "Periodizacao BN de 6 semanas com troca de estimulo a cada 2 semanas."}
+- Protocolo de avaliacao: ${config.assessment_protocol ? cleanConfigText(config.assessment_protocol, 2500) : "Usar avaliacao funcional BN e dados recebidos."}
+- Linhas vermelhas da empresa: ${config.red_lines ? cleanConfigText(config.red_lines, 2500) : "Seguir linhas vermelhas BN de dor, seguranca e escopo."}
+- Estilo de comunicacao: ${config.communication_style ? cleanConfigText(config.communication_style, 1500) : "Tecnico, direto, parceiro e seguro."}
+- Escopo nutricional: ${config.nutrition_scope ? cleanConfigText(config.nutrition_scope, 1500) : "Apenas orientar dentro do contexto se perguntado; nao prescrever dieta fechada."}
+- Limites eticos: ${config.ethical_limits ? cleanConfigText(config.ethical_limits, 2500) : "Nao diagnosticar, nao prometer resultado e nao ultrapassar escopo profissional."}
 - Planos/pagamento/contexto comercial: ${config.plans_payment ? cleanConfigText(config.plans_payment, 2500) : "Nao informado; nao inventar."}
 
-Use esses nomes e tom nas respostas. Se houver conflito entre metodologia configurada e seguranca/dor/linhas vermelhas, escolha a conduta mais conservadora.
+Use esses nomes, tom, preferencias e limites nas respostas. Se houver conflito entre metodologia configurada, comunicacao desejada, seguranca, dor, limites eticos ou linhas vermelhas, escolha a conduta mais conservadora.
 `.trim();
 }
 

@@ -31,10 +31,31 @@ export async function assertTenantAccess(
     throw new HttpError(400, "student_id inválido.");
   }
 
-  const [{ data: isMaster }, { data: userCompanyId }] = await Promise.all([
+  const [masterResult, userCompanyResult] = await Promise.all([
     adminClient.rpc("has_role", { _user_id: userId, _role: "master" }),
     adminClient.rpc("get_user_company_id", { _user_id: userId }),
   ]);
+  if (masterResult.error) {
+    console.error("tenant-auth: has_role(master) RPC failed", {
+      userId,
+      message: masterResult.error.message,
+      code: masterResult.error.code,
+      details: masterResult.error.details,
+    });
+    throw new HttpError(503, `Falha ao validar permissões do usuário: ${masterResult.error.message}`);
+  }
+  if (userCompanyResult.error) {
+    console.error("tenant-auth: get_user_company_id RPC failed", {
+      userId,
+      message: userCompanyResult.error.message,
+      code: userCompanyResult.error.code,
+      details: userCompanyResult.error.details,
+    });
+    throw new HttpError(503, `Falha ao resolver empresa do usuário: ${userCompanyResult.error.message}`);
+  }
+
+  const isMaster = !!masterResult.data;
+  const userCompanyId = userCompanyResult.data ?? null;
 
   let studentCompanyId: string | null = null;
   if (requestedStudentId) {

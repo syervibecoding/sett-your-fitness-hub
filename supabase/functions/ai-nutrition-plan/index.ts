@@ -23,6 +23,15 @@ interface CompanyAiConfig {
   plans_payment: string | null;
   tone: string | null;
   onboarding_completed: boolean;
+  owner_credentials: string | null;
+  niche_audience: string | null;
+  exercise_preferences: string | null;
+  progression_model: string | null;
+  assessment_protocol: string | null;
+  red_lines: string | null;
+  communication_style: string | null;
+  nutrition_scope: string | null;
+  ethical_limits: string | null;
 }
 
 const BN_AI_CONFIG: CompanyAiConfig = {
@@ -32,13 +41,22 @@ const BN_AI_CONFIG: CompanyAiConfig = {
   plans_payment: null,
   tone: null,
   onboarding_completed: false,
+  owner_credentials: null,
+  niche_audience: null,
+  exercise_preferences: null,
+  progression_model: null,
+  assessment_protocol: null,
+  red_lines: null,
+  communication_style: null,
+  nutrition_scope: null,
+  ethical_limits: null,
 };
 
 async function loadCompanyAiConfig(supabase: any, companyId: string | null | undefined): Promise<CompanyAiConfig> {
   if (!companyId) return BN_AI_CONFIG;
   const { data } = await supabase
     .from("company_ai_config")
-    .select("assistant_name, consultancy_name, methodology, plans_payment, tone, onboarding_completed")
+    .select("assistant_name, consultancy_name, methodology, plans_payment, tone, onboarding_completed, owner_credentials, niche_audience, exercise_preferences, progression_model, assessment_protocol, red_lines, communication_style, nutrition_scope, ethical_limits")
     .eq("company_id", companyId)
     .maybeSingle();
   return data ? { ...BN_AI_CONFIG, ...data } : BN_AI_CONFIG;
@@ -50,10 +68,19 @@ CONFIGURACAO WHITE-LABEL DA EMPRESA:
 - Nome da IA: ${clean(config.assistant_name || "BNITO")}
 - Consultoria/app: ${clean(config.consultancy_name || "BN Performance Training")}
 - Tom: ${clean(config.tone || "tecnico, humano, claro e seguro")}
+- Credenciais/voz do dono: ${config.owner_credentials ? clean(config.owner_credentials).slice(0, 2000) : "Nao informado; nao inventar autoridade."}
+- Publico/nicho atendido: ${config.niche_audience ? clean(config.niche_audience).slice(0, 2000) : "Nao informado; usar contexto real do aluno."}
 - Metodologia proprietaria: ${config.methodology ? clean(config.methodology).slice(0, 4000) : "Usar Metodologia BN como fallback."}
+- Preferencias de treino/exercicios: ${config.exercise_preferences ? clean(config.exercise_preferences).slice(0, 1500) : "Usar apenas como contexto de rotina e gasto/recuperacao."}
+- Modelo de progressao: ${config.progression_model ? clean(config.progression_model).slice(0, 1500) : "Sincronizar com ciclos BN quando houver treino no contexto."}
+- Protocolo de avaliacao: ${config.assessment_protocol ? clean(config.assessment_protocol).slice(0, 1500) : "Usar somente como contexto funcional recebido."}
+- Linhas vermelhas da empresa: ${config.red_lines ? clean(config.red_lines).slice(0, 2500) : "Seguir linhas vermelhas BN e limites clinicos."}
+- Estilo de comunicacao: ${config.communication_style ? clean(config.communication_style).slice(0, 1500) : "Tecnico, humano, claro e seguro."}
+- Escopo nutricional: ${config.nutrition_scope ? clean(config.nutrition_scope).slice(0, 3000) : "Orientacoes gerais; nao prescrever dieta clinica fechada."}
+- Limites eticos: ${config.ethical_limits ? clean(config.ethical_limits).slice(0, 2500) : "Nao diagnosticar, nao tratar doenca, nao prometer resultado e nao ultrapassar escopo profissional."}
 - Planos/pagamento/contexto comercial: ${config.plans_payment ? clean(config.plans_payment).slice(0, 2500) : "Nao informado; nao inventar."}
 
-Use essa configuracao para nomes, tom e contexto. Para nutricao, preserve seguranca, evidencias e restricoes clinicas; nao prometa tratamento nem dieta fechada quando a regra pedir orientacoes.
+Use essa configuracao para nomes, tom, escopo nutricional e contexto. Para nutricao, preserve seguranca, evidencias, restricoes clinicas e limites eticos; nao prometa tratamento nem dieta fechada quando a regra pedir orientacoes.
 `.trim();
 }
 

@@ -57,6 +57,15 @@ interface CompanyAiConfig {
   plans_payment: string | null;
   tone: string | null;
   onboarding_completed: boolean;
+  owner_credentials: string | null;
+  niche_audience: string | null;
+  exercise_preferences: string | null;
+  progression_model: string | null;
+  assessment_protocol: string | null;
+  red_lines: string | null;
+  communication_style: string | null;
+  nutrition_scope: string | null;
+  ethical_limits: string | null;
 }
 
 interface AiDecisionLogInput {
@@ -74,6 +83,15 @@ const BN_AI_CONFIG: CompanyAiConfig = {
   plans_payment: null,
   tone: null,
   onboarding_completed: false,
+  owner_credentials: null,
+  niche_audience: null,
+  exercise_preferences: null,
+  progression_model: null,
+  assessment_protocol: null,
+  red_lines: null,
+  communication_style: null,
+  nutrition_scope: null,
+  ethical_limits: null,
 };
 
 type OhsCompensationDefinition = {
@@ -288,7 +306,7 @@ async function loadCompanyAiConfig(supabase: any, companyId: string | null | und
   if (!companyId) return BN_AI_CONFIG;
   const { data } = await supabase
     .from("company_ai_config")
-    .select("assistant_name, consultancy_name, methodology, plans_payment, tone, onboarding_completed")
+    .select("assistant_name, consultancy_name, methodology, plans_payment, tone, onboarding_completed, owner_credentials, niche_audience, exercise_preferences, progression_model, assessment_protocol, red_lines, communication_style, nutrition_scope, ethical_limits")
     .eq("company_id", companyId)
     .maybeSingle();
   return data ? { ...BN_AI_CONFIG, ...data } : BN_AI_CONFIG;
@@ -300,10 +318,19 @@ CONFIGURACAO WHITE-LABEL DA EMPRESA:
 - Nome da IA: ${clean(config.assistant_name || "BNITO")}
 - Consultoria/app: ${clean(config.consultancy_name || "BN Performance Training")}
 - Tom do relatorio: ${clean(config.tone || "tecnico, acolhedor, direto e seguro")}
+- Credenciais/voz do dono: ${config.owner_credentials ? clean(config.owner_credentials).slice(0, 2000) : "Nao informado; nao inventar autoridade."}
+- Publico/nicho atendido: ${config.niche_audience ? clean(config.niche_audience).slice(0, 2000) : "Nao informado; usar somente o contexto recebido."}
 - Metodologia proprietaria: ${config.methodology ? clean(config.methodology).slice(0, 4000) : "Usar Metodologia BN como fallback."}
+- Preferencias de exercicios/biblioteca: ${config.exercise_preferences ? clean(config.exercise_preferences).slice(0, 2000) : "Usar apenas como contexto para implicacao no treino."}
+- Modelo de progressao: ${config.progression_model ? clean(config.progression_model).slice(0, 2000) : "Informar implicacoes para periodizacao BN de 6 semanas."}
+- Protocolo de avaliacao: ${config.assessment_protocol ? clean(config.assessment_protocol).slice(0, 3000) : "Usar protocolo BN de postura e overhead squat."}
+- Linhas vermelhas da empresa: ${config.red_lines ? clean(config.red_lines).slice(0, 2500) : "Seguir linhas vermelhas BN de dor e seguranca."}
+- Estilo de comunicacao: ${config.communication_style ? clean(config.communication_style).slice(0, 1500) : "Tecnico, acolhedor, direto e seguro."}
+- Escopo nutricional: ${config.nutrition_scope ? clean(config.nutrition_scope).slice(0, 1000) : "Nao incluir no laudo funcional, salvo como contexto geral."}
+- Limites eticos: ${config.ethical_limits ? clean(config.ethical_limits).slice(0, 2500) : "Nao diagnosticar, nao prometer resultado e nao ultrapassar escopo profissional."}
 - Planos/pagamento/contexto comercial: ${config.plans_payment ? clean(config.plans_payment).slice(0, 2000) : "Nao informado; nao incluir no laudo."}
 
-Use essa configuracao para nome da consultoria, tom e contexto. Para avaliacao funcional, mantenha achados objetivos e nao diagnostique; se a metodologia configurada conflitar com seguranca, preserve a regra mais conservadora.
+Use essa configuracao para nome da consultoria, tom, protocolo e contexto. Para avaliacao funcional, mantenha achados objetivos e nao diagnostique; se a metodologia configurada, protocolo local ou comunicacao desejada conflitar com seguranca/limites eticos, preserve a regra mais conservadora.
 `.trim();
 }
 
