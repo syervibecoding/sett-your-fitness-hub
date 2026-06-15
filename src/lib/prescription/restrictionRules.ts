@@ -225,8 +225,14 @@ export function applyRestrictionRules(program: TrainingProgram, rules: Restricti
       for (const workout of program.workouts) {
         const before = workout.exercises.length;
         workout.exercises = workout.exercises.filter((exercise) => {
-          const text = normalizeText([exercise.exercise_name, exercise.biomechanical_note, exercise.cues]);
-          return !rule.avoidKeywords.some((keyword) => text.includes(normalizeText(keyword)));
+          const text = normalizeText([exercise.exercise_name, exercise.biomechanical_note, exercise.cues, exercise.phase]);
+          const group = normalizeText(exercise.muscle_group);
+          const explicitlyAvoided = rule.avoidKeywords.some((keyword) => text.includes(normalizeText(keyword)));
+          const severeAffectedPattern =
+            rule.region === "joelho" && /quadr/.test(group)
+            || rule.region === "lombar" && /posterior/.test(group) && /terra|rdl|levantamento|good morning|hinge/.test(text)
+            || rule.region === "ombro" && /peit|ombro/.test(group) && /supino|press|desenvolvimento|overhead|dips/.test(text);
+          return !explicitlyAvoided && !severeAffectedPattern;
         });
         if (workout.exercises.length !== before) {
           corrections.push({

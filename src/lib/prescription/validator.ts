@@ -137,9 +137,28 @@ export function validateTrainingProgram(args: {
     });
   }
 
-  const context = normalizeText(args.input);
+  const context = normalizeText({
+    objective: args.input.objective,
+    restrictions: args.input.restrictions,
+    injuries: args.input.injuries,
+    painReports: args.input.painReports,
+    assessmentContext: args.input.assessmentContext,
+    anamneseContext: args.input.anamneseContext,
+    prescriptionIntegration: args.input.prescriptionIntegration,
+    notes: args.input.notes,
+    painEva: args.input.painEva,
+  });
   const planText = normalizeText(args.program);
   const exerciseText = exerciseOnlyText(args.program);
+  if (/(dor|lesao|lesões|joelho|lombar|ombro|valgo|butt|retorno)/.test(context)) {
+    add({
+      severity: "warning",
+      code: "pain_or_injury_requires_conservative_progression",
+      message: "Há dor, lesão, retorno ou compensação relevante no contexto do aluno.",
+      recommendation: "Manter progressão por tolerância, dor <= 3, sem falha e sem método avançado no padrão afetado.",
+      source: "anamnese",
+    });
+  }
   if (/joelho|valgo/.test(context) && /salto|pliometr|agachamento profundo|atg/.test(exerciseText)) {
     add({
       severity: "warning",

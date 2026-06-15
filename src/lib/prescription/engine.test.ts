@@ -56,6 +56,22 @@ function weeklySetsByGroup(program: ReturnType<typeof generateTrainingProgram>) 
   return out;
 }
 
+function weeklySets(program: ReturnType<typeof generateTrainingProgram>, group: string) {
+  return program.validator.pre_save.volume_review.find((item) => item.muscle_group === group)?.weekly_sets || 0;
+}
+
+function hasWarning(program: ReturnType<typeof generateTrainingProgram>, code: string) {
+  return program.validator.pre_save.warnings.some((warning) => warning.code === code);
+}
+
+function hasBlocker(program: ReturnType<typeof generateTrainingProgram>, code: string) {
+  return program.validator.pre_save.blockers.some((blocker) => blocker.code === code);
+}
+
+function explanationIds(program: ReturnType<typeof generateTrainingProgram>) {
+  return program.explanations.map((explanation) => explanation.rule_id);
+}
+
 describe("BN Prescription Engine v1", () => {
   it("gera plano para iniciante com dor no joelho priorizando glúteo/controle e sem inventar exercício", () => {
     const program = generateTrainingProgram(baseInput({
@@ -249,6 +265,8 @@ describe("BN Prescription Engine v1", () => {
       { id: "face-band", name: "Face Pull com Elástico", muscle_group: "ombros", equipment: "elástico" },
       { id: "row-db", name: "Remada Unilateral com Halteres", muscle_group: "costas", equipment: "halteres" },
       { id: "pushup", name: "Flexão de Braços", muscle_group: "peitoral", equipment: "livre" },
+      { id: "db-press", name: "Supino com Halteres Pegada Neutra", muscle_group: "peitoral", equipment: "halteres" },
+      { id: "floor-press", name: "Floor Press com Halteres", muscle_group: "peitoral", equipment: "halteres" },
       { id: "band-pulldown", name: "Puxada com Elástico", muscle_group: "costas", equipment: "elástico" },
       { id: "step-livre", name: "Step Up Baixo Livre", muscle_group: "glúteos", equipment: "livre" },
       { id: "bridge", name: "Ponte de Glúteos Livre", muscle_group: "glúteos", equipment: "livre" },
@@ -325,5 +343,263 @@ describe("BN Prescription Engine v1", () => {
 
     expect((sets.get("core") || 0)).toBeLessThanOrEqual(10);
     expect((sets.get("ombros") || 0)).toBeLessThanOrEqual(10);
+  });
+});
+
+describe("BN Prescription Engine v1 — Golden Test Cases GC-01..GC-12", () => {
+  it("GC-01 PASS — iniciante com dor no joelho + valgo dinâmico", () => {
+    const program = generateTrainingProgram(baseInput({
+      fitnessLevel: "iniciante",
+      objective: "hipertrofia",
+      daysPerWeek: 3,
+      injuries: ["joelho"],
+      painEva: 3,
+      painReports: [{ region: "joelho", eva: 3 }],
+      restrictions: "dor no joelho e valgo dinâmico",
+      assessmentContext: { ohs_compensations: [{ key: "dynamic_valgus", presente: true, severidade: "moderada" }] },
+    }));
+    const firstLower = program.workouts[0].exercises.map((exercise) => exercise.exercise_name.toLowerCase());
+    const gluteIndex = firstLower.findIndex((name) => /abdu|glut/.test(name));
+    const kneeIndex = firstLower.findIndex((name) => /agachamento|leg press/.test(name));
+
+    expect(program.workouts.length).toBe(3);
+    expect(weeklySets(program, "quadriceps")).toBeLessThanOrEqual(10);
+    expect(gluteIndex).toBeGreaterThanOrEqual(0);
+    expect(kneeIndex === -1 || gluteIndex < kneeIndex).toBe(true);
+    expect(prescribedExerciseText(program)).not.toMatch(/agachamento livre profundo|atg|afundo alto|pliometr|salto/);
+    expect(JSON.stringify(program.periodization_blocks).toLowerCase()).toContain("rir 3-4");
+    expect(explanationIds(program)).toEqual(expect.arrayContaining(["reduzi_quadriceps_por_dor_joelho", "priorizei_gluteo_medio_por_valgo", "evitei_metodo_avancado_por_dor_ou_nivel"]));
+    expect(hasWarning(program, "pain_or_injury_requires_conservative_progression")).toBe(true);
+    expect(program.validator.pre_save.blockers).toEqual([]);
+    expect(allExerciseIds(program).every((id) => catalog.some((exercise) => exercise.id === id))).toBe(true);
+  });
+
+  it("GC-02 PASS — intermediário com dor lombar + butt wink", () => {
+    const program = generateTrainingProgram(baseInput({
+      fitnessLevel: "intermediario",
+      daysPerWeek: 4,
+      injuries: ["lombar"],
+      painEva: 4,
+      restrictions: "dor lombar EVA 4 ao agachar",
+      assessmentContext: { ohs_compensations: [{ key: "butt_wink", presente: true, severidade: "moderada" }] },
+    }));
+    const text = prescribedExerciseText(program);
+
+    expect(program.workouts.length).toBe(4);
+    expect(program.weekly_structure).toContain("Upper/Lower");
+    expect(weeklySets(program, "posterior")).toBeLessThanOrEqual(10);
+    expect(text).toContain("anti-rotação");
+    expect(text).not.toMatch(/terra convencional|good morning|flexão espinhal carregada|agachamento livre pesado/);
+    expect(program.progression_protocol.toLowerCase()).toContain("hold/regress");
+    expect(explanationIds(program)).toEqual(expect.arrayContaining(["reduzi_carga_axial_por_queixa_lombar", "limitei_amplitude_por_butt_wink"]));
+    expect(hasWarning(program, "pain_or_injury_requires_conservative_progression")).toBe(true);
+    expect(program.validator.pre_save.blockers).toEqual([]);
+  });
+
+  it("GC-03 PASS — dor no ombro + cifose/protração", () => {
+    const program = generateTrainingProgram(baseInput({
+      fitnessLevel: "intermediario",
+      daysPerWeek: 4,
+      injuries: ["ombro"],
+      painEva: 4,
+      restrictions: "dor no ombro em overhead",
+      assessmentContext: { ohs_compensations: [{ key: "shoulder_protraction_kyphosis", presente: true, severidade: "moderada" }] },
+    }));
+    const text = prescribedExerciseText(program);
+
+    expect(program.workouts.length).toBe(4);
+    expect(weeklySets(program, "ombros")).toBeLessThanOrEqual(10);
+    expect(text).toMatch(/face pull|remada/);
+    expect(text).not.toMatch(/desenvolvimento atras da nuca|remada alta|dips|barra nuca|overhead pesado/);
+    expect(program.progression_protocol.toLowerCase()).toContain("hold/regress");
+    expect(explanationIds(program)).toEqual(expect.arrayContaining(["troquei_supino_por_rom_indolor", "priorizei_controle_escapular_por_ombro"]));
+    expect(hasWarning(program, "pain_or_injury_requires_conservative_progression")).toBe(true);
+    expect(program.validator.pre_save.blockers).toEqual([]);
+  });
+
+  it("GC-04 PASS — iniciante pedindo 6x/semana é rebaixado com flag", () => {
+    const program = generateTrainingProgram(baseInput({ fitnessLevel: "iniciante", daysPerWeek: 6 }));
+
+    expect(program.workouts.length).toBeLessThanOrEqual(4);
+    expect(program.weekly_structure).toContain("3-4 dias estruturados");
+    expect(weeklySets(program, "quadriceps")).toBeLessThanOrEqual(12);
+    expect(weeklySets(program, "costas")).toBeLessThanOrEqual(12);
+    expect(JSON.stringify(program.periodization_blocks).toLowerCase()).not.toMatch(/drop|cluster|rest-pause/);
+    expect(explanationIds(program)).toContain("rebaixei_frequencia_iniciante_6_dias");
+    expect(program.validator.pre_save.blockers).toEqual([]);
+  });
+
+  it("GC-05 PASS — corrida 3x/semana + hipertrofia aciona anti-interferência", () => {
+    const program = generateTrainingProgram(baseInput({
+      fitnessLevel: "intermediario",
+      objective: "hipertrofia",
+      daysPerWeek: 4,
+      isEnduranceAthlete: true,
+      runningDaysContext: { days_per_week: 3, sport: "corrida" },
+    }));
+
+    expect(program.methodology_preset.key).toBe("corrida_musculacao");
+    expect(weeklySets(program, "quadriceps")).toBeLessThanOrEqual(12);
+    expect(weeklySets(program, "posterior")).toBeLessThanOrEqual(12);
+    expect(explanationIds(program)).toContain("reduzi_mmii_por_corrida");
+    expect(hasWarning(program, "endurance_agenda_missing")).toBe(true);
+    expect(program.validator.pre_save.blockers).toEqual([]);
+  });
+
+  it("GC-06 PASS — emagrecimento iniciante preserva força sem método avançado", () => {
+    const program = generateTrainingProgram(baseInput({ fitnessLevel: "iniciante", objective: "emagrecimento", daysPerWeek: 3 }));
+
+    expect(program.methodology_preset.key).toBe("emagrecimento");
+    expect(program.workouts.length).toBe(3);
+    expect(weeklySets(program, "quadriceps")).toBeLessThanOrEqual(12);
+    expect(weeklySets(program, "costas")).toBeLessThanOrEqual(12);
+    expect(prescribedExerciseText(program)).toMatch(/agachamento|leg press|remada|supino|puxada/);
+    expect(JSON.stringify(program.periodization_blocks).toLowerCase()).not.toMatch(/drop|cluster|rest-pause/);
+    expect(program.validator.pre_save.blockers).toEqual([]);
+  });
+
+  it("GC-07 PASS — avançado sem dor hipertrofia permite intensificação só no bloco final", () => {
+    const program = generateTrainingProgram(baseInput({ fitnessLevel: "avancado", objective: "hipertrofia", daysPerWeek: 5 }));
+    const blockOne = JSON.stringify(program.periodization_blocks[0]).toLowerCase();
+    const finalBlock = JSON.stringify(program.periodization_blocks[2]).toLowerCase();
+
+    expect(program.workouts.length).toBe(5);
+    expect(program.validator.pre_save.volume_review
+      .filter((item) => ["quadriceps", "posterior", "gluteos", "costas", "peitoral"].includes(item.muscle_group))
+      .every((item) => item.weekly_sets <= 16)).toBe(true);
+    expect(blockOne).not.toMatch(/up-set|piramide|drop|cluster/);
+    expect(finalBlock).toMatch(/up-set|piramide|método avançado|metodo avancado/);
+    expect(explanationIds(program)).toContain("metodo_avancado_controlado");
+    expect(program.validator.pre_save.blockers).toEqual([]);
+  });
+
+  it("GC-08 PASS — retorno gradual pós-dor começa em MEV e progride por tolerância", () => {
+    const program = generateTrainingProgram(baseInput({
+      objective: "retorno_gradual",
+      fitnessLevel: "iniciante",
+      daysPerWeek: 3,
+      painEva: 2,
+      restrictions: "retorno gradual pós-dor, EVA 2",
+    }));
+
+    expect(program.methodology_preset.key).toBe("retorno_lesao");
+    expect(weeklySets(program, "quadriceps")).toBeLessThanOrEqual(8);
+    expect(program.workouts.flatMap((w) => w.exercises).every((exercise) => /3|4|5/.test(exercise.rir))).toBe(true);
+    expect(program.progression_protocol.toLowerCase()).toContain("progressao por tolerancia");
+    expect(JSON.stringify(program.periodization_blocks).toLowerCase()).toContain("sem metodos avancados");
+    expect(hasWarning(program, "pain_or_injury_requires_conservative_progression")).toBe(true);
+    expect(program.validator.pre_save.blockers).toEqual([]);
+  });
+
+  it("GC-09 PASS — equipamento limitado usa somente alternativas disponíveis", () => {
+    const limitedCatalog: ExerciseCatalogEntry[] = [
+      { id: "mob", name: "Mobilidade de Quadril Livre", muscle_group: "mobilidade", equipment: "livre" },
+      { id: "dead-bug-livre", name: "Dead Bug Livre", muscle_group: "core", equipment: "livre" },
+      { id: "glute-band-livre", name: "Abdução de Quadril com Mini Band", muscle_group: "glúteos", equipment: "mini band" },
+      { id: "goblet", name: "Agachamento Goblet com Halteres", muscle_group: "quadríceps", equipment: "halteres" },
+      { id: "rdl-halteres", name: "Terra Romeno com Halteres", muscle_group: "posterior", equipment: "halteres" },
+      { id: "thoracic", name: "Mobilidade Torácica Livre", muscle_group: "ombros", equipment: "livre" },
+      { id: "face-band", name: "Face Pull com Elástico", muscle_group: "ombros", equipment: "elástico" },
+      { id: "row-db", name: "Remada Unilateral com Halteres", muscle_group: "costas", equipment: "halteres" },
+      { id: "pushup", name: "Flexão de Braços", muscle_group: "peitoral", equipment: "livre" },
+      { id: "db-press", name: "Supino com Halteres Pegada Neutra", muscle_group: "peitoral", equipment: "halteres" },
+      { id: "floor-press", name: "Floor Press com Halteres", muscle_group: "peitoral", equipment: "halteres" },
+      { id: "band-pulldown", name: "Puxada com Elástico", muscle_group: "costas", equipment: "elástico" },
+      { id: "step-livre", name: "Step Up Baixo Livre", muscle_group: "glúteos", equipment: "livre" },
+      { id: "bridge", name: "Ponte de Glúteos Livre", muscle_group: "glúteos", equipment: "livre" },
+      { id: "calf", name: "Panturrilha em Pé Livre + Core", muscle_group: "core", equipment: "livre" },
+    ];
+    const program = generateTrainingProgram(baseInput({
+      catalog: limitedCatalog,
+      fitnessLevel: "intermediario",
+      daysPerWeek: 4,
+      equipment: "casa_minimo halteres peso corporal elástico",
+    }));
+
+    expect(allExerciseIds(program).every((id) => limitedCatalog.some((exercise) => exercise.id === id))).toBe(true);
+    expect(program.workouts.flatMap((w) => w.exercises).every((exercise) => !/máquina|maquina|barra/i.test(exercise.exercise_name))).toBe(true);
+    expect(program.validator.pre_save.blockers).toEqual([]);
+  });
+
+  it("GC-10 PASS — biblioteca sem substituto seguro bloqueia sem inventar exercício", () => {
+    const unsafeCatalog: ExerciseCatalogEntry[] = [
+      {
+        id: "unsafe-squat",
+        name: "Agachamento Livre Profundo ATG",
+        muscle_group: "quadríceps",
+        equipment: "barra",
+        contraindications: ["joelho"],
+        pain_limitation_tags: ["joelho"],
+      },
+    ];
+    const program = generateTrainingProgram(baseInput({
+      catalog: unsafeCatalog,
+      restrictions: "dor no joelho EVA 4 e valgo dinâmico",
+      painEva: 4,
+      assessmentContext: { ohs_compensations: [{ key: "dynamic_valgus", presente: true, severidade: "moderada" }] },
+    }));
+
+    expect(allExerciseIds(program).every((id) => unsafeCatalog.some((exercise) => exercise.id === id))).toBe(true);
+    expect(allExerciseIds(program)).not.toContain("unsafe-squat");
+    expect(hasBlocker(program, "safe_alternative_unavailable")).toBe(true);
+    expect(program.library_policy.validation).toMatchObject({ valid: false });
+  });
+
+  it("GC-11 PASS — EVA > 5 gera blocker, handoff e remove padrão afetado", () => {
+    const program = generateTrainingProgram(baseInput({
+      restrictions: "dor severa no joelho",
+      painEva: 7,
+      painReports: [{ region: "joelho", eva: 7 }],
+    }));
+    const text = prescribedExerciseText(program);
+
+    expect(hasBlocker(program, "high_pain_requires_professional_review")).toBe(true);
+    expect(program.validator.pre_save.corrections.some((correction) => correction.code.includes("teacher_alert"))).toBe(true);
+    expect(text).not.toMatch(/agachamento|leg press|quadríceps|quadriceps/);
+    expect(program.progression_protocol.toLowerCase()).toContain("hold/regress");
+    expect(JSON.stringify(program).toLowerCase()).not.toMatch(/diagn[oó]stico|tratamento cl[ií]nico|reabilita[cç][aã]o cl[ií]nica/);
+  });
+
+  it("GC-12 PASS — intermediário sem dor 4 dias hipertrofia baseline feliz", () => {
+    const program = generateTrainingProgram(baseInput({ fitnessLevel: "intermediario", objective: "hipertrofia", daysPerWeek: 4 }));
+    const blocks = JSON.stringify(program.periodization_blocks).toLowerCase();
+
+    expect(program.methodology_preset.key).toBe("hipertrofia_intermediario");
+    expect(program.workouts.length).toBe(4);
+    expect(program.weekly_structure).toContain("Upper/Lower");
+    expect(program.validator.pre_save.warnings).toEqual([]);
+    expect(program.validator.pre_save.blockers).toEqual([]);
+    expect(weeklySets(program, "costas")).toBeGreaterThanOrEqual(10);
+    expect(weeklySets(program, "costas")).toBeLessThanOrEqual(16);
+    expect(weeklySets(program, "core")).toBeLessThanOrEqual(10);
+    expect(blocks).toContain("1-2");
+    expect(blocks).toContain("3-4");
+    expect(blocks).toContain("5-6");
+    expect(blocks).toContain("rir 3-4");
+    expect(blocks).toContain("rir 2");
+  });
+});
+
+describe("BN Prescription Engine v1 — regras inegociáveis", () => {
+  it("PASS — R1..R10 são provadas objetivamente no contrato do engine", () => {
+    const painProgram = generateTrainingProgram(baseInput({ restrictions: "dor EVA 4 no joelho", painEva: 4 }));
+    const severeProgram = generateTrainingProgram(baseInput({ restrictions: "dor forte no joelho", painEva: 7 }));
+    const baseline = generateTrainingProgram(baseInput({ fitnessLevel: "intermediario", daysPerWeek: 4 }));
+    const validIds = new Set(catalog.map((exercise) => exercise.id));
+
+    expect(painProgram.progression_protocol.toLowerCase()).toContain("hold/regress");
+    expect(hasBlocker(severeProgram, "high_pain_requires_professional_review")).toBe(true);
+    expect(severeProgram.validator.pre_save.corrections.some((correction) => correction.code.includes("teacher_alert"))).toBe(true);
+    expect(JSON.stringify(severeProgram).toLowerCase()).not.toMatch(/diagn[oó]stico|tratamento cl[ií]nico/);
+    expect(allExerciseIds(baseline).every((id) => validIds.has(id))).toBe(true);
+    expect(JSON.stringify(generateTrainingProgram(baseInput({ fitnessLevel: "iniciante" })).periodization_blocks).toLowerCase()).not.toMatch(/drop|cluster|rest-pause|piramide/);
+    expect(JSON.stringify(painProgram.periodization_blocks).toLowerCase()).not.toMatch(/drop|cluster|rest-pause|piramide/);
+    expect(prescribedExerciseText(baseline)).not.toMatch(/pliometr|salto/);
+    expect(baseline.validator.pre_save.volume_review.filter((item) => ["core", "ombros", "panturrilhas"].includes(item.muscle_group)).every((item) => item.weekly_sets <= 10)).toBe(true);
+    expect(generateTrainingProgram(baseInput({
+      catalog: [{ id: "unsafe", name: "Agachamento Livre Profundo ATG", muscle_group: "quadríceps", contraindications: ["joelho"], pain_limitation_tags: ["joelho"] }],
+      restrictions: "dor no joelho EVA 4",
+      painEva: 4,
+    })).validator.pre_save.blockers.some((blocker) => blocker.code === "safe_alternative_unavailable")).toBe(true);
   });
 });

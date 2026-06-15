@@ -48,6 +48,20 @@ function normalizeCatalog(catalog: ExerciseCatalogEntry[] = []) {
   }));
 }
 
+function riskText(input: PrescriptionInput) {
+  return normalizeText({
+    restrictions: input.restrictions,
+    injuries: input.injuries,
+    painReports: input.painReports,
+    assessmentContext: input.assessmentContext,
+    anamneseContext: input.anamneseContext,
+    prescriptionIntegration: input.prescriptionIntegration,
+    notes: input.notes,
+    painEva: input.painEva,
+    techniqueBreakdown: input.techniqueBreakdown,
+  });
+}
+
 function distributeDays(count: number) {
   if (count <= 2) return [1, 4];
   if (count === 3) return [1, 3, 5];
@@ -108,7 +122,7 @@ function selectExercises(input: PrescriptionInput, specs: ExerciseSpec[], usedId
 }
 
 function lowerWorkoutSpecs(input: PrescriptionInput): ExerciseSpec[] {
-  const text = normalizeText(input);
+  const text = riskText(input);
   const knee = /joelho|valgo/.test(text);
   const back = /lombar|butt|retrovers/.test(text);
   const sets = input.isEnduranceAthlete || input.runningDaysContext ? 2 : 3;
@@ -123,7 +137,7 @@ function lowerWorkoutSpecs(input: PrescriptionInput): ExerciseSpec[] {
 }
 
 function upperWorkoutSpecs(input: PrescriptionInput): ExerciseSpec[] {
-  const shoulder = /ombro|overhead|cifose|protrus/.test(normalizeText(input));
+  const shoulder = /ombro|overhead|cifose|protrus/.test(riskText(input));
   return [
     { phase: "mobilidade", keywords: ["mobilidade toracica", "ombro", "shoulder", "toracica"], preferredMuscleGroup: "ombros", preferredPattern: "isolado_acessorio", required: false, sets: 2, reps: "8-10", rest: 30, rir: input.deload ? "4-5" : "4", cue: "Movimento suave, sem forçar amplitude.", note: "Prepara ombro e coluna torácica para membros superiores." },
     { phase: "ativacao_core", keywords: ["pallof", "prancha", "core", "dead bug"], preferredMuscleGroup: "core", preferredPattern: "core", sets: 2, reps: "20-30s", rest: 45, rir: input.deload ? "4-5" : "3-4", cue: "Mantenha tronco estável.", note: "Estabilidade para puxadas e empurradas." },
@@ -135,8 +149,9 @@ function upperWorkoutSpecs(input: PrescriptionInput): ExerciseSpec[] {
 }
 
 function fullBodySpecs(input: PrescriptionInput): ExerciseSpec[] {
-  const knee = /joelho|valgo/.test(normalizeText(input));
-  const back = /lombar|butt|retrovers/.test(normalizeText(input));
+  const text = riskText(input);
+  const knee = /joelho|valgo/.test(text);
+  const back = /lombar|butt|retrovers/.test(text);
   const beginner = normalizeText(input.fitnessLevel).includes("inic");
   return [
     { phase: "mobilidade", keywords: ["mobilidade quadril", "tornozelo", "alongamento"], preferredMuscleGroup: "mobilidade", preferredPattern: "isolado_acessorio", required: false, sets: 2, reps: "8-10", rest: 30, rir: input.deload ? "4-5" : "4", cue: "Busque amplitude confortável.", note: "Abre movimento antes do unilateral." },
