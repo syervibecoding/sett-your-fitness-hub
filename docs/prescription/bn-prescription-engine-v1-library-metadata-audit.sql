@@ -149,53 +149,62 @@ group by regiao
 order by regiao;
 
 -- ---------------------------------------------------------------------------
--- 7. VEREDITO POR THRESHOLD (computa um status sugerido)
---    BLOCKED_FOR_SHADOW se: >20% sem target primário; pain tags ausentes em alto risco;
---                           algum padrão essencial com <3 exercícios "seguros".
---    ACCEPT_WITH_NOTES se: equipment ausente em >30% (ou outros sinais médios).
+-- 7. VEREDITO POR THRESHOLD (computa um status sugerido — UMA linha)
+--    BLOCKED_FOR_SHADOW se: >20% sem target primário; algum exercício de alto risco sem
+--                           contraindications; algum padrão essencial com <3 exercícios "seguros".
+--    ACCEPT_WITH_NOTES se: equipment ausente em >30%.
 --    ACCEPT caso contrário.
+-- FIX (ORDEM 022): a contagem de "padrões essenciais com <3 seguros" virou CTE (essential_below_3)
+--    com uma linha por padrão que falha, e um count(*) EXTERNO a reduz a escalar. Antes, o
+--    `group by ... having` era usado direto como subquery escalar -> erro "more than one row".
 -- ---------------------------------------------------------------------------
 with base as (select * from public.exercise_library),
 meta as (select * from public.exercise_metadata),
 prim as (select distinct exercise_id from public.exercise_muscle_targets where is_primary = true),
+essential as (
+  -- classifica cada exercício num padrão ESSENCIAL (ou null) + se é "seguro" (tem pain tags ou contraind.)
+  select
+    case
+      when b.name ~* '(agachamento|leg press|hack|afundo|extensora)' then 'joelho_dominante'
+      when b.name ~* '(terra|rdl|romeno|hip ?thrust|ponte|flexora)' then 'quadril_dominante'
+      when b.name ~* '(supino|chest press|crucifixo)' then 'empurrar_horizontal'
+      when b.name ~* '(remada|row)' then 'puxar_horizontal'
+      when b.name ~* '(puxada|barra fixa|pulldown|pull ?up)' then 'puxar_vertical'
+      else null
+    end as pattern,
+    (coalesce(array_length(mm.pain_limitation_tags,1),0) > 0 or coalesce(array_length(mm.contraindications,1),0) > 0) as seguro
+  from base b left join meta mm on mm.exercise_id = b.id
+),
+essential_below_3 as (
+  -- uma linha por padrão essencial com menos de 3 exercícios "seguros"
+  select pattern
+  from essential
+  where pattern is not null
+  group by pattern
+  having count(*) filter (where seguro) < 3
+),
 m as (
   select
-    (select count(*) from base) as total,
-    (select count(*) from base b where b.id not in (select exercise_id from prim))::numeric as sem_primario,
-    (select count(*) from base b where b.equipment is null or btrim(b.equipment)='')::numeric as sem_equip,
-    (select count(*) from base b left join meta mm on mm.exercise_id=b.id
+    (select count(*) from base) as total_exercises,
+    (select count(*) from base b where b.id not in (select exercise_id from prim))::numeric as without_primary,
+    (select count(*) from base b where b.equipment is null or btrim(b.equipment) = '')::numeric as without_equipment,
+    (select count(*) from base b left join meta mm on mm.exercise_id = b.id
        where b.name ~* '(agachamento profundo|atg|terra|good ?morning|desenvolvimento|overhead|dips|salto|pliometr)'
-         and coalesce(array_length(mm.contraindications,1),0)=0) as alto_risco_sem_contra,
-    -- padrões essenciais com <3 exercícios "seguros" (com pain tags ou contraind.)
-    (select count(*) from (
-        select case
-          when b.name ~* '(agachamento|leg press|hack|afundo|extensora)' then 'joelho_dominante'
-          when b.name ~* '(terra|rdl|romeno|hip ?thrust|ponte|flexora)' then 'quadril_dominante'
-          when b.name ~* '(supino|chest press|crucifixo)' then 'empurrar_horizontal'
-          when b.name ~* '(remada|row)' then 'puxar_horizontal'
-          when b.name ~* '(puxada|barra fixa|pulldown|pull ?up)' then 'puxar_vertical'
-          else null end as pattern
-        , (coalesce(array_length(mm.pain_limitation_tags,1),0)>0 or coalesce(array_length(mm.contraindications,1),0)>0) as seguro
-        from base b left join meta mm on mm.exercise_id=b.id
-      ) t
-      where pattern is not null
-      group by pattern
-      having count(*) filter (where seguro) < 3
-    ) as padroes_essenciais_sem_3_seguros
+         and coalesce(array_length(mm.contraindications,1),0) = 0) as high_risk_without_contra,
+    (select count(*) from essential_below_3) as essential_below_3_safe  -- escalar: nº de padrões que falham
 )
-select 'veredito' as relatorio,
-  total,
-  round(100*sem_primario/nullif(total,0),1) as pct_sem_target_primario,
-  round(100*sem_equip/nullif(total,0),1) as pct_sem_equipment,
-  alto_risco_sem_contra,
-  padroes_essenciais_sem_3_seguros,
+select
+  'veredito' as relatorio,
+  total_exercises,
+  round(100 * without_primary / nullif(total_exercises,0), 1) as pct_without_primary_target,
+  high_risk_without_contra as high_risk_without_contraindications,
+  essential_below_3_safe as essential_patterns_below_3_safe,
+  round(100 * without_equipment / nullif(total_exercises,0), 1) as pct_without_equipment,
   case
-    when sem_primario/nullif(total,0) > 0.20
-      or alto_risco_sem_contra > 0
-      or padroes_essenciais_sem_3_seguros > 0
-      then 'BLOCKED_FOR_SHADOW'
-    when sem_equip/nullif(total,0) > 0.30
-      then 'ACCEPT_WITH_NOTES'
+    when without_primary / nullif(total_exercises,0) > 0.20 then 'BLOCKED_FOR_SHADOW'
+    when high_risk_without_contra > 0 then 'BLOCKED_FOR_SHADOW'
+    when essential_below_3_safe > 0 then 'BLOCKED_FOR_SHADOW'
+    when without_equipment / nullif(total_exercises,0) > 0.30 then 'ACCEPT_WITH_NOTES'
     else 'ACCEPT'
   end as status_sugerido
 from m;

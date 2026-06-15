@@ -106,11 +106,12 @@ remoção de padrão em dor severa), mas **sem** a camada de metadados → menor
 | Algum padrão essencial com < 3 seguros | 5/5 | **SIM → BLOCKED_FOR_SHADOW** |
 | `equipment` ausente > 30% | 100% | (seria ACCEPT_WITH_NOTES; sobreposto por BLOCKED) |
 
-**Veredito: `BLOCKED_FOR_SHADOW`** (dois gatilhos). 
-> ⚠️ **Bug encontrado no `.sql` (bloco 7):** a subquery de "padrões essenciais com <3 seguros" é agrupada
-> e usada como escalar → erro `more than one row returned by a subquery`. O veredito acima foi computado
-> manualmente a partir dos blocos 1–6. **Correção do bloco 7 = item de SQL para uma próxima ordem**
-> (envolver o `group by ... having` num `count(*)` externo). Não corrigido aqui (fora do escopo desta ordem).
+**Veredito: `BLOCKED_FOR_SHADOW`** (dois gatilhos).
+> ✅ **Bloco 7 do `.sql` corrigido na ORDEM 022:** a contagem de "padrões essenciais com <3 seguros" virou
+> CTE (`essential_below_3`) reduzida por um `count(*)` externo (escalar). O bloco agora **retorna 1 linha**
+> e foi validado read-only: `total_exercises=447, pct_without_primary_target=14.8,
+> high_risk_without_contraindications=20, essential_patterns_below_3_safe=5, pct_without_equipment=100.0,
+> status_sugerido=BLOCKED_FOR_SHADOW` — confirmando o veredito que havia sido computado manualmente.
 
 ## 10. Top 20 correções recomendadas (curadoria — sem editar dados aqui)
 **Prioridade 1 — segurança (alto risco sem contraindications + pain tags):** popular `contraindications` e
@@ -156,6 +157,6 @@ remada, puxada, supino).
    aprovado** (seed/curadoria revisada — não fake).
 2. **Preencher `equipment`** (447) + **estender o `select` do `loadExerciseCatalog`** para trazer
    `equipment`/`difficulty` (gap B3) — ordem futura.
-3. **Evoluir o `.sql`:** corrigir o **bloco 7** (subquery escalar) — pequena correção, próxima ordem.
+3. **Evoluir o `.sql`:** bloco 7 (subquery escalar) — ✅ **corrigido na ORDEM 022** (retorna 1 linha; validado).
 4. **Runbook de shadow:** pode ser **preparado** (documento) agora, mas a **execução real** do shadow deve
    **aguardar a curadoria** (ou rodar estritamente em modo diagnóstico). Não ligar flag/deploy sem ordem.
