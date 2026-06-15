@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 import { generateTrainingProgram } from "./engine";
 import { buildPrescriptionInputFromEdgePayload } from "../../../supabase/functions/_shared/prescription/adapters/inputAdapter.ts";
 import { buildExerciseCatalogFromEdgeRows } from "../../../supabase/functions/_shared/prescription/adapters/catalogAdapter.ts";
@@ -167,5 +168,40 @@ describe("B4 — output adapter", () => {
     const parsed = JSON.parse(json);
     expect(parsed.plan.cycle_name).toBe(record.cycle_name);
     expect(parsed.plan.schemaVersion).toBe("bn-prescription-v1");
+  });
+});
+
+describe("adapters — pureza Deno-safe e independência da edge", () => {
+  // Caminho relativo à raiz do repo (cwd do vitest) — evita depender de import.meta.url (não-file:// sob vite).
+  const adaptersDir = "supabase/functions/_shared/prescription/adapters/";
+  const FILES = ["types.ts", "inputAdapter.ts", "catalogAdapter.ts", "outputAdapter.ts"];
+  const read = (f: string) => readFileSync(adaptersDir + f, "utf8");
+  const importsOf = (code: string) => [...code.matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1]);
+
+  it("13) adapters não importam React/DOM/Node nem libs externas e não usam globais de DOM", () => {
+    for (const f of FILES) {
+      const code = read(f);
+      // imports só relativos
+      for (const p of importsOf(code)) {
+        expect(p.startsWith("./") || p.startsWith("../")).toBe(true);
+      }
+      // nada de react/react-dom/node:/npm:/http(s)/alias @ nos imports
+      expect(/from\s+["'](react|react-dom|node:|npm:|https?:|@)/.test(code)).toBe(false);
+      // sem globais de DOM/navegador
+      expect(/\b(document|window|localStorage|navigator)\b/.test(code)).toBe(false);
+    }
+  });
+
+  it("14) adapters não dependem da edge diretamente (só tipos do engine/adapters compartilhados)", () => {
+    for (const f of FILES) {
+      const code = read(f);
+      // Prova de independência: TODO import resolve só a ../types.ts (tipos do engine compartilhado)
+      // ou ./types.ts (tipos dos adapters) — nenhum import de edge function / index de função.
+      for (const p of importsOf(code)) {
+        expect(/(^\.\.\/types\.ts$|^\.\/types\.ts$)/.test(p)).toBe(true);
+        expect(p.includes("ai-prescribe-workout")).toBe(false);
+        expect(p.includes("/functions/")).toBe(false);
+      }
+    }
   });
 });
