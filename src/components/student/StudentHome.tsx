@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Dumbbell, BarChart3, CalendarDays, History, Activity, Megaphone, Ruler, Play, Moon, ArrowRight, Utensils, Footprints, Waves, Bike } from "lucide-react";
+import { Dumbbell, BarChart3, CalendarDays, History, Activity, Megaphone, Play, Moon, ArrowRight, Utensils, Footprints, Waves, Bike } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -52,7 +52,6 @@ const NAV_ITEMS: readonly NavItem[] = [
   { view: "historico", label: "Histórico", icon: History },
   { view: "atividades", label: "Atividades", icon: Activity, sub: "Corrida, natação e mais" },
   { view: "avisos", label: "Avisos", icon: Megaphone, sub: "Mural do treinador" },
-  { view: "medidas", label: "Medidas", icon: Ruler, sub: "Circunferências" },
 ];
 
 export function StudentHome({
@@ -164,18 +163,12 @@ export function StudentHome({
             <p className="font-mono-data text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Bem-vindo</p>
             <h3 className="font-display text-xl text-foreground mt-1.5 leading-snug">Seu treino está sendo montado</h3>
             <p className="text-sm text-muted-foreground mt-2">
-              Seu treinador está preparando seu programa. Enquanto isso, adiante seu cadastro para o treino sair sob medida:
+              Seu treinador está preparando seu programa. Enquanto isso, fique de olho nos avisos:
             </p>
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              <button
-                onClick={() => onNavigate("medidas")}
-                className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:border-primary/50"
-              >
-                <Ruler className="h-4 w-4 text-primary" /> Registrar medidas
-              </button>
+            <div className="mt-4">
               <button
                 onClick={() => onNavigate("avisos")}
-                className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:border-primary/50"
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:border-primary/50"
               >
                 <Megaphone className="h-4 w-4 text-primary" /> Ver avisos
               </button>
