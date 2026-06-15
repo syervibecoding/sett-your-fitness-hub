@@ -1,13 +1,18 @@
 import { normalizeText } from "./presets";
 import type { PeriodizationBlock, PrescriptionInput } from "./types";
 import { DELOAD_RULES, PROGRESSION_BLOCKS } from "./methodology";
+import { classifyPainSeverity } from "./restrictionRules";
 
 export function hasPainContext(input: PrescriptionInput) {
-  return /(dor|lesao|joelho|lombar|ombro|eva\s*[4-9]|valgo|butt)/.test(normalizeText({
+  const textual = /(dor|lesao|joelho|lombar|ombro|eva\s*[4-9]|valgo|butt)/.test(normalizeText({
     restrictions: input.restrictions,
     assessment: input.assessmentContext,
     anamnese: input.anamneseContext,
   }));
+  // F1: dor estruturada (painReports[].eva / painEva) também conta como contexto de dor,
+  // mesmo sem texto em restrictions/assessment/anamnese. classifyPainSeverity lê esses campos
+  // e retorna >= "moderada" quando EVA > 3 → trava progressão e bloqueia método avançado.
+  return textual || classifyPainSeverity(input) !== "leve";
 }
 
 export function shouldHoldProgression(input: PrescriptionInput) {

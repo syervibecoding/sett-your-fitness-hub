@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateTrainingProgram } from "./engine";
+import { getVolumeRangeForGroup } from "./volumeRules";
 import type { ExerciseCatalogEntry, PrescriptionInput } from "./types";
 
 const catalog: ExerciseCatalogEntry[] = [
@@ -601,5 +602,83 @@ describe("BN Prescription Engine v1 — regras inegociáveis", () => {
       restrictions: "dor no joelho EVA 4",
       painEva: 4,
     })).validator.pre_save.blockers.some((blocker) => blocker.code === "safe_alternative_unavailable")).toBe(true);
+  });
+});
+
+describe("BN Prescription Engine v1 — hotfix F1..F4", () => {
+  // F1 — dor estruturada (painReports/painEva) sem texto deve travar progressão e bloquear avançado.
+  it("F1 — painReports EVA>3 sem texto trava progressão e bloqueia método avançado (falharia antes do fix)", () => {
+    const program = generateTrainingProgram(baseInput({
+      fitnessLevel: "avancado",
+      objective: "hipertrofia",
+      daysPerWeek: 5,
+      restrictions: "",
+      painReports: [{ region: "joelho", eva: 4 }],
+    }));
+    const blocks = JSON.stringify(program.periodization_blocks).toLowerCase();
+    expect(program.progression_protocol.toLowerCase()).toContain("hold/regress");
+    expect(blocks).not.toMatch(/up-set|piramide|drop|cluster|rest-pause/);
+    expect(blocks).toContain("sem metodos avancados");
+    expect(hasWarning(program, "pain_or_injury_requires_conservative_progression")).toBe(true);
+  });
+
+  it("F1 — painEva estruturado também conta (sem texto)", () => {
+    const program = generateTrainingProgram(baseInput({
+      fitnessLevel: "intermediario", objective: "hipertrofia", daysPerWeek: 4, restrictions: "", painEva: 5,
+    }));
+    expect(program.progression_protocol.toLowerCase()).toMatch(/hold\/regress|tolerancia/);
+    expect(JSON.stringify(program.periodization_blocks).toLowerCase()).not.toMatch(/up-set|piramide|drop|cluster/);
+  });
+
+  it("F1 — sem dor (clean) NÃO trava nem bloqueia avançado (sem falso positivo)", () => {
+    const program = generateTrainingProgram(baseInput({ fitnessLevel: "avancado", objective: "hipertrofia", daysPerWeek: 5 }));
+    expect(program.progression_protocol.toLowerCase()).not.toContain("hold/regress");
+    expect(JSON.stringify(program.periodization_blocks).toLowerCase()).toMatch(/up-set|piramide/);
+  });
+
+  // F2 — endurance só reduz com freq >=3x e só em MMII; superiores preservados.
+  it("F2 — endurance >=3x reduz teto de MMII (~20-30%) e preserva membros superiores", () => {
+    const end = baseInput({ fitnessLevel: "intermediario", isEnduranceAthlete: true, runningDaysContext: { days_per_week: 3 } });
+    const noEnd = baseInput({ fitnessLevel: "intermediario" });
+    const quadEnd = getVolumeRangeForGroup("quadriceps", "intermediario", end).mrv;
+    const quadNo = getVolumeRangeForGroup("quadriceps", "intermediario", noEnd).mrv;
+    const chestEnd = getVolumeRangeForGroup("peitoral", "intermediario", end).mrv;
+    const chestNo = getVolumeRangeForGroup("peitoral", "intermediario", noEnd).mrv;
+    expect(quadEnd).toBeLessThan(quadNo);
+    expect(quadEnd).toBeLessThanOrEqual(Math.round(quadNo * 0.8));
+    expect(chestEnd).toBe(chestNo);
+  });
+
+  it("F2 — endurance <3x NÃO corta MMII", () => {
+    const low = baseInput({ fitnessLevel: "intermediario", runningDaysContext: { days_per_week: 2 } });
+    const noEnd = baseInput({ fitnessLevel: "intermediario" });
+    expect(getVolumeRangeForGroup("quadriceps", "intermediario", low).mrv)
+      .toBe(getVolumeRangeForGroup("quadriceps", "intermediario", noEnd).mrv);
+  });
+
+  it("F2 — endurance sem frequência emite warning de agenda insuficiente", () => {
+    const program = generateTrainingProgram(baseInput({ fitnessLevel: "intermediario", isEnduranceAthlete: true }));
+    expect(hasWarning(program, "endurance_agenda_missing")).toBe(true);
+  });
+
+  // F4 — teto duro no OUTPUT final: iniciante <=12 (grupo grande), interm/avançado <=16 (qualquer grupo).
+  it("F4 — teto de volume garantido no output por perfil", () => {
+    const large = ["quadriceps", "posterior", "gluteos", "costas", "peitoral"];
+    const iniProfiles = [
+      baseInput({ fitnessLevel: "iniciante", daysPerWeek: 6 }),
+      baseInput({ fitnessLevel: "iniciante", objective: "emagrecimento", daysPerWeek: 5 }),
+    ];
+    const advProfiles = [
+      baseInput({ fitnessLevel: "intermediario", daysPerWeek: 5 }),
+      baseInput({ fitnessLevel: "avancado", objective: "hipertrofia", daysPerWeek: 6 }),
+    ];
+    for (const input of iniProfiles) {
+      const sets = weeklySetsByGroup(generateTrainingProgram(input));
+      for (const g of large) expect(sets.get(g) || 0).toBeLessThanOrEqual(12);
+    }
+    for (const input of advProfiles) {
+      const sets = weeklySetsByGroup(generateTrainingProgram(input));
+      for (const [, n] of sets) expect(n).toBeLessThanOrEqual(16);
+    }
   });
 });

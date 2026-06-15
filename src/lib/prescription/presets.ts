@@ -5,7 +5,7 @@ export const METHODOLOGY_PRESETS: Record<string, MethodologyPreset> = {
   hipertrofia_iniciante: {
     key: "hipertrofia_iniciante",
     label: "Hipertrofia iniciante",
-    target_weekly_sets: "8-12 series efetivas por grupo prioritario; maximo conservador de 14-16 para MMII quando houver boa recuperacao",
+    target_weekly_sets: "8-12 series efetivas por grupo prioritario (teto ativo v1 iniciante = 12 series/semana por grupo grande)",
     reps: "8-12 nos multiarticulares, 10-15 nos acessorios",
     rir: "2-3",
     weeklySetRange: { min: 8, max: 12, beginnerMax: 16 },
@@ -18,7 +18,7 @@ export const METHODOLOGY_PRESETS: Record<string, MethodologyPreset> = {
   hipertrofia_intermediario: {
     key: "hipertrofia_intermediario",
     label: "Hipertrofia intermediario",
-    target_weekly_sets: "10-16 series efetivas por grupo prioritario; 16-20 apenas com justificativa e boa tolerancia",
+    target_weekly_sets: "10-16 series efetivas por grupo prioritario (teto ativo v1 = 16; faixa 18-20 fica fora da v1)",
     reps: "6-12 nos multiarticulares, 10-15 nos acessorios",
     rir: "1-3",
     weeklySetRange: { min: 10, max: 16 },

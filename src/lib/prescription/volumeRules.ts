@@ -35,6 +35,24 @@ function normalizedLevel(level: unknown): "iniciante" | "intermediario" | "avanc
   return "iniciante";
 }
 
+// F2: redução por endurance só quando frequência >= 3x/semana e SÓ em MMII.
+// Membros superiores (peito, costas, ombro, bíceps, tríceps, antebraço) não são reduzidos.
+const MMII_GROUPS = ["quadriceps", "posterior", "gluteos", "panturrilhas", "adutores", "adductors"];
+
+function enduranceDaysPerWeek(input?: PrescriptionInput) {
+  if (!input) return 0;
+  const fromContext = Number(input.runningDaysContext?.days_per_week);
+  if (fromContext > 0) return fromContext;
+  // Flag de endurance sem frequência: trata como 3 (conservador); o validador ainda
+  // emite endurance_agenda_missing pedindo a agenda das sessões.
+  return input.isEnduranceAthlete ? 3 : 0;
+}
+
+function enduranceFactorForGroup(group: unknown, input?: PrescriptionInput) {
+  if (enduranceDaysPerWeek(input) < 3) return 1;
+  return MMII_GROUPS.includes(normalizeMuscleGroup(group)) ? 0.75 : 1; // -25% (faixa 20-30%) só em MMII
+}
+
 function objectiveMultiplier(input: PrescriptionInput) {
   const text = normalizeText({ objective: input.objective, restrictions: input.restrictions, assessment: input.assessmentContext });
   if (/forca/.test(text)) return 0.7;
@@ -48,7 +66,7 @@ export function getVolumeRangeForGroup(group: unknown, level: unknown, input?: P
   const base = VOLUME_RULES.largeGroups[normalizedLevel(level)];
   const smallFactor = isSmallGroup(group) ? VOLUME_RULES.smallGroupFactor : 1;
   const objectiveFactor = input ? objectiveMultiplier(input) : 1;
-  const enduranceFactor = input?.isEnduranceAthlete || input?.runningDaysContext ? 0.8 : 1;
+  const enduranceFactor = enduranceFactorForGroup(group, input);
   const painSeverity = input ? classifyPainSeverity(input, normalizeMuscleGroup(group)) : "leve";
   const painFactor = painSeverity === "severa" ? 0.5 : painSeverity === "moderada" ? 0.67 : 1;
   const rawMev = base.mev * smallFactor * objectiveFactor * enduranceFactor * painFactor;
