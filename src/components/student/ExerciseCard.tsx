@@ -63,7 +63,8 @@ export function ExerciseCard({
   activeRest, onSetComplete, onRestComplete, totalSets, onAddSet, onRemoveSet,
 }: ExerciseCardProps) {
   const numSets = totalSets;
-  const hasVideo = !!(ex.video_path || ex.video_url);
+  // Sempre há demonstração: vídeo gravado próprio OU fallback do YouTube pelo nome do exercício.
+  const hasVideo = !!(ex.video_path || ex.video_url || ex.exercise_name);
   const getLogKey = (s: number) => `${workoutId}-${idx}-${s}`;
 
   // Melhor carga histórica deste exercício (antes de hoje) — base para detectar recorde.

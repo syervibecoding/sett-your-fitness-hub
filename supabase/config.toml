@@ -32,3 +32,9 @@ verify_jwt = true
 
 [functions.ai-student-bnito]
 verify_jwt = true
+
+[functions.ai-nutrition-meals]
+verify_jwt = false
+
+[functions.youtube-exercise-video]
+verify_jwt = false

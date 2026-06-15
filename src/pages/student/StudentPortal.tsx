@@ -52,6 +52,7 @@ interface WorkoutExercise {
   reps: string;
   rest: string;
   notes: string;
+  youtube_video_id?: string | null;
 }
 
 interface WorkoutData {
@@ -95,7 +96,7 @@ export default function StudentPortal() {
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [selectedCycle, setSelectedCycle] = useState<Cycle | null>(null);
   const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(null);
-  const [videoModal, setVideoModal] = useState<{ type: "path" | "url"; value: string } | null>(null);
+  const [videoModal, setVideoModal] = useState<{ type: "path" | "url" | "loading"; value: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedExercise, setExpandedExercise] = useState<number | null>(null);
   const [logs, setLogs] = useState<Record<string, WorkoutLog>>({});
@@ -218,15 +219,15 @@ export default function StudentPortal() {
           exs.forEach(ex => { if (ex.exercise_id) exerciseIds.add(ex.exercise_id); });
         });
 
-        let videoMap: Record<string, { video_url: string | null; video_path: string | null }> = {};
+        let videoMap: Record<string, { video_url: string | null; video_path: string | null; youtube_video_id: string | null }> = {};
         if (exerciseIds.size > 0) {
-          const { data: libraryData } = await supabase
+          const { data: libraryData } = await (supabase as any)
             .from("exercise_library")
-            .select("id, video_url, video_path")
+            .select("id, video_url, video_path, youtube_video_id")
             .in("id", Array.from(exerciseIds));
           if (libraryData) {
-            libraryData.forEach(lib => {
-              videoMap[lib.id] = { video_url: lib.video_url, video_path: lib.video_path };
+            libraryData.forEach((lib: any) => {
+              videoMap[lib.id] = { video_url: lib.video_url, video_path: lib.video_path, youtube_video_id: lib.youtube_video_id ?? null };
             });
           }
         }
@@ -243,6 +244,7 @@ export default function StudentPortal() {
                 ...ex,
                 video_url: (ex.video_url && ex.video_url.trim()) || videoMap[ex.exercise_id]?.video_url || null,
                 video_path: (ex.video_path && ex.video_path.trim()) || videoMap[ex.exercise_id]?.video_path || null,
+                youtube_video_id: (ex as any).youtube_video_id || videoMap[ex.exercise_id]?.youtube_video_id || null,
               })),
             }))
             .sort((a, b) => (a.title || "").localeCompare(b.title || ""));
@@ -482,9 +484,21 @@ export default function StudentPortal() {
     return url;
   };
 
-  const openVideoForExercise = (ex: WorkoutExercise) => {
-    if (ex.video_path) setVideoModal({ type: "path", value: getStoragePublicUrl(ex.video_path) });
-    else if (ex.video_url) setVideoModal({ type: "url", value: ex.video_url });
+  const openVideoForExercise = async (ex: WorkoutExercise) => {
+    if (ex.video_path) { setVideoModal({ type: "path", value: getStoragePublicUrl(ex.video_path) }); return; }
+    if (ex.video_url) { setVideoModal({ type: "url", value: ex.video_url }); return; }
+    if (ex.youtube_video_id) { setVideoModal({ type: "url", value: `https://www.youtube.com/watch?v=${ex.youtube_video_id}` }); return; }
+    // Sem vídeo gravado → puxa um vídeo do YouTube pelo nome do exercício (resolvido/cacheado no servidor).
+    setVideoModal({ type: "loading", value: ex.exercise_name });
+    const search = () => window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.exercise_name + " execução técnica")}`, "_blank");
+    try {
+      const { data } = await supabase.functions.invoke("youtube-exercise-video", { body: { exercise_id: ex.exercise_id, name: ex.exercise_name } });
+      const vid = (data as any)?.video_id as string | null;
+      if (vid) setVideoModal({ type: "url", value: `https://www.youtube.com/watch?v=${vid}` });
+      else { search(); setVideoModal(null); }
+    } catch {
+      search(); setVideoModal(null);
+    }
   };
 
   const getOverallProgress = () => {
@@ -958,7 +972,12 @@ export default function StudentPortal() {
           </DialogHeader>
           {videoModal && (
             <div className="aspect-video w-full">
-              {videoModal.type === "path" ? (
+              {videoModal.type === "loading" ? (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-md bg-muted/40">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <p className="text-xs text-muted-foreground">Buscando demonstração no YouTube…</p>
+                </div>
+              ) : videoModal.type === "path" ? (
                 <video src={videoModal.value} controls className="w-full h-full rounded-md" />
               ) : (
                 <iframe src={getEmbedUrl(videoModal.value)} className="w-full h-full rounded-md" allowFullScreen />
