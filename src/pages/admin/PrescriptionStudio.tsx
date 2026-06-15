@@ -335,9 +335,10 @@ export default function PrescriptionStudio() {
       }
 
       // ── Salva bundle ───────────────────────────────────────────────
-      await db.from("prescription_bundles").insert({
+      // prescription_bundles VIVO não tem coluna assessment_id (divergência schema) → não inserir.
+      const { error: bundleErr } = await db.from("prescription_bundles").insert({
         id: crypto.randomUUID(), company_id: companyId, student_id: studentId,
-        anamnese_id: a.id, assessment_id: integrationCtx.sources.assessment_id,
+        anamnese_id: a.id,
         modalities: Array.from(modalities),
         has_strength: modalities.has("musculacao"),
         has_cardio: modalities.has("corrida"),
@@ -350,6 +351,7 @@ export default function PrescriptionStudio() {
         ].join("\n"),
         status: "active",
       });
+      if (bundleErr) console.warn("prescription_bundles insert falhou (nao bloqueia):", bundleErr.message);
 
       // Publica AUTOMATICAMENTE o treino de força no app do aluno (materializa em workouts → aba "Treino").
       // Cardio (running_plans) e nutrição (nutrition_plans) já são persistidos pelas próprias edges e

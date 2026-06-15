@@ -238,11 +238,21 @@ export default function StudentPortal() {
         setCycles(enriched);
 
         const today = new Date();
-        const activeCycle = enriched.find(c => {
+        const inRange = (c: Cycle) => {
           try { return isWithinInterval(today, { start: parseISO(c.start_date), end: parseISO(c.end_date) }); }
           catch { return false; }
-        });
-        const chosen = activeCycle || enriched[0];
+        };
+        // Vários ciclos podem ter períodos sobrepostos (re-publicações). Prioriza: ciclo ATIVO com treinos
+        // > ativo > no período com treinos > no período > com treinos > mais recente (maior cycle_number).
+        const byNewest = [...enriched].sort((a, b) => (b.cycle_number || 0) - (a.cycle_number || 0));
+        const chosen =
+          byNewest.find(c => c.status === "active" && c.workouts.length > 0) ||
+          byNewest.find(c => c.status === "active") ||
+          byNewest.find(c => inRange(c) && c.workouts.length > 0) ||
+          byNewest.find(c => inRange(c)) ||
+          byNewest.find(c => c.workouts.length > 0) ||
+          byNewest[0] ||
+          enriched[0];
         setSelectedCycle(chosen);
         const todayDow = new Date().getDay();
         const todaysWorkout = chosen.workouts.find(w => w.day_of_week === todayDow);
