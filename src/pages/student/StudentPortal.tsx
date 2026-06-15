@@ -171,7 +171,7 @@ export default function StudentPortal() {
 
     const { data: enrollment } = await supabase
       .from("enrollments")
-      .select("id, start_date, end_date, plan_id, plans(name)")
+      .select("id, start_date, end_date, plan_id")
       .eq("student_id", student.id)
       .eq("status", "active")
       .order("created_at", { ascending: false })
@@ -180,17 +180,30 @@ export default function StudentPortal() {
 
     if (enrollment) {
       setActiveEnrollmentId(enrollment.id);
+      // Nome do plano em query separada (sem o embed plans(name), que podia dar 400 por divergência de schema/FK
+      // e derrubar TODA a carga do treino junto).
+      let planName = "Plano";
+      const planId = (enrollment as any).plan_id;
+      if (planId) {
+        const { data: planRow } = await supabase.from("plans").select("name").eq("id", planId).maybeSingle();
+        if ((planRow as any)?.name) planName = (planRow as any).name;
+      }
       setEnrollmentInfo({
-        plan_name: (enrollment.plans as any)?.name || "Plano",
+        plan_name: planName,
         start_date: enrollment.start_date,
         end_date: enrollment.end_date,
       });
+    }
 
-
-      const { data: cyclesData } = await supabase
+    // CICLOS direto por student_id (RLS "students_read_own_cycles") — INDEPENDE da matrícula/plano,
+    // pra o treino aparecer mesmo se a query de matrícula falhar.
+    {
+      // (supabase as any): o types.ts local de training_cycles está defasado e não lista student_id,
+      // que EXISTE no banco vivo (zshrcg). O cast evita o erro de tipo.
+      const { data: cyclesData } = await (supabase as any)
         .from("training_cycles")
         .select("id, cycle_number, start_date, end_date, status")
-        .eq("enrollment_id", enrollment.id)
+        .eq("student_id", student.id)
         .order("cycle_number");
 
       if (cyclesData && cyclesData.length > 0) {
