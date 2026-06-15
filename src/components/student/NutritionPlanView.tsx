@@ -2,12 +2,20 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Apple, Utensils, Droplets, Flame, Beef, Wheat, Leaf, Loader2, Lightbulb } from "lucide-react";
+import { Apple, Utensils, Droplets, Flame, Beef, Wheat, Leaf, Loader2, Coffee, Dumbbell, Moon, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Espelha o schema VIVO de nutrition_plans (Supabase zshrcgbyhzxpnlccssyz): macros nas colunas
-// target_* (+ fallback total_*/*_g), objetivo em goal, restrições em context_dietary_restrictions,
-// e o raciocínio/orientações em ai_rationale. (O banco ativo NÃO tem energy_summary/nutrition_tips.)
+// Espelha o schema VIVO de nutrition_plans (Supabase zshrcgbyhzxpnlccssyz): macros em target_*,
+// objetivo em goal, restrições em context_dietary_restrictions, e o PLANO DE REFEIÇÕES prático em
+// `meals` (jsonb, preenchido pela edge ai-nutrition-plan). O ai_rationale é técnico → NÃO é exibido ao aluno.
+interface MealItem {
+  meal?: string | null;
+  time?: string | null;
+  focus?: string | null;
+  eat?: string[] | null;
+  go_easy?: string[] | null;
+  note?: string | null;
+}
 interface NutritionRow {
   name?: string | null;
   plan_name?: string | null;
@@ -24,9 +32,7 @@ interface NutritionRow {
   carbs_g?: number | null;
   fat_g?: number | null;
   context_dietary_restrictions?: string | null;
-  ai_rationale?: string | null;
-  notes?: string | null;
-  observations?: string | null;
+  meals?: MealItem[] | null;
 }
 
 const GOAL_LABEL: Record<string, string> = {
@@ -39,15 +45,17 @@ const GOAL_LABEL: Record<string, string> = {
 };
 
 const GLASS_ML = 250;
+const asArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
-// Quebra o texto em tópicos por frase, SEM cortar números (ex.: "1.715", "2,0g/kg"):
-// só divide num ponto/ponto-e-vírgula precedido por letra/%/) e seguido de espaço + MAIÚSCULA.
-function splitPoints(text: string): string[] {
-  if (!text) return [];
-  return text
-    .split(/(?<=[\p{L}%)\]])[.;]\s+(?=\p{Lu})/u)
-    .map((s) => s.replace(/[.;]\s*$/, "").trim())
-    .filter((s) => s.length > 0);
+// Ícone por tipo de refeição (heurística simples pelo nome).
+function mealIcon(name?: string | null) {
+  const n = (name || "").toLowerCase();
+  if (/(café|manh|desjejum)/.test(n)) return Coffee;
+  if (/(pré|pre)[\s-]?treino/.test(n)) return Dumbbell;
+  if (/(pós|pos)[\s-]?treino/.test(n)) return Dumbbell;
+  if (/(ceia|noite|dormir)/.test(n)) return Moon;
+  if (/(lanche|fruta)/.test(n)) return Apple;
+  return Utensils;
 }
 
 function MacroCard({ icon: Icon, value, label, tint }: { icon: typeof Flame; value: string; label: string; tint?: string }) {
@@ -59,6 +67,20 @@ function MacroCard({ icon: Icon, value, label, tint }: { icon: typeof Flame; val
         <span className="text-eyebrow text-muted-foreground">{label}</span>
       </CardContent>
     </Card>
+  );
+}
+
+function Chip({ children, variant }: { children: React.ReactNode; variant: "eat" | "easy" }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-sans",
+        variant === "eat" ? "border-emerald-600/30 bg-emerald-600/10 text-emerald-800" : "border-amber-600/30 bg-amber-600/10 text-amber-800",
+      )}
+    >
+      {variant === "eat" && <Check className="h-3 w-3 shrink-0" />}
+      {children}
+    </span>
   );
 }
 
@@ -127,8 +149,7 @@ export function NutritionPlanView({ studentId }: { studentId: string }) {
   const fat = row.target_fat_g ?? row.fat_g ?? 0;
   const title = row.plan_name || row.name || "Plano nutricional";
   const goal = row.goal ? GOAL_LABEL[row.goal] || row.goal : null;
-  const points = splitPoints((row.ai_rationale || "").trim());
-  const notesPoints = splitPoints([row.notes, row.observations].map((s) => (s || "").trim()).filter(Boolean).join(". "));
+  const meals = asArray<MealItem>(row.meals).filter((m) => m && (m.meal || (m.eat && m.eat.length)));
 
   // Divisão dos macros por contribuição calórica (P/C = 4 kcal/g, G = 9 kcal/g).
   const pK = protein * 4, cK = carbs * 4, fK = fat * 9;
@@ -197,6 +218,58 @@ export function NutritionPlanView({ studentId }: { studentId: string }) {
         </Card>
       )}
 
+      {/* PLANO DE REFEIÇÕES (prático, individualizado pela anamnese) */}
+      <div>
+        <p className="text-eyebrow text-muted-foreground mb-2">Plano de refeições</p>
+        {meals.length > 0 ? (
+          <div className="space-y-2.5">
+            {meals.map((m, i) => {
+              const Icon = mealIcon(m.meal);
+              const eat = asArray<string>(m.eat).filter(Boolean);
+              const easy = asArray<string>(m.go_easy).filter(Boolean);
+              return (
+                <Card key={i} className="bg-card border-border overflow-hidden">
+                  <CardContent className="p-0">
+                    <div className="flex items-center justify-between gap-2 bg-primary/5 px-4 py-2.5 border-b border-border">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Icon className="h-4 w-4 text-primary shrink-0" />
+                        <span className="font-semibold text-foreground truncate">{m.meal || `Refeição ${i + 1}`}</span>
+                      </div>
+                      {m.time && <Badge variant="outline" className="font-mono-data text-primary border-primary/30 shrink-0">{m.time}</Badge>}
+                    </div>
+                    <div className="p-4 space-y-2.5">
+                      {m.focus && <p className="text-sm font-medium text-primary/90">{m.focus}</p>}
+                      {eat.length > 0 && (
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">Comer</p>
+                          <div className="flex flex-wrap gap-1.5">{eat.map((f, k) => <Chip key={k} variant="eat">{f}</Chip>)}</div>
+                        </div>
+                      )}
+                      {easy.length > 0 && (
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">Pegar leve</p>
+                          <div className="flex flex-wrap gap-1.5">{easy.map((f, k) => <Chip key={k} variant="easy">{f}</Chip>)}</div>
+                        </div>
+                      )}
+                      {m.note && <p className="text-xs text-muted-foreground">{m.note}</p>}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        ) : (
+          <Card className="bg-card border-border border-dashed">
+            <CardContent className="p-5 text-center">
+              <Utensils className="h-5 w-5 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground font-sans">
+                Seu plano de refeições está sendo preparado pelo seu treinador.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
       {/* Hidratação (interativo) */}
       {totalGlasses > 0 && (
         <Card className="bg-card border-border">
@@ -229,43 +302,6 @@ export function NutritionPlanView({ studentId }: { studentId: string }) {
             <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
               <div className="h-full rounded-full bg-sky-500 transition-all" style={{ width: `${waterPctDone}%` }} />
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Orientações — em tópicos */}
-      {points.length > 0 && (
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Lightbulb className="h-4 w-4 text-amber-500" />
-              <p className="text-eyebrow text-muted-foreground">Orientações</p>
-            </div>
-            <ul className="space-y-2.5">
-              {points.map((p, i) => (
-                <li key={i} className="flex gap-2.5 text-sm text-foreground/90 font-sans leading-relaxed">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/60" />
-                  <span>{p}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Observações */}
-      {notesPoints.length > 0 && (
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <p className="text-eyebrow text-muted-foreground mb-2">Observações</p>
-            <ul className="space-y-2">
-              {notesPoints.map((p, i) => (
-                <li key={i} className="flex gap-2.5 text-sm text-foreground/90 font-sans leading-relaxed">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/50" />
-                  <span>{p}</span>
-                </li>
-              ))}
-            </ul>
           </CardContent>
         </Card>
       )}
