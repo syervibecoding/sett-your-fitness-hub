@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { Dumbbell, Play, Clock, CheckCircle2, Circle, Loader2, LogOut, Save, CalendarDays, History, BarChart3, ArrowLeft } from "lucide-react";
 import { format, parseISO, differenceInDays, isWithinInterval } from "date-fns";
@@ -97,6 +99,12 @@ export default function StudentPortal() {
   const [selectedCycle, setSelectedCycle] = useState<Cycle | null>(null);
   const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(null);
   const [videoModal, setVideoModal] = useState<{ type: "path" | "url" | "loading"; value: string } | null>(null);
+  // Feedback pós-treino ("como foi o treino?") — vai pro WhatsApp do treinador.
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackRating, setFeedbackRating] = useState<string | null>(null);
+  const [feedbackWorkoutTitle, setFeedbackWorkoutTitle] = useState("");
+  const [sendingFeedback, setSendingFeedback] = useState(false);
   const [loading, setLoading] = useState(true);
   const [expandedExercise, setExpandedExercise] = useState<number | null>(null);
   const [logs, setLogs] = useState<Record<string, WorkoutLog>>({});
@@ -542,6 +550,28 @@ export default function StudentPortal() {
     });
 
     await session.finishSession(logs, selectedWorkout.exercises, previousBestWeights);
+
+    // Abre o popup "Como foi o treino?" — a resposta vai pro WhatsApp do treinador.
+    setFeedbackWorkoutTitle(selectedWorkout.title);
+    setFeedbackText("");
+    setFeedbackRating(null);
+    setFeedbackOpen(true);
+  };
+
+  const sendWorkoutFeedback = async () => {
+    if (!studentId) return;
+    setSendingFeedback(true);
+    try {
+      await supabase.functions.invoke("student-workout-feedback", {
+        body: { student_id: studentId, feedback: feedbackText, rating: feedbackRating, workout_title: feedbackWorkoutTitle },
+      });
+      toast({ title: "Valeu pelo feedback! 💪", description: "Seu treinador já recebeu." });
+    } catch {
+      toast({ title: "Feedback registrado", description: "Obrigado!" });
+    } finally {
+      setSendingFeedback(false);
+      setFeedbackOpen(false);
+    }
   };
 
 
@@ -963,6 +993,43 @@ export default function StudentPortal() {
 
 
       </div>
+
+      {/* Feedback pós-treino → WhatsApp do treinador */}
+      <Dialog open={feedbackOpen} onOpenChange={(o) => { if (!o) setFeedbackOpen(false); }}>
+        <DialogContent className="bg-card border-border max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-primary">Como foi o treino?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">Seu treinador recebe sua resposta no WhatsApp.</p>
+            <div className="flex gap-2">
+              {[{ e: "😮‍💨", l: "Difícil" }, { e: "👍", l: "Bom" }, { e: "🔥", l: "Ótimo" }].map((o) => (
+                <button
+                  key={o.l} type="button" onClick={() => setFeedbackRating(o.l)}
+                  className={cn(
+                    "flex-1 rounded-lg border p-2 text-sm transition-colors",
+                    feedbackRating === o.l ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted/50",
+                  )}
+                >
+                  <span className="block text-xl">{o.e}</span>{o.l}
+                </button>
+              ))}
+            </div>
+            <Textarea
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              placeholder="Conta pro seu treinador: dores, dificuldade, como se sentiu… (opcional)"
+              className="min-h-[90px]"
+            />
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setFeedbackOpen(false)} disabled={sendingFeedback}>Pular</Button>
+              <Button className="flex-1" onClick={sendWorkoutFeedback} disabled={sendingFeedback || (!feedbackRating && !feedbackText.trim())}>
+                {sendingFeedback ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enviar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Video Modal */}
       <Dialog open={!!videoModal} onOpenChange={() => setVideoModal(null)}>

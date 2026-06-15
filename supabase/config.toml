@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.youtube-exercise-video]
 verify_jwt = false
+
+[functions.student-workout-feedback]
+verify_jwt = false
