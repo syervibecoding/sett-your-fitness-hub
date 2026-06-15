@@ -11,6 +11,10 @@ import type { Json } from "@/integrations/supabase/types";
 import { Loader2, Video, Camera, Plus, X, Save, Sparkles, RefreshCw, SkipBack, SkipForward, Eye, Maximize2 } from "lucide-react";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/lib/studioUi";
+import { toast } from "sonner";
+import { generateAssessmentPDF } from "@/lib/generatePDFs";
+import { saveStudentFile } from "@/lib/studentFiles";
+import { sendPdfToStudentWhatsApp } from "@/lib/sendStudentMedia";
 
 type JsonObject = { [key: string]: Json | undefined };
 
@@ -201,6 +205,12 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
   const [autoProtocol, setAutoProtocol] = useState<AutoProtocol>("posture_ohs");
   const [previewFrame, setPreviewFrame] = useState<Frame | null>(null);
   const activeProtocol = PROTOCOL_PRESETS[autoProtocol];
+  // Entrega do laudo: popup "enviar para o aluno" após salvar a avaliação.
+  const [deliverOpen, setDeliverOpen] = useState(false);
+  const [deliverBlob, setDeliverBlob] = useState<Blob | null>(null);
+  const [deliverName, setDeliverName] = useState("aluno");
+  const [sendingPdf, setSendingPdf] = useState(false);
+  const [sentPdf, setSentPdf] = useState(false);
 
   // ── Extrai frame do vídeo no tempo atual ────────────────────────────────
   function captureFrame(video: HTMLVideoElement): Promise<{ preview: string; blob: Blob; mostlyBlack: boolean }> {
@@ -557,8 +567,45 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
         assessment_json: assessmentJson,
         frame_findings: aiFrameFindings,
       });
+
+      // 3. Gera o PDF entregável do laudo → salva na PASTA do aluno + abre o popup de envio.
+      try {
+        const { data: st } = await supabase.from("students").select("full_name").eq("id", studentId).maybeSingle();
+        const name = (st as { full_name?: string } | null)?.full_name || "Aluno";
+        const pdf = generateAssessmentPDF(
+          { report_text: aiReportText || fallbackReport, assessment_json: assessmentJson },
+          { studentName: name, date: new Date().toLocaleDateString("pt-BR") },
+        );
+        const blob = pdf.output("blob") as Blob;
+        const safe = name.replace(/[^\w.\-]+/g, "_");
+        await saveStudentFile({
+          studentId, companyId, data: blob,
+          fileName: `laudo-avaliacao-${safe}.pdf`, kind: "assessment_report",
+          contentType: "application/pdf", stampMs: Date.now(), stableName: true,
+          source: "VideoAssessment", metadata: { assessment_id: assessment.id },
+        });
+        setDeliverBlob(blob);
+        setDeliverName(name);
+        setSentPdf(false);
+        setDeliverOpen(true);
+      } catch { /* não bloqueia o save se o PDF/pasta falhar */ }
     } catch (e: unknown) { setError(errorMessage(e)); }
     setSaving(false);
+  }
+
+  // Envia o PDF do laudo direto pro WhatsApp do aluno.
+  async function sendLaudoWhatsApp() {
+    if (!deliverBlob) return;
+    setSendingPdf(true);
+    const safe = deliverName.replace(/[^\w.\-]+/g, "_");
+    const res = await sendPdfToStudentWhatsApp({
+      companyId, studentId, blob: deliverBlob,
+      fileName: `laudo-avaliacao-${safe}.pdf`,
+      caption: `Olá, ${deliverName.split(" ")[0]}! Segue o laudo da sua avaliação funcional. Qualquer dúvida, é só chamar. 💪`,
+    });
+    setSendingPdf(false);
+    if (res.ok) { setSentPdf(true); toast.success("Laudo enviado no WhatsApp do aluno."); }
+    else toast.error(res.error || "Não consegui enviar pelo WhatsApp.");
   }
 
   // ── Render ────────────────────────────────────────────────────────────
@@ -759,6 +806,39 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
             </div>
             <div className="self-center rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow">
               {previewFrame.vista} · {previewFrame.time.toFixed(1)}s
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Popup pós-avaliação: laudo salvo na pasta + enviar para o aluno no WhatsApp */}
+      {deliverOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" onClick={() => setDeliverOpen(false)}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between">
+              <div className="pr-4">
+                <h3 className="text-lg font-bold text-slate-800">Avaliação concluída</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  O laudo (PDF) já foi salvo na pasta do aluno. Gostaria de enviar para {deliverName.split(" ")[0]} no WhatsApp?
+                </p>
+              </div>
+              <button onClick={() => setDeliverOpen(false)} className="text-slate-400 hover:text-slate-600" aria-label="Fechar">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mt-4 flex flex-col gap-2">
+              <Button onClick={sendLaudoWhatsApp} disabled={sendingPdf || sentPdf} className="w-full bg-[#25D366] hover:bg-[#25D366]/90 text-white">
+                {sendingPdf ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                {sentPdf ? "Enviado ✓" : "Enviar para o aluno no WhatsApp"}
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => { if (deliverBlob) window.open(URL.createObjectURL(deliverBlob), "_blank"); }}>
+                  Ver PDF
+                </Button>
+                <Button variant="outline" className="flex-1" onClick={() => setDeliverOpen(false)}>
+                  {sentPdf ? "Fechar" : "Agora não"}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

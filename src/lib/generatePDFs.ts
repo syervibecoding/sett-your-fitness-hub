@@ -799,6 +799,63 @@ export function generateNutritionPDF(plan: any, meta: PDFMeta): jsPDF {
   return doc;
 }
 
+// ── PDF da AVALIAÇÃO FUNCIONAL (laudo entregável ao aluno) ───────────────────
+export function generateAssessmentPDF(data: any, meta: PDFMeta): jsPDF {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  header(doc, "Avaliacao Funcional", "Laudo tecnico — postura e movimento", meta);
+  let y = 40;
+
+  const json = data?.assessment_json ?? data ?? {};
+  const reportText = first(data?.report_text, json?.relatorio_para_aluno, json?.report_text) || "";
+
+  const ctx: [string, string][] = [];
+  if (json?.total_compensacoes != null) ctx.push([String(json.total_compensacoes), "Compensações"]);
+  if (Array.isArray(json?.vistas)) ctx.push([String(json.vistas.length), "Vistas analisadas"]);
+  if (ctx.length) y = statCards(doc, ctx, y);
+
+  if (reportText) {
+    y = sectionTitle(doc, "Laudo", y);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...TEXT);
+    y = wrapText(doc, asText(reportText), MARGIN, y, W(doc) - MARGIN * 2, 5) + 4;
+  }
+
+  const vistas = Array.isArray(json?.vistas) ? json.vistas : [];
+  const withFindings = vistas.filter((v: any) => Array.isArray(v?.compensacoes) && v.compensacoes.length);
+  if (withFindings.length) {
+    y = sectionTitle(doc, "Compensacoes observadas", y);
+    withFindings.forEach((v: any) => {
+      y = ensure(doc, y, 10);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...NAVY);
+      y = wrapText(doc, asText(v.vista || "Vista"), MARGIN, y, W(doc) - MARGIN * 2, 4.5) + 1;
+      (v.compensacoes || []).forEach((c: any) => {
+        const desc = typeof c === "string" ? c : asText(first(c?.descricao, c?.description, c?.nome));
+        const sev = typeof c === "object" && c ? asText(first(c?.gravidade, c?.severity)) : "";
+        if (!desc) return;
+        doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...TEXT);
+        y = wrapText(doc, `•  ${desc}${sev ? ` (${sev})` : ""}`, MARGIN + 2, y, W(doc) - MARGIN * 2 - 4, 4.5) + 1;
+      });
+      y += 2;
+    });
+  }
+
+  const recs = json?.prescription_context;
+  if (recs) {
+    y = sectionTitle(doc, "Orientacoes para o treino", y);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...TEXT);
+    y = wrapText(doc, asText(recs), MARGIN, y, W(doc) - MARGIN * 2, 5) + 2;
+  }
+
+  if (Array.isArray(json?.warnings) && json.warnings.length) y = warningsBlock(doc, json.warnings, y);
+
+  if (!reportText && !withFindings.length) {
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...GRAY);
+    wrapText(doc, "Avaliacao registrada. O laudo detalhado estara disponivel com o seu treinador.", MARGIN, y, W(doc) - MARGIN * 2, 5);
+  }
+
+  stampFooters(doc, meta);
+  return doc;
+}
+
 // ── Orquestrador ────────────────────────────────────────────────────────────
 export interface GeneratedPDF { modality: string; label: string; doc: jsPDF; filename: string; }
 
