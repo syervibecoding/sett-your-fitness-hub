@@ -87,6 +87,7 @@ function Chip({ children, variant }: { children: React.ReactNode; variant: "eat"
 export function NutritionPlanView({ studentId }: { studentId: string }) {
   const [row, setRow] = useState<NutritionRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generatingMeals, setGeneratingMeals] = useState(false);
 
   // Rastreador de hidratação (interativo) — persiste por aluno + dia no localStorage.
   const dayKey = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -115,6 +116,19 @@ export function NutritionPlanView({ studentId }: { studentId: string }) {
           .maybeSingle();
         if (!active) return;
         setRow((data as NutritionRow) ?? null);
+        setLoading(false);
+        // Gera o plano de refeições sob demanda se ainda não existe (preenche nutrition_plans.meals).
+        const existing = Array.isArray((data as any)?.meals) ? (data as any).meals : [];
+        if (data && existing.length === 0) {
+          setGeneratingMeals(true);
+          try {
+            const { data: gen } = await supabase.functions.invoke("ai-nutrition-meals", { body: { student_id: studentId } });
+            if (active && Array.isArray((gen as any)?.meals)) {
+              setRow((prev) => (prev ? { ...prev, meals: (gen as any).meals } : prev));
+            }
+          } catch { /* mantém empty-state */ }
+          finally { if (active) setGeneratingMeals(false); }
+        }
       } catch {
         if (active) setRow(null);
       } finally {
@@ -261,10 +275,17 @@ export function NutritionPlanView({ studentId }: { studentId: string }) {
         ) : (
           <Card className="bg-card border-border border-dashed">
             <CardContent className="p-5 text-center">
-              <Utensils className="h-5 w-5 text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground font-sans">
-                Seu plano de refeições está sendo preparado pelo seu treinador.
-              </p>
+              {generatingMeals ? (
+                <>
+                  <Loader2 className="h-5 w-5 text-primary mx-auto mb-2 animate-spin" />
+                  <p className="text-sm text-muted-foreground font-sans">Montando seu plano de refeições…</p>
+                </>
+              ) : (
+                <>
+                  <Utensils className="h-5 w-5 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground font-sans">Seu plano de refeições está sendo preparado pelo seu treinador.</p>
+                </>
+              )}
             </CardContent>
           </Card>
         )}
