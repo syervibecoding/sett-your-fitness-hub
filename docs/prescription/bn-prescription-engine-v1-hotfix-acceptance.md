@@ -25,6 +25,7 @@
 | `2fd7dcf` | claude: audit bn prescription engine core |
 | `ee4bfbe` | claude: fix prescription pain progression gate |
 | `469ce66` | claude: plan prescription engine phase b |
+| `c60affd` | claude: add prescription phase b tickets |
 
 ---
 
