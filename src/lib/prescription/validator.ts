@@ -19,6 +19,19 @@ function hasAdvancedMethod(program: TrainingProgram) {
   return /(drop[- ]?set|cluster[- ]?set|piramide|up[- ]?set|rest[- ]?pause)/.test(normalizeText(program));
 }
 
+function exerciseOnlyText(program: TrainingProgram) {
+  return normalizeText(program.workouts.flatMap((workout) =>
+    workout.exercises.map((exercise) => [
+      exercise.exercise_name,
+      exercise.library_exercise_name,
+      exercise.muscle_group,
+      exercise.phase,
+      exercise.cues,
+      exercise.biomechanical_note,
+    ].join(" ")),
+  ));
+}
+
 function hasHeavyLowerNearEndurance(program: TrainingProgram) {
   const lowerDays = new Set(
     program.workouts
@@ -92,7 +105,8 @@ export function validateTrainingProgram(args: {
 
   const context = normalizeText(args.input);
   const planText = normalizeText(args.program);
-  if (/joelho|valgo/.test(context) && /salto|pliometr|agachamento profundo/.test(planText)) {
+  const exerciseText = exerciseOnlyText(args.program);
+  if (/joelho|valgo/.test(context) && /salto|pliometr|agachamento profundo|atg/.test(exerciseText)) {
     add({
       severity: "warning",
       code: "knee_conflict",
@@ -101,7 +115,7 @@ export function validateTrainingProgram(args: {
       source: "anamnese",
     });
   }
-  if (/lombar|butt|retrovers/.test(context) && /terra pesado|good morning|carga axial alta/.test(planText)) {
+  if (/lombar|butt|retrovers/.test(context) && /terra convencional pesado|terra pesado|good morning|carga axial alta|flexao espinhal carregada/.test(exerciseText)) {
     add({
       severity: "warning",
       code: "low_back_conflict",
@@ -110,7 +124,7 @@ export function validateTrainingProgram(args: {
       source: "avaliacao_funcional",
     });
   }
-  if (/ombro|overhead|cifose|protrus/.test(context) && /overhead pesado|desenvolvimento pesado|barra nuca/.test(planText)) {
+  if (/ombro|overhead|cifose|protrus/.test(context) && /overhead pesado|desenvolvimento pesado|barra nuca|remada alta|dips/.test(exerciseText)) {
     add({
       severity: "warning",
       code: "shoulder_conflict",
@@ -137,6 +151,37 @@ export function validateTrainingProgram(args: {
       message: "Método avançado apareceu em contexto com dor/restrição.",
       recommendation: "Remover método avançado até estabilizar dor e técnica.",
       source: "nivel",
+    });
+  }
+
+  const level = normalizeText(args.input.fitnessLevel);
+  if (level.includes("inic") && hasAdvancedMethod(args.program)) {
+    add({
+      severity: "warning",
+      code: "advanced_method_for_beginner",
+      message: "Método avançado apareceu para aluno iniciante.",
+      recommendation: "Usar progressão dupla, técnica e RIR 3-4 antes de métodos avançados.",
+      source: "nivel",
+    });
+  }
+
+  if (/pliometr|salto|jump|hop/.test(exerciseText) && Number(args.input.blockNumber || 1) <= 1) {
+    add({
+      severity: "warning",
+      code: "plyometrics_in_block_1",
+      message: "Pliometria apareceu no primeiro bloco.",
+      recommendation: "Remover pliometria nas semanas 1-2 e priorizar base técnica.",
+      source: "periodizacao",
+    });
+  }
+
+  if (args.input.deload && /(falha|drop|cluster|piramide|up-set|rest-pause)/.test(planText)) {
+    add({
+      severity: "warning",
+      code: "deload_with_advanced_method",
+      message: "Deload não deve conter falha ou método avançado.",
+      recommendation: "Reduzir volume 40-50%, usar RIR 4-5 e manter técnica.",
+      source: "periodizacao",
     });
   }
 

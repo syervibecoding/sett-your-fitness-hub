@@ -1,4 +1,5 @@
 import type { MethodologyPreset, PrescriptionInput } from "./types";
+import { OBJECTIVE_MODIFIERS, SPLIT_TABLE } from "./methodology";
 
 export const METHODOLOGY_PRESETS: Record<string, MethodologyPreset> = {
   hipertrofia_iniciante: {
@@ -113,4 +114,38 @@ export function selectMethodologyPreset(input: Pick<PrescriptionInput, "objectiv
   if (objective.includes("recomp")) return METHODOLOGY_PRESETS.recomposicao;
   if (objective.includes("hipertrof") && (level.includes("inter") || level.includes("avanc"))) return METHODOLOGY_PRESETS.hipertrofia_intermediario;
   return METHODOLOGY_PRESETS.hipertrofia_iniciante;
+}
+
+export function objectiveKey(input: Pick<PrescriptionInput, "objective" | "restrictions" | "assessmentContext">) {
+  const objective = normalizeText(input.objective);
+  const risk = normalizeText({ restrictions: input.restrictions, assessment: input.assessmentContext });
+  if (/(dor|lesao|retorno|reabilit|joelho|lombar|ombro|valgo|butt)/.test(`${objective} ${risk}`)) return "retorno_gradual" as const;
+  if (objective.includes("forca")) return "forca_geral" as const;
+  if (objective.includes("emagrec")) return "emagrecimento" as const;
+  if (objective.includes("saude")) return "saude_geral" as const;
+  return "hipertrofia" as const;
+}
+
+export function objectiveModifier(input: Pick<PrescriptionInput, "objective" | "restrictions" | "assessmentContext">) {
+  return OBJECTIVE_MODIFIERS[objectiveKey(input)];
+}
+
+export function normalizeLevel(level: unknown): "iniciante" | "intermediario" | "avancado" {
+  const text = normalizeText(level);
+  if (text.includes("avanc")) return "avancado";
+  if (text.includes("inter")) return "intermediario";
+  return "iniciante";
+}
+
+export function resolveSplit(input: Pick<PrescriptionInput, "daysPerWeek" | "fitnessLevel" | "objective" | "restrictions" | "assessmentContext">) {
+  const requested = Math.min(6, Math.max(2, Number(input.daysPerWeek) || 3)) as 2 | 3 | 4 | 5 | 6;
+  const level = normalizeLevel(input.fitnessLevel);
+  const split = SPLIT_TABLE[requested][level];
+  return {
+    requestedDays: requested,
+    structuredDays: split.maxStructuredDays,
+    label: split.label,
+    days: [...split.days],
+    downgraded: Boolean("downgrade" in split && split.downgrade),
+  };
 }

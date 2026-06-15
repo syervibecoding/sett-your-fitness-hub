@@ -1,5 +1,7 @@
 import { normalizeText } from "./presets";
 import type { MethodologyPreset, PrescriptionInput, TrainingProgram, VolumeReview } from "./types";
+import { LARGE_GROUPS, SMALL_GROUPS, VOLUME_RULES } from "./methodology";
+import { classifyPainSeverity } from "./restrictionRules";
 
 export const IMPORTANT_GROUPS = ["quadriceps", "posterior", "gluteos", "costas", "peitoral", "core"];
 
@@ -14,6 +16,56 @@ export function normalizeMuscleGroup(group: unknown) {
   if (/ombro|delto/.test(text)) return "ombros";
   if (/panturr|calf/.test(text)) return "panturrilhas";
   return text || "geral";
+}
+
+export function isSmallGroup(group: unknown) {
+  const normalized = normalizeMuscleGroup(group);
+  return (SMALL_GROUPS as readonly string[]).includes(normalized);
+}
+
+export function isLargeGroup(group: unknown) {
+  const normalized = normalizeMuscleGroup(group);
+  return (LARGE_GROUPS as readonly string[]).includes(normalized);
+}
+
+function normalizedLevel(level: unknown): "iniciante" | "intermediario" | "avancado" {
+  const text = normalizeText(level);
+  if (text.includes("avanc")) return "avancado";
+  if (text.includes("inter")) return "intermediario";
+  return "iniciante";
+}
+
+function objectiveMultiplier(input: PrescriptionInput) {
+  const text = normalizeText({ objective: input.objective, restrictions: input.restrictions, assessment: input.assessmentContext });
+  if (/forca/.test(text)) return 0.7;
+  if (/saude/.test(text)) return 0.7;
+  if (/retorno|lesao|dor|joelho|lombar|ombro|valgo|butt/.test(text)) return 0.5;
+  if (/emagrec/.test(text)) return 0.9;
+  return 1;
+}
+
+export function getVolumeRangeForGroup(group: unknown, level: unknown, input?: PrescriptionInput) {
+  const base = VOLUME_RULES.largeGroups[normalizedLevel(level)];
+  const smallFactor = isSmallGroup(group) ? VOLUME_RULES.smallGroupFactor : 1;
+  const objectiveFactor = input ? objectiveMultiplier(input) : 1;
+  const enduranceFactor = input?.isEnduranceAthlete || input?.runningDaysContext ? 0.8 : 1;
+  const painSeverity = input ? classifyPainSeverity(input, normalizeMuscleGroup(group)) : "leve";
+  const painFactor = painSeverity === "severa" ? 0.5 : painSeverity === "moderada" ? 0.67 : 1;
+  const rawMev = base.mev * smallFactor * objectiveFactor * enduranceFactor * painFactor;
+  const rawMav = base.mavMax * smallFactor * objectiveFactor * enduranceFactor * painFactor;
+  const rawMrv = base.mrv * smallFactor * objectiveFactor * enduranceFactor * painFactor;
+  const technicalMinimum = objectiveFactor <= 0.5 ? (isSmallGroup(group) ? 3 : 4) : (isSmallGroup(group) ? 4 : 6);
+  const hardCap = Math.min(
+    VOLUME_RULES.hardCapWithoutJustification,
+    isSmallGroup(group) ? Math.ceil(VOLUME_RULES.hardCapWithoutJustification * VOLUME_RULES.smallGroupFactor) : VOLUME_RULES.hardCapWithoutJustification,
+  );
+  return {
+    mev: Math.max(technicalMinimum, Math.round(rawMev)),
+    mavMin: Math.max(technicalMinimum, Math.round(base.mavMin * smallFactor * objectiveFactor * enduranceFactor * painFactor)),
+    mavMax: Math.max(technicalMinimum, Math.round(rawMav)),
+    mrv: Math.max(technicalMinimum, Math.min(hardCap, Math.round(rawMrv))),
+    isSmall: isSmallGroup(group),
+  };
 }
 
 export function targetVolumeRange(input: PrescriptionInput, preset: MethodologyPreset) {
@@ -38,18 +90,18 @@ export function countWeeklySets(program: Pick<TrainingProgram, "workouts">) {
 }
 
 export function reviewVolume(program: Pick<TrainingProgram, "workouts">, input: PrescriptionInput, preset: MethodologyPreset): VolumeReview[] {
-  const range = targetVolumeRange(input, preset);
   const counts = countWeeklySets(program);
   const groups = new Set([...IMPORTANT_GROUPS, ...counts.keys()]);
   return [...groups].map((muscle_group) => {
+    const range = getVolumeRangeForGroup(muscle_group, input.fitnessLevel, input);
     const weekly_sets = Math.round((counts.get(muscle_group) || 0) * 10) / 10;
-    const status = weekly_sets === 0 || weekly_sets < Math.max(4, range.min - 2) ? "baixo" : weekly_sets > range.max ? "alto" : "ok";
+    const status = weekly_sets === 0 || weekly_sets < Math.max(3, range.mev - 2) ? "baixo" : weekly_sets > range.mrv ? "alto" : "ok";
     return {
       muscle_group,
       weekly_sets,
       status,
       note: status === "alto"
-        ? `Acima do limite conservador (${range.max}) para o contexto.`
+        ? `Acima do MRV conservador (${range.mrv}) para o contexto.`
         : status === "baixo"
           ? "Volume baixo ou ausente; revisar se este grupo deveria entrar no ciclo."
           : "Volume dentro da faixa planejada.",

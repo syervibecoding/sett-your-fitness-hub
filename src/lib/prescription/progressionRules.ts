@@ -1,5 +1,6 @@
 import { normalizeText } from "./presets";
 import type { PeriodizationBlock, PrescriptionInput } from "./types";
+import { DELOAD_RULES, PROGRESSION_BLOCKS } from "./methodology";
 
 export function hasPainContext(input: PrescriptionInput) {
   return /(dor|lesao|joelho|lombar|ombro|eva\s*[4-9]|valgo|butt)/.test(normalizeText({
@@ -7,6 +8,10 @@ export function hasPainContext(input: PrescriptionInput) {
     assessment: input.assessmentContext,
     anamnese: input.anamneseContext,
   }));
+}
+
+export function shouldHoldProgression(input: PrescriptionInput) {
+  return hasPainContext(input) || Boolean(input.techniqueBreakdown);
 }
 
 export function resolveDurationWeeks(input: PrescriptionInput) {
@@ -19,6 +24,7 @@ export function buildPeriodizationBlocks(input: PrescriptionInput): Periodizatio
   const level = normalizeText(input.fitnessLevel);
   const pain = hasPainContext(input);
   const advancedAllowed = !pain && !level.includes("inic");
+  const hold = shouldHoldProgression(input);
 
   if (duration === 4) {
     return [
@@ -28,14 +34,21 @@ export function buildPeriodizationBlocks(input: PrescriptionInput): Periodizatio
   }
 
   return [
-    { weeks: "1-2", stimulus: "adaptacao/base tecnica", methods: ["sem metodos avancados", "tempo controlado"], progression_rule: "Aumentar reps dentro da faixa mantendo RIR 3-4 e dor <= 3." },
-    { weeks: "3-4", stimulus: "progressao", methods: ["progressao dupla", "aumento discreto de series se tolerado"], progression_rule: "Aumentar 1 serie em exercicios estaveis ou carga leve se tecnica estiver limpa." },
-    { weeks: "5-6", stimulus: "intensificacao controlada", methods: advancedAllowed ? ["up-set ou piramide leve em exercicio estavel"] : ["sem metodos avancados"], progression_rule: "Consolidar cargas, evitar falha e preparar reavaliacao." },
+    { weeks: PROGRESSION_BLOCKS.base.weeks, stimulus: PROGRESSION_BLOCKS.base.stimulus, methods: [...PROGRESSION_BLOCKS.base.methods], progression_rule: "RIR 3-4. Se RIR acima do alvo: subir reps; se bateu topo com RIR alvo: subir carga e voltar ao piso. Sem pliometria." },
+    { weeks: PROGRESSION_BLOCKS.accumulation.weeks, stimulus: PROGRESSION_BLOCKS.accumulation.stimulus, methods: hold ? ["hold/regress por dor ou técnica"] : [...PROGRESSION_BLOCKS.accumulation.methods], progression_rule: hold ? "RIR 2-3. Dor > 3 ou técnica quebrou: manter/regredir." : "RIR 2-3. Adicionar reps antes de carga; +1 série apenas em exercício estável e sem dor." },
+    { weeks: PROGRESSION_BLOCKS.intensification.weeks, stimulus: PROGRESSION_BLOCKS.intensification.stimulus, methods: advancedAllowed && !hold ? ["up-set ou piramide leve em exercicio estavel"] : ["sem metodos avancados"], progression_rule: hold ? "RIR 2. Manter ou regredir até dor <= 3 e técnica estável." : "RIR 2; método avançado só em exercício estável e sem dor." },
   ];
 }
 
 export function progressionProtocol(input: PrescriptionInput) {
+  if (input.deload) return `Deload: reduzir volume 40-50%, RIR ${DELOAD_RULES.rir}, sem falha e sem método avançado.`;
+  if (shouldHoldProgression(input)) return "Dor > 3 ou técnica quebrou: hold/regress. Sem método avançado, sem pliometria e sem falha.";
   return hasPainContext(input)
     ? "Progredir reps antes de carga; regredir amplitude/carga se dor > 3 ou perda técnica. Métodos avançados bloqueados."
     : "Progredir reps antes de carga; usar métodos avançados apenas no bloco final e em padrões estáveis.";
+}
+
+export function deloadAdjustSets(sets: number, input: PrescriptionInput) {
+  if (!input.deload) return sets;
+  return Math.max(1, Math.round(sets * DELOAD_RULES.volumeReduction));
 }

@@ -9,6 +9,7 @@ export interface ExercisePickRequest {
   equipment?: unknown;
   fitnessLevel?: unknown;
   preferredMuscleGroup?: string;
+  preferredPattern?: string;
 }
 
 function exerciseText(exercise: ExerciseCatalogEntry) {
@@ -20,6 +21,7 @@ function exerciseText(exercise: ExerciseCatalogEntry) {
     exercise.equipment,
     exercise.targets?.map((target) => `${target.muscle_group} ${target.role ?? ""}`).join(" "),
     exercise.pain_limitation_tags?.join(" "),
+    exercise.movement_pattern,
   ].join(" "));
 }
 
@@ -45,15 +47,17 @@ export function scoreExercise(exercise: ExerciseCatalogEntry, request: ExerciseP
   }
 
   if (request.preferredMuscleGroup && normalizeText(exercise.muscle_group).includes(normalizeText(request.preferredMuscleGroup))) score += 4;
+  if (request.preferredPattern && text.includes(normalizeText(request.preferredPattern))) score += 4;
   if (equipment && text.includes(equipment)) score += 2;
   if (level.includes("inic") && /avanc|complex|olimp|snatch|clean|salto/.test(text)) score -= 5;
   if (request.usedIds?.has(exercise.id)) score -= 4;
 
   for (const rule of request.restrictions || []) {
     if (!rule.active) continue;
-    if (rule.preferKeywords.some((keyword) => text.includes(normalizeText(keyword)))) score += 4;
+    if (rule.preferKeywords.some((keyword) => text.includes(normalizeText(keyword)))) score += rule.severity === "severa" ? 8 : 4;
     if (rule.avoidKeywords.some((keyword) => text.includes(normalizeText(keyword)) || meta.includes(normalizeText(keyword)))) score -= 9;
     if (rule.affectedRegions.some((region) => meta.includes(normalizeText(region)))) score -= 6;
+    if (rule.severity === "severa" && rule.avoidKeywords.some((keyword) => text.includes(normalizeText(keyword)))) score -= 20;
   }
 
   return score;
@@ -61,6 +65,14 @@ export function scoreExercise(exercise: ExerciseCatalogEntry, request: ExerciseP
 
 export function pickCatalogExercise(request: ExercisePickRequest): ExerciseCatalogEntry | null {
   if (!request.catalog.length) return null;
+  const equivalentIds = new Set(
+    request.catalog
+      .filter((exercise) => request.keywords.some((keyword) => exerciseText(exercise).includes(normalizeText(keyword))))
+      .flatMap((exercise) => exercise.equivalent_substitutes || []),
+  );
+  const equivalent = request.catalog.find((exercise) => equivalentIds.has(exercise.id) && !request.usedIds?.has(exercise.id));
+  if (equivalent) return equivalent;
+
   const ranked = request.catalog
     .map((exercise) => ({ exercise, score: scoreExercise(exercise, request) }))
     .sort((a, b) => b.score - a.score);
@@ -69,7 +81,8 @@ export function pickCatalogExercise(request: ExercisePickRequest): ExerciseCatal
   if (notUsed) return notUsed.exercise;
   const acceptable = ranked.find((item) => item.score > -8);
   if (acceptable) return acceptable.exercise;
-  return request.catalog.find((exercise) => !request.usedIds?.has(exercise.id)) || request.catalog[0];
+  const fallback = request.catalog.find((exercise) => !request.usedIds?.has(exercise.id)) || request.catalog[0];
+  return fallback || null;
 }
 
 export function safeExerciseName(exercise: ExerciseCatalogEntry | null) {

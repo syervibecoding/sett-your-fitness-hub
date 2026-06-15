@@ -30,6 +30,7 @@ export interface ExerciseCatalogEntry {
   equivalent_substitutes?: string[];
   pain_limitation_tags?: string[];
   targets?: ExerciseTarget[];
+  movement_pattern?: string | null;
 }
 
 export interface PrescriptionInput {
@@ -47,6 +48,9 @@ export interface PrescriptionInput {
   runningDaysContext?: { days_per_week?: number | string | null; sport?: string | null } | null;
   blockNumber?: number | string | null;
   notes?: unknown;
+  painEva?: number | string | null;
+  techniqueBreakdown?: boolean;
+  deload?: boolean;
   catalog: ExerciseCatalogEntry[];
 }
 
@@ -70,6 +74,10 @@ export interface RestrictionRule {
   volumeMultiplier?: number;
   recommendation: string;
   explanationCode: string;
+  severity?: "leve" | "moderada" | "severa";
+  region?: "joelho" | "lombar" | "ombro" | "global";
+  removePattern?: boolean;
+  alertTeacher?: boolean;
 }
 
 export interface TrainingExercise {
@@ -132,11 +140,13 @@ export interface PrescriptionValidationResult {
 }
 
 export interface PrescriptionExplanation {
-  code: string;
-  title: string;
+  rule_id: string;
+  category: "seguranca" | "priorizacao" | "nivel" | "volume" | "substituicao" | "progressao" | "deload";
+  source: "anamnese" | "avaliacao_funcional" | "biblioteca" | "nivel" | "objetivo" | "feedback_aluno" | "validador";
+  target: string;
+  action: string;
   reason: string;
-  applied_to?: string[];
-  source: ValidationSource | "engine";
+  severity?: "leve" | "moderada" | "severa";
 }
 
 export interface PeriodizationBlock {
