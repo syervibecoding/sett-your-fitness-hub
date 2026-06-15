@@ -1,0 +1,273 @@
+import { pickCatalogExercise } from "./exerciseScoring";
+import { correctionsToExplanations, enduranceExplanation, explanationsFromRestrictions, progressionExplanation } from "./explanations";
+import { normalizeText, selectMethodologyPreset } from "./presets";
+import { buildPeriodizationBlocks, hasPainContext, progressionProtocol, resolveDurationWeeks } from "./progressionRules";
+import { deriveRestrictionRules } from "./restrictionRules";
+import { validateTrainingProgram } from "./validator";
+import type {
+  ExerciseCatalogEntry,
+  PrescriptionInput,
+  TrainingExercise,
+  TrainingProgram,
+  TrainingWorkout,
+  ValidationCorrection,
+} from "./types";
+
+type ExerciseSpec = {
+  phase: string;
+  keywords: string[];
+  sets: number;
+  reps: string;
+  rest: number;
+  rir: string;
+  cue: string;
+  note: string;
+  tempo?: string;
+  preferredMuscleGroup?: string;
+};
+
+function clean(value: unknown) {
+  return String(value || "").replace(/[^\x20-\x7E\u00C0-\u017F]/g, "");
+}
+
+function clampDays(days: unknown) {
+  return Math.min(5, Math.max(2, Number(days) || 3));
+}
+
+function normalizeCatalog(catalog: ExerciseCatalogEntry[] = []) {
+  return catalog.filter((exercise) => exercise?.id && exercise?.name).map((exercise) => ({
+    ...exercise,
+    contraindications: exercise.contraindications || [],
+    regressions: exercise.regressions || [],
+    progressions: exercise.progressions || [],
+    equivalent_substitutes: exercise.equivalent_substitutes || [],
+    pain_limitation_tags: exercise.pain_limitation_tags || [],
+    targets: exercise.targets || [],
+  }));
+}
+
+function distributeDays(count: number) {
+  if (count <= 2) return [1, 4];
+  if (count === 3) return [1, 3, 5];
+  if (count === 4) return [1, 2, 4, 5];
+  return [1, 2, 3, 5, 6];
+}
+
+function exerciseToTrainingExercise(exercise: ExerciseCatalogEntry, spec: ExerciseSpec, order: number): TrainingExercise {
+  return {
+    phase: spec.phase,
+    exercise_id: exercise.id,
+    exercise_name: exercise.name,
+    library_exercise_name: exercise.name,
+    muscle_group: exercise.muscle_group || exercise.targets?.[0]?.muscle_group || spec.preferredMuscleGroup || "geral",
+    sets: spec.sets,
+    reps: spec.reps,
+    load_percent_1rm: null,
+    rir: spec.rir,
+    rest_seconds: spec.rest,
+    tempo: spec.tempo || "3010",
+    exercise_order: order,
+    cues: spec.cue,
+    biomechanical_note: spec.note,
+    regression: exercise.regressions?.[0] || "Reduzir amplitude/carga e manter dor <= 3.",
+    progression: exercise.progressions?.[0] || "Progredir reps antes de carga, mantendo técnica.",
+  };
+}
+
+function selectExercises(input: PrescriptionInput, specs: ExerciseSpec[], usedIds: Set<string>) {
+  const catalog = normalizeCatalog(input.catalog);
+  const restrictions = deriveRestrictionRules(input);
+  const gaps: string[] = [];
+  const exercises: TrainingExercise[] = [];
+
+  specs.forEach((spec, index) => {
+    const exercise = pickCatalogExercise({
+      catalog,
+      keywords: spec.keywords,
+      usedIds,
+      restrictions,
+      equipment: input.equipment,
+      fitnessLevel: input.fitnessLevel,
+      preferredMuscleGroup: spec.preferredMuscleGroup,
+    });
+    if (!exercise) {
+      gaps.push(`Sem exercício cadastrado para fase ${spec.phase}: ${spec.keywords.join("/")}`);
+      return;
+    }
+    usedIds.add(exercise.id);
+    exercises.push(exerciseToTrainingExercise(exercise, spec, index + 1));
+  });
+
+  return { exercises, gaps };
+}
+
+function lowerWorkoutSpecs(input: PrescriptionInput): ExerciseSpec[] {
+  const text = normalizeText(input);
+  const knee = /joelho|valgo/.test(text);
+  const back = /lombar|butt|retrovers/.test(text);
+  const sets = input.isEnduranceAthlete || input.runningDaysContext ? 2 : 3;
+  return [
+    { phase: "mobilidade", keywords: ["mobilidade tornozelo quadril", "tornozelo", "quadril", "alongamento"], preferredMuscleGroup: "mobilidade", sets: 2, reps: "8-10", rest: 30, rir: "4", cue: "Amplitude sem dor e respiração calma.", note: knee ? "Preparar tornozelo/quadril para reduzir estresse no joelho." : "Preparar amplitude antes da força." },
+    { phase: "ativacao_core", keywords: ["prancha", "dead bug", "core", "pallof"], preferredMuscleGroup: "core", sets: 2, reps: "20-30s", rest: 45, rir: "3-4", cue: "Trave costelas e pelve, sem prender o ar.", note: "Aumenta estabilidade lombo-pélvica antes da carga." },
+    { phase: "ativacao_especifica", keywords: ["gluteo medio", "gluteo", "abducao", "mini band"], preferredMuscleGroup: "gluteos", sets: 2, reps: "12-15", rest: 45, rir: "3", cue: "Joelho alinhado ao pé, sem colapsar.", note: knee ? "Prioriza controle de valgo dinâmico." : "Ativa quadril para padrões de agachar." },
+    { phase: "controle_motor", keywords: ["agachamento", "goblet", "squat", "caixa"], preferredMuscleGroup: "quadriceps", sets: 2, reps: "8-10", rest: 60, rir: "3-4", cue: "Desça até onde mantém pelve e joelho alinhados.", note: back ? "Limitar amplitude para manter coluna neutra." : "Reforça padrão técnico antes de carga." },
+    { phase: "forca_global", keywords: back ? ["leg press", "hack", "maquina", "agachamento"] : ["agachamento", "leg press", "goblet", "squat"], preferredMuscleGroup: "quadriceps", sets, reps: "8-10", rest: 90, rir: "2-3", cue: "Empurre o chão sem perder alinhamento.", note: "Força global com margem de segurança." },
+    { phase: "forca_especifica", keywords: ["posterior", "mesa flexora", "isquiotibiais", "gluteo"], preferredMuscleGroup: "posterior", sets: 2, reps: "10-12", rest: 75, rir: "2-3", cue: "Controle a volta e evite compensar lombar.", note: "Equilibra cadeia posterior para proteger joelho/quadril." },
+  ];
+}
+
+function upperWorkoutSpecs(input: PrescriptionInput): ExerciseSpec[] {
+  const shoulder = /ombro|overhead|cifose|protrus/.test(normalizeText(input));
+  return [
+    { phase: "mobilidade", keywords: ["mobilidade toracica", "ombro", "shoulder", "toracica"], preferredMuscleGroup: "ombros", sets: 2, reps: "8-10", rest: 30, rir: "4", cue: "Movimento suave, sem forçar amplitude.", note: "Prepara ombro e coluna torácica para membros superiores." },
+    { phase: "ativacao_core", keywords: ["pallof", "prancha", "core", "dead bug"], preferredMuscleGroup: "core", sets: 2, reps: "20-30s", rest: 45, rir: "3-4", cue: "Mantenha tronco estável.", note: "Estabilidade para puxadas e empurradas." },
+    { phase: "ativacao_especifica", keywords: ["escapula", "face pull", "rotador", "manguito"], preferredMuscleGroup: "ombros", sets: 2, reps: "12-15", rest: 45, rir: "3", cue: "Ombros longe das orelhas.", note: shoulder ? "Prioriza controle escapular antes de empurrar." : "Melhora controle escapular." },
+    { phase: "controle_motor", keywords: ["remada", "row", "puxada"], preferredMuscleGroup: "costas", sets: 2, reps: "10", rest: 60, rir: "3", cue: "Puxe com cotovelos, sem jogar tronco.", note: "Ensina trajetória e controle escapular." },
+    { phase: "forca_global", keywords: shoulder ? ["supino maquina", "press maquina", "pegada neutra"] : ["supino", "press", "empurrar", "chest"], preferredMuscleGroup: "peitoral", sets: 3, reps: "8-10", rest: 90, rir: "2-3", cue: "Escápulas firmes e punho neutro.", note: "Empurrar global com controle." },
+    { phase: "forca_especifica", keywords: ["remada", "puxada", "costas", "dorsal"], preferredMuscleGroup: "costas", sets: 3, reps: "8-12", rest: 90, rir: "2-3", cue: "Controle a volta sem perder postura.", note: "Equilibra ombro e postura." },
+  ];
+}
+
+function fullBodySpecs(input: PrescriptionInput): ExerciseSpec[] {
+  const knee = /joelho|valgo/.test(normalizeText(input));
+  const back = /lombar|butt|retrovers/.test(normalizeText(input));
+  return [
+    { phase: "mobilidade", keywords: ["mobilidade quadril", "tornozelo", "alongamento"], preferredMuscleGroup: "mobilidade", sets: 2, reps: "8-10", rest: 30, rir: "4", cue: "Busque amplitude confortável.", note: "Abre movimento antes do unilateral." },
+    { phase: "ativacao_core", keywords: ["bird dog", "perdigueiro", "core", "prancha"], preferredMuscleGroup: "core", sets: 2, reps: "8-10 por lado", rest: 45, rir: "3-4", cue: "Quadril parado e coluna neutra.", note: "Controle anti-rotação." },
+    { phase: "controle_motor", keywords: ["afundo", "lunge", "step", "unilateral"], preferredMuscleGroup: "gluteos", sets: 2, reps: "8 por lado", rest: 60, rir: "3-4", cue: "Joelho acompanha o pé.", note: knee ? "Usar amplitude curta e sem dor." : "Integra equilíbrio e controle." },
+    { phase: "forca_global", keywords: back ? ["hip thrust", "gluteo", "ponte"] : ["terra romeno", "rdl", "levantamento", "hip hinge"], preferredMuscleGroup: "posterior", sets: 3, reps: "8-10", rest: 90, rir: "2-3", cue: "Dobre quadril sem arredondar lombar.", note: "Fortalece cadeia posterior com controle." },
+    { phase: "forca_global", keywords: ["remada", "puxada", "costas"], preferredMuscleGroup: "costas", sets: 3, reps: "10-12", rest: 75, rir: "2-3", cue: "Postura alta e controle de escápulas.", note: "Complementa postura e tronco." },
+    { phase: "forca_especifica", keywords: ["panturrilha", "calf", "abdomen", "core"], preferredMuscleGroup: "core", sets: 2, reps: "12-15", rest: 60, rir: "2-3", cue: "Controle total da fase excêntrica.", note: "Acessório leve para suporte do ciclo." },
+  ];
+}
+
+function splitTemplates(input: PrescriptionInput): Array<{ name: string; focus: string; specs: ExerciseSpec[] }> {
+  const days = clampDays(input.daysPerWeek);
+  const base = [
+    { name: "Treino A - Base tecnica de membros inferiores", focus: "mobilidade, core, controle de quadril e força global leve", specs: lowerWorkoutSpecs(input) },
+    { name: "Treino B - Postura, puxar e empurrar", focus: "mobilidade torácica, escápula, puxar e empurrar técnico", specs: upperWorkoutSpecs(input) },
+    { name: "Treino C - Corpo inteiro e unilateral leve", focus: "integração full body, unilateral e acessórios", specs: fullBodySpecs(input) },
+    { name: "Treino D - Superior e core complementar", focus: "costas, peitoral técnico, ombro saudável e core", specs: upperWorkoutSpecs(input).map((spec) => ({ ...spec, sets: Math.min(spec.sets, 2) })) },
+    { name: "Treino E - Inferior posterior leve", focus: "cadeia posterior, glúteos e estabilidade", specs: fullBodySpecs(input).map((spec) => ({ ...spec, sets: Math.min(spec.sets, 2) })) },
+  ];
+  return base.slice(0, days);
+}
+
+function buildWorkouts(input: PrescriptionInput) {
+  const usedIds = new Set<string>();
+  const daySlots = distributeDays(clampDays(input.daysPerWeek));
+  const gaps: string[] = [];
+  const workouts: TrainingWorkout[] = splitTemplates(input).map((template, index) => {
+    const picked = selectExercises(input, template.specs, usedIds);
+    gaps.push(...picked.gaps);
+    return {
+      name: template.name,
+      day_of_week: daySlots[index] || index + 1,
+      duration_min: 50,
+      split_focus: template.focus,
+      exercises: picked.exercises,
+      volume_load_estimate: input.isEnduranceAthlete || input.runningDaysContext
+        ? "Conservador; volume de MMII reduzido por endurance; usar RIR 2-3."
+        : "Conservador; usar RIR 2-4 e dor <= 3.",
+      notes: "Gerado pelo BN Prescription Engine v1. Revisar casos clínicos complexos antes de publicar.",
+    };
+  });
+  return { workouts, gaps };
+}
+
+function applySimpleCorrections(program: TrainingProgram, input: PrescriptionInput) {
+  const corrections: ValidationCorrection[] = [];
+  const level = normalizeText(input.fitnessLevel);
+  if (hasPainContext(input) || level.includes("inic")) {
+    const before = JSON.stringify(program.periodization_blocks);
+    program.periodization_blocks = program.periodization_blocks.map((block) => ({
+      ...block,
+      methods: block.methods.filter((method) => !/(drop|cluster|piramide|up-set|rest)/.test(normalizeText(method))).concat(block.methods.some((method) => /avancado|piramide|up-set|drop|cluster/.test(normalizeText(method))) ? ["sem metodos avancados"] : []),
+    }));
+    if (before !== JSON.stringify(program.periodization_blocks)) {
+      corrections.push({
+        code: "removed_advanced_methods",
+        message: "Removi métodos avançados por nível iniciante ou contexto de dor/restrição.",
+        applied: true,
+        source: "nivel",
+      });
+    }
+  }
+  return corrections;
+}
+
+export function generateTrainingProgram(input: PrescriptionInput): TrainingProgram {
+  const normalizedInput: PrescriptionInput = {
+    ...input,
+    catalog: normalizeCatalog(input.catalog),
+    daysPerWeek: clampDays(input.daysPerWeek),
+    durationWeeks: resolveDurationWeeks(input),
+  };
+  const preset = selectMethodologyPreset(normalizedInput);
+  const restrictions = deriveRestrictionRules(normalizedInput);
+  const durationWeeks = resolveDurationWeeks(normalizedInput);
+  const { workouts, gaps } = buildWorkouts(normalizedInput);
+  const periodization = buildPeriodizationBlocks(normalizedInput);
+  const advancedAllowed = !hasPainContext(normalizedInput) && !normalizeText(normalizedInput.fitnessLevel).includes("inic");
+  const explanations = [
+    ...explanationsFromRestrictions(restrictions),
+    ...enduranceExplanation(Boolean(normalizedInput.isEnduranceAthlete || normalizedInput.runningDaysContext)),
+    progressionExplanation(advancedAllowed),
+  ];
+
+  const program: TrainingProgram = {
+    cycle_name: `Plano BN Engine - ${clean(normalizedInput.studentName || "Aluno")}`,
+    objective: clean(normalizedInput.objective || "base tecnica e consistencia"),
+    duration_weeks: durationWeeks,
+    block: "1",
+    methodology_preset: {
+      key: preset.key,
+      label: preset.label,
+      why_selected: "Selecionado por objetivo, nível, dias disponíveis, restrições e contexto de endurance.",
+      rules: preset,
+    },
+    generated_by: "bn_prescription_engine_v1",
+    biomechanical_notes: restrictions.length
+      ? restrictions.map((rule) => rule.recommendation).join(" ")
+      : "Plano técnico conservador com mobilidade, ativação, controle motor e força antes de métodos avançados.",
+    workouts,
+    library_policy: {
+      only_library_exercises: true,
+      catalog_count: normalizedInput.catalog.length,
+      gaps,
+    },
+    periodization_blocks: periodization,
+    weekly_structure: `${workouts.length} sessões/semana distribuídas em dias alternados quando possível.`,
+    progression_protocol: progressionProtocol(normalizedInput),
+    warnings: gaps.length ? ["Biblioteca incompleta para alguns padrões; nenhum exercício foi inventado."] : [],
+    validator: {
+      pre_save: {
+        status: "ok",
+        warnings: [],
+        corrections: [],
+        blockers: [],
+        volume_review: [],
+      },
+    },
+    explanations,
+    bnito_after_generation: {
+      intent: "notify_student_prescription_ready",
+      question_to_teacher: "Quer que eu avise o aluno que a prescrição foi feita?",
+      suggested_message: "Sua prescrição nova já está pronta no app. Comece leve, priorize técnica e me chame se quiser tirar dúvida de execução.",
+    },
+  };
+
+  const corrections = applySimpleCorrections(program, normalizedInput);
+  program.explanations.push(...correctionsToExplanations(corrections));
+  program.validator.pre_save = validateTrainingProgram({
+    program,
+    input: normalizedInput,
+    preset,
+    catalog: normalizedInput.catalog,
+    corrections,
+  });
+  program.library_policy.validation = {
+    valid: program.validator.pre_save.blockers.every((blocker) => blocker.code !== "exercise_outside_library" && blocker.code !== "empty_exercise_library"),
+  };
+  return program;
+}

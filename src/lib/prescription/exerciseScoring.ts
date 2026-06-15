@@ -1,0 +1,77 @@
+import { normalizeText } from "./presets";
+import type { ExerciseCatalogEntry, RestrictionRule } from "./types";
+
+export interface ExercisePickRequest {
+  catalog: ExerciseCatalogEntry[];
+  keywords: string[];
+  usedIds?: Set<string>;
+  restrictions?: RestrictionRule[];
+  equipment?: unknown;
+  fitnessLevel?: unknown;
+  preferredMuscleGroup?: string;
+}
+
+function exerciseText(exercise: ExerciseCatalogEntry) {
+  return normalizeText([
+    exercise.name,
+    exercise.description,
+    exercise.muscle_group,
+    exercise.difficulty,
+    exercise.equipment,
+    exercise.targets?.map((target) => `${target.muscle_group} ${target.role ?? ""}`).join(" "),
+    exercise.pain_limitation_tags?.join(" "),
+  ].join(" "));
+}
+
+function metadataText(exercise: ExerciseCatalogEntry) {
+  return normalizeText([
+    exercise.contraindications,
+    exercise.pain_limitation_tags,
+  ]);
+}
+
+export function scoreExercise(exercise: ExerciseCatalogEntry, request: ExercisePickRequest) {
+  const text = exerciseText(exercise);
+  const meta = metadataText(exercise);
+  const keywords = request.keywords.map(normalizeText).filter(Boolean);
+  const equipment = normalizeText(request.equipment);
+  const level = normalizeText(request.fitnessLevel);
+  let score = 0;
+
+  for (const keyword of keywords) {
+    if (text.includes(keyword)) score += 5;
+    const pieces = keyword.split(/\s+/).filter(Boolean);
+    score += pieces.filter((piece) => text.includes(piece)).length;
+  }
+
+  if (request.preferredMuscleGroup && normalizeText(exercise.muscle_group).includes(normalizeText(request.preferredMuscleGroup))) score += 4;
+  if (equipment && text.includes(equipment)) score += 2;
+  if (level.includes("inic") && /avanc|complex|olimp|snatch|clean|salto/.test(text)) score -= 5;
+  if (request.usedIds?.has(exercise.id)) score -= 4;
+
+  for (const rule of request.restrictions || []) {
+    if (!rule.active) continue;
+    if (rule.preferKeywords.some((keyword) => text.includes(normalizeText(keyword)))) score += 4;
+    if (rule.avoidKeywords.some((keyword) => text.includes(normalizeText(keyword)) || meta.includes(normalizeText(keyword)))) score -= 9;
+    if (rule.affectedRegions.some((region) => meta.includes(normalizeText(region)))) score -= 6;
+  }
+
+  return score;
+}
+
+export function pickCatalogExercise(request: ExercisePickRequest): ExerciseCatalogEntry | null {
+  if (!request.catalog.length) return null;
+  const ranked = request.catalog
+    .map((exercise) => ({ exercise, score: scoreExercise(exercise, request) }))
+    .sort((a, b) => b.score - a.score);
+
+  const notUsed = ranked.find((item) => item.score > -8 && !request.usedIds?.has(item.exercise.id));
+  if (notUsed) return notUsed.exercise;
+  const acceptable = ranked.find((item) => item.score > -8);
+  if (acceptable) return acceptable.exercise;
+  return request.catalog.find((exercise) => !request.usedIds?.has(exercise.id)) || request.catalog[0];
+}
+
+export function safeExerciseName(exercise: ExerciseCatalogEntry | null) {
+  return exercise?.name || "";
+}
