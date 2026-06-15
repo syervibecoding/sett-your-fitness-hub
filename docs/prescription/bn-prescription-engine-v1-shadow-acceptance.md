@@ -1,51 +1,56 @@
-# BN Prescription Engine v1 — Aceitação do Shadow Mode (B5/B6) + Hardening (B7)
+# BN Prescription Engine v1 — Aceitação do Shadow Mode (B5/B6) + Hardening/Contrato (B7)
 
 ## 1. Status
 
-**B5/B6 = `ACCEPT_WITH_NOTES`**
+- **B5/B6 = `ACCEPT_WITH_NOTES`**
+- **B7 (contract/hardening) = `ACCEPT_WITH_NOTES`**
 
-Shadow mode + feature flag implementados na edge `ai-prescribe-workout` com **default seguro OFF**.
-A lógica pura (parse da flag + comparação) vive em `_shared/prescription/shadow.ts` e é testada no
-Vitest; a parte que vive na edge Deno é coberta por **contract tests estáticos** (leitura do arquivo).
+Motivo:
+- Shadow mode implementado **atrás da flag** `PRESCRIPTION_ENGINE_V1`, **default off**.
+- **Resposta principal preservada** (`{ id, plan }` intocada) e `buildEmergencyFallbackPlan`/Anthropic intactos.
+- Logs em **`ai_decision_logs` sem migration** (`source='prescricao'` + `payload.kind='shadow_comparison'`).
+- **Contrato PDF/publicação/portal validado** depois (ORDEM 016) contra plano real do engine.
+- **`deno check` ainda pendente** (Deno indisponível na máquina; pendência Codex/CI).
 
-## 2. Commit auditado
+## 2. Commits auditados
 
-| Commit | Mensagem |
+| Commit | O quê |
 |---|---|
-| `b917bb2` | claude: add prescription engine shadow mode |
-
-Pré-condição **B2/B3/B4 confirmada**: adapters em `_shared/prescription/adapters/` commitados em
-`2cd4652` + testes em `a817b4f`.
+| `b917bb2` | claude: add prescription engine shadow mode (edge + `_shared/prescription/shadow.ts` + teste) |
+| `478967c` | claude: add prescription shadow acceptance tests (hardening, 20 checks) |
+| `f1c15bd` | claude: add prescription pdf/publish/portal contract tests |
+| `75b46dc` | claude: add prescription engine pre-deploy checklist |
+| `c7294c8` | claude: add prescription engine codex review package |
 
 ## 3. Comportamento da flag `PRESCRIPTION_ENGINE_V1`
 
-| Valor | Roda engine novo? | Altera a resposta `{id, plan}`? | Grava log shadow? | Pode ir para produção? |
-|---|---|---|---|---|
-| **off** | Não (nem importa) | Não | Não | **Sim** — é o estado atual/seguro |
-| **ausente** | Não | Não | Não | **Sim** (equivale a off) |
-| **inválida** | Não | Não | Não | **Sim** (resolve para off) |
-| **shadow** | Sim (em paralelo) | **Não** (resposta inalterada) | Sim (`ai_decision_logs`) | Só sob autorização (observação; **NOT_AUTHORIZED** agora) |
-| **on** | Sim (roda comparação) | **Não** (sem cutover nesta implementação) | Sim | **Não** — `NOT_AUTHORIZED` |
+| Valor | Roda engine novo? | Altera `{id, plan}`? | Grava log? | Pode ir p/ produção? | Observação |
+|---|---|---|---|---|---|
+| **ausente** | Não | Não | Não | **Sim** | Equivale a off (estado atual) |
+| **off** | Não (nem importa) | Não | Não | **Sim** | Default seguro |
+| **inválida** | Não | Não | Não | **Sim** | `resolveEngineFlag` → off |
+| **shadow** | Sim (paralelo) | **Não** | Sim | Só sob ordem | Observação/medição; engine só p/ log |
+| **on** | Sim (comparação) | **Não** (sem cutover) | Sim | **Não** | Reconhecido no código; cutover real NÃO implementado/autorizado |
 
-> `on` é reconhecido no código mas, por decisão de segurança desta fase, **não faz cutover** (não serve
-> o plano do engine). O ponto de cutover está comentado como etapa futura/autorizada.
+Regra: ausente/off/inválida = comportamento atual; shadow = paralelo sem alterar resposta; on = reconhecido,
+mas cutover continua **NOT_AUTHORIZED**.
 
-## 4. Matriz dos 20 testes/checks
+## 4. Matriz de checks (23)
 
 | # | Check | Tipo | Resultado |
 |---|---|---|---|
 | 1 | Flag ausente → off | Unit | ✅ PASS |
 | 2 | Flag inválida → off | Unit | ✅ PASS |
-| 3 | Flag off não chama engine novo | STATIC (edge) | ✅ engine só por `import(...)` dinâmico + guard de flag |
-| 4 | shadow monta comparação sem alterar plano principal | STATIC (edge) | ✅ `currentPlan: planJson`, resposta intocada |
+| 3 | Flag off não chama engine novo | STATIC (edge) | ✅ engine só via `import()` dinâmico + guard de flag |
+| 4 | shadow monta comparação sem alterar plano principal | STATIC (edge) | ✅ `currentPlan: planJson`; resposta intocada |
 | 5 | on reconhecida, mas não serve plano novo | Unit + STATIC | ✅ `resolveEngineFlag("on")="on"`; edge sem `plan: program`/`plan: output` |
-| 6 | Erro no shadow não quebra fluxo | STATIC (edge) | ✅ `catch (shadowError)` dedicado (best-effort log) |
+| 6 | Erro no shadow não quebra fluxo | STATIC (edge) | ✅ `catch (shadowError)` (log best-effort) |
 | 7 | Log usa source='prescricao' + kind='shadow_comparison' | Unit + STATIC | ✅ constantes + `source: shadow.SHADOW_LOG_SOURCE` |
 | 8 | Payload serializável em JSON | Unit | ✅ PASS |
-| 9 | Sem dados sensíveis desnecessários | Unit | ✅ nome/restrições/anamnese crus ausentes do payload |
-| 10 | Preserva blocker/handoff no resumo novo | Unit | ✅ EVA>5 → handoff_count 1 + blockers no resumo |
-| 11 | Mede missing_exercises | Unit | ✅ `[]` com catálogo completo; detecta quando id falta |
-| 12 | Mede safe_alternative_unavailable_count | Unit | ✅ ≥1 com catálogo sem substituto seguro |
+| 9 | Sem dados sensíveis desnecessários | Unit | ✅ nome/restrições/anamnese crus ausentes (sentinelas) |
+| 10 | Preserva blocker/handoff no resumo novo | Unit | ✅ EVA>5 → handoff_count 1 + blockers |
+| 11 | Mede missing_exercises | Unit | ✅ `[]` c/ catálogo completo; detecta quando falta id |
+| 12 | Mede safe_alternative_unavailable_count | Unit | ✅ ≥1 sem substituto seguro |
 | 13 | Mede volume_by_group_delta | Unit | ✅ objeto de deltas numéricos |
 | 14 | Mede timing_ms | Unit | ✅ PASS |
 | 15 | buildEmergencyFallbackPlan presente | STATIC (edge) | ✅ |
@@ -54,49 +59,64 @@ Pré-condição **B2/B3/B4 confirmada**: adapters em `_shared/prescription/adapt
 | 18 | Nenhum arquivo UI/PDF/publicação alterado | STATIC (git) | ✅ `b917bb2` = só edge + shadow.ts + teste |
 | 19 | Contrato de resposta continua `{ id, plan }` | STATIC (edge) | ✅ `JSON.stringify({ id: planId, plan: planJson })` |
 | 20 | off semanticamente igual ao anterior | STATIC (edge) | ✅ bloco guardado por flag; engine só carrega fora de off |
+| 21 | Contrato PDF/publicação/portal validado por teste real | Unit | ✅ ORDEM 016 (`contract-pdf-portal.test.ts`, 5 testes) |
+| 22 | Deploy não foi executado | Fato/git | ✅ nenhum deploy; só commits locais |
+| 23 | Flag ON não foi autorizada | Fato | ✅ default off em todo ambiente; sem cutover |
 
-**Total: 20/20** (11 unit PASS + 9 STATIC OK). Os STATIC cobrem o que o Vitest não roda (edge Deno),
-por leitura do arquivo — registrados como contract tests.
+**Total: 23/23.** Os STATIC cobrem a edge Deno (não executável no Vitest) por leitura do arquivo/git.
 
 ## 5. Logs de shadow
 
 - **Tabela:** `ai_decision_logs` (sem migration).
-- **`source = 'prescricao'`** — o `source` tem `CHECK IN ('prescricao','avaliacao','bnito')`; por isso
-  **não** se usa `source='prescricao_shadow'` (seria rejeitado pelo CHECK sem migration).
-- **Discriminador:** `payload.kind = 'shadow_comparison'`.
-- **Campos do payload:** `kind`, `engine` (`bn_prescription_engine_v1`), `mode` (`shadow|on`),
-  `old_engine_summary` {generated_by, split, workouts, status, blockers(códigos), warnings(códigos),
-  volume_by_group}, `new_engine_summary` {idem + blocked, handoff}, `diff` {split_changed,
-  volume_by_group_delta, blockers_delta, warnings_delta, missing_exercises, safe_alternative_unavailable_count,
-  handoff_count}, `timing_ms`, `created_by_edge: true`.
+- **`source = 'prescricao'`** + **`payload.kind = 'shadow_comparison'`**.
+- **Por que não `source='prescricao_shadow'`:** o `source` tem `CHECK IN ('prescricao','avaliacao','bnito')`
+  → um valor novo exigiria migration; o discriminador fica no `payload.kind` (sem migration).
+- **Payload mínimo esperado:**
+```json
+{
+  "kind": "shadow_comparison",
+  "engine": "bn_prescription_engine_v1",
+  "mode": "shadow",
+  "old_engine_summary": { "generated_by": "...", "split": "...", "workouts": 4, "status": "ok", "blockers": [], "warnings": [], "volume_by_group": {} },
+  "new_engine_summary": { "generated_by": "bn_prescription_engine_v1", "split": "...", "workouts": 4, "status": "ok", "blocked": false, "handoff": false, "blockers": [], "warnings": [], "volume_by_group": {} },
+  "diff": { "split_changed": true, "volume_by_group_delta": {}, "blockers_delta": 0, "warnings_delta": 0, "missing_exercises": [], "safe_alternative_unavailable_count": 0, "handoff_count": 0 },
+  "timing_ms": 7,
+  "created_by_edge": true
+}
+```
+- **Erro no shadow não quebra o fluxo principal:** todo o bloco está em `try/catch`; em falha, grava um log
+  de erro best-effort (também em `try/catch`), sem afetar a prescrição/retorno ao aluno.
 
-## 6. Segurança
+## 6. Contrato PDF/publicação/portal (ORDEM 016, `f1c15bd`)
 
-- **Erro no shadow não quebra o fluxo atual:** todo o bloco está em `try/catch`; falha apenas registra um
-  log best-effort (e o log de erro também é `try/catch`).
-- **O plano atual (IA/fallback) continua sendo o retorno ao aluno:** a resposta segue
-  `{ id: planId, plan: planJson }`, intocada.
-- **Blocker/handoff do engine novo ficam só no log:** entram em `new_engine_summary`/`diff`, nunca na resposta.
-- **Nenhum diagnóstico clínico é gerado:** o shadow apenas compara métricas; o handoff do engine é
-  representado como contagem/flag, sem texto clínico.
-- **Sem dados sensíveis desnecessários no payload:** só códigos de blocker/warning, contagens, split,
-  `generated_by`, volume por grupo e ids de exercício. Nome do aluno, restrições/anamnese crus **não** entram
-  (verificado por teste com sentinelas).
+Validado contra um **plano real do engine** (via output adapter), **sem alterar UI/PDF/publicação**:
+- **`buildWorkoutRows`**: gera linhas válidas pro app do aluno (cycle_id/company_id/sort_order; exercícios com
+  `exercise_id` da biblioteca, `exercise_name`, `sets/reps/rest/notes` como string) — contrato `StudentWorkoutExercise`.
+- **`mapStrengthExercise`**: mapeia `rest_seconds → "Ns"` e `cues → notes`.
+- **`generateStrengthPDF` / `generateAllPDFs`**: **rodam sem lançar**; **jsPDF renderiza** o PDF de musculação.
+- Conclusão: o **plano do engine é consumível** pelo PDF, pela publicação e pelo portal do aluno — contrato preservado.
 
-## 7. Limitações
+## 7. Segurança
 
-- **`deno check` pendente:** Deno indisponível localmente; a edge e o `shadow.ts` (imports Deno `.ts` +
-  dynamic import) **não** foram type-checados no runtime Deno. Rodar no Codex/CI.
-- **Shadow ainda não rodou em ambiente Supabase real** (flag off em todo ambiente).
-- **Sem amostra real de produção** para comparar engine × IA/fallback.
-- **`on` não faz cutover** por decisão desta fase.
-- **Performance real ainda não medida** (timing_ms só validado em teste unitário).
-- **Codex ainda não revisou** o shadow nem o hotfix `ee4bfbe`.
+- O **plano atual (IA/fallback) continua sendo o retorno ao aluno** em todos os modos desta fase.
+- **Blocker/handoff do engine novo ficam só no log** (em shadow), nunca na resposta.
+- **Nenhum diagnóstico clínico é gerado** — só métricas/contagens; handoff é flag/contagem.
+- **Sem dados sensíveis desnecessários no payload** (sentinelas de nome/restrições/anamnese ausentes — testado).
+- **`buildEmergencyFallbackPlan` preservado**; **Anthropic/OpenAI preservados**.
 
-## 8. Decisão
+## 8. Limitações
+
+- **`deno check` pendente** (Deno indisponível local) — validar edge + `_shared` no runtime Deno (Codex/CI).
+- **Shadow não rodou em ambiente Supabase real** (flag off em todo ambiente).
+- **Sem amostra real de produção** (engine × IA/fallback).
+- **Performance real não medida** (`timing_ms` só em teste unitário).
+- **Codex ainda não revisou** (pacote em `bn-prescription-engine-v1-codex-review-package.md`).
+- **Cutover não implementado** (`on` não serve o plano do engine).
+
+## 9. Decisão
 
 - **B5/B6 = `ACCEPT_WITH_NOTES`**
-- **B7 = concluído** (20/20 testes/checks passaram; build + 123 testes + tsc verdes).
-- **Cutover = `NOT_AUTHORIZED`**
+- **B7 = `ACCEPT_WITH_NOTES`**
+- **B8 / Cutover = `NOT_AUTHORIZED`**
 - **Deploy = `NOT_AUTHORIZED`**
-- **Flag ON = `NOT_AUTHORIZED`** (default permanece off em todo ambiente).
+- **Flag ON = `NOT_AUTHORIZED`** (default off em todo ambiente)
