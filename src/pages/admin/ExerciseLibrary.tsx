@@ -76,6 +76,10 @@ export default function ExerciseLibrary() {
   });
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  // Upload rápido/inline de vídeo por exercício (sem abrir o formulário de edição).
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const quickInputRef = useRef<HTMLInputElement>(null);
+  const quickExRef = useRef<Exercise | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Muscle targets state
@@ -323,6 +327,35 @@ export default function ExerciseLibrary() {
     return url;
   };
 
+  const triggerQuickUpload = (ex: Exercise) => {
+    quickExRef.current = ex;
+    quickInputRef.current?.click();
+  };
+
+  const onQuickUploadChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const ex = quickExRef.current;
+    e.target.value = "";
+    if (!file || !ex) return;
+    setUploadingId(ex.id);
+    try {
+      const uploadCompanyId = ex.is_global ? "global" : (ex.company_id || effectiveCompanyId || companyId || "unknown");
+      const ext = file.name.split(".").pop() || "mp4";
+      const filePath = `${uploadCompanyId}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("exercises-videos").upload(filePath, file);
+      if (upErr) { toast({ title: "Erro no upload", description: upErr.message, variant: "destructive" }); return; }
+      const { error: updErr } = await supabase.from("exercise_library").update({ video_path: filePath }).eq("id", ex.id);
+      if (updErr) { toast({ title: "Erro", description: updErr.message, variant: "destructive" }); return; }
+      if (ex.video_path) { try { await supabase.storage.from("exercises-videos").remove([ex.video_path]); } catch { /* ignore */ } }
+      toast({ title: "Vídeo enviado!", description: ex.name });
+      loadExercises();
+    } catch (err: any) {
+      toast({ title: "Erro no upload", description: err?.message || "Tente novamente", variant: "destructive" });
+    } finally {
+      setUploadingId(null);
+    }
+  };
+
   const openVideoForExercise = (ex: Exercise) => {
     if (ex.video_path) {
       setVideoModal({ type: "path", value: getStoragePublicUrl(ex.video_path) });
@@ -477,15 +510,22 @@ export default function ExerciseLibrary() {
                           })}
                       </div>
                     )}
-                    {(ex.video_path || ex.video_url) && (
+                    <div className="flex gap-1.5">
+                      {(ex.video_path || ex.video_url) && (
+                        <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => openVideoForExercise(ex)}>
+                          <Play className="h-3.5 w-3.5 mr-1" />Ver Vídeo
+                        </Button>
+                      )}
                       <Button
-                        variant="outline" size="sm"
-                        className="w-full text-xs"
-                        onClick={() => openVideoForExercise(ex)}
+                        variant="outline" size="sm" className="flex-1 text-xs"
+                        disabled={uploadingId === ex.id}
+                        onClick={() => triggerQuickUpload(ex)}
                       >
-                        <Play className="h-3.5 w-3.5 mr-1" />Ver Vídeo
+                        {uploadingId === ex.id
+                          ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />Enviando…</>
+                          : <><Upload className="h-3.5 w-3.5 mr-1" />{(ex.video_path || ex.video_url) ? "Trocar vídeo" : "Subir vídeo"}</>}
                       </Button>
-                    )}
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -493,6 +533,9 @@ export default function ExerciseLibrary() {
           </div>
         ))}
       </div>
+
+      {/* Input escondido do upload rápido/inline de vídeo por exercício */}
+      <input ref={quickInputRef} type="file" accept="video/*" className="hidden" onChange={onQuickUploadChange} />
 
       {/* Create/Edit Dialog */}
       <Dialog open={open} onOpenChange={(o) => { if (!o) resetForm(); else setOpen(true); }}>

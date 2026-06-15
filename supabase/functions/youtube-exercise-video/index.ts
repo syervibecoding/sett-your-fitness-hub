@@ -7,6 +7,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+// Opcional: se houver chave da YouTube Data API, usa a API (robusta) antes do scrape.
+const YOUTUBE_API_KEY = Deno.env.get("YOUTUBE_API_KEY") || "";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +23,20 @@ async function hasValidUser(req: Request): Promise<boolean> {
   const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { headers: { Authorization: auth } } });
   const { data, error } = await supa.auth.getClaims(auth.replace("Bearer ", ""));
   return !error && !!data?.claims?.sub;
+}
+
+// Robusto: YouTube Data API (precisa de YOUTUBE_API_KEY como secret). Retorna null se sem chave/erro.
+async function resolveViaApi(query: string): Promise<string | null> {
+  if (!YOUTUBE_API_KEY) return null;
+  try {
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=1&relevanceLanguage=pt&regionCode=BR&q=${encodeURIComponent(query)}&key=${YOUTUBE_API_KEY}`;
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data?.items?.[0]?.id?.videoId ?? null;
+  } catch (_e) {
+    return null;
+  }
 }
 
 async function resolveYoutubeId(query: string): Promise<string | null> {
@@ -60,8 +76,12 @@ serve(async (req) => {
 
     let videoId: string | null = null;
     try {
-      videoId = await resolveYoutubeId(`${resolvedName} execução técnica musculação`);
-      if (!videoId) videoId = await resolveYoutubeId(`${resolvedName} como fazer`);
+      const q1 = `${resolvedName} execução técnica musculação`;
+      // 1) API oficial (se houver chave) → robusta. 2) scrape como fallback.
+      videoId = (await resolveViaApi(q1))
+        || (await resolveYoutubeId(q1))
+        || (await resolveViaApi(`${resolvedName} como fazer`))
+        || (await resolveYoutubeId(`${resolvedName} como fazer`));
     } catch (_e) {
       videoId = null;
     }
