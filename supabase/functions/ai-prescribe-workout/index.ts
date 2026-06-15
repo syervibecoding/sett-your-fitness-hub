@@ -1343,6 +1343,71 @@ INSTRUÇÕES:
         || "Sua prescrição nova já está pronta no app. Dá uma olhada com calma e me chama por aqui se quiser tirar dúvida de execução.",
     };
 
+    // ── B5/B6 — Shadow mode + feature flag (PRESCRIPTION_ENGINE_V1) ─────────────
+    // Default OFF: undefined/off => comportamento 100% atual (este bloco nem roda).
+    // shadow/on: roda o BN Prescription Engine v1 EM PARALELO, só para LOG comparativo;
+    // NUNCA altera planJson nem a resposta {id, plan}. Cutover real do "on" (servir o plano
+    // do engine) é etapa separada e NÃO autorizada nesta ordem. Erros aqui nunca quebram a
+    // prescrição atual (try/catch que só loga). O engine só é importado atrás da flag.
+    const engineFlag = (Deno.env.get("PRESCRIPTION_ENGINE_V1") ?? "off").trim().toLowerCase();
+    if (engineFlag === "shadow" || engineFlag === "on") {
+      const shadowStart = Date.now();
+      try {
+        const [{ buildPrescriptionInputFromEdgePayload }, { adaptTrainingProgramForAiStrengthPlan }, { generateTrainingProgram }, shadow] = await Promise.all([
+          import("../_shared/prescription/adapters/inputAdapter.ts"),
+          import("../_shared/prescription/adapters/outputAdapter.ts"),
+          import("../_shared/prescription/engine.ts"),
+          import("../_shared/prescription/shadow.ts"),
+        ]);
+        const mode = shadow.resolveEngineFlag(engineFlag) === "on" ? "on" : "shadow";
+        const { input } = buildPrescriptionInputFromEdgePayload({
+          payload: {
+            student_name, objective, fitness_level, days_per_week, duration_weeks,
+            equipment, restrictions, block_number, is_endurance_athlete,
+            assessment_context, anamnese_context, prescription_integration,
+            running_days_context, notes,
+          },
+          catalog: exerciseCatalog.exercises as any,
+        });
+        const program = generateTrainingProgram(input);
+        const output = adaptTrainingProgramForAiStrengthPlan({ program });
+        const comparison = shadow.buildShadowComparison({
+          mode,
+          currentPlan: planJson,
+          currentValidation: preSaveValidation,
+          program,
+          output,
+          catalogIds: exerciseCatalog.exercises.map((e) => e.id),
+          timingMs: Date.now() - shadowStart,
+        });
+        await supabase.from("ai_decision_logs").insert({
+          student_id,
+          company_id: authorizedCompanyId,
+          source: shadow.SHADOW_LOG_SOURCE, // 'prescricao' (CHECK permite; discriminador no payload.kind)
+          summary: `Shadow ${mode}: engine ${output.status}; blockers ${output.blockers.length}; handoff ${output.handoff}; split_changed ${comparison.diff.split_changed}.`,
+          payload: comparison,
+        });
+      } catch (shadowError) {
+        // Erro no shadow NUNCA quebra a prescrição atual — só registra (best-effort).
+        try {
+          await supabase.from("ai_decision_logs").insert({
+            student_id,
+            company_id: authorizedCompanyId,
+            source: "prescricao",
+            summary: "Shadow comparison falhou (sem impacto na prescricao atual).",
+            payload: {
+              kind: "shadow_comparison",
+              engine: "bn_prescription_engine_v1",
+              mode: engineFlag,
+              error: shadowError instanceof Error ? shadowError.message : String(shadowError),
+              created_by_edge: true,
+            },
+          });
+        } catch (_logError) { /* swallow: log best-effort */ }
+      }
+    }
+    // ── fim B5/B6 ──────────────────────────────────────────────────────────────
+
     await writeAiDecisionLog(supabase, {
       student_id,
       company_id: authorizedCompanyId,
