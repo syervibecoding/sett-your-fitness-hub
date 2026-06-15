@@ -24,6 +24,7 @@
 | `9000d95` | codex: complete prescription engine qa coverage |
 | `2fd7dcf` | claude: audit bn prescription engine core |
 | `ee4bfbe` | claude: fix prescription pain progression gate |
+| `469ce66` | claude: plan prescription engine phase b |
 
 ---
 
@@ -78,12 +79,15 @@ Observação: `targetVolumeRange` em `volumeRules.ts` é código não utilizado 
 - **Revisão independente do Codex no hotfix** (`ee4bfbe`): dono da lane de IA/metodologia deve revisar.
 - **Divergência fallback ↔ engine**: definir fonte de verdade e plano de descontinuação de
   `buildEmergencyFallbackPlan` (não tocado nesta fase).
+- **Cutover em produção**: virar a flag do engine como gerador principal — etapa separada, só após
+  todos os gates da Fase B (ver `bn-prescription-engine-v1-phase-b-plan.md`, commit `469ce66`).
 
 ---
 
 ## 7. Decisão
 
 - **Fase A = `ACCEPT_PROVISIONAL`** (tecnicamente aceita após hotfix; sujeita à revisão do Codex).
-- **Fase B = `NOT_AUTHORIZED_FOR_CUTOVER`** (engine não promovido; sem acoplamento a edge/UI/PDF/publicação).
-- **Próxima etapa permitida = planejamento da Fase B, sem código de produção** (desenho de adapter,
-  shadow mode, mapeamento de contrato e plano de migração do fallback).
+- **Fase B = `PLANNED_ONLY`** (plano técnico documentado em `bn-prescription-engine-v1-phase-b-plan.md`
+  / commit `469ce66`; nenhuma implementação iniciada).
+- **Cutover = `NOT_AUTHORIZED`** (engine não promovido a gerador principal; sem acoplamento a edge/UI/PDF/publicação).
+- **Deploy = `NOT_AUTHORIZED`** (nenhum deploy de edge/Netlify autorizado nesta etapa).
