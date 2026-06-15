@@ -89,10 +89,15 @@ export const VOLUME_RULES = {
   largeGroups: {
     iniciante: { mev: 8, mavMin: 10, mavMax: 12, mrv: 12 },
     intermediario: { mev: 10, mavMin: 14, mavMax: 16, mrv: 16 },
-    avancado: { mev: 12, mavMin: 16, mavMax: 18, mrv: 16, justifiedMrv: 20 },
+    avancado: { mev: 12, mavMin: 16, mavMax: 16, mrv: 16 },
   },
   smallGroupFactor: 0.6,
   hardCapWithoutJustification: 16,
+  hardCapsByLevel: {
+    iniciante: 12,
+    intermediario: 16,
+    avancado: 16,
+  },
   painVolumeMultiplier: {
     leve: 1,
     moderada: 0.67,

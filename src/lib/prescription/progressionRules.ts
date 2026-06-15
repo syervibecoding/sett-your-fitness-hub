@@ -42,7 +42,7 @@ export function buildPeriodizationBlocks(input: PrescriptionInput): Periodizatio
 
 export function progressionProtocol(input: PrescriptionInput) {
   if (input.deload) return `Deload: reduzir volume 40-50%, RIR ${DELOAD_RULES.rir}, sem falha e sem método avançado.`;
-  if (shouldHoldProgression(input)) return "Dor > 3 ou técnica quebrou: hold/regress. Sem método avançado, sem pliometria e sem falha.";
+  if (shouldHoldProgression(input)) return "Progressao por tolerancia: dor > 3 ou técnica quebrou: hold/regress. Sem método avançado, sem pliometria e sem falha.";
   return hasPainContext(input)
     ? "Progredir reps antes de carga; regredir amplitude/carga se dor > 3 ou perda técnica. Métodos avançados bloqueados."
     : "Progredir reps antes de carga; usar métodos avançados apenas no bloco final e em padrões estáveis.";

@@ -20,12 +20,22 @@ function asSeverity(value: unknown): Severity {
 export function classifyPainSeverity(input: PrescriptionInput, region?: string): Severity {
   const text = normalizeText({
     restrictions: input.restrictions,
+    injuries: input.injuries,
+    painReports: input.painReports,
     anamnese: input.anamneseContext,
     integration: input.prescriptionIntegration,
     notes: input.notes,
   });
   const scoped = region ? `${region} ${text}` : text;
-  const eva = Number(input.painEva) || Number((input.anamneseContext as any)?.eva) || Number((input.anamneseContext as any)?.pain_eva) || 0;
+  const reportEva = Math.max(0, ...(input.painReports || [])
+    .filter((report) => !region || normalizeText(report.region).includes(normalizeText(region)) || text.includes(normalizeText(region)))
+    .map((report) => Number(report.eva) || 0));
+  const eva = Math.max(
+    Number(input.painEva) || 0,
+    Number((input.anamneseContext as any)?.eva) || 0,
+    Number((input.anamneseContext as any)?.pain_eva) || 0,
+    reportEva,
+  );
   if (eva > 5 || /eva\s*(6|7|8|9|10)|dor\s*(severa|grave|forte)/.test(scoped)) return "severa";
   if (eva >= 4 || /eva\s*(4|5)|dor\s*moder/.test(scoped)) return "moderada";
   return "leve";
@@ -132,6 +142,8 @@ export function getRestrictionRulesForRegion(input: PrescriptionInput, region: "
 export function deriveRestrictionRules(input: PrescriptionInput): RestrictionRule[] {
   const text = normalizeText({
     restrictions: input.restrictions,
+    injuries: input.injuries,
+    painReports: input.painReports,
     assessment: input.assessmentContext,
     anamnese: input.anamneseContext,
     integration: input.prescriptionIntegration,

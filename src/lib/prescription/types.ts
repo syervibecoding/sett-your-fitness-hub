@@ -41,11 +41,14 @@ export interface PrescriptionInput {
   durationWeeks?: number | string | null;
   equipment?: unknown;
   restrictions?: unknown;
+  injuries?: unknown;
+  painReports?: Array<{ region?: string; eva?: number | string | null; severity?: string | null }> | null;
   isEnduranceAthlete?: boolean;
   assessmentContext?: unknown;
   anamneseContext?: unknown;
   prescriptionIntegration?: unknown;
-  runningDaysContext?: { days_per_week?: number | string | null; sport?: string | null } | null;
+  runningDaysContext?: { days_per_week?: number | string | null; sport?: string | null; schedule?: unknown; sessions?: unknown[] } | null;
+  enduranceAgenda?: unknown;
   blockNumber?: number | string | null;
   notes?: unknown;
   painEva?: number | string | null;
@@ -157,6 +160,15 @@ export interface PeriodizationBlock {
 }
 
 export interface TrainingProgram {
+  schemaVersion: "bn-prescription-v1";
+  engineMeta: {
+    version: "v1";
+    generated_at: string;
+    requested_days: number;
+    structured_days: number;
+    split: string;
+    library_only: true;
+  };
   cycle_name: string;
   objective: string;
   duration_weeks: number;
@@ -183,6 +195,7 @@ export interface TrainingProgram {
   validator: {
     pre_save: PrescriptionValidationResult;
   };
+  validation: PrescriptionValidationResult;
   explanations: PrescriptionExplanation[];
   bnito_after_generation: {
     intent: "notify_student_prescription_ready";

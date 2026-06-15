@@ -55,9 +55,10 @@ export function getVolumeRangeForGroup(group: unknown, level: unknown, input?: P
   const rawMav = base.mavMax * smallFactor * objectiveFactor * enduranceFactor * painFactor;
   const rawMrv = base.mrv * smallFactor * objectiveFactor * enduranceFactor * painFactor;
   const technicalMinimum = objectiveFactor <= 0.5 ? (isSmallGroup(group) ? 3 : 4) : (isSmallGroup(group) ? 4 : 6);
+  const levelCap = VOLUME_RULES.hardCapsByLevel[normalizedLevel(level)];
   const hardCap = Math.min(
-    VOLUME_RULES.hardCapWithoutJustification,
-    isSmallGroup(group) ? Math.ceil(VOLUME_RULES.hardCapWithoutJustification * VOLUME_RULES.smallGroupFactor) : VOLUME_RULES.hardCapWithoutJustification,
+    levelCap,
+    isSmallGroup(group) ? Math.ceil(levelCap * VOLUME_RULES.smallGroupFactor) : levelCap,
   );
   return {
     mev: Math.max(technicalMinimum, Math.round(rawMev)),

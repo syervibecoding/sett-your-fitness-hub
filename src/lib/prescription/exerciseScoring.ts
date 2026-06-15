@@ -70,19 +70,18 @@ export function pickCatalogExercise(request: ExercisePickRequest): ExerciseCatal
       .filter((exercise) => request.keywords.some((keyword) => exerciseText(exercise).includes(normalizeText(keyword))))
       .flatMap((exercise) => exercise.equivalent_substitutes || []),
   );
-  const equivalent = request.catalog.find((exercise) => equivalentIds.has(exercise.id) && !request.usedIds?.has(exercise.id));
+  const equivalent = request.catalog.find((exercise) => equivalentIds.has(exercise.id) && !request.usedIds?.has(exercise.id) && scoreExercise(exercise, request) > 0);
   if (equivalent) return equivalent;
 
   const ranked = request.catalog
     .map((exercise) => ({ exercise, score: scoreExercise(exercise, request) }))
     .sort((a, b) => b.score - a.score);
 
-  const notUsed = ranked.find((item) => item.score > -8 && !request.usedIds?.has(item.exercise.id));
+  const notUsed = ranked.find((item) => item.score > 0 && !request.usedIds?.has(item.exercise.id));
   if (notUsed) return notUsed.exercise;
-  const acceptable = ranked.find((item) => item.score > -8);
+  const acceptable = ranked.find((item) => item.score > 0);
   if (acceptable) return acceptable.exercise;
-  const fallback = request.catalog.find((exercise) => !request.usedIds?.has(exercise.id)) || request.catalog[0];
-  return fallback || null;
+  return null;
 }
 
 export function safeExerciseName(exercise: ExerciseCatalogEntry | null) {

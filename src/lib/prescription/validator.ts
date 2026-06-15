@@ -1,5 +1,6 @@
 import { normalizeText } from "./presets";
 import { hasPainContext } from "./progressionRules";
+import { deriveRestrictionRules } from "./restrictionRules";
 import { IMPORTANT_GROUPS, reviewVolume } from "./volumeRules";
 import type {
   ExerciseCatalogEntry,
@@ -78,6 +79,39 @@ export function validateTrainingProgram(args: {
     });
   }
 
+  const blockerGaps = args.program.library_policy.gaps.filter((gap) => gap.startsWith("BLOCKER:safe_alternative_unavailable"));
+  for (const gap of blockerGaps) {
+    add({
+      severity: "blocker",
+      code: "safe_alternative_unavailable",
+      message: `Sem substituto seguro na biblioteca para padrão necessário (${gap.split(":").slice(2).join(" / ")}).`,
+      recommendation: "Cadastrar exercício seguro equivalente ou ajustar o plano manualmente antes de publicar.",
+      source: "biblioteca",
+    });
+  }
+
+  const optionalGaps = args.program.library_policy.gaps.filter((gap) => gap.startsWith("WARNING:"));
+  for (const gap of optionalGaps) {
+    add({
+      severity: "warning",
+      code: "no_optional_accessory_available",
+      message: `Acessório opcional não encontrado na biblioteca (${gap.split(":").slice(2).join(" / ")}).`,
+      recommendation: "Publicar só se o professor aceitar a ausência do acessório, ou cadastrar equivalente.",
+      source: "biblioteca",
+    });
+  }
+
+  const severeRestrictions = deriveRestrictionRules(args.input).filter((rule) => rule.severity === "severa" || rule.alertTeacher);
+  for (const rule of severeRestrictions) {
+    add({
+      severity: "blocker",
+      code: "high_pain_requires_professional_review",
+      message: `${rule.label}: severidade ${rule.severity}; prescrição automática precisa de revisão do professor.`,
+      recommendation: "Remover padrão doloroso, manter apenas estímulos seguros e revisar com profissional antes de liberar ao aluno.",
+      source: "anamnese",
+    });
+  }
+
   const volume_review = reviewVolume(args.program, args.input, args.preset);
   for (const review of volume_review) {
     if (review.status === "alto") {
@@ -140,6 +174,18 @@ export function validateTrainingProgram(args: {
       code: "endurance_lower_body_conflict",
       message: "Treino pesado de MMII pode conflitar com corrida/endurance no fim da semana.",
       recommendation: "Separar MMII pesado de longos/tiros e reduzir volume de pernas em cerca de 20%.",
+      source: "periodizacao",
+    });
+  }
+
+  const enduranceDays = Number(args.input.runningDaysContext?.days_per_week) || (args.input.isEnduranceAthlete ? 3 : 0);
+  const hasEnduranceAgenda = Boolean(args.input.enduranceAgenda || args.input.runningDaysContext?.schedule || args.input.runningDaysContext?.sessions?.length);
+  if (enduranceDays >= 3 && !hasEnduranceAgenda) {
+    add({
+      severity: "warning",
+      code: "endurance_agenda_missing",
+      message: "Aluno faz endurance >= 3x/semana, mas a agenda das sessões não foi informada.",
+      recommendation: "Confirmar dias de treino longo/tiro antes de posicionar MMII pesado.",
       source: "periodizacao",
     });
   }
