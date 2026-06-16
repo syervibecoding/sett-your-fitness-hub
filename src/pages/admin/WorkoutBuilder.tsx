@@ -15,6 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, BrainCircuit, Sparkles, MessageCircle, Loader2, AlertCircle } from "lucide-react";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
+import { useAssistantName } from "@/hooks/useAssistantName";
 import { BodyMap } from "@/components/body/BodyMap";
 import { regionForLibraryGroup, normalizeGender, BODY_REGION_LABELS, type BodyRegionId } from "@/lib/bodyMap";
 
@@ -131,6 +132,7 @@ export default function WorkoutBuilder() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const assistantName = useAssistantName();
   const muscleGroupsList = useMuscleGroups();
   const MUSCLE_GROUP_NAMES = muscleGroupsList.map(g => g.name);
 
@@ -325,7 +327,7 @@ export default function WorkoutBuilder() {
     if (blockerCount > 0 || validation.status === "blocked") {
       setSaving(false);
       toast({
-        title: "BNITO bloqueou o salvamento",
+        title: `${assistantName} bloqueou o salvamento`,
         description: "Resolva os pontos críticos do validador antes de salvar.",
         variant: "destructive",
       });
@@ -515,7 +517,7 @@ export default function WorkoutBuilder() {
 
   const callBnito = async (action: "review" | "ask") => {
     if (action === "ask" && !bnitoQuestion.trim()) {
-      toast({ title: "Digite uma pergunta para o BNITO", variant: "destructive" });
+      toast({ title: `Digite uma pergunta para o ${assistantName}`, variant: "destructive" });
       return;
     }
     setBnitoLoading(action);
@@ -536,16 +538,16 @@ export default function WorkoutBuilder() {
       });
 
       if (error) throw new Error(error.message);
-      if (!data) throw new Error("O BNITO não retornou dados.");
+      if (!data) throw new Error(`O ${assistantName} não retornou dados.`);
       if (data.error) throw new Error(data.details || data.error);
       setBnitoResponse(data);
       toast({
-        title: action === "review" ? "BNITO auditou o treino" : "BNITO respondeu",
+        title: action === "review" ? `${assistantName} auditou o treino` : `${assistantName} respondeu`,
         description: data.context_loaded?.has_anamnese ? "Contexto da anamnese carregado" : "Resposta gerada com o contexto disponível",
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro inesperado";
-      toast({ title: "Falha no BNITO", description: message, variant: "destructive" });
+      toast({ title: `Falha no ${assistantName}`, description: message, variant: "destructive" });
     } finally {
       setBnitoLoading(null);
     }
@@ -629,7 +631,7 @@ export default function WorkoutBuilder() {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => callBnito("review")} disabled={!!bnitoLoading}>
               {bnitoLoading === "review" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <BrainCircuit className="h-4 w-4 mr-2" />}
-              BNITO
+              {assistantName}
             </Button>
             <Button variant="outline" size="sm" onClick={() => setShowVolume(!showVolume)}>
               <BarChart3 className="h-4 w-4 mr-2" />Volume
@@ -905,7 +907,7 @@ export default function WorkoutBuilder() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-primary text-sm flex items-center gap-2">
                   <BrainCircuit className="h-4 w-4" />
-                  BNITO
+                  {assistantName}
                 </CardTitle>
                 <p className="text-xs text-muted-foreground font-sans">
                   Copiloto técnico para revisar o treino manual antes de salvar.
@@ -939,13 +941,13 @@ export default function WorkoutBuilder() {
                     disabled={!!bnitoLoading || !bnitoQuestion.trim()}
                   >
                     {bnitoLoading === "ask" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MessageCircle className="h-4 w-4 mr-2" />}
-                    Perguntar ao BNITO
+                    Perguntar ao {assistantName}
                   </Button>
                 </div>
 
                 {!bnitoResult ? (
                   <div className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground font-sans">
-                    O BNITO considera o rascunho atual, volume semanal, anamnese e avaliação funcional disponíveis.
+                    O {assistantName} considera o rascunho atual, volume semanal, anamnese e avaliação funcional disponíveis.
                   </div>
                 ) : (
                   <div className="space-y-3">

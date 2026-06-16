@@ -13,6 +13,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
+import { useCompanyAiConfig } from "@/lib/companyAiConfig";
 import {
   Loader2, Copy, CheckCircle2, Circle, AlertCircle, Send, Download, Wand2,
   Dumbbell, Activity, Waves, Bike, Apple, FileText,
@@ -50,6 +51,8 @@ export default function PrescriptionStudio() {
   const { user, companyId: authCompanyId, role, loading: authLoading } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
   const effectiveCompanyId = role === "master" ? (isViewingCompany ? viewingCompany?.id ?? null : null) : authCompanyId ?? null;
+  const { config: aiConfig } = useCompanyAiConfig(effectiveCompanyId);
+  const assistantName = aiConfig.assistant_name || "Setty";
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [students, setStudents]   = useState<{ id: string; name: string; email?: string | null }[]>([]);
@@ -630,7 +633,7 @@ export default function PrescriptionStudio() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
-                  Orquestração BNITO
+                  Orquestração {assistantName}
                   <Badge variant="outline" className="text-xs">6 semanas</Badge>
                   <BnitoContextButton
                     label="orquestracao BNITO"

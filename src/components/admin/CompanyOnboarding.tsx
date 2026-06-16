@@ -115,7 +115,7 @@ export default function CompanyOnboarding() {
         </div>
         <div className="space-y-1.5">
           <Label>Nome do seu assistente de IA</Label>
-          <Input value={form.assistant_name ?? ""} onChange={(e) => set("assistant_name", e.target.value)} placeholder="Ex: BNITO" />
+          <Input value={form.assistant_name ?? ""} onChange={(e) => set("assistant_name", e.target.value)} placeholder="Ex: Setty" />
           <p className="text-xs text-muted-foreground">Como o assistente se apresenta para você e seus alunos.</p>
         </div>
         <div className="space-y-1.5">

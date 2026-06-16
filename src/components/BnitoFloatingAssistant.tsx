@@ -1,8 +1,10 @@
-import { createContext, FormEvent, ReactNode, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, FormEvent, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { BrainCircuit, HelpCircle, Loader2, Send, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useMaster } from "@/contexts/MasterContext";
+import { useCompanyAiConfig } from "@/lib/companyAiConfig";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,6 +53,7 @@ type BnitoOpenOptions = {
 type BnitoAssistantContextValue = {
   isAvailable: boolean;
   openBnito: (options?: BnitoOpenOptions) => void;
+  assistantName: string;
 };
 
 type BnitoContextButtonProps = {
@@ -82,12 +85,15 @@ const quickPrompts = [
   },
 ];
 
-const firstMessage: BnitoMessage = {
-  id: "bnito-welcome",
-  role: "assistant",
-  content:
-    "Oi, professor. Eu sou o BNITO. Posso revisar volume, coerencia com objetivo, dor/restricao, avaliacao funcional e te devolver sugestoes tecnicas para voce aprovar.",
-};
+const WELCOME_ID = "bnito-welcome";
+// Nome do assistente vem da empresa (Central de IA). Padrão do app = "Setty".
+function makeWelcome(name: string): BnitoMessage {
+  return {
+    id: WELCOME_ID,
+    role: "assistant",
+    content: `Oi, professor. Eu sou o ${name}. Posso revisar volume, coerencia com objetivo, dor/restricao, avaliacao funcional e te devolver sugestoes tecnicas para voce aprovar.`,
+  };
+}
 
 function createMessage(role: BnitoMessage["role"], content: string): BnitoMessage {
   return {
@@ -117,10 +123,10 @@ function getPageLabel(pathname: string) {
   return "painel";
 }
 
-function formatBnitoResponse(data: BnitoResponse) {
+function formatBnitoResponse(data: BnitoResponse, name: string) {
   if (typeof data.result === "string") return data.result;
   const result = data.result;
-  if (!result) return data.raw || "BNITO respondeu, mas sem texto estruturado.";
+  if (!result) return data.raw || `${name} respondeu, mas sem texto estruturado.`;
 
   const base = result.answer || result.summary || "Analise tecnica gerada.";
   const suggestions = Array.isArray(result.suggestions)
@@ -139,21 +145,25 @@ function formatBnitoResponse(data: BnitoResponse) {
   return [base, ...suggestions, ...questions].filter(Boolean).join("\n\n");
 }
 
-function getUnavailableMessage(message: string) {
+function getUnavailableMessage(message: string, name: string) {
   if (/function|edge|404|403|fetch|non-2xx/i.test(message)) {
-    return "Nao consegui conectar com o BNITO agora. A interface ja esta instalada, mas a funcao ai-bnito-coach precisa estar publicada na Supabase para eu responder com IA.";
+    return `Nao consegui conectar com o ${name} agora. A interface ja esta instalada, mas a funcao ai-bnito-coach precisa estar publicada na Supabase para eu responder com IA.`;
   }
   return `Nao consegui responder agora: ${message}`;
 }
 
 export function useBnitoAssistant() {
   const context = useContext(BnitoAssistantContext);
-  return context || { isAvailable: false, openBnito: () => {} };
+  return context || { isAvailable: false, openBnito: () => {}, assistantName: "Setty" };
 }
 
 export function BnitoContextButton({ label, context, question, className, text }: BnitoContextButtonProps) {
   const assistant = useBnitoAssistant();
   if (!assistant.isAvailable) return null;
+  const name = assistant.assistantName || "Setty";
+  // White-label: troca "BNITO" literal (rótulo legado) pelo nome da empresa nos textos visíveis.
+  const displayText = text ? text.replace(/BNITO/gi, name) : text;
+  const displayLabel = label.replace(/BNITO/gi, name);
 
   return (
     <Tooltip>
@@ -168,25 +178,35 @@ export function BnitoContextButton({ label, context, question, className, text }
             event.stopPropagation();
             assistant.openBnito({ label, context, question });
           }}
-          aria-label={`Perguntar ao BNITO sobre ${label}`}
+          aria-label={`Perguntar ao ${name} sobre ${displayLabel}`}
         >
           <BrainCircuit className="h-4 w-4" />
-          {text && <span>{text}</span>}
+          {displayText && <span>{displayText}</span>}
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="top">Perguntar ao BNITO sobre {label}</TooltipContent>
+      <TooltipContent side="top">{`Perguntar ao ${name} sobre ${displayLabel}`}</TooltipContent>
     </Tooltip>
   );
 }
 
 export function BnitoAssistantProvider({ children }: { children: ReactNode }) {
-  const { role } = useAuth();
+  const { role, companyId } = useAuth();
+  const { viewingCompany, isViewingCompany } = useMaster();
+  const effectiveCompanyId =
+    role === "master" ? (isViewingCompany ? viewingCompany?.id ?? null : null) : companyId;
+  const { config } = useCompanyAiConfig(effectiveCompanyId);
+  const name = config.assistant_name || "Setty";
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [messages, setMessages] = useState<BnitoMessage[]>([firstMessage]);
+  const [messages, setMessages] = useState<BnitoMessage[]>(() => [makeWelcome("Setty")]);
   const [sessionContext, setSessionContext] = useState<BnitoOpenOptions | null>(null);
+
+  // Atualiza a saudação quando o nome da empresa carrega (se a conversa ainda não começou).
+  useEffect(() => {
+    setMessages((cur) => (cur.length === 1 && cur[0].id === WELCOME_ID ? [makeWelcome(name)] : cur));
+  }, [name]);
 
   const shouldShow = role === "admin" || role === "coordinator" || role === "trainer" || role === "master";
   const cycleId = useMemo(() => getCycleId(location.pathname), [location.pathname]);
@@ -246,12 +266,12 @@ export function BnitoAssistantProvider({ children }: { children: ReactNode }) {
       if (!data) throw new Error("resposta vazia");
       if (data.error) throw new Error(data.details || data.error);
 
-      setMessages((current) => [...current, createMessage("assistant", formatBnitoResponse(data))]);
+      setMessages((current) => [...current, createMessage("assistant", formatBnitoResponse(data, name))]);
     } catch (error) {
       const raw = error instanceof Error ? error.message : "erro inesperado";
       const message = raw === "__timeout__"
-        ? "O BNITO demorou demais para responder e a requisicao foi cancelada. Tente de novo em instantes."
-        : getUnavailableMessage(raw);
+        ? `O ${name} demorou demais para responder e a requisicao foi cancelada. Tente de novo em instantes.`
+        : getUnavailableMessage(raw, name);
       setMessages((current) => [...current, createMessage("assistant", message)]);
     } finally {
       setLoading(false);
@@ -264,8 +284,8 @@ export function BnitoAssistantProvider({ children }: { children: ReactNode }) {
   };
 
   const contextValue = useMemo(
-    () => ({ isAvailable: shouldShow, openBnito }),
-    [openBnito, shouldShow],
+    () => ({ isAvailable: shouldShow, openBnito, assistantName: name }),
+    [openBnito, shouldShow, name],
   );
 
   return (
@@ -277,7 +297,7 @@ export function BnitoAssistantProvider({ children }: { children: ReactNode }) {
             <TooltipTrigger asChild>
               <button
                 type="button"
-                aria-label="Abrir BNITO"
+                aria-label={`Abrir ${name}`}
                 onClick={() => openBnito()}
                 className="fixed bottom-6 right-6 z-40 flex h-16 w-16 items-center justify-center rounded-full border border-white/60 bg-navy text-primary-foreground shadow-[0_18px_45px_rgba(29,45,92,0.32)] ring-8 ring-navy/10 transition duration-200 hover:-translate-y-0.5 hover:bg-navy/95 focus:outline-none focus:ring-4 focus:ring-ring focus:ring-offset-2"
               >
@@ -286,7 +306,7 @@ export function BnitoAssistantProvider({ children }: { children: ReactNode }) {
                 </span>
               </button>
             </TooltipTrigger>
-            <TooltipContent side="left">Abrir BNITO</TooltipContent>
+            <TooltipContent side="left">{`Abrir ${name}`}</TooltipContent>
           </Tooltip>
 
           <DialogContent className="flex max-h-[88vh] w-[calc(100vw-2rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-[28px] border-line bg-paper p-0 shadow-2xl [&>button]:rounded-full">
@@ -296,7 +316,7 @@ export function BnitoAssistantProvider({ children }: { children: ReactNode }) {
               <BrainCircuit className="h-6 w-6" />
             </div>
             <div className="min-w-0">
-              <DialogTitle className="font-display text-2xl text-navy">BNITO</DialogTitle>
+              <DialogTitle className="font-display text-2xl text-navy">{name}</DialogTitle>
               <DialogDescription className="mt-1 text-sm">
                 copiloto tecnico para treino, anamnese e avaliacao funcional
               </DialogDescription>
@@ -316,12 +336,12 @@ export function BnitoAssistantProvider({ children }: { children: ReactNode }) {
             </DialogHeader>
 
             <div className="shrink-0 border-b border-line bg-paper-warm/45 px-5 py-3 text-xs text-muted-foreground">
-              <span className="font-medium text-navy">Contexto:</span> {activeLabel}. O BNITO usa a pagina atual e, quando houver ciclo aberto, usa esse contexto para responder com mais precisao.
+              <span className="font-medium text-navy">Contexto:</span> {activeLabel}. O {name} usa a pagina atual e, quando houver ciclo aberto, usa esse contexto para responder com mais precisao.
             </div>
 
             <div className="shrink-0 space-y-3 px-5 py-4">
           <div className="rounded-[18px] border border-line bg-background p-3 text-sm">
-            <span className="font-semibold text-navy">BNITO lembra:</span> tecnica, dor, nivel e objetivo vem antes de carga.
+            <span className="font-semibold text-navy">{name} lembra:</span> tecnica, dor, nivel e objetivo vem antes de carga.
           </div>
           <div className="rounded-[18px] border border-primary/20 bg-primary/5 p-3 text-sm text-navy">
             <span className="font-semibold">Plano tecnico agora:</span> descreva o aluno, o objetivo, a restricao e o rascunho do treino. Eu devolvo riscos e ajustes para voce aprovar.
@@ -350,7 +370,7 @@ export function BnitoAssistantProvider({ children }: { children: ReactNode }) {
               <div className="flex justify-start">
                 <div className="flex items-center gap-2 rounded-[20px] border border-line bg-background px-4 py-3 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  BNITO revisando contexto...
+                  {name} revisando contexto...
                 </div>
               </div>
             )}
@@ -378,7 +398,7 @@ export function BnitoAssistantProvider({ children }: { children: ReactNode }) {
             <Textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Conta para o BNITO..."
+              placeholder={`Conta para o ${name}...`}
               className="min-h-[44px] flex-1 resize-none border-0 bg-transparent px-0 py-2 shadow-none focus-visible:ring-0"
             />
             <Button type="submit" size="icon" disabled={loading || !input.trim()} className="mb-1 h-9 w-9 rounded-full">

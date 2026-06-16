@@ -25,6 +25,7 @@ import {
   ChevronDown, ChevronUp, ClipboardCheck, MessageCircle,
 } from "lucide-react";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
+import { useAssistantName } from "@/hooks/useAssistantName";
 import {
   buildBnitoOrchestrationPlan,
   buildPrescriptionIntegration,
@@ -93,6 +94,7 @@ async function describeInvokeFailure(
 }
 
 export default function UnifiedPrescriber() {
+  const assistantName = useAssistantName();
   const [companyId, setCompanyId]   = useState<string | null>(null);
   const [students, setStudents]     = useState<Student[]>([]);
   const [studentId, setStudentId]   = useState("");
@@ -647,7 +649,7 @@ export default function UnifiedPrescriber() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
-                  Orquestração BNITO
+                  Orquestração {assistantName}
                   <Badge variant="outline" className="text-xs">6 semanas</Badge>
                   <BnitoContextButton
                     label="orquestracao BNITO integrada"

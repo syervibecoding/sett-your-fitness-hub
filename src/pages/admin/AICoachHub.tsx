@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
+import { useAssistantName } from "@/hooks/useAssistantName";
 import { useToast } from "@/hooks/use-toast";
 
 type Modality =
@@ -200,6 +201,9 @@ export default function AICoachHub() {
   const location = useLocation();
   const rolePrefix = location.pathname.split("/").filter(Boolean)[0] || "admin";
   const goTo = (path: "avaliacao" | "studio" | "prescricao") => navigate(`/${rolePrefix}/${path}`);
+  const assistantName = useAssistantName();
+  // White-label: troca o rótulo legado "BNITO" pelo nome da empresa nos textos visíveis.
+  const swap = (s: string) => s.replace(/BNITO/gi, assistantName);
   const [selectedId, setSelectedId] = useState<Modality>("bnito");
   const selectedMode = modes.find((mode) => mode.id === selectedId) || modes[0];
   const [forms, setForms] = useState<Record<Modality, Record<string, string>>>(() =>
@@ -270,7 +274,7 @@ export default function AICoachHub() {
       if (data.error) throw new Error(data.details || data.error);
 
       setResponse(data);
-      toast({ title: "IA gerou a resposta", description: selectedMode.title });
+      toast({ title: "IA gerou a resposta", description: swap(selectedMode.title) });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro inesperado";
       toast({ title: "Falha ao gerar", description: message, variant: "destructive" });
@@ -302,7 +306,7 @@ export default function AICoachHub() {
             />
           </div>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            BNITO como coracao do app; musculacao absorve adaptacao de treino; avaliacao funcional concentra composicao, tecnica, fotos e video.
+            {assistantName} como coracao do app; musculacao absorve adaptacao de treino; avaliacao funcional concentra composicao, tecnica, fotos e video.
           </p>
         </div>
         <Badge variant="outline" className="w-fit">
@@ -342,12 +346,12 @@ export default function AICoachHub() {
                   >
                     <div className="flex items-center gap-2">
                       <Icon className="h-4 w-4 text-primary" />
-                      <span className="font-medium">{mode.title}</span>
+                      <span className="font-medium">{swap(mode.title)}</span>
                       <Badge variant="secondary" className="ml-auto text-[10px]">
                         {mode.badge}
                       </Badge>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">{mode.subtitle}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{swap(mode.subtitle)}</p>
                   </button>
                 );
               })}
@@ -370,10 +374,10 @@ export default function AICoachHub() {
               {reassignedFlows.map((flow) => (
                 <div key={flow.title} className="rounded-md border border-line bg-paper/60 p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-ink">{flow.title}</span>
-                    <Badge variant="outline" className="text-[10px]">{flow.target}</Badge>
+                    <span className="text-sm font-medium text-ink">{swap(flow.title)}</span>
+                    <Badge variant="outline" className="text-[10px]">{swap(flow.target)}</Badge>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">{flow.note}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{swap(flow.note)}</p>
                 </div>
               ))}
               <div className="grid gap-2">
@@ -394,7 +398,7 @@ export default function AICoachHub() {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <selectedMode.icon className="h-4 w-4 text-primary" />
-              {selectedMode.title}
+              {swap(selectedMode.title)}
               <BnitoContextButton
                 label={`modo ${selectedMode.title}`}
                 context={`Modo selecionado na Central IA: ${selectedMode.title}. Subtitulo: ${selectedMode.subtitle}`}
@@ -406,7 +410,7 @@ export default function AICoachHub() {
           <CardContent className="space-y-4">
             {selectedId === "bnito" && (
               <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-sm text-primary">
-                BNITO agora concentra revisao tecnica, triagem conservadora, perguntas do professor e secretaria.
+                {assistantName} agora concentra revisao tecnica, triagem conservadora, perguntas do professor e secretaria.
               </div>
             )}
             {selectedId === "strength" && (
@@ -462,7 +466,7 @@ export default function AICoachHub() {
                 id="ai-context"
                 value={selectedContext}
                 onChange={(event) => setContexts((current) => ({ ...current, [selectedId]: event.target.value }))}
-                placeholder={selectedMode.contextPlaceholder}
+                placeholder={swap(selectedMode.contextPlaceholder)}
                 className="mt-1 min-h-[180px]"
               />
             </div>
