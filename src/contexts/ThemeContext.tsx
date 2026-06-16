@@ -149,12 +149,32 @@ export function applyTheme(settings: { primary_color: string; background_color: 
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
-  const { companyId, role } = useAuth();
+  const { companyId, role, user } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
-  // Empresa em foco: master vendo uma empresa usa a DELA; senão a do próprio usuário.
-  // (Antes usava só companyId → master testando outra empresa nunca via o tema mudar.)
+
+  // Aluno não está em company_members → a empresa vem de students.company_id.
+  // Sem isso, o app do aluno carregava o tema GLOBAL e ignorava o tema/layout da empresa dele.
+  const { data: studentCompanyId } = useQuery({
+    queryKey: ["theme-student-company", user?.id],
+    enabled: role === "student" && !!user?.id,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("students")
+        .select("company_id")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      return (data?.company_id as string | undefined) ?? null;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Empresa em foco: master → empresa visualizada; aluno → empresa do aluno; staff → a sua.
   const effectiveCompanyId =
-    role === "master" ? (isViewingCompany ? viewingCompany?.id ?? null : null) : companyId;
+    role === "master"
+      ? (isViewingCompany ? viewingCompany?.id ?? null : null)
+      : role === "student"
+        ? (studentCompanyId ?? null)
+        : companyId;
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["platform-settings", effectiveCompanyId],

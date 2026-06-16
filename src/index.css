@@ -174,6 +174,45 @@
   box-shadow: 0 0 20px -4px color-mix(in srgb, hsl(var(--primary)) 65%, transparent);
 }
 
+/* COMPACTO — denso/eficiente: reduz a base rem (encolhe espaçamento e texto juntos) */
+:root[data-layout="compacto"] { font-size: 14px; --radius: 0.35rem; }
+[data-layout="compacto"] h1, [data-layout="compacto"] h2, [data-layout="compacto"] h3,
+[data-layout="compacto"] h4, [data-layout="compacto"] h5, [data-layout="compacto"] h6,
+[data-layout="compacto"] .font-display {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* EDITORIAL — espaçoso/leitura confortável: base rem maior, títulos serifados */
+:root[data-layout="editorial"] { font-size: 17px; --radius: 0.5rem; }
+[data-layout="editorial"] h1, [data-layout="editorial"] h2, [data-layout="editorial"] h3,
+[data-layout="editorial"] h4, [data-layout="editorial"] h5, [data-layout="editorial"] h6,
+[data-layout="editorial"] .font-display {
+  font-family: 'Fraunces', Georgia, serif;
+  letter-spacing: 0;
+  line-height: 1.15;
+}
+[data-layout="editorial"] p { line-height: 1.7; }
+[data-layout="editorial"] .bg-card,
+[data-layout="editorial"] .bg-paper-warm { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); }
+
+/* INDUSTRIAL — reto (sem curvas), bordas fortes, títulos em mono caixa-alta */
+:root[data-layout="industrial"] { --radius: 0rem; }
+[data-layout="industrial"] h1, [data-layout="industrial"] h2, [data-layout="industrial"] h3,
+[data-layout="industrial"] h4, [data-layout="industrial"] h5, [data-layout="industrial"] h6,
+[data-layout="industrial"] .font-display {
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+[data-layout="industrial"] .bg-card,
+[data-layout="industrial"] .bg-paper-warm {
+  border: 1.5px solid color-mix(in srgb, hsl(var(--ink)) 55%, transparent);
+  box-shadow: 4px 4px 0 0 color-mix(in srgb, hsl(var(--ink)) 16%, transparent);
+}
+
 /* Scrollbar — Paper system */
 ::-webkit-scrollbar {
   width: 8px;

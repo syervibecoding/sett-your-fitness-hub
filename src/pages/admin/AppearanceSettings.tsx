@@ -29,6 +29,9 @@ const LAYOUTS: LayoutOption[] = [
   { id: "moderno", name: "Moderno", desc: "Cantos arredondados, sombras suaves, tipografia limpa." },
   { id: "minimal", name: "Minimalista", desc: "Plano e clean, sem sombras, foco no conteúdo." },
   { id: "futurista", name: "Futurista", desc: "Efeito vidro, brilho e tipografia técnica." },
+  { id: "compacto", name: "Compacto", desc: "Denso e eficiente — menos espaçamento, cabe mais na tela." },
+  { id: "editorial", name: "Editorial", desc: "Espaçoso e elegante — mais respiro e leitura confortável." },
+  { id: "industrial", name: "Industrial", desc: "Reto e marcante — bordas fortes e tipografia mono." },
 ];
 
 export default function AppearanceSettings() {
@@ -208,18 +211,24 @@ export default function AppearanceSettings() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {LAYOUTS.map((l) => {
                 const active = layoutStyle === l.id;
-                const radius = l.id === "moderno" ? 14 : l.id === "futurista" ? 10 : l.id === "minimal" ? 5 : 4;
+                const radius =
+                  l.id === "moderno" ? 14 : l.id === "futurista" ? 10 : l.id === "editorial" ? 8
+                  : l.id === "minimal" || l.id === "compacto" ? 5 : l.id === "industrial" ? 0 : 4;
                 const cardStyle: CSSProperties =
                   l.id === "moderno"
                     ? { backgroundColor: cardColor, boxShadow: "0 6px 16px -8px rgba(0,0,0,0.3)", border: "none" }
-                    : l.id === "minimal"
+                    : l.id === "minimal" || l.id === "compacto"
                     ? { backgroundColor: cardColor, border: "1px solid rgba(0,0,0,0.12)", boxShadow: "none" }
                     : l.id === "futurista"
                     ? { backgroundColor: cardColor, border: `1px solid ${primaryColor}`, boxShadow: `0 0 12px -2px ${primaryColor}` }
+                    : l.id === "industrial"
+                    ? { backgroundColor: cardColor, border: `1.5px solid ${textColor}`, boxShadow: `4px 4px 0 0 ${textColor}33` }
+                    : l.id === "editorial"
+                    ? { backgroundColor: cardColor, border: "1px solid rgba(0,0,0,0.06)", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }
                     : { backgroundColor: cardColor, border: "1px solid rgba(0,0,0,0.08)" };
                 const labelFont =
-                  l.id === "futurista" ? "'JetBrains Mono', monospace"
-                  : l.id === "classico" ? "'Fraunces', Georgia, serif"
+                  l.id === "futurista" || l.id === "industrial" ? "'JetBrains Mono', monospace"
+                  : l.id === "classico" || l.id === "editorial" ? "'Fraunces', Georgia, serif"
                   : "'Inter', system-ui, sans-serif";
                 return (
                   <button
