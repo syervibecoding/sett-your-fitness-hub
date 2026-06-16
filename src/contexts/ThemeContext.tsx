@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useMaster } from "@/contexts/MasterContext";
 
 interface PlatformSettings {
   id: string;
@@ -147,23 +148,21 @@ export function applyTheme(settings: { primary_color: string; background_color: 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const { companyId, role } = useAuth();
+  const { viewingCompany, isViewingCompany } = useMaster();
+  // Empresa em foco: master vendo uma empresa usa a DELA; senão a do próprio usuário.
+  // (Antes usava só companyId → master testando outra empresa nunca via o tema mudar.)
+  const effectiveCompanyId =
+    role === "master" ? (isViewingCompany ? viewingCompany?.id ?? null : null) : companyId;
 
   const { data: settings, isLoading } = useQuery({
-    queryKey: ["platform-settings", companyId],
+    queryKey: ["platform-settings", effectiveCompanyId],
     queryFn: async () => {
       let query = supabase.from("platform_settings").select("*");
-      
-      if (companyId) {
-        // Load company-specific settings
-        query = query.eq("company_id", companyId);
-      } else if (role === "master") {
-        // Master without company context: load global (null company_id) settings
-        query = query.is("company_id", null);
+      if (effectiveCompanyId) {
+        query = query.eq("company_id", effectiveCompanyId);
       } else {
-        // Fallback: try to get any settings available
         query = query.is("company_id", null);
       }
-      
       const { data, error } = await query.limit(1).maybeSingle();
       if (error) throw error;
       return data as PlatformSettings | null;
@@ -174,9 +173,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (settings) {
       applyTheme(settings);
-      document.title = settings.platform_title;
+      document.title = settings.platform_title || DEFAULTS.platform_title;
+    } else if (!isLoading) {
+      // Empresa sem tema custom → volta ao padrão (não herda o tema da empresa anterior).
+      applyTheme(DEFAULTS);
+      document.title = DEFAULTS.platform_title;
     }
-  }, [settings]);
+  }, [settings, isLoading]);
 
   return (
     <ThemeContext.Provider
@@ -184,7 +187,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         settings,
         isLoading,
         defaults: DEFAULTS,
-        refetch: () => queryClient.invalidateQueries({ queryKey: ["platform-settings", companyId] }),
+        refetch: () => queryClient.invalidateQueries({ queryKey: ["platform-settings", effectiveCompanyId] }),
       }}
     >
       {children}

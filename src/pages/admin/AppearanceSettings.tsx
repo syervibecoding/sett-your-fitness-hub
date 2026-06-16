@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
-import { useTheme } from "@/contexts/ThemeContext";
+import { useTheme, applyTheme } from "@/contexts/ThemeContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,21 @@ const DEFAULTS = {
   text_color: "#0A0A0A",
   platform_title: "Set Training App",
 };
+
+// Temas/layouts prontos — o dono escolhe um e ajusta fino se quiser.
+type ThemePreset = { name: string; primary: string; background: string; card: string; text: string };
+const THEME_PRESETS: ThemePreset[] = [
+  { name: "BN Navy (padrão)", primary: "#1D2D5C", background: "#FAFAF7", card: "#F2F0EA", text: "#0A0A0A" },
+  { name: "Clean Light", primary: "#2563EB", background: "#FFFFFF", card: "#F1F5F9", text: "#0F172A" },
+  { name: "Dark Pro", primary: "#3B82F6", background: "#0B1120", card: "#111A2E", text: "#E5E7EB" },
+  { name: "Midnight", primary: "#8B5CF6", background: "#0F0F17", card: "#1A1A26", text: "#ECECF5" },
+  { name: "Energy", primary: "#EA580C", background: "#FFFBF5", card: "#FFF1E6", text: "#1C1917" },
+  { name: "Forest", primary: "#15803D", background: "#F6FBF7", card: "#E7F5EC", text: "#0B1F12" },
+  { name: "Royal", primary: "#7C3AED", background: "#FBFAFF", card: "#F1ECFB", text: "#1E1633" },
+  { name: "Rose", primary: "#E11D48", background: "#FFFBFC", card: "#FCE9EE", text: "#1F0A11" },
+  { name: "Ocean", primary: "#0891B2", background: "#F5FCFE", card: "#E2F4F9", text: "#08323B" },
+  { name: "Slate Mono", primary: "#334155", background: "#F8FAFC", card: "#E2E8F0", text: "#0F172A" },
+];
 
 export default function AppearanceSettings() {
   const { user, companyId, role } = useAuth();
@@ -62,6 +77,16 @@ export default function AppearanceSettings() {
       setCurrentLogoUrl(settings.logo_url);
     }
   }, [settings]);
+
+  // Pré-visualização ao vivo: aplica o tema no app inteiro enquanto o usuário edita/escolhe.
+  useEffect(() => {
+    applyTheme({
+      primary_color: primaryColor,
+      background_color: backgroundColor,
+      card_color: cardColor,
+      text_color: textColor,
+    });
+  }, [primaryColor, backgroundColor, cardColor, textColor]);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -113,7 +138,9 @@ export default function AppearanceSettings() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["platform-settings-admin", companyId] });
+      // Revalida AS DUAS famílias de query (a do admin e a do tema global), independente do id.
+      queryClient.invalidateQueries({ queryKey: ["platform-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["platform-settings-admin"] });
       refetch();
       toast.success("Aparência salva com sucesso!");
     },
@@ -131,6 +158,17 @@ export default function AppearanceSettings() {
     setLogoFile(null);
     setLogoPreview(null);
   };
+
+  const applyPreset = (p: ThemePreset) => {
+    setPrimaryColor(p.primary);
+    setBackgroundColor(p.background);
+    setCardColor(p.card);
+    setTextColor(p.text);
+  };
+  const eq = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  const activePreset = THEME_PRESETS.find(
+    (p) => eq(p.primary, primaryColor) && eq(p.background, backgroundColor) && eq(p.card, cardColor) && eq(p.text, textColor),
+  );
 
   if (isLoading) {
     return (
@@ -165,6 +203,50 @@ export default function AppearanceSettings() {
             </Button>
           </div>
         </div>
+
+        {/* Temas prontos / layouts */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl">Temas prontos</CardTitle>
+            <p className="text-muted-foreground font-sans text-sm">
+              Escolha um layout pronto e ajuste as cores se quiser. A prévia é aplicada no app na hora — clique em <strong>Salvar</strong> para fixar.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {THEME_PRESETS.map((p) => {
+                const active = activePreset?.name === p.name;
+                return (
+                  <button
+                    key={p.name}
+                    type="button"
+                    onClick={() => applyPreset(p)}
+                    className={`group rounded-xl border p-2 text-left transition ${active ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary/50"}`}
+                  >
+                    {/* mini-mockup do tema */}
+                    <div className="overflow-hidden rounded-lg border border-black/5" style={{ backgroundColor: p.background }}>
+                      <div className="flex h-5 items-center gap-1 px-2" style={{ backgroundColor: p.primary }}>
+                        <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
+                        <span className="h-1.5 w-8 rounded-full bg-white/40" />
+                      </div>
+                      <div className="space-y-1.5 p-2">
+                        <div className="rounded-md p-1.5" style={{ backgroundColor: p.card }}>
+                          <div className="h-1.5 w-12 rounded-full" style={{ backgroundColor: p.text, opacity: 0.55 }} />
+                          <div className="mt-1 h-1.5 w-8 rounded-full" style={{ backgroundColor: p.text, opacity: 0.3 }} />
+                        </div>
+                        <div className="h-4 w-14 rounded-md" style={{ backgroundColor: p.primary }} />
+                      </div>
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <span className="text-xs font-sans font-medium">{p.name}</span>
+                      {active && <span className="text-[10px] font-bold text-primary">✓</span>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Colors */}

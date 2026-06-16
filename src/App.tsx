@@ -171,8 +171,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-        <ThemeProvider>
         <MasterProvider>
+        <ThemeProvider>
         <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
         <StudentBnitoAssistantProvider>
@@ -280,8 +280,8 @@ const App = () => (
         </StudentBnitoAssistantProvider>
         </Suspense>
         </ErrorBoundary>
-        </MasterProvider>
         </ThemeProvider>
+        </MasterProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
