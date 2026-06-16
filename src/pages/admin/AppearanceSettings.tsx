@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, CSSProperties } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,19 +21,14 @@ const DEFAULTS = {
   platform_title: "Set Training App",
 };
 
-// Temas/layouts prontos — o dono escolhe um e ajusta fino se quiser.
-type ThemePreset = { name: string; primary: string; background: string; card: string; text: string };
-const THEME_PRESETS: ThemePreset[] = [
-  { name: "BN Navy (padrão)", primary: "#1D2D5C", background: "#FAFAF7", card: "#F2F0EA", text: "#0A0A0A" },
-  { name: "Clean Light", primary: "#2563EB", background: "#FFFFFF", card: "#F1F5F9", text: "#0F172A" },
-  { name: "Dark Pro", primary: "#3B82F6", background: "#0B1120", card: "#111A2E", text: "#E5E7EB" },
-  { name: "Midnight", primary: "#8B5CF6", background: "#0F0F17", card: "#1A1A26", text: "#ECECF5" },
-  { name: "Energy", primary: "#EA580C", background: "#FFFBF5", card: "#FFF1E6", text: "#1C1917" },
-  { name: "Forest", primary: "#15803D", background: "#F6FBF7", card: "#E7F5EC", text: "#0B1F12" },
-  { name: "Royal", primary: "#7C3AED", background: "#FBFAFF", card: "#F1ECFB", text: "#1E1633" },
-  { name: "Rose", primary: "#E11D48", background: "#FFFBFC", card: "#FCE9EE", text: "#1F0A11" },
-  { name: "Ocean", primary: "#0891B2", background: "#F5FCFE", card: "#E2F4F9", text: "#08323B" },
-  { name: "Slate Mono", primary: "#334155", background: "#F8FAFC", card: "#E2E8F0", text: "#0F172A" },
+// Layouts (skins) — mudam a FORMA do app (cantos, sombras, superfície, tipografia).
+// As cores continuam vindo do editor abaixo. Os ids batem com o CSS [data-layout] em index.css.
+type LayoutOption = { id: string; name: string; desc: string };
+const LAYOUTS: LayoutOption[] = [
+  { id: "classico", name: "Clássico", desc: "Visual atual — títulos serifados, cantos discretos." },
+  { id: "moderno", name: "Moderno", desc: "Cantos arredondados, sombras suaves, tipografia limpa." },
+  { id: "minimal", name: "Minimalista", desc: "Plano e clean, sem sombras, foco no conteúdo." },
+  { id: "futurista", name: "Futurista", desc: "Efeito vidro, brilho e tipografia técnica." },
 ];
 
 export default function AppearanceSettings() {
@@ -48,6 +43,7 @@ export default function AppearanceSettings() {
   const [cardColor, setCardColor] = useState(DEFAULTS.card_color);
   const [textColor, setTextColor] = useState(DEFAULTS.text_color);
   const [platformTitle, setPlatformTitle] = useState(DEFAULTS.platform_title);
+  const [layoutStyle, setLayoutStyle] = useState("classico");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
@@ -74,11 +70,12 @@ export default function AppearanceSettings() {
       setCardColor(settings.card_color);
       setTextColor(settings.text_color);
       setPlatformTitle(settings.platform_title);
+      setLayoutStyle((settings as { layout_style?: string }).layout_style || "classico");
       setCurrentLogoUrl(settings.logo_url);
     }
   }, [settings]);
 
-  // Pré-visualização ao vivo: aplica o tema no app inteiro enquanto o usuário edita/escolhe.
+  // Pré-visualização ao vivo: aplica cor + layout no app inteiro enquanto o usuário edita.
   useEffect(() => {
     applyTheme({
       primary_color: primaryColor,
@@ -87,6 +84,10 @@ export default function AppearanceSettings() {
       text_color: textColor,
     });
   }, [primaryColor, backgroundColor, cardColor, textColor]);
+
+  useEffect(() => {
+    document.documentElement.dataset.layout = layoutStyle;
+  }, [layoutStyle]);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -120,6 +121,7 @@ export default function AppearanceSettings() {
         text_color: textColor,
         platform_title: platformTitle,
         logo_url: logoUrl,
+        layout_style: layoutStyle,
         updated_at: new Date().toISOString(),
         company_id: effectiveCompanyId,
       };
@@ -155,20 +157,10 @@ export default function AppearanceSettings() {
     setCardColor(DEFAULTS.card_color);
     setTextColor(DEFAULTS.text_color);
     setPlatformTitle(DEFAULTS.platform_title);
+    setLayoutStyle("classico");
     setLogoFile(null);
     setLogoPreview(null);
   };
-
-  const applyPreset = (p: ThemePreset) => {
-    setPrimaryColor(p.primary);
-    setBackgroundColor(p.background);
-    setCardColor(p.card);
-    setTextColor(p.text);
-  };
-  const eq = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
-  const activePreset = THEME_PRESETS.find(
-    (p) => eq(p.primary, primaryColor) && eq(p.background, backgroundColor) && eq(p.card, cardColor) && eq(p.text, textColor),
-  );
 
   if (isLoading) {
     return (
@@ -204,43 +196,52 @@ export default function AppearanceSettings() {
           </div>
         </div>
 
-        {/* Temas prontos / layouts */}
+        {/* Layout / skin do app */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl">Temas prontos</CardTitle>
+            <CardTitle className="text-xl">Layout</CardTitle>
             <p className="text-muted-foreground font-sans text-sm">
-              Escolha um layout pronto e ajuste as cores se quiser. A prévia é aplicada no app na hora — clique em <strong>Salvar</strong> para fixar.
+              Muda o <strong>estilo visual</strong> do app (cantos, sombras, superfície e tipografia) — as cores ficam no editor abaixo. A prévia aplica na hora; clique em <strong>Salvar</strong> para fixar.
             </p>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              {THEME_PRESETS.map((p) => {
-                const active = activePreset?.name === p.name;
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {LAYOUTS.map((l) => {
+                const active = layoutStyle === l.id;
+                const radius = l.id === "moderno" ? 14 : l.id === "futurista" ? 10 : l.id === "minimal" ? 5 : 4;
+                const cardStyle: CSSProperties =
+                  l.id === "moderno"
+                    ? { backgroundColor: cardColor, boxShadow: "0 6px 16px -8px rgba(0,0,0,0.3)", border: "none" }
+                    : l.id === "minimal"
+                    ? { backgroundColor: cardColor, border: "1px solid rgba(0,0,0,0.12)", boxShadow: "none" }
+                    : l.id === "futurista"
+                    ? { backgroundColor: cardColor, border: `1px solid ${primaryColor}`, boxShadow: `0 0 12px -2px ${primaryColor}` }
+                    : { backgroundColor: cardColor, border: "1px solid rgba(0,0,0,0.08)" };
+                const labelFont =
+                  l.id === "futurista" ? "'JetBrains Mono', monospace"
+                  : l.id === "classico" ? "'Fraunces', Georgia, serif"
+                  : "'Inter', system-ui, sans-serif";
                 return (
                   <button
-                    key={p.name}
+                    key={l.id}
                     type="button"
-                    onClick={() => applyPreset(p)}
-                    className={`group rounded-xl border p-2 text-left transition ${active ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary/50"}`}
+                    onClick={() => setLayoutStyle(l.id)}
+                    className={`rounded-xl border p-2 text-left transition ${active ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary/50"}`}
                   >
-                    {/* mini-mockup do tema */}
-                    <div className="overflow-hidden rounded-lg border border-black/5" style={{ backgroundColor: p.background }}>
-                      <div className="flex h-5 items-center gap-1 px-2" style={{ backgroundColor: p.primary }}>
-                        <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
-                        <span className="h-1.5 w-8 rounded-full bg-white/40" />
-                      </div>
-                      <div className="space-y-1.5 p-2">
-                        <div className="rounded-md p-1.5" style={{ backgroundColor: p.card }}>
-                          <div className="h-1.5 w-12 rounded-full" style={{ backgroundColor: p.text, opacity: 0.55 }} />
-                          <div className="mt-1 h-1.5 w-8 rounded-full" style={{ backgroundColor: p.text, opacity: 0.3 }} />
-                        </div>
-                        <div className="h-4 w-14 rounded-md" style={{ backgroundColor: p.primary }} />
+                    {/* mini-mockup do layout (usa as cores atuais da empresa) */}
+                    <div className="overflow-hidden rounded-lg p-2" style={{ backgroundColor }}>
+                      <div className="mb-1.5 h-2 w-10" style={{ backgroundColor: primaryColor, borderRadius: radius / 2 }} />
+                      <div className="p-2" style={{ ...cardStyle, borderRadius: radius }}>
+                        <div className="h-1.5 w-14 rounded-full" style={{ backgroundColor: textColor, opacity: 0.6 }} />
+                        <div className="mt-1 h-1.5 w-9 rounded-full" style={{ backgroundColor: textColor, opacity: 0.3 }} />
+                        <div className="mt-2 h-4 w-12" style={{ backgroundColor: primaryColor, borderRadius: radius }} />
                       </div>
                     </div>
-                    <div className="mt-1.5 flex items-center justify-between">
-                      <span className="text-xs font-sans font-medium">{p.name}</span>
-                      {active && <span className="text-[10px] font-bold text-primary">✓</span>}
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-sm font-medium" style={{ fontFamily: labelFont }}>{l.name}</span>
+                      {active && <span className="text-xs font-bold text-primary">✓</span>}
                     </div>
+                    <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{l.desc}</p>
                   </button>
                 );
               })}

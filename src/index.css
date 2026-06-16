@@ -108,6 +108,72 @@
   }
 }
 
+/* ============================================================
+   LAYOUTS / SKINS — trocam o "visual" do app via [data-layout].
+   As CORES continuam vindo da aba Aparência; aqui muda forma,
+   sombra, superfície e tipografia. Fontes já carregadas:
+   Inter (sans), Fraunces (display/serif), JetBrains Mono (mono).
+   Valores: classico (padrão) | moderno | minimal | futurista
+   ============================================================ */
+
+/* MODERNO — cantos bem arredondados, sombras suaves, títulos em sans */
+:root[data-layout="moderno"] { --radius: 0.9rem; }
+[data-layout="moderno"] h1, [data-layout="moderno"] h2, [data-layout="moderno"] h3,
+[data-layout="moderno"] h4, [data-layout="moderno"] h5, [data-layout="moderno"] h6,
+[data-layout="moderno"] .font-display {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+[data-layout="moderno"] .bg-card,
+[data-layout="moderno"] .bg-paper-warm {
+  box-shadow: 0 6px 24px -10px rgba(15, 23, 42, 0.22);
+  border-color: transparent;
+}
+
+/* MINIMALISTA — plano, sem sombra nos cards, cantos discretos, títulos sans leves */
+:root[data-layout="minimal"] { --radius: 0.4rem; }
+[data-layout="minimal"] h1, [data-layout="minimal"] h2, [data-layout="minimal"] h3,
+[data-layout="minimal"] h4, [data-layout="minimal"] h5, [data-layout="minimal"] h6,
+[data-layout="minimal"] .font-display {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+[data-layout="minimal"] .bg-card,
+[data-layout="minimal"] .bg-paper-warm {
+  box-shadow: none !important;
+  border: 1px solid hsl(var(--border));
+}
+
+/* FUTURISTA — vidro (glassmorphism), brilho e títulos em mono */
+:root[data-layout="futurista"] { --radius: 0.75rem; }
+[data-layout="futurista"] h1, [data-layout="futurista"] h2, [data-layout="futurista"] h3,
+[data-layout="futurista"] h4, [data-layout="futurista"] h5, [data-layout="futurista"] h6,
+[data-layout="futurista"] .font-display {
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  letter-spacing: 0.01em;
+}
+[data-layout="futurista"] body {
+  background-image:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, hsl(var(--primary)) 10%, transparent), transparent 42%),
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, hsl(var(--primary)) 7%, transparent), transparent 38%);
+  background-attachment: fixed;
+}
+[data-layout="futurista"] .bg-card,
+[data-layout="futurista"] .bg-paper-warm {
+  background-color: color-mix(in srgb, hsl(var(--card)) 72%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid color-mix(in srgb, hsl(var(--primary)) 32%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, hsl(var(--primary)) 10%, transparent),
+              0 12px 40px -14px color-mix(in srgb, hsl(var(--primary)) 45%, transparent);
+}
+[data-layout="futurista"] .bg-primary,
+[data-layout="futurista"] .bg-navy {
+  box-shadow: 0 0 20px -4px color-mix(in srgb, hsl(var(--primary)) 65%, transparent);
+}
+
 /* Scrollbar — Paper system */
 ::-webkit-scrollbar {
   width: 8px;

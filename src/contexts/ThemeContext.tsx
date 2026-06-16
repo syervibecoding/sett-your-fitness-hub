@@ -12,6 +12,7 @@ interface PlatformSettings {
   text_color: string;
   platform_title: string;
   logo_url: string | null;
+  layout_style: string | null;
   company_id: string | null;
 }
 
@@ -22,6 +23,7 @@ const DEFAULTS: Omit<PlatformSettings, "id" | "company_id"> = {
   text_color: "#0A0A0A",
   platform_title: "Set Training App",
   logo_url: null,
+  layout_style: "classico",
 };
 
 interface ThemeContextValue {
@@ -173,10 +175,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (settings) {
       applyTheme(settings);
+      document.documentElement.dataset.layout = settings.layout_style || "classico";
       document.title = settings.platform_title || DEFAULTS.platform_title;
     } else if (!isLoading) {
       // Empresa sem tema custom → volta ao padrão (não herda o tema da empresa anterior).
       applyTheme(DEFAULTS);
+      document.documentElement.dataset.layout = "classico";
       document.title = DEFAULTS.platform_title;
     }
   }, [settings, isLoading]);
