@@ -3,6 +3,7 @@ import { useLocation, useParams } from "react-router-dom";
 import { BrainCircuit, HelpCircle, Loader2, Send, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCompanyAiConfig } from "@/lib/companyAiConfig";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,12 +65,15 @@ const quickPrompts = [
   },
 ];
 
-const firstMessage: StudentBnitoMessage = {
-  id: "student-bnito-welcome",
-  role: "assistant",
-  content:
-    "Oi. Eu sou o Bnito. Me chama para entender seu treino, tirar duvidas de execucao, cuidar da recuperacao e saber quando vale avisar a equipe.",
-};
+const WELCOME_ID = "student-bnito-welcome";
+// O nome do assistente é por empresa (Central de IA). Padrão do app = "Setty".
+function makeWelcome(name: string): StudentBnitoMessage {
+  return {
+    id: WELCOME_ID,
+    role: "assistant",
+    content: `Oi. Eu sou o ${name}. Me chama para entender seu treino, tirar duvidas de execucao, cuidar da recuperacao e saber quando vale avisar a equipe.`,
+  };
+}
 
 const appMap = [
   "Home: resumo do dia, treino sugerido, meta semanal, progresso e atalhos.",
@@ -94,44 +98,44 @@ function createMessage(role: StudentBnitoMessage["role"], content: string): Stud
 function getStudentPageLabel(pathname: string) {
   if (pathname.includes("/treino/")) return "treino aberto";
   if (pathname.includes("/aluno")) return "area do aluno";
-  return "BNapp";
+  return "SettApp";
 }
 
-function buildLocalMission(pageLabel: string): ProactiveMission {
+function buildLocalMission(pageLabel: string, name: string): ProactiveMission {
   if (pageLabel === "treino aberto") {
     return {
-      title: "Bnito no treino",
+      title: `${name} no treino`,
       body: "Antes de aumentar carga, confere tecnica, amplitude e descanso. Se algo doer acima de 3/10, reduz ou para e me chama.",
       actionPrompt: "Me guia no treino de hoje: objetivo, tecnica e pontos de atencao.",
       urgency: "normal",
     };
   }
   return {
-    title: "Bnito acompanhando",
+    title: `${name} acompanhando`,
     body: "Vou cruzar treino, registros, ciclo, medidas, atividades e avisos para te dar o proximo passo mais seguro.",
     actionPrompt: "Olha meu app agora e me diz qual deveria ser meu foco hoje.",
     urgency: "normal",
   };
 }
 
-function toMission(data: StudentBnitoResponse, fallback: ProactiveMission): ProactiveMission {
+function toMission(data: StudentBnitoResponse, fallback: ProactiveMission, name: string): ProactiveMission {
   if (typeof data.result === "string") {
     return { ...fallback, body: data.result.slice(0, 220) };
   }
   const result = data.result;
   if (!result) return fallback;
   return {
-    title: result.urgency === "parar_e_avisar" ? "Atencao do Bnito" : "Missao do Bnito",
+    title: result.urgency === "parar_e_avisar" ? `Atencao do ${name}` : `Missao do ${name}`,
     body: result.answer || fallback.body,
     actionPrompt: result.student_action || result.follow_up_question || fallback.actionPrompt,
     urgency: result.urgency || fallback.urgency,
   };
 }
 
-function formatStudentBnitoResponse(data: StudentBnitoResponse) {
+function formatStudentBnitoResponse(data: StudentBnitoResponse, name: string) {
   if (typeof data.result === "string") return data.result;
   const result = data.result;
-  if (!result) return data.raw || "O Bnito respondeu, mas sem texto estruturado.";
+  if (!result) return data.raw || `O ${name} respondeu, mas sem texto estruturado.`;
 
   const parts = [
     result.answer || "Analise pronta.",
@@ -143,15 +147,38 @@ function formatStudentBnitoResponse(data: StudentBnitoResponse) {
   return parts.join("\n\n");
 }
 
-function getUnavailableMessage(message: string) {
+function getUnavailableMessage(message: string, name: string) {
   if (/function|edge|404|403|fetch|non-2xx/i.test(message)) {
-    return "Nao consegui conectar com o Bnito agora. A interface ja esta instalada, mas a funcao ai-student-bnito precisa estar publicada na Supabase para responder.";
+    return `Nao consegui conectar com o ${name} agora. A interface ja esta instalada, mas a funcao ai-student-bnito precisa estar publicada na Supabase para responder.`;
   }
   return `Nao consegui responder agora: ${message}`;
 }
 
 export function StudentBnitoAssistantProvider({ children }: { children: ReactNode }) {
   const { role } = useAuth();
+  // Nome do assistente vem da empresa do aluno (Central de IA). Padrão do app = "Setty".
+  const [studentCompanyId, setStudentCompanyId] = useState<string | null>(null);
+  useEffect(() => {
+    if (role !== "student") return;
+    let active = true;
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = data.user?.id;
+      if (!uid) return;
+      (supabase as any)
+        .from("students")
+        .select("company_id")
+        .eq("user_id", uid)
+        .maybeSingle()
+        .then(({ data: s }: { data: { company_id?: string } | null }) => {
+          if (active && s?.company_id) setStudentCompanyId(s.company_id);
+        });
+    });
+    return () => {
+      active = false;
+    };
+  }, [role]);
+  const { config } = useCompanyAiConfig(studentCompanyId);
+  const name = config.assistant_name || "Setty";
   const location = useLocation();
   const params = useParams();
   // useParams() devolve um OBJETO NOVO a cada render — usar `params` direto nas deps de
@@ -161,10 +188,15 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [messages, setMessages] = useState<StudentBnitoMessage[]>([firstMessage]);
+  const [messages, setMessages] = useState<StudentBnitoMessage[]>(() => [makeWelcome("Setty")]);
   const [mission, setMission] = useState<ProactiveMission | null>(null);
   const [missionLoading, setMissionLoading] = useState(false);
   const [missionDismissed, setMissionDismissed] = useState(false);
+
+  // Quando o nome da empresa carrega, atualiza a mensagem de boas-vindas (se a conversa ainda nem começou).
+  useEffect(() => {
+    setMessages((cur) => (cur.length === 1 && cur[0].id === WELCOME_ID ? [makeWelcome(name)] : cur));
+  }, [name]);
 
   const shouldShow = role === "student";
   const pageLabel = useMemo(() => getStudentPageLabel(location.pathname), [location.pathname]);
@@ -183,7 +215,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
 
     try {
       const history = messages
-        .filter((message) => message.id !== firstMessage.id)
+        .filter((message) => message.id !== WELCOME_ID)
         .slice(-8)
         .map((message) => ({ role: message.role, content: message.content }));
 
@@ -205,20 +237,20 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
       if (!data) throw new Error("resposta vazia");
       if (data.error) throw new Error(data.details || data.error);
 
-      setMessages((current) => [...current, createMessage("assistant", formatStudentBnitoResponse(data))]);
+      setMessages((current) => [...current, createMessage("assistant", formatStudentBnitoResponse(data, name))]);
     } catch (error) {
       const message = error instanceof Error ? error.message : "erro inesperado";
-      setMessages((current) => [...current, createMessage("assistant", getUnavailableMessage(message))]);
+      setMessages((current) => [...current, createMessage("assistant", getUnavailableMessage(message, name))]);
     } finally {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, location.pathname, messages, pageLabel, paramsKey]);
+  }, [loading, location.pathname, messages, pageLabel, paramsKey, name]);
 
   useEffect(() => {
     if (!shouldShow) return;
 
-    const fallback = buildLocalMission(pageLabel);
+    const fallback = buildLocalMission(pageLabel, name);
     setMissionDismissed(false);
     setMission(fallback);
 
@@ -248,7 +280,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
       },
     }).then(({ data, error }) => {
       if (!active || error || !data || data.error) return;
-      const nextMission = toMission(data, fallback);
+      const nextMission = toMission(data, fallback, name);
       setMission(nextMission);
       sessionStorage.setItem(missionCacheKey, JSON.stringify(nextMission));
     }).finally(() => {
@@ -259,7 +291,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, missionCacheKey, pageLabel, paramsKey, shouldShow]);
+  }, [location.pathname, missionCacheKey, pageLabel, paramsKey, shouldShow, name]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -275,7 +307,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
             <TooltipTrigger asChild>
               <button
                 type="button"
-                aria-label="Abrir Bnito"
+                aria-label={`Abrir ${name}`}
                 onClick={() => setOpen(true)}
                 className="fixed bottom-24 right-5 z-40 flex h-16 w-16 items-center justify-center rounded-full border border-white/70 bg-navy text-primary-foreground shadow-[0_18px_45px_rgba(29,45,92,0.32)] ring-8 ring-navy/10 transition duration-200 hover:-translate-y-0.5 hover:bg-navy/95 focus:outline-none focus:ring-4 focus:ring-ring focus:ring-offset-2 md:bottom-6 md:right-6"
               >
@@ -284,7 +316,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
                 </span>
               </button>
             </TooltipTrigger>
-            <TooltipContent side="left">Falar com o Bnito</TooltipContent>
+            <TooltipContent side="left">{`Falar com o ${name}`}</TooltipContent>
           </Tooltip>
 
           {!open && mission && !missionDismissed && (
@@ -328,7 +360,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
                   <BrainCircuit className="h-6 w-6" />
                 </div>
                 <div className="min-w-0">
-                  <DialogTitle className="font-display text-2xl text-navy">Bnito</DialogTitle>
+                  <DialogTitle className="font-display text-2xl text-navy">{name}</DialogTitle>
                   <DialogDescription className="mt-1 text-sm">
                     seu parceiro tecnico de treino
                   </DialogDescription>
@@ -348,7 +380,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
             </DialogHeader>
 
             <div className="shrink-0 border-b border-line bg-paper-warm/45 px-5 py-3 text-xs text-muted-foreground">
-              <span className="font-medium text-navy">Contexto:</span> {pageLabel}. O Bnito usa seu treino salvo e seus registros para responder melhor.
+              <span className="font-medium text-navy">Contexto:</span> {pageLabel}. O {name} usa seu treino salvo e seus registros para responder melhor.
             </div>
 
             <div className="shrink-0 space-y-3 px-5 py-4">
@@ -358,7 +390,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
                 </div>
               )}
               <div className="rounded-[18px] border border-line bg-background p-3 text-sm">
-                <span className="font-semibold text-navy">Bnito lembra:</span> tecnica boa vale mais que carga alta.
+                <span className="font-semibold text-navy">{name} lembra:</span> tecnica boa vale mais que carga alta.
               </div>
               <div className="rounded-[18px] border border-primary/20 bg-primary/5 p-3 text-sm text-navy">
                 <span className="font-semibold">Plano agora:</span> me conte a duvida, o exercicio e o que voce sentiu. Eu te ajudo a decidir o proximo passo com seguranca.
@@ -387,7 +419,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
                   <div className="flex justify-start">
                     <div className="flex items-center gap-2 rounded-[20px] border border-line bg-background px-4 py-3 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Bnito lendo seu contexto...
+                      {name} lendo seu contexto...
                     </div>
                   </div>
                 )}
@@ -415,7 +447,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
                 <Textarea
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
-                  placeholder="Conta para o Bnito..."
+                  placeholder={`Conta para o ${name}...`}
                   className="min-h-[44px] flex-1 resize-none border-0 bg-transparent px-0 py-2 shadow-none focus-visible:ring-0"
                 />
                 <Button type="submit" size="icon" disabled={loading || !input.trim()} className="mb-1 h-9 w-9 rounded-full">

@@ -84,6 +84,8 @@ export default function PublicAnamnesis() {
   const [modalityOther, setModalityOther] = useState("");
   const [trainingDays, setTrainingDays] = useState("");
   const [availableDays, setAvailableDays] = useState("");
+  const [daysStrength, setDaysStrength] = useState("");
+  const [daysCardio, setDaysCardio] = useState("");
   const [sessionDuration, setSessionDuration] = useState("");
   const [trainingLocation, setTrainingLocation] = useState("");
   const [equipment, setEquipment] = useState<string[]>([]);
@@ -112,9 +114,12 @@ export default function PublicAnamnesis() {
   const [swimPool, setSwimPool] = useState("");
   const [swimLevel, setSwimLevel] = useState("");
   const [swimVolume, setSwimVolume] = useState("");
+  const [swimBest, setSwimBest] = useState("");
   const [bikeType, setBikeType] = useState("");
   const [bikeVolume, setBikeVolume] = useState("");
+  const [bikeFtp, setBikeFtp] = useState("");
   const [bikePower, setBikePower] = useState(false);
+  const [fuelingStrategy, setFuelingStrategy] = useState("");
   const [medicalConditions, setMedicalConditions] = useState("");
   const [medications, setMedications] = useState("");
   const [stressScore, setStressScore] = useState("");
@@ -147,6 +152,8 @@ export default function PublicAnamnesis() {
   const [budgetFood, setBudgetFood] = useState("moderado");
   const [hasKitchen, setHasKitchen] = useState(true);
   const [supplements, setSupplements] = useState("");
+  const [hydration, setHydration] = useState("");
+  const [giSensitivities, setGiSensitivities] = useState("");
 
   useEffect(() => {
     if (!studentId) { setNotFound(true); return; }
@@ -184,6 +191,7 @@ export default function PublicAnamnesis() {
     setter(next.join(", "));
   };
   const hasEndurance = modalities.some(m => ["Corrida", "Natação", "Bike", "Triathlon"].includes(m));
+  const doesStrength = modalities.some(m => /muscula|funcional|crossfit/i.test(m));
 
   const getMissingFields = (targetStep: number) => {
     if (targetStep === 1) {
@@ -264,6 +272,8 @@ export default function PublicAnamnesis() {
         training_location: trainingLocation,
         available_equipment: allEquipment,
         days_available: availableDays ? parseInt(availableDays) : null,
+        days_strength: daysStrength ? parseInt(daysStrength) : null,
+        days_cardio: daysCardio ? parseInt(daysCardio) : null,
         goals,
         diseases,
         injuries,
@@ -293,9 +303,12 @@ export default function PublicAnamnesis() {
         swim_pool: swimPool,
         swim_level: swimLevel,
         swim_volume: swimVolume,
+        swim_best: swimBest,
         bike_type: bikeType,
         bike_volume: bikeVolume,
+        bike_ftp: bikeFtp,
         bike_power: bikePower,
+        fueling_strategy: fuelingStrategy,
         medical_conditions: medicalConditions,
         medications,
         stress_score: stressScore ? Number(stressScore) : null,
@@ -328,6 +341,8 @@ export default function PublicAnamnesis() {
         budget_food: budgetFood,
         has_kitchen: hasKitchen,
         supplements,
+        hydration,
+        gi_sensitivities: giSensitivities,
       },
     });
 
@@ -476,6 +491,22 @@ export default function PublicAnamnesis() {
               <Input type="number" min={0} max={7} value={availableDays} onChange={e => setAvailableDays(e.target.value)} />
             </div>
 
+            {doesStrength && hasEndurance && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-lg border border-border p-4">
+                <div className="space-y-2 sm:col-span-2">
+                  <p className="text-sm text-muted-foreground font-sans">Desses dias, como você divide entre força e cardio? (ajuda a IA a montar cada prescrição)</p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-sans font-medium">Dias de musculação / força</Label>
+                  <Input type="number" min={0} max={7} value={daysStrength} onChange={e => setDaysStrength(e.target.value)} placeholder="ex: 3" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-sans font-medium">Dias de cardio (corrida/natação/pedal)</Label>
+                  <Input type="number" min={0} max={7} value={daysCardio} onChange={e => setDaysCardio(e.target.value)} placeholder="ex: 3" />
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label className="font-sans font-medium">Quanto tempo livre para as sessões? *</Label>
               <RadioGroup value={sessionDuration} onValueChange={setSessionDuration}>
@@ -575,9 +606,13 @@ export default function PublicAnamnesis() {
                           <option value="avancado">Avançado</option>
                         </select>
                       </div>
-                      <div className="space-y-2 sm:col-span-2">
+                      <div className="space-y-2">
                         <Label className="font-sans font-medium">Volume de natação</Label>
                         <Input value={swimVolume} onChange={e => setSwimVolume(e.target.value)} placeholder="ex: 3000m/sem ou 2x40min" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="font-sans font-medium">Melhor tempo / pace recente</Label>
+                        <Input value={swimBest} onChange={e => setSwimBest(e.target.value)} placeholder="ex: 400m em 8min, ou 100m em 1:50" />
                       </div>
                     </>
                   )}
@@ -596,12 +631,20 @@ export default function PublicAnamnesis() {
                         <Label className="font-sans font-medium">Volume de bike</Label>
                         <Input value={bikeVolume} onChange={e => setBikeVolume(e.target.value)} placeholder="ex: 120km/sem" />
                       </div>
+                      <div className="space-y-2">
+                        <Label className="font-sans font-medium">FTP ou potência média (W), se souber</Label>
+                        <Input value={bikeFtp} onChange={e => setBikeFtp(e.target.value)} placeholder="ex: 220W" />
+                      </div>
                       <label className="flex items-center gap-2 text-sm font-sans cursor-pointer sm:col-span-2">
                         <Checkbox checked={bikePower} onCheckedChange={v => setBikePower(!!v)} />
                         Tenho medidor de potência
                       </label>
                     </>
                   )}
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label className="font-sans font-medium">Como você se alimenta em treinos/provas longas?</Label>
+                    <Input value={fuelingStrategy} onChange={e => setFuelingStrategy(e.target.value)} placeholder="ex: gel a cada 40min, isotônico, ou não uso nada" />
+                  </div>
                 </div>
               </div>
             )}
@@ -855,6 +898,14 @@ export default function PublicAnamnesis() {
                 <div className="space-y-2 sm:col-span-2">
                   <Label className="font-sans font-medium">Restrições / alergias / dieta</Label>
                   <Textarea value={foodRestrictions} onChange={e => setFoodRestrictions(e.target.value)} placeholder="Ex: intolerância à lactose, vegetariano, alergia..." />
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-sans font-medium">Água por dia (litros)</Label>
+                  <Input value={hydration} onChange={e => setHydration(e.target.value)} placeholder="ex: 2,5L" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-sans font-medium">Desconfortos digestivos (opcional)</Label>
+                  <Input value={giSensitivities} onChange={e => setGiSensitivities(e.target.value)} placeholder="ex: empachamento, gases, refluxo" />
                 </div>
                 <div className="space-y-2">
                   <Label className="font-sans font-medium">Suplementos que usa</Label>

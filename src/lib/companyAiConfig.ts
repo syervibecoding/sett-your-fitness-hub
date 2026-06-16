@@ -1,6 +1,7 @@
 // White-label: configuração da "IA-coração" por empresa.
-// Fonte de verdade da persona/metodologia/nome do assistente que o BNITO (e as edge functions)
-// devem usar. Fallback = comportamento BN atual (assistente "BNITO").
+// Fonte de verdade da persona/metodologia/nome do assistente que a IA (e as edge functions) devem usar.
+// PADRÃO do app (SettApp) = assistente "Setty". Cada empresa pode trocar na Central de IA.
+// (A BN Performance Training tem sua própria config semeada com "BNITO".)
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -23,10 +24,11 @@ export interface CompanyAiConfig {
   onboarding_completed: boolean;
 }
 
-// Fallback BN — usado quando a empresa ainda não preencheu o onboarding.
-export const BN_AI_CONFIG: CompanyAiConfig = {
-  assistant_name: "BNITO",
-  consultancy_name: "BN Performance Training",
+// Fallback PADRÃO do app — usado quando a empresa ainda não preencheu a Central de IA.
+// O nome padrão do assistente é "Setty" (app = SettApp). O dono troca depois no onboarding.
+export const DEFAULT_AI_CONFIG: CompanyAiConfig = {
+  assistant_name: "Setty",
+  consultancy_name: null,
   methodology: null,
   plans_payment: null,
   tone: null,
@@ -43,14 +45,14 @@ export const BN_AI_CONFIG: CompanyAiConfig = {
 };
 
 export async function fetchCompanyAiConfig(companyId: string | null | undefined): Promise<CompanyAiConfig> {
-  if (!companyId) return BN_AI_CONFIG;
+  if (!companyId) return DEFAULT_AI_CONFIG;
   const { data } = await (supabase as any)
     .from("company_ai_config")
     .select("assistant_name, consultancy_name, methodology, plans_payment, tone, owner_credentials, niche_audience, exercise_preferences, progression_model, assessment_protocol, red_lines, communication_style, nutrition_scope, ethical_limits, onboarding_completed")
     .eq("company_id", companyId)
     .maybeSingle();
-  if (!data) return BN_AI_CONFIG;
-  return { ...BN_AI_CONFIG, ...data };
+  if (!data) return DEFAULT_AI_CONFIG;
+  return { ...DEFAULT_AI_CONFIG, ...data };
 }
 
 export async function saveCompanyAiConfig(
@@ -65,7 +67,7 @@ export async function saveCompanyAiConfig(
 
 /** Hook React: carrega a config da empresa (com fallback BN). */
 export function useCompanyAiConfig(companyId: string | null | undefined) {
-  const [config, setConfig] = useState<CompanyAiConfig>(BN_AI_CONFIG);
+  const [config, setConfig] = useState<CompanyAiConfig>(DEFAULT_AI_CONFIG);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let active = true;

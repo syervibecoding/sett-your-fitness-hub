@@ -116,6 +116,9 @@ function buildNutritionContext(body: Record<string, any>) {
     body.appetite_wake && `Fome ao acordar: ${appetiteLabels[body.appetite_wake] || body.appetite_wake}`,
     body.food_likes && `Gosta de: ${cleanText(body.food_likes)}`,
     body.food_dislikes && `NÃO gosta / evitar: ${cleanText(body.food_dislikes)}`,
+    body.hydration && `Hidratação atual: ${cleanText(body.hydration, 60)}`,
+    body.gi_sensitivities && `Desconfortos digestivos: ${cleanText(body.gi_sensitivities, 200)}`,
+    body.fueling_strategy && `Nutrição em treino/prova longa: ${cleanText(body.fueling_strategy, 200)}`,
   ].filter(Boolean).join(" | ");
 }
 
@@ -144,10 +147,12 @@ function mapLegacySubmitToStudioAnamnese(body: Record<string, any>, student: Rec
       body.swim_pool && "piscina " + cleanText(body.swim_pool, 80),
       body.swim_level && "nível " + cleanText(body.swim_level, 80),
       body.swim_volume && "volume " + cleanText(body.swim_volume, 120),
+      body.swim_best && "melhor tempo/pace " + cleanText(body.swim_best, 80),
     ].filter(Boolean).join(", ") || "detalhes não informados"}`,
     cycling && `CICLISMO: ${[
       body.bike_type && cleanText(body.bike_type, 80),
       body.bike_volume && "volume " + cleanText(body.bike_volume, 120),
+      body.bike_ftp && "FTP/potência " + cleanText(body.bike_ftp, 60),
       boolValue(body.bike_power) && "tem medidor de potência",
     ].filter(Boolean).join(", ") || "detalhes não informados"}`,
     body.perceived_recovery && `Recuperação percebida hoje: ${body.perceived_recovery}/10`,
@@ -183,8 +188,13 @@ function mapLegacySubmitToStudioAnamnese(body: Record<string, any>, student: Rec
       swimming && "natação",
       cycling && "ciclismo",
     ].filter(Boolean).join(" + ") || modalities.join(" + "), 300),
-    days_per_week_strength: strength ? numberOrNull(body.days_available ?? body.available_days) : null,
-    days_per_week_cardio: (running || swimming || cycling) ? numberOrNull(body.days_available ?? body.available_days) : null,
+    // Split por modalidade quando informado; senão usa o total disponível.
+    days_per_week_strength: strength
+      ? (numberOrNull(body.days_strength) ?? numberOrNull(body.days_available ?? body.available_days))
+      : null,
+    days_per_week_cardio: (running || swimming || cycling)
+      ? (numberOrNull(body.days_cardio) ?? numberOrNull(body.days_available ?? body.available_days))
+      : null,
     session_duration_min: parseSessionMinutes(body),
     equipment: cleanText(body.equipment || body.training_location || allEquipment.join(", "), 500),
     experience_months: numberOrNull(body.experience_months),

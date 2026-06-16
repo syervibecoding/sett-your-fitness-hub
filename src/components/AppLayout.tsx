@@ -4,6 +4,9 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { BnitoAssistantProvider, BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 import { RouteTransition } from "@/components/RouteTransition";
+import { useAuth } from "@/hooks/useAuth";
+import { useMaster } from "@/contexts/MasterContext";
+import { useCompanyAiConfig } from "@/lib/companyAiConfig";
 
 const ContentLoader = () => (
   <div className="flex items-center justify-center py-24">
@@ -13,6 +16,13 @@ const ContentLoader = () => (
 
 export function AppLayout() {
   const location = useLocation();
+  const { role, companyId } = useAuth();
+  const { viewingCompany, isViewingCompany } = useMaster();
+  // Empresa em foco: master vendo uma empresa → a dela; senão a do usuário.
+  const effectiveCompanyId =
+    role === "master" ? (isViewingCompany ? viewingCompany?.id ?? null : null) : companyId;
+  const { config } = useCompanyAiConfig(effectiveCompanyId);
+  const assistantName = config.assistant_name || "Setty";
   const noPadding =
     location.pathname.includes("/whatsapp-chat") ||
     location.pathname.includes("/whatsapp-automation");
@@ -32,7 +42,7 @@ export function AppLayout() {
                 label="painel atual"
                 context="Ajuda contextual geral da rota atual, considerando permissao, modulo e tarefa em andamento."
                 question="Me orienta sobre esta tela e os proximos passos tecnicos?"
-                text="BNITO"
+                text={assistantName}
                 className="ml-auto"
               />
             </header>

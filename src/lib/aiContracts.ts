@@ -60,9 +60,11 @@ export interface CompanyAiContractConfig {
   onboarding_completed: boolean;
 }
 
+// Padrão do app (SettApp) = assistente "Setty". Cada empresa troca na Central de IA.
+// (Mantém o nome do símbolo por compatibilidade de import/teste; valores agora são o default Setty.)
 export const BN_AI_CONFIG_FALLBACK: CompanyAiContractConfig = {
-  assistant_name: "BNITO",
-  consultancy_name: "BN Performance Training",
+  assistant_name: "Setty",
+  consultancy_name: null,
   methodology: null,
   plans_payment: null,
   tone: null,

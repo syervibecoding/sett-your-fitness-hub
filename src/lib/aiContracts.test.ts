@@ -107,11 +107,13 @@ describe("AI contracts", () => {
     expect(result.warnings[0].recommendation).toContain("Regressao sugerida");
   });
 
-  it("falls back to BN/BNITO when company_ai_config is missing", () => {
+  it("usa o padrão do app (Setty) quando company_ai_config está ausente", () => {
     expect(resolveCompanyAiContractConfig(null)).toEqual(BN_AI_CONFIG_FALLBACK);
+    expect(resolveCompanyAiContractConfig(null).assistant_name).toBe("Setty");
+    // Config parcial sobrepõe só o que foi informado; o resto vem do padrão.
     expect(resolveCompanyAiContractConfig({ assistant_name: "Coach X" })).toMatchObject({
       assistant_name: "Coach X",
-      consultancy_name: "BN Performance Training",
+      consultancy_name: null,
       onboarding_completed: false,
     });
   });
