@@ -1,6 +1,34 @@
-# SETT Your Fitness Hub
+# SETT / BN Performance — Fitness Hub
 
-Fitness hub built with Vite, React, TypeScript, shadcn/ui, Tailwind CSS, and Supabase.
+App de **treino, avaliação funcional, nutrição e gestão** para personal trainers e consultorias.
+Atende dois públicos: o **aluno** (no aplicativo) e o **treinador** (painel de gestão).
+
+> App em produção: **https://bn-performance-webapp-matheus.netlify.app**
+> Stack: Vite + React + TypeScript + shadcn/ui + Tailwind + Supabase.
+
+---
+
+## O que a plataforma faz
+
+### Para o aluno
+- **Treino guiado:** cronômetro, aviso sonoro no descanso, a tela não apaga e as cargas são salvas sozinhas (até offline).
+- **Recorde pessoal** comemorado na hora; **gamificação** (pontos, ranking mensal anônimo, conquistas, gráficos de evolução).
+- **Vídeo de demonstração** em cada exercício.
+- **Abas que só aparecem se houver prescrição:** Treino, Dicas Nutricionais, Corrida, Natação e Ciclismo.
+- **Plano nutricional por refeição** (horários, o que comer / evitar), metas, macros e marcador de hidratação.
+- **Popup pós-treino "Como foi o treino?"** — a resposta chega ao treinador no WhatsApp.
+
+### Para o treinador
+- **Prescrição num lugar só:** anamnese → avaliação por vídeo (gera laudo) → prescrição → PDFs, com **publicação automática no app do aluno**.
+- **Laudo em PDF** com envio ao aluno e arquivo na pasta dele.
+- **Vídeo do WhatsApp vira avaliação em 1 clique**; **anamnese enviada direto no WhatsApp**.
+- **Painel de gestão:** risco de evasão, aniversariantes do mês, renovações vencendo, troca de treino.
+- **CRM de WhatsApp:** mensagens-modelo, envio em massa por segmento, conversa com mensagem pronta.
+- **Central de IA** que personaliza o assistente para cada unidade.
+- **Biblioteca de 447 exercícios** com upload de vídeo por exercício.
+- **Página de pagamento personalizada (white-label)** por empresa.
+
+---
 
 ## AI Pack
 
@@ -46,6 +74,7 @@ Optional:
 
 ```bash
 ANTHROPIC_MODEL
+YOUTUBE_API_KEY
 ```
 
 ## Commands
