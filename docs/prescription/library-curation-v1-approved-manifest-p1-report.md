@@ -1,0 +1,255 @@
+# Relatório do Approved Manifest (curadoria) — offline
+
+> Gerado por `scripts/prescription/build-approved-curation-manifest.mjs` (ORDEM 031).
+> **Offline** — não conecta no banco, não executa SQL, não altera dados.
+
+## Status: NO_APPROVED_ROWS
+
+## Entradas
+- Manifesto: `docs/prescription/library-curation-v1-consolidated-manifest.csv`
+- Review CSV: `docs/prescription/library-curation-v1-review-board-p1.csv`
+- Prioridade esperada: `P1`
+- Saída CSV: `docs/prescription/library-curation-v1-approved-manifest-p1.csv`
+
+## Contagens
+| métrica | valor |
+|---|---|
+| total_review_rows | 51 |
+| approved_rows | 0 |
+| ready_for_upsert_rows | 0 |
+| skipped_needs_review | 51 |
+| skipped_rejected | 0 |
+| skipped_needs_more_info | 0 |
+| linhas no approved manifest (saída) | 0 |
+| errors | 0 |
+| warnings | 222 |
+
+> Nenhuma linha aprovada. CSV de saída contém **apenas o header**. Nada a aplicar.
+
+## Erros
+- (nenhum)
+
+## Warnings
+- ⚠️ linha 2 (606fe07b-7696-428d-91b3-012863ca5554): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 2 (606fe07b-7696-428d-91b3-012863ca5554): progression "carga só sem dor e técnica limpa" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 2 (606fe07b-7696-428d-91b3-012863ca5554): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 2 (606fe07b-7696-428d-91b3-012863ca5554): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 3 (4834bdde-5c05-47d1-94b3-9cdecd81fd62): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 3 (4834bdde-5c05-47d1-94b3-9cdecd81fd62): progression "carga só sem dor e técnica limpa" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 3 (4834bdde-5c05-47d1-94b3-9cdecd81fd62): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 3 (4834bdde-5c05-47d1-94b3-9cdecd81fd62): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 4 (7c4dd9a3-c6c2-4e9a-a896-42b7c9911ade): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 4 (7c4dd9a3-c6c2-4e9a-a896-42b7c9911ade): progression "carga só sem dor e técnica limpa" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 4 (7c4dd9a3-c6c2-4e9a-a896-42b7c9911ade): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 4 (7c4dd9a3-c6c2-4e9a-a896-42b7c9911ade): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 5 (e9356e80-6f25-4ac7-bce7-afc652825220): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 5 (e9356e80-6f25-4ac7-bce7-afc652825220): progression "carga só sem dor e técnica limpa" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 5 (e9356e80-6f25-4ac7-bce7-afc652825220): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 5 (e9356e80-6f25-4ac7-bce7-afc652825220): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 6 (f65e178d-2fb9-467d-8ec7-153df01be7bb): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 6 (f65e178d-2fb9-467d-8ec7-153df01be7bb): progression "carga só sem dor e técnica limpa" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 6 (f65e178d-2fb9-467d-8ec7-153df01be7bb): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 6 (f65e178d-2fb9-467d-8ec7-153df01be7bb): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 7 (e1ff0905-955b-4bf7-95c6-1b72dbfa34ff): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 7 (e1ff0905-955b-4bf7-95c6-1b72dbfa34ff): progression "carga só sem dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 7 (e1ff0905-955b-4bf7-95c6-1b72dbfa34ff): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 7 (e1ff0905-955b-4bf7-95c6-1b72dbfa34ff): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 8 (bf14a53d-23ee-4db4-a46e-07e149e66454): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 8 (bf14a53d-23ee-4db4-a46e-07e149e66454): progression "carga só sem dor e técnica limpa" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 8 (bf14a53d-23ee-4db4-a46e-07e149e66454): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 8 (bf14a53d-23ee-4db4-a46e-07e149e66454): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 9 (48ece7af-de72-45c1-bdf4-27a7ff2f3209): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 9 (48ece7af-de72-45c1-bdf4-27a7ff2f3209): progression "carga só sem dor e técnica limpa" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 9 (48ece7af-de72-45c1-bdf4-27a7ff2f3209): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 9 (48ece7af-de72-45c1-bdf4-27a7ff2f3209): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 10 (77208e72-8b6f-4fdc-99ca-42a18e2889d6): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 10 (77208e72-8b6f-4fdc-99ca-42a18e2889d6): progression "carga só sem dor e técnica limpa" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 10 (77208e72-8b6f-4fdc-99ca-42a18e2889d6): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 10 (77208e72-8b6f-4fdc-99ca-42a18e2889d6): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 11 (7f9fbd65-d234-4b84-b198-faca46343915): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 11 (7f9fbd65-d234-4b84-b198-faca46343915): progression "carga só sem dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 11 (7f9fbd65-d234-4b84-b198-faca46343915): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 11 (7f9fbd65-d234-4b84-b198-faca46343915): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 12 (a863ae76-f3e6-42c0-9757-26e7e1a111a7): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 12 (a863ae76-f3e6-42c0-9757-26e7e1a111a7): progression "carga só sem dor e técnica limpa" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 12 (a863ae76-f3e6-42c0-9757-26e7e1a111a7): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 12 (a863ae76-f3e6-42c0-9757-26e7e1a111a7): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 13 (e54dd5b2-99cf-4648-9885-6cd19d03f9d9): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 13 (e54dd5b2-99cf-4648-9885-6cd19d03f9d9): progression "carga só sem dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 13 (e54dd5b2-99cf-4648-9885-6cd19d03f9d9): progression "sem dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 13 (e54dd5b2-99cf-4648-9885-6cd19d03f9d9): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 13 (e54dd5b2-99cf-4648-9885-6cd19d03f9d9): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 14 (b1683ec5-c903-4406-a33d-0a03606ac7f5): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 14 (b1683ec5-c903-4406-a33d-0a03606ac7f5): progression "Separar os movimentos" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 14 (b1683ec5-c903-4406-a33d-0a03606ac7f5): progression "progredir reps antes de carga sem dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 14 (b1683ec5-c903-4406-a33d-0a03606ac7f5): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 14 (b1683ec5-c903-4406-a33d-0a03606ac7f5): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 14 (b1683ec5-c903-4406-a33d-0a03606ac7f5): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 14 (b1683ec5-c903-4406-a33d-0a03606ac7f5): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 15 (c8dfd65e-2b07-405f-a506-311c0995241c): substitute "Encolhimento Halter" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_equivalent_substitutes].
+- ⚠️ linha 15 (c8dfd65e-2b07-405f-a506-311c0995241c): substitute "Encolhimento Smith" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_equivalent_substitutes].
+- ⚠️ linha 15 (c8dfd65e-2b07-405f-a506-311c0995241c): regression "Encolhimento Halter" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 15 (c8dfd65e-2b07-405f-a506-311c0995241c): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 15 (c8dfd65e-2b07-405f-a506-311c0995241c): progression "carga só sem dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 15 (c8dfd65e-2b07-405f-a506-311c0995241c): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 15 (c8dfd65e-2b07-405f-a506-311c0995241c): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 16 (c7e285f9-ef03-4c45-81ee-635ae58b236f): substitute "Encolhimento Smith" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_equivalent_substitutes].
+- ⚠️ linha 16 (c7e285f9-ef03-4c45-81ee-635ae58b236f): substitute "Encolhimento Halter" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_equivalent_substitutes].
+- ⚠️ linha 16 (c7e285f9-ef03-4c45-81ee-635ae58b236f): regression "Encolhimento Halter" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 16 (c7e285f9-ef03-4c45-81ee-635ae58b236f): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 16 (c7e285f9-ef03-4c45-81ee-635ae58b236f): progression "carga só sem dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 16 (c7e285f9-ef03-4c45-81ee-635ae58b236f): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 16 (c7e285f9-ef03-4c45-81ee-635ae58b236f): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 17 (2345fdf0-2bb7-49c0-839d-1d1bfd3024f8): substitute "Elevação Pélvica Barra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_equivalent_substitutes].
+- ⚠️ linha 17 (2345fdf0-2bb7-49c0-839d-1d1bfd3024f8): regression "Elevação Pélvica Barra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 17 (2345fdf0-2bb7-49c0-839d-1d1bfd3024f8): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 17 (2345fdf0-2bb7-49c0-839d-1d1bfd3024f8): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 17 (2345fdf0-2bb7-49c0-839d-1d1bfd3024f8): progression "manter coluna neutra e dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 17 (2345fdf0-2bb7-49c0-839d-1d1bfd3024f8): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 17 (2345fdf0-2bb7-49c0-839d-1d1bfd3024f8): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 18 (45912e02-399e-4442-8b13-365e834fab4b): substitute "Elevação Pélvica Barra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_equivalent_substitutes].
+- ⚠️ linha 18 (45912e02-399e-4442-8b13-365e834fab4b): regression "Elevação Pélvica Barra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 18 (45912e02-399e-4442-8b13-365e834fab4b): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 18 (45912e02-399e-4442-8b13-365e834fab4b): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 18 (45912e02-399e-4442-8b13-365e834fab4b): progression "manter coluna neutra e dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 18 (45912e02-399e-4442-8b13-365e834fab4b): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 18 (45912e02-399e-4442-8b13-365e834fab4b): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 19 (cb160be6-90a5-4365-b77c-0ae473917009): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 19 (cb160be6-90a5-4365-b77c-0ae473917009): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 19 (cb160be6-90a5-4365-b77c-0ae473917009): progression "manter coluna neutra e dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 19 (cb160be6-90a5-4365-b77c-0ae473917009): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 19 (cb160be6-90a5-4365-b77c-0ae473917009): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 20 (dc0ad1e1-6d1b-4cec-8e29-1c9ce486097f): substitute "Elevação Pélvica Barra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_equivalent_substitutes].
+- ⚠️ linha 20 (dc0ad1e1-6d1b-4cec-8e29-1c9ce486097f): regression "Elevação Pélvica Barra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 20 (dc0ad1e1-6d1b-4cec-8e29-1c9ce486097f): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 20 (dc0ad1e1-6d1b-4cec-8e29-1c9ce486097f): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 20 (dc0ad1e1-6d1b-4cec-8e29-1c9ce486097f): progression "manter coluna neutra e dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 20 (dc0ad1e1-6d1b-4cec-8e29-1c9ce486097f): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 20 (dc0ad1e1-6d1b-4cec-8e29-1c9ce486097f): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 21 (fa532cec-fd1b-440e-b42e-6d2c0f6ae3fb): substitute "Elevação Pélvica Barra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_equivalent_substitutes].
+- ⚠️ linha 21 (fa532cec-fd1b-440e-b42e-6d2c0f6ae3fb): regression "Elevação Pélvica Barra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 21 (fa532cec-fd1b-440e-b42e-6d2c0f6ae3fb): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 21 (fa532cec-fd1b-440e-b42e-6d2c0f6ae3fb): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 21 (fa532cec-fd1b-440e-b42e-6d2c0f6ae3fb): progression "manter coluna neutra e dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 21 (fa532cec-fd1b-440e-b42e-6d2c0f6ae3fb): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 21 (fa532cec-fd1b-440e-b42e-6d2c0f6ae3fb): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 22 (3e192862-ed2e-4063-b6f9-13b433844cf8): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 22 (3e192862-ed2e-4063-b6f9-13b433844cf8): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 22 (3e192862-ed2e-4063-b6f9-13b433844cf8): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 22 (3e192862-ed2e-4063-b6f9-13b433844cf8): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 23 (f6f1683c-2e7c-4e75-b268-89803b22e6ac): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 23 (f6f1683c-2e7c-4e75-b268-89803b22e6ac): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 23 (f6f1683c-2e7c-4e75-b268-89803b22e6ac): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 23 (f6f1683c-2e7c-4e75-b268-89803b22e6ac): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 24 (c916c624-2e7c-40b2-8195-4e5f8a4f2c3c): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 24 (c916c624-2e7c-40b2-8195-4e5f8a4f2c3c): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 24 (c916c624-2e7c-40b2-8195-4e5f8a4f2c3c): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 24 (c916c624-2e7c-40b2-8195-4e5f8a4f2c3c): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 25 (9c34a520-62bb-4385-b4f4-384ebce408b8): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 25 (9c34a520-62bb-4385-b4f4-384ebce408b8): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 25 (9c34a520-62bb-4385-b4f4-384ebce408b8): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 25 (9c34a520-62bb-4385-b4f4-384ebce408b8): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 26 (99a351d1-7fc4-441c-b95c-691e795f26d1): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 26 (99a351d1-7fc4-441c-b95c-691e795f26d1): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 26 (99a351d1-7fc4-441c-b95c-691e795f26d1): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 26 (99a351d1-7fc4-441c-b95c-691e795f26d1): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 27 (ffbf282d-91d7-44fb-b4fe-7775256eca1f): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 27 (ffbf282d-91d7-44fb-b4fe-7775256eca1f): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 27 (ffbf282d-91d7-44fb-b4fe-7775256eca1f): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 27 (ffbf282d-91d7-44fb-b4fe-7775256eca1f): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 28 (4fa767dc-338d-48f0-accc-9088900c2738): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 28 (4fa767dc-338d-48f0-accc-9088900c2738): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 28 (4fa767dc-338d-48f0-accc-9088900c2738): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 28 (4fa767dc-338d-48f0-accc-9088900c2738): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 29 (3da3626b-01f8-4fcd-bc73-281255db1d62): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 29 (3da3626b-01f8-4fcd-bc73-281255db1d62): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 29 (3da3626b-01f8-4fcd-bc73-281255db1d62): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 29 (3da3626b-01f8-4fcd-bc73-281255db1d62): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 30 (506123c3-3d0d-4d4e-91a4-2e2363dd9280): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 30 (506123c3-3d0d-4d4e-91a4-2e2363dd9280): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 30 (506123c3-3d0d-4d4e-91a4-2e2363dd9280): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 30 (506123c3-3d0d-4d4e-91a4-2e2363dd9280): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 31 (edaabff8-cd69-4e3c-8658-6a300fd46872): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 31 (edaabff8-cd69-4e3c-8658-6a300fd46872): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 31 (edaabff8-cd69-4e3c-8658-6a300fd46872): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 31 (edaabff8-cd69-4e3c-8658-6a300fd46872): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 32 (1e9ca66e-a79c-4885-87f0-049742a63266): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 32 (1e9ca66e-a79c-4885-87f0-049742a63266): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 32 (1e9ca66e-a79c-4885-87f0-049742a63266): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 32 (1e9ca66e-a79c-4885-87f0-049742a63266): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 33 (8327a63b-80c4-421a-97d4-7de1a4b667c5): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 33 (8327a63b-80c4-421a-97d4-7de1a4b667c5): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 33 (8327a63b-80c4-421a-97d4-7de1a4b667c5): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 33 (8327a63b-80c4-421a-97d4-7de1a4b667c5): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 34 (5f51a4d4-44ee-45e1-89ac-ef44712b0c1e): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 34 (5f51a4d4-44ee-45e1-89ac-ef44712b0c1e): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 34 (5f51a4d4-44ee-45e1-89ac-ef44712b0c1e): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 34 (5f51a4d4-44ee-45e1-89ac-ef44712b0c1e): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 35 (ad2c7265-abc6-44f1-9fb6-d1dd2db714bf): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 35 (ad2c7265-abc6-44f1-9fb6-d1dd2db714bf): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 35 (ad2c7265-abc6-44f1-9fb6-d1dd2db714bf): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 35 (ad2c7265-abc6-44f1-9fb6-d1dd2db714bf): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 36 (da6ed290-59ef-49c0-a831-51ee224233bf): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 36 (da6ed290-59ef-49c0-a831-51ee224233bf): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 36 (da6ed290-59ef-49c0-a831-51ee224233bf): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 36 (da6ed290-59ef-49c0-a831-51ee224233bf): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 37 (03913dfa-9d5c-44b5-9e92-325a1697cc19): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 37 (03913dfa-9d5c-44b5-9e92-325a1697cc19): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 37 (03913dfa-9d5c-44b5-9e92-325a1697cc19): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 37 (03913dfa-9d5c-44b5-9e92-325a1697cc19): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 38 (af71347e-48d2-40df-83b4-d77c4dd21ea7): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 38 (af71347e-48d2-40df-83b4-d77c4dd21ea7): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 38 (af71347e-48d2-40df-83b4-d77c4dd21ea7): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 38 (af71347e-48d2-40df-83b4-d77c4dd21ea7): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 39 (2aba59cb-6e22-4e64-9b76-f931d0b7d069): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 39 (2aba59cb-6e22-4e64-9b76-f931d0b7d069): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 39 (2aba59cb-6e22-4e64-9b76-f931d0b7d069): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 39 (2aba59cb-6e22-4e64-9b76-f931d0b7d069): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 40 (e07a88c2-da55-42e7-935a-1b53261381c6): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 40 (e07a88c2-da55-42e7-935a-1b53261381c6): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 40 (e07a88c2-da55-42e7-935a-1b53261381c6): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 40 (e07a88c2-da55-42e7-935a-1b53261381c6): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 41 (1aebf554-0bd2-42d6-a749-4070c77e128d): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 41 (1aebf554-0bd2-42d6-a749-4070c77e128d): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 41 (1aebf554-0bd2-42d6-a749-4070c77e128d): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 41 (1aebf554-0bd2-42d6-a749-4070c77e128d): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 42 (dc207ca2-b186-4220-b154-63c08c53ea66): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 42 (dc207ca2-b186-4220-b154-63c08c53ea66): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 42 (dc207ca2-b186-4220-b154-63c08c53ea66): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 42 (dc207ca2-b186-4220-b154-63c08c53ea66): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 43 (26ac45b4-4a3c-49f4-a68e-20e87a00252a): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 43 (26ac45b4-4a3c-49f4-a68e-20e87a00252a): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 43 (26ac45b4-4a3c-49f4-a68e-20e87a00252a): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 43 (26ac45b4-4a3c-49f4-a68e-20e87a00252a): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 44 (e72c6531-5b99-4757-9a7d-efaa5d4bfdbf): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 44 (e72c6531-5b99-4757-9a7d-efaa5d4bfdbf): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 44 (e72c6531-5b99-4757-9a7d-efaa5d4bfdbf): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 44 (e72c6531-5b99-4757-9a7d-efaa5d4bfdbf): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 45 (fc025e5f-41e3-41df-8dc7-0d2507f26f17): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 45 (fc025e5f-41e3-41df-8dc7-0d2507f26f17): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 45 (fc025e5f-41e3-41df-8dc7-0d2507f26f17): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 45 (fc025e5f-41e3-41df-8dc7-0d2507f26f17): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 46 (40f6085e-6038-403a-9419-bc67731defea): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 46 (40f6085e-6038-403a-9419-bc67731defea): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 46 (40f6085e-6038-403a-9419-bc67731defea): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 46 (40f6085e-6038-403a-9419-bc67731defea): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 47 (18248fd8-94bb-46c6-a567-de54ce6103d7): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 47 (18248fd8-94bb-46c6-a567-de54ce6103d7): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 47 (18248fd8-94bb-46c6-a567-de54ce6103d7): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 47 (18248fd8-94bb-46c6-a567-de54ce6103d7): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 48 (b222ffd2-a90e-47a2-9924-a63381446069): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 48 (b222ffd2-a90e-47a2-9924-a63381446069): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 48 (b222ffd2-a90e-47a2-9924-a63381446069): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 49 (bc77dd8b-8a5b-49da-987b-2653991d1659): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 49 (bc77dd8b-8a5b-49da-987b-2653991d1659): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 49 (bc77dd8b-8a5b-49da-987b-2653991d1659): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 50 (ce8529f2-dd0e-4c7c-8110-d2505d84bfe2): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 50 (ce8529f2-dd0e-4c7c-8110-d2505d84bfe2): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 50 (ce8529f2-dd0e-4c7c-8110-d2505d84bfe2): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 51 (e2e6d537-a9ba-4feb-bd2d-f6b7591895c2): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 51 (e2e6d537-a9ba-4feb-bd2d-f6b7591895c2): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 51 (e2e6d537-a9ba-4feb-bd2d-f6b7591895c2): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 52 (6c2e58df-666f-420a-81e2-192929555fdc): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 52 (6c2e58df-666f-420a-81e2-192929555fdc): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 52 (6c2e58df-666f-420a-81e2-192929555fdc): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+
