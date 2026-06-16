@@ -74,6 +74,7 @@ function looksLikeNonExercise(tok) {
   if (t.startsWith("(")) return true;
   if (t.includes("—") || t.includes(" – ")) return true;
   if (/\((reduzir|corretivo|assistido|leve|joelhos apoiados|base)/i.test(t)) return true;
+  if (/^[A-Z0-9_]+$/.test(t) && t.length >= 6 && t.includes("_")) return true; // sentinela/codigo (SCREAMING_SNAKE), nao-exercicio
   return false;
 }
 function readBool(v) {

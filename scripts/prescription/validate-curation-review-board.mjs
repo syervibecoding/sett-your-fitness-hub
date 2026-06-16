@@ -85,6 +85,7 @@ function looksLikeNonExercise(tok) {
   if (t.startsWith("(")) return true;          // ex.: "(reduzir altura do step)"
   if (t.includes("—") || t.includes(" – ")) return true; // nota com travessao
   if (/\((reduzir|corretivo|assistido|leve|joelhos apoiados|base)/i.test(t)) return true;
+  if (/^[A-Z0-9_]+$/.test(t) && t.length >= 6 && t.includes("_")) return true; // sentinela/codigo (SCREAMING_SNAKE), nao-exercicio
   return false;
 }
 
