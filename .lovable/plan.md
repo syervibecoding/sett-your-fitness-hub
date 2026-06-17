@@ -1,36 +1,48 @@
-# Remover feedback do app e direcionar para o WhatsApp
+# Plano: Boneco anatômico + UX da área do aluno
 
-Substituir todos os formulários/coletas de feedback (pós-treino, ciclo e histórico no admin) por um link direto para o WhatsApp fixo `https://wa.me/message/GZWXMSEEKWGII1`.
+Baseado na auditoria do repositório BN, adaptado para o Set App (multi-profissional). Dividido em fases por impacto/esforço — dá pra parar em qualquer fase.
 
-## O que muda
+## Diagnóstico (o que temos vs. o que o BN tem)
 
-### 1. Feedback pós-treino (aluno)
-- Remover o formulário `PostWorkoutFeedback` (dificuldade, energia, áreas de dor, notas) que aparece antes do resumo do treino.
-- Depois de concluir o treino, o aluno vai direto para o resumo (`WorkoutSummary`).
-- No resumo, o botão "Enviar Feedback" passa a abrir o link fixo do WhatsApp (em vez de montar uma mensagem com a instância da empresa). O botão fica sempre visível, sem depender do número da empresa.
+| Recurso | Set App hoje | BN | Ação |
+|---|---|---|---|
+| Boneco | SVG paramétrico só de largura (`BodyAvatar.tsx`) | Mapa anatômico `react-muscle-highlighter` (frente/costas, músculos) | **Trocar/expandir** |
+| Mapa muscular | Radar/spider de volume (`MuscleRadar.tsx`) | Heatmap no corpo por grupo | **Adicionar heatmap** |
+| Tela acesa no treino | ❌ | `useWakeLock` | **Portar** |
+| Som no fim do descanso | só vibra (`RestTimer`) | beep Web Audio + mute persistido | **Portar** |
+| Celebração de PR | toast simples | beep + vibração + toast | **Enriquecer** |
 
-### 2. Feedback de ciclo (aluno)
-- No banner "Seu ciclo termina em X dias", o botão "Dar feedback do ciclo" deixa de abrir o formulário com estrelas/intenção de renovação e passa a abrir o link fixo do WhatsApp.
-- O formulário `CycleFeedbackForm` deixa de ser usado.
+## Fase 1 — Boneco anatômico com heatmap de volume (maior impacto visual)
 
-### 3. Histórico de feedback (admin / treinador)
-- Remover a aba "Feedbacks" da ficha do aluno (`StudentDetail`), junto com o componente `StudentFeedbackTab` que listava feedbacks de ciclo e pós-treino.
+Adotar `react-muscle-highlighter` (compatível com React 18) e criar uma camada de contrato própria, multi-tenant.
 
-### Componentes removidos
-- `src/components/student/PostWorkoutFeedback.tsx`
-- `src/components/student/CycleFeedbackForm.tsx`
-- `src/components/admin/StudentFeedbackTab.tsx`
+1. `bun add react-muscle-highlighter`.
+2. Novo `src/lib/bodyMap.ts`: contrato único com as regiões anatômicas (`chest`, `shoulders`, `biceps`, `triceps`, `forearm`, `abs`, `trapezius`, `back`, `lower_back`, `glutes`, `quads`, `hamstrings`, `adductors`, `calves`) + mapeamento `REGION_TO_SLUG` e helper `muscleGroupToRegion` (liga os grupos cadastrados por cada empresa às regiões do boneco — sem hardcode da BN).
+3. Novo `src/components/body/BodyMap.tsx`: wrapper genérico com toggle Frente/Costas, gênero, `getRegionFill(region)`, `onRegionClick`. Cores via tokens do design system (não hardcode).
+4. Novo `src/components/student/MuscleHeatmap.tsx`: recebe os volumes que já alimentam o `MuscleRadar` e pinta o corpo com intensidade proporcional ao volume (heatmap). Mantém a lista de barras kg embaixo.
+5. Em Estatísticas do aluno: heatmap + radar lado a lado (radar continua útil pra comparar formato).
+
+## Fase 2 — Boneco de medidas mantido e integrado
+
+O boneco paramétrico atual (`BodyAvatar`) tem valor próprio (ajusta com circunferências em tempo real). Mantê-lo na aba **Medidas**, e usar o novo mapa anatômico (Fase 1) na aba **Estatísticas**. Sem retrabalho destrutivo.
+
+## Fase 3 — UX de execução do treino (rápido, alto valor)
+
+1. `src/hooks/useWakeLock.ts`: mantém a tela acesa enquanto a sessão está ativa (re-adquire no `visibilitychange`). Ativar no `StudentPortal` quando `session` ativo.
+2. `src/lib/feedback.ts`: Web Audio API (zero assets) — `restDoneFeedback()` (beep+vibração no fim do descanso) e `prFeedback()` (beep mais agudo no PR). Mute persistido em `localStorage`.
+3. `RestTimer.tsx`: tocar `restDoneFeedback()` no `onComplete` + botão mute (ícone Volume2/VolumeX).
+4. PR: ao detectar recorde no fluxo de finalização, disparar `prFeedback()` junto do toast já existente.
+
+## Fase 4 (opcional) — Mapa de limitações para o treinador
+
+Reaproveitar o `BodyMap` para o treinador marcar limitações por região (muscular/articular/neural + severidade) no perfil do aluno. Requer tabela nova `student_body_limitations` (company-scoped, RLS). Só se houver interesse — é o item de maior esforço.
 
 ## Detalhes técnicos
 
-- Criar uma constante `WHATSAPP_FEEDBACK_URL = "https://wa.me/message/GZWXMSEEKWGII1"` usada nos pontos abaixo.
-- `StudentPortal.tsx`: remover import e uso de `PostWorkoutFeedback`, o estado `pendingFeedbackSessionId` e a lógica que "trava" o resumo até o feedback. O `WorkoutSummary` passa a renderizar assim que `session.summary` existir.
-- `WorkoutSummary.tsx`: trocar o `onClick` do botão "Enviar Feedback" por `window.open(WHATSAPP_FEEDBACK_URL, "_blank")` e exibi-lo sempre (remover a dependência de `whatsappNumber`). O botão "Compartilhar" continua igual.
-- `CycleFeedbackBanner.tsx`: remover import/uso de `CycleFeedbackForm`; o botão vira um link/abertura do `WHATSAPP_FEEDBACK_URL`. O banner ainda aparece nos últimos 7 dias do ciclo; pode-se manter o controle de "dispensar".
-- `StudentDetail.tsx`: remover o `TabsTrigger value="feedback"`, o `TabsContent value="feedback"` e o `lazy import` de `StudentFeedbackTab`.
+- **Multi-tenant**: o boneco nunca assume grupos fixos. `muscleGroupToRegion` casa os nomes de grupamento cadastrados por cada empresa (normalizando acento/caixa) com as regiões do SVG; grupos sem correspondência aparecem só no radar/lista.
+- **Design system**: highlights e estados usam tokens HSL de `index.css` (primary/muted/etc.), garantindo tema claro/escuro. Nada de `text-white`/`bg-[#...]`.
+- **Sem mudança de schema** nas fases 1–3 (usam dados já existentes: `workout_logs`, volumes agregados, `students.gender`).
+- **Fase 4** é a única que toca o banco.
 
-## Banco de dados
-- As tabelas `workout_feedback` e `cycle_feedback` deixam de ser usadas pela aplicação. Por padrão **não vou apagá-las** (para preservar dados já coletados). Posso remover via migração se você confirmar — me avise.
-
-## Observação
-- O link `wa.me/message/...` é um deep link genérico (não aceita texto pré-preenchido), então o aluno cai direto na conversa, sem mensagem automática. Os botões de "Compartilhar" resumo continuam funcionando normalmente.
+## Ordem sugerida
+Fase 3 primeiro (1 commit, rápido, sentido imediato no treino) → Fase 1 (boneco anatômico + heatmap) → Fase 2 (integração) → Fase 4 só se quiser.
