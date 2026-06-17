@@ -88,6 +88,7 @@ export default function WorkoutBuilder() {
   const [libraryExercises, setLibraryExercises] = useState<Exercise[]>([]);
   const [libSearch, setLibSearch] = useState("");
   const [libGroup, setLibGroup] = useState("all");
+  const [libRegion, setLibRegion] = useState<BodyRegionId | null>(null);
   const [videoModal, setVideoModal] = useState<{ type: "path" | "url"; value: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [cycleInfo, setCycleInfo] = useState<{ cycle_number: number; student_name: string } | null>(null);
