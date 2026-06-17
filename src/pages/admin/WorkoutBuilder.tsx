@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, X } from "lucide-react";
@@ -83,7 +83,7 @@ export default function WorkoutBuilder() {
   const MUSCLE_GROUP_NAMES = muscleGroupsList.map(g => g.name);
 
   const [workouts, setWorkouts] = useState<Workout[]>([]);
-  const [activeTab, setActiveTab] = useState("0");
+  const [targetWorkoutIdx, setTargetWorkoutIdx] = useState(0);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryExercises, setLibraryExercises] = useState<Exercise[]>([]);
   const [libSearch, setLibSearch] = useState("");
@@ -176,7 +176,6 @@ export default function WorkoutBuilder() {
   const addWorkout = () => {
     const nextLabel = WORKOUT_LABELS[workouts.length] || `Treino ${workouts.length + 1}`;
     setWorkouts(prev => [...prev, { title: `Treino ${nextLabel}`, description: "", exercises: [] }]);
-    setActiveTab(String(workouts.length));
   };
 
   const removeWorkout = async (idx: number) => {
@@ -189,7 +188,7 @@ export default function WorkoutBuilder() {
       newWorkouts.push({ title: "Treino A", description: "", exercises: [] });
     }
     setWorkouts(newWorkouts);
-    setActiveTab("0");
+    setTargetWorkoutIdx(0);
     toast({ title: "Treino removido" });
   };
 
@@ -198,7 +197,7 @@ export default function WorkoutBuilder() {
   };
 
   const addExercise = (ex: Exercise) => {
-    const idx = parseInt(activeTab);
+    const idx = targetWorkoutIdx;
     setWorkouts(prev => prev.map((w, i) => {
       if (i !== idx) return w;
       return {
@@ -351,8 +350,7 @@ export default function WorkoutBuilder() {
 
   const hasVideo = (ex: WorkoutExercise) => !!(ex.video_path || ex.video_url);
 
-  const currentWorkout = workouts[parseInt(activeTab)] || workouts[0];
-  const currentIdx = parseInt(activeTab);
+  const currentWorkout = workouts[targetWorkoutIdx] || workouts[0];
 
   return (
     <>
@@ -384,73 +382,50 @@ export default function WorkoutBuilder() {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Main content */}
-          <div className="flex-1 space-y-4">
-            {/* Workout Tabs */}
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <div className="flex items-center gap-2">
-                <TabsList className="flex-1 flex-wrap h-auto">
-                  {workouts.map((w, idx) => (
-                    <TabsTrigger key={idx} value={String(idx)} className="text-sm">
-                      {w.title || `Treino ${WORKOUT_LABELS[idx] || idx + 1}`}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-                {workouts.length < 7 && (
-                  <Button variant="outline" size="sm" onClick={addWorkout}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-
+          <div className="flex-1 min-w-0">
+            {/* Workout columns (side by side, horizontal scroll) */}
+            <div className="flex gap-4 overflow-x-auto pb-4 items-start">
               {workouts.map((workout, wIdx) => (
-                <TabsContent key={wIdx} value={String(wIdx)} className="space-y-4">
-                  {/* Workout details */}
+                <div key={wIdx} className="w-[320px] min-w-[320px] shrink-0 space-y-3">
+                  {/* Column header */}
                   <Card className="bg-card border-border">
-                    <CardContent className="p-4 space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="font-sans">Título do Treino *</Label>
-                          <Input
-                            value={workout.title}
-                            onChange={(e) => updateWorkout(wIdx, "title", e.target.value)}
-                            placeholder="Ex: Treino A - Superior"
-                            className="bg-secondary border-border"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="font-sans">Descrição</Label>
-                          <Input
-                            value={workout.description}
-                            onChange={(e) => updateWorkout(wIdx, "description", e.target.value)}
-                            placeholder="Observações gerais..."
-                            className="bg-secondary border-border"
-                          />
-                        </div>
+                    <CardContent className="p-3 space-y-3">
+                      <div className="space-y-2">
+                        <Label className="font-sans text-xs">Título do Treino *</Label>
+                        <Input
+                          value={workout.title}
+                          onChange={(e) => updateWorkout(wIdx, "title", e.target.value)}
+                          placeholder="Ex: Treino A - Superior"
+                          className="bg-secondary border-border h-9"
+                        />
                       </div>
-                      {workouts.length > 1 && (
-                        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => removeWorkout(wIdx)}>
-                          <Trash2 className="h-4 w-4 mr-1" />Remover este treino
-                        </Button>
-                      )}
+                      <div className="space-y-2">
+                        <Label className="font-sans text-xs">Descrição</Label>
+                        <Input
+                          value={workout.description}
+                          onChange={(e) => updateWorkout(wIdx, "description", e.target.value)}
+                          placeholder="Observações gerais..."
+                          className="bg-secondary border-border h-9"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-sans text-muted-foreground">
+                          {workout.exercises.length} exercício(s)
+                        </span>
+                        {workouts.length > 1 && (
+                          <Button variant="ghost" size="sm" className="text-destructive h-7 px-2" onClick={() => removeWorkout(wIdx)}>
+                            <Trash2 className="h-3.5 w-3.5 mr-1" />Remover
+                          </Button>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
 
-                  {/* Exercises list */}
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl text-primary">EXERCÍCIOS ({workout.exercises.length})</h2>
-                    <Button onClick={() => setLibraryOpen(true)}>
-                      <Plus className="h-4 w-4 mr-2" />Adicionar
-                    </Button>
-                  </div>
-
+                  {/* Exercises */}
                   {workout.exercises.length === 0 && (
                     <Card className="bg-card border-border border-dashed">
-                      <CardContent className="p-8 text-center">
-                        <p className="text-muted-foreground font-sans">Nenhum exercício adicionado</p>
-                        <Button variant="outline" className="mt-4" onClick={() => setLibraryOpen(true)}>
-                          <Plus className="h-4 w-4 mr-2" />Buscar na Biblioteca
-                        </Button>
+                      <CardContent className="p-6 text-center">
+                        <p className="text-muted-foreground font-sans text-sm">Nenhum exercício</p>
                       </CardContent>
                     </Card>
                   )}
@@ -458,8 +433,8 @@ export default function WorkoutBuilder() {
                   <div className="space-y-3">
                     {workout.exercises.map((ex, exIdx) => (
                       <Card key={exIdx} className="bg-card border-border">
-                        <CardContent className="p-4">
-                          <div className="flex items-start gap-3">
+                        <CardContent className="p-3">
+                          <div className="flex items-start gap-2">
                             <div className="flex flex-col gap-0.5 pt-1">
                               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => moveExercise(wIdx, exIdx, "up")} disabled={exIdx === 0}>
                                 <ChevronUp className="h-3.5 w-3.5" />
@@ -469,22 +444,24 @@ export default function WorkoutBuilder() {
                                 <ChevronDown className="h-3.5 w-3.5" />
                               </Button>
                             </div>
-                            <div className="flex-1 space-y-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <p className="font-sans font-medium text-foreground">{ex.exercise_name}</p>
-                                  <Badge variant="outline" className="capitalize text-xs">{ex.muscle_group}</Badge>
-                                  {hasVideo(ex) && (
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openVideoForExercise(ex)}>
-                                      <Play className="h-3.5 w-3.5 text-primary" />
-                                    </Button>
-                                  )}
+                            <div className="flex-1 min-w-0 space-y-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="font-sans font-medium text-foreground text-sm truncate">{ex.exercise_name}</p>
+                                    {hasVideo(ex) && (
+                                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => openVideoForExercise(ex)}>
+                                        <Play className="h-3.5 w-3.5 text-primary" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                  <Badge variant="outline" className="capitalize text-[10px] mt-1">{ex.muscle_group}</Badge>
                                 </div>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeExercise(wIdx, exIdx)}>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => removeExercise(wIdx, exIdx)}>
                                   <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
                               </div>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              <div className="grid grid-cols-2 gap-2">
                                 <div className="space-y-1">
                                   <Label className="text-xs text-muted-foreground font-sans">Séries</Label>
                                   <Input
@@ -517,8 +494,8 @@ export default function WorkoutBuilder() {
                                   <Textarea
                                     value={ex.notes}
                                     onChange={(e) => updateExercise(wIdx, exIdx, "notes", e.target.value)}
-                                    className="bg-secondary border-border text-sm min-h-[60px]"
-                                    rows={2}
+                                    className="bg-secondary border-border text-sm min-h-[32px]"
+                                    rows={1}
                                     placeholder="Cadência 3-1-2"
                                   />
                                 </div>
@@ -574,10 +551,34 @@ export default function WorkoutBuilder() {
                       </Card>
                     ))}
                   </div>
-                </TabsContent>
+
+                  {/* Add exercise to this column */}
+                  <Button
+                    variant="outline"
+                    className="w-full border-dashed"
+                    onClick={() => { setTargetWorkoutIdx(wIdx); setLibraryOpen(true); }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />Adicionar exercício
+                  </Button>
+                </div>
               ))}
-            </Tabs>
+
+              {/* New column */}
+              {workouts.length < 7 && (
+                <div className="w-[120px] min-w-[120px] shrink-0">
+                  <Button
+                    variant="outline"
+                    className="w-full h-24 flex-col gap-2 border-dashed"
+                    onClick={addWorkout}
+                  >
+                    <Plus className="h-5 w-5" />
+                    <span className="text-xs font-sans">Novo treino</span>
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
+
 
           {/* Volume Sidebar */}
           {showVolume && (

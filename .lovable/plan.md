@@ -1,48 +1,47 @@
-# Plano: Boneco anatômico + UX da área do aluno
+## Objetivo
 
-Baseado na auditoria do repositório BN, adaptado para o Set App (multi-profissional). Dividido em fases por impacto/esforço — dá pra parar em qualquer fase.
+Transformar a tela de prescrição de treino (`src/pages/admin/WorkoutBuilder.tsx`) para exibir **todos os treinos lado a lado em colunas** (estilo quadro/Kanban), em vez de abas que mostram um treino por vez. Assim você visualiza Treino A, B, C... simultaneamente e consegue montar um ligado ao outro, com **rolagem horizontal** quando houver muitos treinos.
 
-## Diagnóstico (o que temos vs. o que o BN tem)
+## Como vai ficar
 
-| Recurso | Set App hoje | BN | Ação |
-|---|---|---|---|
-| Boneco | SVG paramétrico só de largura (`BodyAvatar.tsx`) | Mapa anatômico `react-muscle-highlighter` (frente/costas, músculos) | **Trocar/expandir** |
-| Mapa muscular | Radar/spider de volume (`MuscleRadar.tsx`) | Heatmap no corpo por grupo | **Adicionar heatmap** |
-| Tela acesa no treino | ❌ | `useWakeLock` | **Portar** |
-| Som no fim do descanso | só vibra (`RestTimer`) | beep Web Audio + mute persistido | **Portar** |
-| Celebração de PR | toast simples | beep + vibração + toast | **Enriquecer** |
+```text
+┌─────────────────────────────────────────────────────────────┐  ┌──────────┐
+│  ◀──── rolagem horizontal ────▶                              │  │ VOLUME   │
+│ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────┐ │  │ SEMANAL  │
+│ │ Treino A │ │ Treino B │ │ Treino C │ │ Treino D │ │  +  │ │  │ (lateral)│
+│ │ ──────── │ │ ──────── │ │ ──────── │ │ ──────── │ │ nova│ │  │          │
+│ │ título   │ │ título   │ │ título   │ │ título   │ │coluna│ │  │ barras   │
+│ │ descr.   │ │ descr.   │ │ descr.   │ │ descr.   │ │     │ │  │ por      │
+│ │ [exerc.] │ │ [exerc.] │ │ [exerc.] │ │ [exerc.] │ │     │ │  │ músculo  │
+│ │ [exerc.] │ │ [exerc.] │ │ [exerc.] │ │ [exerc.] │ │     │ │  │          │
+│ │ + Add    │ │ + Add    │ │ + Add    │ │ + Add    │ │     │ │  │          │
+│ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └─────┘ │  └──────────┘
+└─────────────────────────────────────────────────────────────┘
+```
 
-## Fase 1 — Boneco anatômico com heatmap de volume (maior impacto visual)
+- Cada treino vira uma **coluna** com largura fixa (≈ 320px), com cabeçalho (título + descrição + botão remover), lista de exercícios e botão "Adicionar exercício".
+- Container com **scroll horizontal** quando os treinos não couberem na tela.
+- Botão **"+"** para criar nova coluna (novo treino) ao final da fileira.
+- A barra lateral de **Volume Semanal** continua igual, fixa à direita (continua somando o volume de todos os treinos).
+- O cabeçalho da página (voltar, título, botão Volume, "Salvar Tudo") permanece o mesmo.
 
-Adotar `react-muscle-highlighter` (compatível com React 18) e criar uma camada de contrato própria, multi-tenant.
+## Mudanças técnicas
 
-1. `bun add react-muscle-highlighter`.
-2. Novo `src/lib/bodyMap.ts`: contrato único com as regiões anatômicas (`chest`, `shoulders`, `biceps`, `triceps`, `forearm`, `abs`, `trapezius`, `back`, `lower_back`, `glutes`, `quads`, `hamstrings`, `adductors`, `calves`) + mapeamento `REGION_TO_SLUG` e helper `muscleGroupToRegion` (liga os grupos cadastrados por cada empresa às regiões do boneco — sem hardcode da BN).
-3. Novo `src/components/body/BodyMap.tsx`: wrapper genérico com toggle Frente/Costas, gênero, `getRegionFill(region)`, `onRegionClick`. Cores via tokens do design system (não hardcode).
-4. Novo `src/components/student/MuscleHeatmap.tsx`: recebe os volumes que já alimentam o `MuscleRadar` e pinta o corpo com intensidade proporcional ao volume (heatmap). Mantém a lista de barras kg embaixo.
-5. Em Estatísticas do aluno: heatmap + radar lado a lado (radar continua útil pra comparar formato).
+Arquivo único: `src/pages/admin/WorkoutBuilder.tsx`
 
-## Fase 2 — Boneco de medidas mantido e integrado
+1. **Remover o sistema de abas** (`Tabs`, `TabsList`, `TabsTrigger`, `TabsContent`) e o estado `activeTab`/`currentWorkout`/`currentIdx` baseado nele.
+2. **Renderizar as colunas**: substituir o bloco de `Tabs` por um wrapper `flex gap-4 overflow-x-auto pb-4`, mapeando `workouts` para colunas com `min-w-[320px] w-[320px] shrink-0`. Cada coluna reaproveita o mesmo conteúdo de detalhes do treino + lista de exercícios já existente.
+3. **Adicionar exercício por coluna**: introduzir estado `targetWorkoutIdx` (substitui o uso de `activeTab` em `addExercise`). Cada botão "Adicionar" da coluna define `targetWorkoutIdx` antes de abrir a biblioteca; `addExercise` insere no treino certo. O check de "já adicionado" no diálogo passa a usar `workouts[targetWorkoutIdx]`.
+4. **Ajustar o card de exercício** ao espaço mais estreito da coluna: a grade de Séries/Reps/Descanso/Observação passa de 4 colunas para 2 colunas (`grid-cols-2`), mantendo todos os campos e os "Tipos de Série".
+5. **Botão de nova coluna**: card vertical fino com ícone `+` (reusa `addWorkout`, mantendo o limite de 7 treinos / labels A–G).
+6. Manter intactos: carregamento (`loadExisting`, `loadLibrary`, `loadMuscleTargets`), salvamento (`handleSaveAll`), cálculo de `weeklyVolume`, diálogo da Biblioteca (com o boneco/BodyMap) e o modal de vídeo.
 
-O boneco paramétrico atual (`BodyAvatar`) tem valor próprio (ajusta com circunferências em tempo real). Mantê-lo na aba **Medidas**, e usar o novo mapa anatômico (Fase 1) na aba **Estatísticas**. Sem retrabalho destrutivo.
+## Comportamento responsivo
 
-## Fase 3 — UX de execução do treino (rápido, alto valor)
+- Desktop: várias colunas visíveis, scroll horizontal quando passar da largura.
+- Mobile/telas estreitas: as colunas mantêm largura fixa e o usuário rola horizontalmente entre os treinos (a barra de Volume vai para baixo, como já acontece hoje no layout `flex-col lg:flex-row`).
 
-1. `src/hooks/useWakeLock.ts`: mantém a tela acesa enquanto a sessão está ativa (re-adquire no `visibilitychange`). Ativar no `StudentPortal` quando `session` ativo.
-2. `src/lib/feedback.ts`: Web Audio API (zero assets) — `restDoneFeedback()` (beep+vibração no fim do descanso) e `prFeedback()` (beep mais agudo no PR). Mute persistido em `localStorage`.
-3. `RestTimer.tsx`: tocar `restDoneFeedback()` no `onComplete` + botão mute (ícone Volume2/VolumeX).
-4. PR: ao detectar recorde no fluxo de finalização, disparar `prFeedback()` junto do toast já existente.
+## Fora de escopo
 
-## Fase 4 (opcional) — Mapa de limitações para o treinador
-
-Reaproveitar o `BodyMap` para o treinador marcar limitações por região (muscular/articular/neural + severidade) no perfil do aluno. Requer tabela nova `student_body_limitations` (company-scoped, RLS). Só se houver interesse — é o item de maior esforço.
-
-## Detalhes técnicos
-
-- **Multi-tenant**: o boneco nunca assume grupos fixos. `muscleGroupToRegion` casa os nomes de grupamento cadastrados por cada empresa (normalizando acento/caixa) com as regiões do SVG; grupos sem correspondência aparecem só no radar/lista.
-- **Design system**: highlights e estados usam tokens HSL de `index.css` (primary/muted/etc.), garantindo tema claro/escuro. Nada de `text-white`/`bg-[#...]`.
-- **Sem mudança de schema** nas fases 1–3 (usam dados já existentes: `workout_logs`, volumes agregados, `students.gender`).
-- **Fase 4** é a única que toca o banco.
-
-## Ordem sugerida
-Fase 3 primeiro (1 commit, rápido, sentido imediato no treino) → Fase 1 (boneco anatômico + heatmap) → Fase 2 (integração) → Fase 4 só se quiser.
+- Nenhuma mudança no banco de dados, na área do aluno ou na lógica de volume.
+- Não será adicionado arrastar-e-soltar de exercícios entre treinos nesta etapa (posso fazer depois, se quiser).
