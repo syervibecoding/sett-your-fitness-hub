@@ -83,7 +83,7 @@ export default function WorkoutBuilder() {
   const MUSCLE_GROUP_NAMES = muscleGroupsList.map(g => g.name);
 
   const [workouts, setWorkouts] = useState<Workout[]>([]);
-  const [activeTab, setActiveTab] = useState("0");
+  const [targetWorkoutIdx, setTargetWorkoutIdx] = useState(0);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryExercises, setLibraryExercises] = useState<Exercise[]>([]);
   const [libSearch, setLibSearch] = useState("");
