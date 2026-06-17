@@ -26,6 +26,7 @@ interface Exercise {
   muscle_group: string;
   category: string | null;
   categories: string[] | null;
+  body_regions: string[] | null;
   youtube_video_id: string | null;
   video_url: string | null;
   video_path: string | null;
@@ -226,7 +227,7 @@ export default function WorkoutBuilder() {
   const loadLibrary = async () => {
     const { data } = await supabase
       .from("exercise_library")
-      .select("id, name, muscle_group, category, categories, youtube_video_id, video_url, video_path, description")
+      .select("id, name, muscle_group, category, categories, body_regions, youtube_video_id, video_url, video_path, description")
       .order("muscle_group")
       .order("name");
     setLibraryExercises((data as Exercise[]) || []);
@@ -492,7 +493,9 @@ export default function WorkoutBuilder() {
     const matchSearch = ex.name.toLowerCase().includes(libSearch.toLowerCase());
     const matchCategory = libCategory === "all" || (ex.categories || [ex.category]).includes(libCategory);
     const matchGroup = libGroup === "all" || ex.muscle_group === libGroup;
-    const matchRegion = !bodyRegion || regionForLibraryGroup(ex.muscle_group) === bodyRegion;
+    const matchRegion = !bodyRegion
+      || (ex.body_regions || []).includes(bodyRegion)
+      || regionForLibraryGroup(ex.muscle_group) === bodyRegion;
     return matchSearch && matchCategory && matchGroup && matchRegion;
   }), [libraryExercises, libSearch, libCategory, libGroup, bodyRegion]);
 
