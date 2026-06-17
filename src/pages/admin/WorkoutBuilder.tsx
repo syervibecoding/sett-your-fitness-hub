@@ -188,7 +188,7 @@ export default function WorkoutBuilder() {
       newWorkouts.push({ title: "Treino A", description: "", exercises: [] });
     }
     setWorkouts(newWorkouts);
-    setActiveTab("0");
+    setTargetWorkoutIdx(0);
     toast({ title: "Treino removido" });
   };
 
