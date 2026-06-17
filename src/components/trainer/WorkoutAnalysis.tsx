@@ -305,25 +305,8 @@ export function WorkoutAnalysis({ studentId }: Props) {
             <div className="w-full">
               <MuscleRadar muscleVolumes={muscleData.map(mg => ({ muscleGroup: mg.name, volume: mg.totalVolume }))} />
             </div>
-
-            {/* Alerts */}
-            {muscleData.some(mg => getVolumeAlert(mg) !== "ok") && (
-              <div className="space-y-2 mt-3">
-                {muscleData.filter(mg => getVolumeAlert(mg) === "sub").map(mg => (
-                  <div key={mg.name} className="flex items-center gap-2 p-2 rounded-lg bg-warning/10 border border-warning/20 text-xs font-sans">
-                    <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
-                    <span className="text-warning"><strong>{mg.name}</strong>: sub-treinado ({(mg.executedSets / (parseInt(period) / 7)).toFixed(1)} séries/semana — recomendado ≥10)</span>
-                  </div>
-                ))}
-                {muscleData.filter(mg => getVolumeAlert(mg) === "over").map(mg => (
-                  <div key={mg.name} className="flex items-center gap-2 p-2 rounded-lg bg-destructive/10 border border-destructive/20 text-xs font-sans">
-                    <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
-                    <span className="text-destructive"><strong>{mg.name}</strong>: volume excessivo ({(mg.executedSets / (parseInt(period) / 7)).toFixed(1)} séries/semana — recomendado ≤20)</span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
+
         ) : (
           <p className="text-sm text-muted-foreground font-sans text-center py-4">
             Nenhum dado de treino encontrado para este período.
