@@ -5,6 +5,19 @@ import { useToast } from "@/hooks/use-toast";
 import { BodyMap } from "@/components/body/BodyMap";
 import { REGION_LABEL, type BodyRegionId } from "@/lib/bodyMap";
 import { resolveHslVar } from "@/lib/cssColor";
+import {
+  type Limitation,
+  type LimitationType,
+  type Severity,
+  LIMITATION_TYPES,
+  SEVERITIES,
+  TYPE_LABEL,
+  SEVERITY_LABEL,
+  SEVERITY_BADGE,
+  buildLimitationsByRegion,
+  buildLimitationPayload,
+  getRegionFill as resolveRegionFill,
+} from "@/lib/bodyLimitations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -13,48 +26,6 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Trash2 } from "lucide-react";
-
-type LimitationType = "muscular" | "articular" | "neural";
-type Severity = "leve" | "moderada" | "severa";
-
-interface Limitation {
-  id: string;
-  region: BodyRegionId;
-  type: LimitationType;
-  severity: Severity;
-  note: string | null;
-}
-
-const TYPE_LABEL: Record<LimitationType, string> = {
-  muscular: "Muscular",
-  articular: "Articular",
-  neural: "Neural",
-};
-
-const SEVERITY_LABEL: Record<Severity, string> = {
-  leve: "Leve",
-  moderada: "Moderada",
-  severa: "Severa",
-};
-
-// Severity → design token used for the body fill and the badge.
-const SEVERITY_TOKEN: Record<Severity, string> = {
-  leve: "--warning",
-  moderada: "--warning",
-  severa: "--destructive",
-};
-
-const SEVERITY_ALPHA: Record<Severity, number> = {
-  leve: 0.4,
-  moderada: 0.7,
-  severa: 1,
-};
-
-const SEVERITY_BADGE: Record<Severity, string> = {
-  leve: "bg-warning/15 text-warning border-warning/30",
-  moderada: "bg-warning/25 text-warning border-warning/40",
-  severa: "bg-destructive/15 text-destructive border-destructive/30",
-};
 
 interface BodyLimitationsEditorProps {
   studentId: string;
@@ -96,17 +67,10 @@ export function BodyLimitationsEditor({ studentId, gender = "male" }: BodyLimita
     setLoading(false);
   };
 
-  const byRegion = useMemo(() => {
-    const map = new Map<BodyRegionId, Limitation>();
-    limitations.forEach((l) => map.set(l.region, l));
-    return map;
-  }, [limitations]);
+  const byRegion = useMemo(() => buildLimitationsByRegion(limitations), [limitations]);
 
-  const getRegionFill = (region: BodyRegionId): string | undefined => {
-    const lim = byRegion.get(region);
-    if (!lim) return undefined;
-    return resolveHslVar(SEVERITY_TOKEN[lim.severity], SEVERITY_ALPHA[lim.severity]);
-  };
+  const getRegionFill = (region: BodyRegionId): string | undefined =>
+    resolveRegionFill(byRegion, region, resolveHslVar);
 
   const openEdit = (region: BodyRegionId) => {
     const existing = byRegion.get(region);
@@ -123,14 +87,15 @@ export function BodyLimitationsEditor({ studentId, gender = "male" }: BodyLimita
     if (!editRegion) return;
     setSaving(true);
     const existing = byRegion.get(editRegion);
-    const payload = {
-      student_id: studentId,
+    const payload = buildLimitationPayload({
+      studentId,
       region: editRegion,
       type: form.type,
       severity: form.severity,
-      note: form.note.trim() || null,
-      created_by: session?.user.id ?? null,
-    };
+      note: form.note,
+      createdBy: session?.user.id ?? null,
+    });
+
 
     const { error } = existing
       ? await supabase
@@ -258,7 +223,7 @@ export function BodyLimitationsEditor({ studentId, gender = "male" }: BodyLimita
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(TYPE_LABEL) as LimitationType[]).map((t) => (
+                  {LIMITATION_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>{TYPE_LABEL[t]}</SelectItem>
                   ))}
                 </SelectContent>
@@ -272,7 +237,7 @@ export function BodyLimitationsEditor({ studentId, gender = "male" }: BodyLimita
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(SEVERITY_LABEL) as Severity[]).map((s) => (
+                  {SEVERITIES.map((s) => (
                     <SelectItem key={s} value={s}>{SEVERITY_LABEL[s]}</SelectItem>
                   ))}
                 </SelectContent>
