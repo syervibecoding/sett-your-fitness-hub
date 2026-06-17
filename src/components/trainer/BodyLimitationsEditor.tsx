@@ -67,17 +67,10 @@ export function BodyLimitationsEditor({ studentId, gender = "male" }: BodyLimita
     setLoading(false);
   };
 
-  const byRegion = useMemo(() => {
-    const map = new Map<BodyRegionId, Limitation>();
-    limitations.forEach((l) => map.set(l.region, l));
-    return map;
-  }, [limitations]);
+  const byRegion = useMemo(() => buildLimitationsByRegion(limitations), [limitations]);
 
-  const getRegionFill = (region: BodyRegionId): string | undefined => {
-    const lim = byRegion.get(region);
-    if (!lim) return undefined;
-    return resolveHslVar(SEVERITY_TOKEN[lim.severity], SEVERITY_ALPHA[lim.severity]);
-  };
+  const getRegionFill = (region: BodyRegionId): string | undefined =>
+    resolveRegionFill(byRegion, region, resolveHslVar);
 
   const openEdit = (region: BodyRegionId) => {
     const existing = byRegion.get(region);
@@ -94,14 +87,15 @@ export function BodyLimitationsEditor({ studentId, gender = "male" }: BodyLimita
     if (!editRegion) return;
     setSaving(true);
     const existing = byRegion.get(editRegion);
-    const payload = {
-      student_id: studentId,
+    const payload = buildLimitationPayload({
+      studentId,
       region: editRegion,
       type: form.type,
       severity: form.severity,
-      note: form.note.trim() || null,
-      created_by: session?.user.id ?? null,
-    };
+      note: form.note,
+      createdBy: session?.user.id ?? null,
+    });
+
 
     const { error } = existing
       ? await supabase
