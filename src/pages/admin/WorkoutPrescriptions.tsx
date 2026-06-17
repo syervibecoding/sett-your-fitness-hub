@@ -4,11 +4,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Users, Search, Dumbbell, ChevronRight, Calendar, Plus, Edit, Clock, CheckCircle2 } from "lucide-react";
+import { Users, Search, Dumbbell, ChevronRight, Calendar, Plus, Edit, Clock } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -37,6 +36,14 @@ interface StudentWithCycles {
   enrollment_id: string | null;
   cycles: CycleSummary[];
 }
+
+const WORKOUT_LETTERS = ["A", "B", "C", "D", "E", "F", "G"];
+
+const statusConfig: Record<string, { label: string; dot: string; text: string }> = {
+  active: { label: "Ativo", dot: "bg-success", text: "text-success" },
+  completed: { label: "Concluído", dot: "bg-muted-foreground", text: "text-muted-foreground" },
+  future: { label: "Futuro", dot: "bg-warning", text: "text-warning" },
+};
 
 export default function WorkoutPrescriptions() {
   const { role, companyId } = useAuth();
@@ -149,160 +156,214 @@ export default function WorkoutPrescriptions() {
     s.cycles.reduce((sum, c) => sum + c.workouts.length, 0);
 
   return (
-    <>
-      <div className="p-4 md:p-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <Dumbbell className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl text-primary font-bold tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
-            PRESCRIÇÃO DE TREINOS
-          </h1>
-        </div>
+    <div className="p-4 md:p-8 space-y-8">
+      {/* Page header */}
+      <header className="space-y-2 border-b border-line pb-6">
+        <span className="text-eyebrow flex items-center gap-2">
+          <Dumbbell className="h-3.5 w-3.5" />
+          Prescrição
+        </span>
+        <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-foreground">
+          Prescrição de <span className="font-display italic text-primary">Treinos</span>
+        </h1>
+        <p className="text-sm text-muted-foreground max-w-prose">
+          Selecione um aluno para visualizar seus ciclos e prescrever ou ajustar os treinos.
+        </p>
+      </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Student list */}
-          <div className="lg:col-span-1 space-y-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar aluno..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-
-            <ScrollArea className="h-[calc(100vh-240px)]">
-              <div className="space-y-2 pr-2">
-                {loading ? (
-                  Array.from({ length: 4 }).map((_, i) => (
-                    <Skeleton key={i} className="h-20 w-full rounded-lg" />
-                  ))
-                ) : filtered.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Users className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground font-sans">
-                      {search ? "Nenhum aluno encontrado" : "Nenhum aluno com matrícula ativa"}
-                    </p>
-                  </div>
-                ) : (
-                  filtered.map(student => (
-                    <Card
-                      key={student.id}
-                      className={`cursor-pointer transition-all hover:border-primary/50 ${
-                        selectedStudent?.id === student.id ? "border-primary bg-primary/5" : "bg-card border-border"
-                      }`}
-                      onClick={() => setSelectedStudent(student)}
-                    >
-                      <CardContent className="p-3">
-                        <div className="flex items-center justify-between">
-                          <div className="min-w-0 flex-1">
-                            <p className="font-sans font-medium text-foreground text-sm truncate">{student.full_name}</p>
-                            <p className="text-xs text-muted-foreground font-sans truncate">
-                              {student.plan_name || "Sem plano"} · {totalWorkouts(student)} treino(s)
-                            </p>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+        {/* Student list */}
+        <aside className="lg:col-span-1 space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar aluno..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 bg-card border-line"
+            />
           </div>
 
-          {/* Student detail */}
-          <div className="lg:col-span-2">
-            {selectedStudent ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-sans font-semibold text-foreground">{selectedStudent.full_name}</h2>
-                    <p className="text-sm text-muted-foreground font-sans">{selectedStudent.plan_name}</p>
+          <ScrollArea className="h-[calc(100vh-280px)]">
+            <div className="space-y-2 pr-3">
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-[68px] w-full rounded-lg" />
+                ))
+              ) : filtered.length === 0 ? (
+                <div className="text-center py-12 px-4">
+                  <Users className="h-9 w-9 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    {search ? "Nenhum aluno encontrado" : "Nenhum aluno com matrícula ativa"}
+                  </p>
+                </div>
+              ) : (
+                filtered.map(student => {
+                  const isSelected = selectedStudent?.id === student.id;
+                  const count = totalWorkouts(student);
+                  return (
+                    <button
+                      key={student.id}
+                      onClick={() => setSelectedStudent(student)}
+                      className={`group relative w-full overflow-hidden rounded-lg border text-left transition-all ${
+                        isSelected
+                          ? "border-primary bg-secondary"
+                          : "border-line bg-card hover:border-primary/40 hover:bg-secondary/40"
+                      }`}
+                    >
+                      <span
+                        className={`absolute left-0 top-0 h-full w-1 transition-colors ${
+                          isSelected ? "bg-primary" : "bg-transparent"
+                        }`}
+                      />
+                      <div className="flex items-center justify-between gap-3 p-3 pl-4">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-foreground text-sm truncate">
+                            {student.full_name}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground font-mono-data uppercase tracking-wide truncate mt-0.5">
+                            {student.plan_name || "Sem plano"} · {count} treino{count === 1 ? "" : "s"}
+                          </p>
+                        </div>
+                        <ChevronRight
+                          className={`h-4 w-4 flex-shrink-0 transition-transform ${
+                            isSelected ? "text-primary translate-x-0.5" : "text-muted-foreground/50"
+                          }`}
+                        />
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </ScrollArea>
+        </aside>
+
+        {/* Student detail */}
+        <section className="lg:col-span-2">
+          {selectedStudent ? (
+            <div className="space-y-6">
+              {/* Student header */}
+              <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-5">
+                <div>
+                  <span className="text-eyebrow">{selectedStudent.plan_name || "Sem plano"}</span>
+                  <h2 className="text-2xl font-semibold text-foreground tracking-tight mt-1">
+                    {selectedStudent.full_name}
+                  </h2>
+                </div>
+                <div className="flex items-center gap-6">
+                  <div className="text-right">
+                    <p className="text-2xl font-mono-data text-primary leading-none">
+                      {selectedStudent.cycles.length}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground font-mono-data uppercase tracking-wide mt-1">
+                      Ciclos
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-mono-data text-primary leading-none">
+                      {totalWorkouts(selectedStudent)}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground font-mono-data uppercase tracking-wide mt-1">
+                      Treinos
+                    </p>
                   </div>
                 </div>
+              </div>
 
-                {selectedStudent.cycles.length === 0 ? (
-                  <Card className="bg-card border-border border-dashed">
-                    <CardContent className="p-8 text-center">
-                      <Calendar className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-                      <p className="text-muted-foreground font-sans">Nenhum ciclo de treino criado.</p>
-                      <p className="text-xs text-muted-foreground/60 font-sans mt-1">
-                        Defina a data de início do treino na matrícula do aluno.
-                      </p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="space-y-4">
-                    {selectedStudent.cycles.map(cycle => (
-                      <Card key={cycle.id} className="bg-card border-border">
-                        <CardContent className="p-4 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-primary font-bold text-sm" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
-                                CICLO {cycle.cycle_number}
+              {selectedStudent.cycles.length === 0 ? (
+                <Card className="bg-card border-line border-dashed">
+                  <CardContent className="p-10 text-center">
+                    <Calendar className="h-10 w-10 text-muted-foreground/30 mx-auto mb-4" />
+                    <p className="text-foreground font-medium">Nenhum ciclo de treino criado</p>
+                    <p className="text-sm text-muted-foreground mt-1.5 max-w-sm mx-auto">
+                      Defina a data de início do treino na matrícula do aluno para gerar o primeiro ciclo.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  {selectedStudent.cycles.map(cycle => {
+                    const status = statusConfig[cycle.status] || statusConfig.future;
+                    const hasWorkouts = cycle.workouts.length > 0;
+                    return (
+                      <Card key={cycle.id} className="bg-card border-line overflow-hidden">
+                        <CardContent className="p-0">
+                          {/* Cycle header */}
+                          <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-line bg-secondary/30">
+                            <div className="flex items-center gap-3">
+                              <span className={`h-2 w-2 rounded-full ${status.dot}`} />
+                              <h3 className="font-semibold text-foreground text-sm">
+                                Ciclo {String(cycle.cycle_number).padStart(2, "0")}
                               </h3>
-                              <Badge
-                                variant={cycle.status === "active" ? "default" : "outline"}
-                                className="text-[10px]"
-                              >
-                                {cycle.status === "active" ? "Ativo" : cycle.status === "completed" ? "Concluído" : "Futuro"}
-                              </Badge>
+                              <span className={`text-[11px] font-mono-data uppercase tracking-wide ${status.text}`}>
+                                {status.label}
+                              </span>
                             </div>
-                            <span className="text-xs text-muted-foreground font-sans">
-                              {format(parseISO(cycle.start_date), "dd/MM", { locale: ptBR })} — {format(parseISO(cycle.end_date), "dd/MM", { locale: ptBR })}
+                            <span className="text-[11px] text-muted-foreground font-mono-data">
+                              {format(parseISO(cycle.start_date), "dd/MM", { locale: ptBR })} — {format(parseISO(cycle.end_date), "dd/MM/yy", { locale: ptBR })}
                             </span>
                           </div>
 
-                          {cycle.workouts.length > 0 ? (
-                            <div className="space-y-2">
-                              {cycle.workouts.map((w, i) => (
-                                <div key={w.id} className="flex items-center justify-between bg-secondary/30 rounded-md px-3 py-2">
-                                  <div className="flex items-center gap-2">
-                                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                                    <span className="text-sm font-sans text-foreground">{w.title}</span>
-                                    <Badge variant="outline" className="text-[10px]">{w.exerciseCount} ex.</Badge>
+                          {/* Workouts */}
+                          <div className="p-5 space-y-4">
+                            {hasWorkouts ? (
+                              <div className="space-y-1.5">
+                                {cycle.workouts.map((w, i) => (
+                                  <div
+                                    key={w.id}
+                                    className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-secondary/50"
+                                  >
+                                    <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-semibold font-mono-data">
+                                      {WORKOUT_LETTERS[i] || i + 1}
+                                    </span>
+                                    <span className="text-sm text-foreground flex-1 truncate">{w.title}</span>
+                                    <span className="text-[11px] text-muted-foreground font-mono-data whitespace-nowrap">
+                                      {w.exerciseCount} ex.
+                                    </span>
                                   </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Clock className="h-4 w-4" />
-                              <span className="text-sm font-sans">Nenhum treino prescrito</span>
-                            </div>
-                          )}
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 text-muted-foreground py-1">
+                                <Clock className="h-4 w-4" />
+                                <span className="text-sm">Nenhum treino prescrito</span>
+                              </div>
+                            )}
 
-                          <div className="flex gap-2">
                             <Button
                               size="sm"
-                              variant={cycle.workouts.length > 0 ? "outline" : "default"}
+                              variant={hasWorkouts ? "outline" : "default"}
                               onClick={() => navigate(`${prefix}/workout/${cycle.id}`)}
+                              className="w-full sm:w-auto"
                             >
-                              {cycle.workouts.length > 0 ? (
-                                <><Edit className="h-3.5 w-3.5 mr-1" />Editar Treinos</>
+                              {hasWorkouts ? (
+                                <><Edit className="h-3.5 w-3.5 mr-1.5" />Editar treinos</>
                               ) : (
-                                <><Plus className="h-3.5 w-3.5 mr-1" />Prescrever Treino</>
+                                <><Plus className="h-3.5 w-3.5 mr-1.5" />Prescrever treino</>
                               )}
                             </Button>
                           </div>
                         </CardContent>
                       </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-[400px]">
-                <div className="text-center">
-                  <Users className="h-12 w-12 text-muted-foreground/20 mx-auto mb-3" />
-                  <p className="text-muted-foreground font-sans">Selecione um aluno para ver seus treinos</p>
+                    );
+                  })}
                 </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-[400px] rounded-lg border border-dashed border-line bg-card/50">
+              <div className="text-center px-6">
+                <Users className="h-12 w-12 text-muted-foreground/20 mx-auto mb-4" />
+                <p className="text-foreground font-medium">Selecione um aluno</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Os ciclos e treinos aparecerão aqui.
+                </p>
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
+        </section>
       </div>
-    </>
+    </div>
   );
 }
