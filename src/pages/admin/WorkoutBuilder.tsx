@@ -657,7 +657,7 @@ export default function WorkoutBuilder() {
                 {libRegion ? <> · <span className="text-foreground font-medium">{REGION_LABEL[libRegion]}</span></> : null}
               </p>
               <BodyMap
-                activeRegions={libRegion ? [libRegion] : regionsWithExercises}
+                activeRegions={libRegion ? [libRegion] : []}
                 onRegionClick={(region) =>
                   setLibRegion((prev) => (prev === region ? null : region))
                 }
