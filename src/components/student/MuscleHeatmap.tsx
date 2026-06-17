@@ -58,7 +58,7 @@ export function MuscleHeatmap({ muscleVolumes, gender = "male" }: MuscleHeatmapP
       <BodyMap
         gender={gender}
         getRegionFill={getRegionFill}
-        className="h-[320px] w-auto"
+        scale={0.95}
       />
 
       {/* Ranking list */}
