@@ -21,6 +21,7 @@ import { regionForLibraryGroup, normalizeGender, BODY_REGION_LABELS, type BodyRe
 import { exerciseThumb, youtubeIdFromUrl, EXERCISE_CATEGORIES } from "@/lib/exerciseCover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { groupWorkoutExercises, WORKOUT_METHODS, GROUPING_METHODS, SINGLE_METHODS, isGroupingMethod, type MethodId } from "@/lib/workoutMethods";
+import { useMaster } from "@/contexts/MasterContext";
 
 interface Exercise {
   id: string;
@@ -139,11 +140,17 @@ export default function WorkoutBuilder() {
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get("returnTo") || "/admin/students";
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, companyId: authCompanyId, role } = useAuth();
+  const { viewingCompany, isViewingCompany } = useMaster();
   const { toast } = useToast();
   const assistantName = useAssistantName();
   const muscleGroupsList = useMuscleGroups();
   const MUSCLE_GROUP_NAMES = muscleGroupsList.map(g => g.name);
+  // Modo BIBLIOTECA DE TREINOS: ?tpl=<id> edita um template em vez de um ciclo de aluno.
+  const tplId = searchParams.get("tpl");
+  const isTemplate = !!tplId;
+  const effectiveCompanyId = role === "master" ? (isViewingCompany ? viewingCompany?.id ?? null : null) : authCompanyId ?? null;
+  const [templateName, setTemplateName] = useState("");
 
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [activeTab, setActiveTab] = useState("0");
@@ -205,13 +212,51 @@ export default function WorkoutBuilder() {
   const [muscleTargets, setMuscleTargets] = useState<MuscleTarget[]>([]);
 
   useEffect(() => {
-    if (cycleId) {
+    if (isTemplate) {
+      if (tplId && tplId !== "new") loadTemplate(tplId);
+      else setWorkouts([{ title: "Treino A", description: "", exercises: [] }]);
+    } else if (cycleId) {
       loadExisting();
       loadCycleInfo();
     }
     loadLibrary();
     loadMuscleTargets();
-  }, [cycleId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cycleId, tplId]);
+
+  const loadTemplate = async (id: string) => {
+    const { data } = await (supabase as any).from("workout_templates").select("name, workouts").eq("id", id).maybeSingle();
+    if (data) {
+      setTemplateName(data.name || "");
+      const ws = Array.isArray(data.workouts) ? data.workouts : [];
+      setWorkouts(ws.length ? ws : [{ title: "Treino A", description: "", exercises: [] }]);
+    }
+  };
+
+  const saveTemplate = async () => {
+    const name = (templateName || "").trim();
+    if (!name) { toast({ title: "Dê um nome ao treino da biblioteca", variant: "destructive" }); return; }
+    if (workouts.some((w) => !w.title)) { toast({ title: "Preencha o título de todos os treinos", variant: "destructive" }); return; }
+    setSaving(true);
+    const { error } = await (supabase as any).from("workout_templates")
+      .update({ name, workouts: workouts as any, updated_at: new Date().toISOString() }).eq("id", tplId);
+    setSaving(false);
+    if (error) { toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Treino salvo na biblioteca!" });
+    const prefix = window.location.pathname.split("/").filter(Boolean)[0] || "admin";
+    navigate(`/${prefix}/biblioteca-treinos`);
+  };
+
+  const saveAsTemplate = async () => {
+    const name = window.prompt("Salvar na biblioteca de treinos como:", templateName || (cycleInfo ? `Treino — ${cycleInfo.student_name}` : "Novo treino"));
+    if (!name || !name.trim()) return;
+    if (!effectiveCompanyId) { toast({ title: "Sem empresa em foco para salvar o template", variant: "destructive" }); return; }
+    const { error } = await (supabase as any).from("workout_templates").insert({
+      company_id: effectiveCompanyId, name: name.trim(), workouts: workouts as any, created_by: user?.id || null,
+    });
+    if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Salvo na biblioteca de treinos!" });
+  };
 
   const loadCycleInfo = async () => {
     const { data } = await supabase
@@ -358,6 +403,7 @@ export default function WorkoutBuilder() {
   };
 
   const handleSaveAll = async () => {
+    if (isTemplate) { await saveTemplate(); return; }
     const hasEmpty = workouts.some(w => !w.title);
     if (hasEmpty) {
       toast({ title: "Preencha o título de todos os treinos", variant: "destructive" });
@@ -701,14 +747,21 @@ export default function WorkoutBuilder() {
             </Button>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-3xl text-primary">PRESCRIÇÃO DE TREINO</h1>
+                <h1 className="text-3xl text-primary">{isTemplate ? "TREINO DA BIBLIOTECA" : "PRESCRIÇÃO DE TREINO"}</h1>
                 <BnitoContextButton
                   label="builder manual de treino"
                   context={`Montagem manual de treino. ${cycleInfo ? `Aluno: ${cycleInfo.student_name}; ciclo ${cycleInfo.cycle_number}.` : "Ciclo ainda carregando."}`}
                   question="Me ajuda a revisar a estrutura deste treino manual antes de salvar?"
                 />
               </div>
-              {cycleInfo && (
+              {isTemplate ? (
+                <Input
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  placeholder="Nome do treino (ex.: Full Body Iniciante A/B)"
+                  className="mt-1 h-9 max-w-md bg-secondary border-border"
+                />
+              ) : cycleInfo && (
                 <p className="text-muted-foreground font-sans">
                   {cycleInfo.student_name} — Ciclo {cycleInfo.cycle_number}
                 </p>
@@ -723,9 +776,14 @@ export default function WorkoutBuilder() {
             <Button variant="outline" size="sm" onClick={() => setShowVolume(!showVolume)}>
               <BarChart3 className="h-4 w-4 mr-2" />Volume
             </Button>
+            {!isTemplate && (
+              <Button variant="outline" size="sm" onClick={saveAsTemplate} disabled={workouts.length === 0}>
+                <Save className="h-4 w-4 mr-2" />Salvar na biblioteca
+              </Button>
+            )}
             <Button onClick={handleSaveAll} disabled={saving} size="lg">
               <Save className="h-4 w-4 mr-2" />
-              {saving ? "Salvando..." : "Salvar Tudo"}
+              {saving ? "Salvando..." : isTemplate ? "Salvar na Biblioteca" : "Salvar Tudo"}
             </Button>
           </div>
         </div>
