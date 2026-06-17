@@ -11,6 +11,7 @@ import { format, parseISO, differenceInDays, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
+import { useWakeLock } from "@/hooks/useWakeLock";
 import { WorkoutTimer } from "@/components/student/WorkoutTimer";
 import { WorkoutSummary } from "@/components/student/WorkoutSummary";
 import { ExerciseCard } from "@/components/student/ExerciseCard";
@@ -109,6 +110,9 @@ export default function StudentPortal() {
   const todayStr = new Date().toISOString().split("T")[0];
 
   const session = useWorkoutSession(studentId, companyId);
+
+  // Keep the screen awake while a workout session is in progress.
+  useWakeLock(session.isActive);
 
   const { activeRest, startRest, clearRest } = useRestTimer();
 
@@ -764,7 +768,7 @@ export default function StudentPortal() {
 
         {/* STATS VIEW */}
         {activeView === "stats" && (
-          <StatsCharts allLogs={allLogs} cycles={cycles} todayStr={todayStr} />
+          <StatsCharts allLogs={allLogs} cycles={cycles} todayStr={todayStr} gender={gender ?? "male"} />
         )}
 
         {/* CALENDARIO VIEW */}

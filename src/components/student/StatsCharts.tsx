@@ -14,11 +14,13 @@ import {
 import { format, parseISO, differenceInCalendarDays, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { MuscleRadar } from "./MuscleRadar";
+import { MuscleHeatmap } from "./MuscleHeatmap";
 
 interface StatsChartsProps {
   allLogs: any[];
   cycles: { id: string; cycle_number: number; workouts: { id: string; exercises: { exercise_name: string; muscle_group: string; sets: string }[] }[] }[];
   todayStr: string;
+  gender?: "male" | "female";
 }
 
 type Period = "7" | "30" | "90" | "all";
@@ -26,7 +28,7 @@ type Period = "7" | "30" | "90" | "all";
 // Epley 1RM: peso * (1 + reps/30)
 const epley = (weight: number, reps: number) => (reps > 0 ? weight * (1 + reps / 30) : weight);
 
-export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
+export function StatsCharts({ allLogs, cycles, todayStr, gender = "male" }: StatsChartsProps) {
   const [selectedExercise, setSelectedExercise] = useState<string>("all");
   const [period, setPeriod] = useState<Period>("all");
   const [show1RM, setShow1RM] = useState<boolean>(false);
@@ -291,10 +293,18 @@ export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
         <TabsContent value="bodymap" className="space-y-4">
           <Card className="bg-card border-border">
             <CardContent className="p-4">
+              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-4">Mapa Muscular de Volume</h3>
+              <MuscleHeatmap muscleVolumes={muscleVolumes} gender={gender} />
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border">
+            <CardContent className="p-4">
               <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-4">Volume por Grupamento</h3>
               <MuscleRadar muscleVolumes={muscleVolumes} />
             </CardContent>
           </Card>
+
 
           <Card className="bg-card border-border">
             <CardContent className="p-4">

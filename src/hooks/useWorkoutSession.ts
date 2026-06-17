@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { prFeedback } from "@/lib/feedback";
 
 interface ActiveSession {
   id: string;
@@ -134,6 +135,11 @@ export function useWorkoutSession(studentId: string | null, companyId: string | 
     const totalVolume = exercisesSummary.reduce((sum, ex) => sum + ex.volume, 0);
     const totalSetsCompleted = exercisesSummary.reduce((sum, ex) => sum + ex.sets.filter(s => s.weight > 0 || s.reps > 0).length, 0);
     const totalSetsPrescribed = exercises.reduce((sum, ex) => sum + (parseInt(ex.sets) || 3), 0);
+
+    // Celebrate if at least one personal record was set this session.
+    if (exercisesSummary.some(ex => ex.isPR)) {
+      prFeedback();
+    }
 
     await supabase
       .from("workout_sessions")
