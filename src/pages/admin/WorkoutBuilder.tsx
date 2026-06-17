@@ -324,16 +324,6 @@ export default function WorkoutBuilder() {
     return matchSearch && matchGroup && matchRegion;
   });
 
-  // Regions that actually have exercises (paint only the clickable ones).
-  const regionsWithExercises = useMemo(() => {
-    const set = new Set<BodyRegionId>();
-    libraryExercises.forEach((ex) => {
-      const r = muscleGroupToRegion(ex.muscle_group);
-      if (r) set.add(r);
-    });
-    return Array.from(set);
-  }, [libraryExercises]);
-
 
   const getEmbedUrl = (url: string) => {
     if (url.includes("youtube.com/watch")) {
