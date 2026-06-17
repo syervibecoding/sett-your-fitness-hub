@@ -223,7 +223,7 @@ export function BodyLimitationsEditor({ studentId, gender = "male" }: BodyLimita
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(TYPE_LABEL) as LimitationType[]).map((t) => (
+                  {LIMITATION_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>{TYPE_LABEL[t]}</SelectItem>
                   ))}
                 </SelectContent>
@@ -237,7 +237,7 @@ export function BodyLimitationsEditor({ studentId, gender = "male" }: BodyLimita
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(SEVERITY_LABEL) as Severity[]).map((s) => (
+                  {SEVERITIES.map((s) => (
                     <SelectItem key={s} value={s}>{SEVERITY_LABEL[s]}</SelectItem>
                   ))}
                 </SelectContent>
