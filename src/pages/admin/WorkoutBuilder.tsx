@@ -147,9 +147,10 @@ export default function WorkoutBuilder() {
   const [libraryExercises, setLibraryExercises] = useState<Exercise[]>([]);
   const [libSearch, setLibSearch] = useState("");
   const [libGroup, setLibGroup] = useState("all");
-  const [libCategory, setLibCategory] = useState("all");
-  const [bodyRegion, setBodyRegion] = useState<BodyRegionId | null>(null);
+  const [libCats, setLibCats] = useState<string[]>([]);
+  const [bodyRegions, setBodyRegions] = useState<BodyRegionId[]>([]);
   const [showBoneco, setShowBoneco] = useState(false);
+  const toggleInArray = <T,>(arr: T[], v: T): T[] => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
   // Capas resolvidas sob demanda (exercícios antigos sem youtube_video_id): id -> youtube id
   const [covers, setCovers] = useState<Record<string, string>>({});
   const coverRequested = useRef<Set<string>>(new Set());
@@ -491,13 +492,16 @@ export default function WorkoutBuilder() {
 
   const filteredLib = useMemo(() => libraryExercises.filter((ex) => {
     const matchSearch = ex.name.toLowerCase().includes(libSearch.toLowerCase());
-    const matchCategory = libCategory === "all" || (ex.categories || [ex.category]).includes(libCategory);
+    const exCats = ex.categories || (ex.category ? [ex.category] : []);
+    const matchCategory = libCats.length === 0 || exCats.some((c) => libCats.includes(c));
     const matchGroup = libGroup === "all" || ex.muscle_group === libGroup;
-    const matchRegion = !bodyRegion
-      || (ex.body_regions || []).includes(bodyRegion)
-      || regionForLibraryGroup(ex.muscle_group) === bodyRegion;
+    const exRegions = ex.body_regions || [];
+    const legacyRegion = regionForLibraryGroup(ex.muscle_group);
+    const matchRegion = bodyRegions.length === 0
+      || exRegions.some((r) => bodyRegions.includes(r as BodyRegionId))
+      || (legacyRegion ? bodyRegions.includes(legacyRegion) : false);
     return matchSearch && matchCategory && matchGroup && matchRegion;
-  }), [libraryExercises, libSearch, libCategory, libGroup, bodyRegion]);
+  }), [libraryExercises, libSearch, libCats, libGroup, bodyRegions]);
 
   // Capa do exercício: thumbnail do YouTube (direto, ou resolvida sob demanda).
   const coverFor = (ex: Exercise): string | null => {
@@ -1146,21 +1150,24 @@ export default function WorkoutBuilder() {
             <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
               <button
                 type="button"
-                onClick={() => setLibCategory("all")}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition ${libCategory === "all" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}
+                onClick={() => setLibCats([])}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition ${libCats.length === 0 ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}
               >
                 Todos
               </button>
-              {EXERCISE_CATEGORIES.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setLibCategory((cur) => (cur === c.id ? "all" : c.id))}
-                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition ${libCategory === c.id ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}
-                >
-                  {c.label}
-                </button>
-              ))}
+              {EXERCISE_CATEGORIES.map((c) => {
+                const active = libCats.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setLibCats((cur) => toggleInArray(cur, c.id))}
+                    className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition ${active ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {c.label}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Busca + filtro por músculo (boneco) */}
@@ -1171,16 +1178,20 @@ export default function WorkoutBuilder() {
               </div>
               <Button
                 type="button"
-                variant={bodyRegion || showBoneco ? "default" : "outline"}
+                variant={bodyRegions.length || showBoneco ? "default" : "outline"}
                 size="sm"
                 onClick={() => setShowBoneco((v) => !v)}
                 className="shrink-0"
               >
                 <PersonStanding className="mr-1 h-4 w-4" />
-                {bodyRegion ? BODY_REGION_LABELS[bodyRegion] : "Músculo"}
+                {bodyRegions.length === 0
+                  ? "Músculo"
+                  : bodyRegions.length === 1
+                    ? BODY_REGION_LABELS[bodyRegions[0]]
+                    : `${bodyRegions.length} músculos`}
               </Button>
-              {bodyRegion && (
-                <Button type="button" variant="ghost" size="sm" onClick={() => setBodyRegion(null)} className="shrink-0 text-xs">
+              {bodyRegions.length > 0 && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setBodyRegions([])} className="shrink-0 text-xs">
                   Limpar
                 </Button>
               )}
@@ -1190,11 +1201,11 @@ export default function WorkoutBuilder() {
               <div className="rounded-lg border border-border bg-secondary/30 p-3">
                 <BodyMap
                   gender={cycleInfo?.gender ?? "male"}
-                  onRegionClick={(id) => setBodyRegion((cur) => (cur === id ? null : id))}
-                  activeRegions={bodyRegion ? [bodyRegion] : []}
-                  getRegionFill={(id) => (id === bodyRegion ? "hsl(var(--primary))" : undefined)}
+                  onRegionClick={(id) => setBodyRegions((cur) => toggleInArray(cur, id))}
+                  activeRegions={bodyRegions}
+                  getRegionFill={(id) => (bodyRegions.includes(id) ? "hsl(var(--primary))" : undefined)}
                   svgClassName="h-[300px] w-auto"
-                  footer={<span className="text-[11px] text-muted-foreground">Clique num músculo para filtrar os exercícios.</span>}
+                  footer={<span className="text-[11px] text-muted-foreground">Clique em um ou mais músculos para filtrar (pode selecionar vários).</span>}
                 />
               </div>
             )}
