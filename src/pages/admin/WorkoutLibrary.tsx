@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dumbbell, Plus, Sparkles, Pencil, Send, Copy, Trash2, Loader2, Library } from "lucide-react";
 import { sendTemplateToStudent } from "@/lib/sendWorkoutTemplate";
+import { buildPeriodizationPlan, MESOCYCLES } from "@/lib/periodization";
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
 const OBJ_PRESETS: Record<string, { sets: string; reps: string; rest: string }> = {
@@ -134,8 +135,12 @@ export default function WorkoutLibrary() {
         }).filter(Boolean);
         return { title: `Treino ${LETTERS[d]}`, description: "", exercises };
       });
+      // Periodização (metodologia SETT/BN): resumo das fases p/ o objetivo (6 semanas de referência).
+      const plan = buildPeriodizationPlan(gen.objetivo, 6);
+      const fases = [...new Set(plan.weeks.map((w) => MESOCYCLES[w.mesocycle].label))].join(" → ");
+      const periodNote = `Periodizado (metodologia SETT/BN) · Objetivo: ${gen.objetivo} · Fases: ${fases}. As semanas (microciclos ordinário/choque/regenerativo) aparecem para o aluno conforme as datas do ciclo.`;
       const { data, error } = await (supabase as any).from("workout_templates")
-        .insert({ company_id: effectiveCompanyId, name: gen.name.trim(), level: gen.nivel, focus: split.label, workouts, created_by: user?.id || null })
+        .insert({ company_id: effectiveCompanyId, name: gen.name.trim(), level: gen.nivel, focus: split.label, description: periodNote, workouts, created_by: user?.id || null })
         .select("id").single();
       if (error) throw error;
       toast({ title: "Treino gerado!", description: "Abrindo para você ajustar." });

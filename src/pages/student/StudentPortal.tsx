@@ -18,6 +18,7 @@ import { WorkoutSummary } from "@/components/student/WorkoutSummary";
 import { ExerciseCard } from "@/components/student/ExerciseCard";
 import { groupWorkoutExercises, WORKOUT_METHODS, type MethodId } from "@/lib/workoutMethods";
 import { MethodBadge } from "@/components/workout/MethodBadge";
+import { PeriodizationBanner } from "@/components/student/PeriodizationBanner";
 import { StatsCharts } from "@/components/student/StatsCharts";
 import { VolumeInsights } from "@/components/student/VolumeInsights";
 import { useRestTimer } from "@/components/student/RestTimer";
@@ -75,6 +76,8 @@ interface Cycle {
   start_date: string;
   end_date: string;
   status: string;
+  objective?: string | null;
+  duration_weeks?: number | null;
   workouts: WorkoutData[];
 }
 
@@ -215,7 +218,7 @@ export default function StudentPortal() {
       // que EXISTE no banco vivo (zshrcg). O cast evita o erro de tipo.
       const { data: cyclesData } = await (supabase as any)
         .from("training_cycles")
-        .select("id, cycle_number, start_date, end_date, status")
+        .select("id, cycle_number, start_date, end_date, status, objective, duration_weeks")
         .eq("student_id", student.id)
         .order("cycle_number");
 
@@ -813,6 +816,13 @@ export default function StudentPortal() {
                     <Progress value={getCycleProgress(selectedCycle)} className="h-1.5" />
                   </CardContent>
                 </Card>
+
+                <PeriodizationBanner
+                  objective={selectedCycle.objective}
+                  durationWeeks={selectedCycle.duration_weeks}
+                  startDate={selectedCycle.start_date}
+                  endDate={selectedCycle.end_date}
+                />
 
                 {selectedCycle.workouts.length > 0 ? (
                   <div className="space-y-3">
