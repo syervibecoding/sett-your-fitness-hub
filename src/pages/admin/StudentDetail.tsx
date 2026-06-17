@@ -37,6 +37,7 @@ import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 const WorkoutAnalysis = lazy(() => import("@/components/trainer/WorkoutAnalysis").then(m => ({ default: m.WorkoutAnalysis })));
 const TrainerWeeklyBar = lazy(() => import("@/components/trainer/TrainerWeeklyBar").then(m => ({ default: m.TrainerWeeklyBar })));
 const MuscleRadar = lazy(() => import("@/components/student/MuscleRadar").then(m => ({ default: m.MuscleRadar })));
+const BodyLimitationsEditor = lazy(() => import("@/components/trainer/BodyLimitationsEditor").then(m => ({ default: m.BodyLimitationsEditor })));
 
 
 const TabFallback = () => (
@@ -838,6 +839,7 @@ export default function StudentDetail() {
             <TabsTrigger value="workouts" className="text-xs sm:text-sm">Treinos</TabsTrigger>
             <TabsTrigger value="analytics" className="text-xs sm:text-sm">Análises</TabsTrigger>
             <TabsTrigger value="anamnesis" className="text-xs sm:text-sm">Anamnese</TabsTrigger>
+            <TabsTrigger value="limitations" className="text-xs sm:text-sm">Limitações</TabsTrigger>
             <TabsTrigger value="financial" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
             <TabsTrigger value="evaluations" className="text-xs sm:text-sm">Avaliações</TabsTrigger>
           </TabsList>
@@ -1268,6 +1270,13 @@ export default function StudentDetail() {
             <Suspense fallback={<TabFallback />}>
               <TrainerWeeklyBar studentId={id!} />
               <WorkoutAnalysis studentId={id!} />
+            </Suspense>
+          </TabsContent>
+
+          {/* ===== LIMITAÇÕES ===== */}
+          <TabsContent value="limitations" className="space-y-4">
+            <Suspense fallback={<TabFallback />}>
+              <BodyLimitationsEditor studentId={id!} />
             </Suspense>
           </TabsContent>
 
