@@ -1827,6 +1827,53 @@ export type Database = {
           },
         ]
       }
+      student_body_limitations: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          region: string
+          severity: string
+          student_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          region: string
+          severity?: string
+          student_id: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          region?: string
+          severity?: string
+          student_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_body_limitations_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_categories: {
         Row: {
           color: string | null
