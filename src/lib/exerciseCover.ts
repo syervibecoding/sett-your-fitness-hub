@@ -30,6 +30,7 @@ export const EXERCISE_CATEGORIES: ExerciseCategory[] = [
   { id: "controle_motor", label: "Controle Motor" },
   { id: "ativacao", label: "Ativação", hint: "mini band, tera band" },
   { id: "core", label: "Core" },
+  { id: "performance", label: "Performance", hint: "reativos, wall drills, propulsão, med ball" },
   { id: "base", label: "Base", hint: "agachamento, terra…" },
   { id: "pesos_livres", label: "Pesos Livres" },
   { id: "peso_corporal", label: "Peso Corporal" },
