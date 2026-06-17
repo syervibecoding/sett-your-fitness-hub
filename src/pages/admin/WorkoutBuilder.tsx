@@ -176,7 +176,6 @@ export default function WorkoutBuilder() {
   const addWorkout = () => {
     const nextLabel = WORKOUT_LABELS[workouts.length] || `Treino ${workouts.length + 1}`;
     setWorkouts(prev => [...prev, { title: `Treino ${nextLabel}`, description: "", exercises: [] }]);
-    setActiveTab(String(workouts.length));
   };
 
   const removeWorkout = async (idx: number) => {
