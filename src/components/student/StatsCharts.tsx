@@ -293,10 +293,18 @@ export function StatsCharts({ allLogs, cycles, todayStr, gender = "male" }: Stat
         <TabsContent value="bodymap" className="space-y-4">
           <Card className="bg-card border-border">
             <CardContent className="p-4">
+              <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-4">Mapa Muscular de Volume</h3>
+              <MuscleHeatmap muscleVolumes={muscleVolumes} gender={gender} />
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border">
+            <CardContent className="p-4">
               <h3 className="text-sm font-sans font-semibold text-muted-foreground uppercase tracking-wider mb-4">Volume por Grupamento</h3>
               <MuscleRadar muscleVolumes={muscleVolumes} />
             </CardContent>
           </Card>
+
 
           <Card className="bg-card border-border">
             <CardContent className="p-4">
