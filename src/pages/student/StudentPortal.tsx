@@ -11,6 +11,7 @@ import { format, parseISO, differenceInDays, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
+import { useWakeLock } from "@/hooks/useWakeLock";
 import { WorkoutTimer } from "@/components/student/WorkoutTimer";
 import { WorkoutSummary } from "@/components/student/WorkoutSummary";
 import { ExerciseCard } from "@/components/student/ExerciseCard";
