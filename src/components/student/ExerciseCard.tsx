@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { prFeedback } from "@/lib/feedback";
 import { RestTimer } from "./RestTimer";
 import { SET_TYPE_CONFIG, SET_TYPES, getSetLabel, type SetType } from "@/lib/setTypes";
+import { exerciseThumb } from "@/lib/exerciseCover";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +23,7 @@ interface WorkoutExercise {
   muscle_group: string;
   video_url: string | null;
   video_path: string | null;
+  youtube_video_id?: string | null;
   sets: string;
   reps: string;
   rest: string;
@@ -65,6 +67,7 @@ export function ExerciseCard({
   const numSets = totalSets;
   // Sempre há demonstração: vídeo gravado próprio OU fallback do YouTube pelo nome do exercício.
   const hasVideo = !!(ex.video_path || ex.video_url || ex.exercise_name);
+  const cover = exerciseThumb(ex);
   const getLogKey = (s: number) => `${workoutId}-${idx}-${s}`;
 
   // Melhor carga histórica deste exercício (antes de hoje) — base para detectar recorde.
@@ -119,6 +122,22 @@ export function ExerciseCard({
               idx + 1
             )}
           </div>
+          {/* Capa do exercício (vídeo) */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onVideoPlay(); }}
+            className="relative h-11 w-16 shrink-0 overflow-hidden rounded-md border border-border bg-secondary"
+            aria-label="Ver vídeo"
+          >
+            {cover ? (
+              <img src={cover} alt="" loading="lazy" className="h-full w-full object-cover" />
+            ) : (
+              <span className="flex h-full w-full items-center justify-center"><Play className="h-4 w-4 text-muted-foreground" /></span>
+            )}
+            <span className="absolute inset-0 flex items-center justify-center bg-black/15">
+              <Play className="h-4 w-4 text-white drop-shadow" />
+            </span>
+          </button>
           <div className="flex-1 min-w-0">
             <p className="font-sans font-medium text-foreground text-sm truncate">{ex.exercise_name}</p>
             <div className="flex items-center gap-2">

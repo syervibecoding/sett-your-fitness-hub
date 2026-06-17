@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Pencil, Trash2, Play, Globe, Building2, Upload, Loader2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Play, Globe, Building2, Upload, Loader2, Dumbbell } from "lucide-react";
+import { exerciseThumb } from "@/lib/exerciseCover";
 import { useMaster } from "@/contexts/MasterContext";
 
 interface Exercise {
@@ -20,6 +21,8 @@ interface Exercise {
   name: string;
   description: string | null;
   muscle_group: string;
+  category: string | null;
+  youtube_video_id: string | null;
   video_url: string | null;
   video_path: string | null;
   thumbnail_url: string | null;
@@ -361,6 +364,8 @@ export default function ExerciseLibrary() {
       setVideoModal({ type: "path", value: getStoragePublicUrl(ex.video_path) });
     } else if (ex.video_url) {
       setVideoModal({ type: "url", value: ex.video_url });
+    } else if (ex.youtube_video_id) {
+      setVideoModal({ type: "url", value: `https://www.youtube.com/watch?v=${ex.youtube_video_id}` });
     }
   };
 
@@ -459,7 +464,20 @@ export default function ExerciseLibrary() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-6">
               {exs.map((ex) => (
-                <Card key={ex.id} className="bg-card border-border group">
+                <Card key={ex.id} className="bg-card border-border group overflow-hidden">
+                  {/* Capa do exercício (vídeo) */}
+                  <div className="relative aspect-video w-full bg-secondary">
+                    {exerciseThumb(ex) ? (
+                      <img src={exerciseThumb(ex)!} alt={ex.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center"><Dumbbell className="h-7 w-7 text-muted-foreground/40" /></div>
+                    )}
+                    {(ex.video_path || ex.video_url || exerciseThumb(ex)) && (
+                      <button type="button" onClick={() => openVideoForExercise(ex)} className="absolute inset-0 flex items-center justify-center bg-black/0 transition hover:bg-black/30">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition group-hover:opacity-100"><Play className="h-4 w-4" /></span>
+                      </button>
+                    )}
+                  </div>
                   <CardContent className="p-4 space-y-2">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">

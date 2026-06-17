@@ -778,6 +778,26 @@ export default function WorkoutBuilder() {
                                 <ChevronDown className="h-3.5 w-3.5" />
                               </Button>
                             </div>
+                            {/* Capa do exercício (vídeo) */}
+                            {(() => {
+                              const lib = libraryExercises.find((l) => l.id === ex.exercise_id);
+                              const cover = lib ? coverFor(lib) : null;
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => (hasVideo(ex) ? openVideoForExercise(ex) : lib ? openPickerVideo(lib) : undefined)}
+                                  className="relative mt-1 h-12 w-16 shrink-0 overflow-hidden rounded-md border border-border bg-secondary"
+                                  aria-label="Ver vídeo"
+                                >
+                                  {cover ? (
+                                    <img src={cover} alt="" loading="lazy" className="h-full w-full object-cover" />
+                                  ) : (
+                                    <span className="flex h-full w-full items-center justify-center"><Dumbbell className="h-4 w-4 text-muted-foreground/50" /></span>
+                                  )}
+                                  <span className="absolute inset-0 flex items-center justify-center bg-black/15"><Play className="h-3.5 w-3.5 text-white" /></span>
+                                </button>
+                              );
+                            })()}
                             <div className="flex-1 space-y-3">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
