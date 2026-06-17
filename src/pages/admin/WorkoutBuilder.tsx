@@ -197,7 +197,7 @@ export default function WorkoutBuilder() {
   };
 
   const addExercise = (ex: Exercise) => {
-    const idx = parseInt(activeTab);
+    const idx = targetWorkoutIdx;
     setWorkouts(prev => prev.map((w, i) => {
       if (i !== idx) return w;
       return {
