@@ -350,8 +350,7 @@ export default function WorkoutBuilder() {
 
   const hasVideo = (ex: WorkoutExercise) => !!(ex.video_path || ex.video_url);
 
-  const currentWorkout = workouts[parseInt(activeTab)] || workouts[0];
-  const currentIdx = parseInt(activeTab);
+  const currentWorkout = workouts[targetWorkoutIdx] || workouts[0];
 
   return (
     <>
