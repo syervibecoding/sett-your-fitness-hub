@@ -1,0 +1,314 @@
+# Relatório do Approved Manifest (curadoria) — offline
+
+> Gerado por `scripts/prescription/build-approved-curation-manifest.mjs` (ORDEM 031).
+> **Offline** — não conecta no banco, não executa SQL, não altera dados.
+
+## Status: NO_APPROVED_ROWS
+
+## Entradas
+- Manifesto: `docs/prescription/library-curation-v1-consolidated-manifest.csv`
+- Review CSV: `docs/prescription/library-curation-v1-p2-human-review.csv`
+- Prioridade esperada: `P2`
+- Saída CSV: `docs/prescription/library-curation-v1-approved-manifest-p2.csv`
+
+## Contagens
+| métrica | valor |
+|---|---|
+| total_review_rows | 78 |
+| approved_rows | 0 |
+| ready_for_upsert_rows | 0 |
+| skipped_needs_review | 78 |
+| skipped_rejected | 0 |
+| skipped_needs_more_info | 0 |
+| linhas no approved manifest (saída) | 0 |
+| errors | 0 |
+| warnings | 281 |
+
+> Nenhuma linha aprovada. CSV de saída contém **apenas o header**. Nada a aplicar.
+
+## Erros
+- (nenhum)
+
+## Warnings
+- ⚠️ linha 2 (05f95cd1-0819-458e-ba2a-f4431d7816e5): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 2 (05f95cd1-0819-458e-ba2a-f4431d7816e5): progression "escápulas firmes" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 2 (05f95cd1-0819-458e-ba2a-f4431d7816e5): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 2 (05f95cd1-0819-458e-ba2a-f4431d7816e5): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 3 (be15aca9-9af9-4e55-8c54-288689feb7cd): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 3 (be15aca9-9af9-4e55-8c54-288689feb7cd): progression "escápulas firmes" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 3 (be15aca9-9af9-4e55-8c54-288689feb7cd): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 3 (be15aca9-9af9-4e55-8c54-288689feb7cd): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 4 (316c9693-ce56-4b3b-b31e-f4316f75e70c): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 4 (316c9693-ce56-4b3b-b31e-f4316f75e70c): progression "sem dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 4 (316c9693-ce56-4b3b-b31e-f4316f75e70c): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 4 (316c9693-ce56-4b3b-b31e-f4316f75e70c): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 5 (75be10d2-4087-4b4d-9a88-c04f9bdb1a30): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 5 (75be10d2-4087-4b4d-9a88-c04f9bdb1a30): progression "Progredir carga só com equilíbrio e sem dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 5 (75be10d2-4087-4b4d-9a88-c04f9bdb1a30): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 5 (75be10d2-4087-4b4d-9a88-c04f9bdb1a30): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 5 (75be10d2-4087-4b4d-9a88-c04f9bdb1a30): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 6 (d91a1c63-de51-4a7f-a42c-23f5911c18f9): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 6 (d91a1c63-de51-4a7f-a42c-23f5911c18f9): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 6 (d91a1c63-de51-4a7f-a42c-23f5911c18f9): progression "sem dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 6 (d91a1c63-de51-4a7f-a42c-23f5911c18f9): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 6 (d91a1c63-de51-4a7f-a42c-23f5911c18f9): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 7 (88194a44-bee6-4693-a1a6-73d5e80aaaff): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 7 (88194a44-bee6-4693-a1a6-73d5e80aaaff): progression "Aumentar altura do step / carga sem dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 7 (88194a44-bee6-4693-a1a6-73d5e80aaaff): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 7 (88194a44-bee6-4693-a1a6-73d5e80aaaff): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 7 (88194a44-bee6-4693-a1a6-73d5e80aaaff): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 8 (78b51c57-8c6b-4aba-8696-0716caaa3e9c): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 8 (78b51c57-8c6b-4aba-8696-0716caaa3e9c): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 8 (78b51c57-8c6b-4aba-8696-0716caaa3e9c): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 8 (78b51c57-8c6b-4aba-8696-0716caaa3e9c): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 9 (75a0be3c-782a-43bd-b622-51bb4c2def59): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 9 (75a0be3c-782a-43bd-b622-51bb4c2def59): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 9 (75a0be3c-782a-43bd-b622-51bb4c2def59): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 9 (75a0be3c-782a-43bd-b622-51bb4c2def59): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 10 (18ca2f96-e70f-4428-b5d6-e20804eb193a): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 10 (18ca2f96-e70f-4428-b5d6-e20804eb193a): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 10 (18ca2f96-e70f-4428-b5d6-e20804eb193a): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 10 (18ca2f96-e70f-4428-b5d6-e20804eb193a): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 11 (1682b804-b531-426d-bb6b-93e5b9b7ceda): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 11 (1682b804-b531-426d-bb6b-93e5b9b7ceda): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 11 (1682b804-b531-426d-bb6b-93e5b9b7ceda): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 11 (1682b804-b531-426d-bb6b-93e5b9b7ceda): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 12 (02b41ea3-d381-4c67-baec-67c4998ba7a8): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 12 (02b41ea3-d381-4c67-baec-67c4998ba7a8): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 12 (02b41ea3-d381-4c67-baec-67c4998ba7a8): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 12 (02b41ea3-d381-4c67-baec-67c4998ba7a8): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 13 (9898104c-2955-45b1-a364-661ee61c444d): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 13 (9898104c-2955-45b1-a364-661ee61c444d): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 13 (9898104c-2955-45b1-a364-661ee61c444d): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 13 (9898104c-2955-45b1-a364-661ee61c444d): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 14 (c452607e-7dff-463d-adb2-a712059a8d26): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 14 (c452607e-7dff-463d-adb2-a712059a8d26): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 14 (c452607e-7dff-463d-adb2-a712059a8d26): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 14 (c452607e-7dff-463d-adb2-a712059a8d26): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 15 (553c7283-a12a-4407-b23c-1498460c8e87): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 15 (553c7283-a12a-4407-b23c-1498460c8e87): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 15 (553c7283-a12a-4407-b23c-1498460c8e87): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 15 (553c7283-a12a-4407-b23c-1498460c8e87): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 16 (d0c93be9-6ee3-420e-a34e-10ffe077d9f2): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 16 (d0c93be9-6ee3-420e-a34e-10ffe077d9f2): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 16 (d0c93be9-6ee3-420e-a34e-10ffe077d9f2): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 16 (d0c93be9-6ee3-420e-a34e-10ffe077d9f2): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 17 (e9d6bfd4-2980-45b9-beac-855bb6be8c0b): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 17 (e9d6bfd4-2980-45b9-beac-855bb6be8c0b): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 17 (e9d6bfd4-2980-45b9-beac-855bb6be8c0b): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 17 (e9d6bfd4-2980-45b9-beac-855bb6be8c0b): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 18 (b09418bb-1aaf-49bf-90d1-7e3276065408): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 18 (b09418bb-1aaf-49bf-90d1-7e3276065408): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 18 (b09418bb-1aaf-49bf-90d1-7e3276065408): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 18 (b09418bb-1aaf-49bf-90d1-7e3276065408): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 19 (7a8976b1-789e-4ea7-b499-8b81ece87d25): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 19 (7a8976b1-789e-4ea7-b499-8b81ece87d25): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 19 (7a8976b1-789e-4ea7-b499-8b81ece87d25): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 19 (7a8976b1-789e-4ea7-b499-8b81ece87d25): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 20 (6950cec4-2d21-40e1-992c-0e0a11ba5d38): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 20 (6950cec4-2d21-40e1-992c-0e0a11ba5d38): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 20 (6950cec4-2d21-40e1-992c-0e0a11ba5d38): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 20 (6950cec4-2d21-40e1-992c-0e0a11ba5d38): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 21 (6bc152db-68b2-4629-99bf-719ab3f060bd): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 21 (6bc152db-68b2-4629-99bf-719ab3f060bd): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 21 (6bc152db-68b2-4629-99bf-719ab3f060bd): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 21 (6bc152db-68b2-4629-99bf-719ab3f060bd): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 22 (faa0a8a1-a84f-42f9-b234-8286d1c46912): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 22 (faa0a8a1-a84f-42f9-b234-8286d1c46912): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 22 (faa0a8a1-a84f-42f9-b234-8286d1c46912): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 22 (faa0a8a1-a84f-42f9-b234-8286d1c46912): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 23 (ba5cc0fa-5df4-41c9-8bf1-fce04648ec6f): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 23 (ba5cc0fa-5df4-41c9-8bf1-fce04648ec6f): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 23 (ba5cc0fa-5df4-41c9-8bf1-fce04648ec6f): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 23 (ba5cc0fa-5df4-41c9-8bf1-fce04648ec6f): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 24 (b62d4d38-20bb-4873-a61f-95f5b3dc0b92): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 24 (b62d4d38-20bb-4873-a61f-95f5b3dc0b92): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 24 (b62d4d38-20bb-4873-a61f-95f5b3dc0b92): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 24 (b62d4d38-20bb-4873-a61f-95f5b3dc0b92): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 25 (59a8c0a7-e25a-4f86-aedc-232ee1622301): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 25 (59a8c0a7-e25a-4f86-aedc-232ee1622301): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 25 (59a8c0a7-e25a-4f86-aedc-232ee1622301): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 25 (59a8c0a7-e25a-4f86-aedc-232ee1622301): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 26 (ec82da9b-8652-4a1d-a570-8aafdda2c2c9): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 26 (ec82da9b-8652-4a1d-a570-8aafdda2c2c9): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 26 (ec82da9b-8652-4a1d-a570-8aafdda2c2c9): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 26 (ec82da9b-8652-4a1d-a570-8aafdda2c2c9): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 27 (9476d942-f358-4ea6-87ff-ae031adf98e1): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 27 (9476d942-f358-4ea6-87ff-ae031adf98e1): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 27 (9476d942-f358-4ea6-87ff-ae031adf98e1): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 27 (9476d942-f358-4ea6-87ff-ae031adf98e1): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 28 (df795cb5-06d1-49a9-848f-ac7b186ff807): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 28 (df795cb5-06d1-49a9-848f-ac7b186ff807): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 28 (df795cb5-06d1-49a9-848f-ac7b186ff807): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 28 (df795cb5-06d1-49a9-848f-ac7b186ff807): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 29 (64b2b71e-49e4-4792-b63e-fd105879e0ac): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 29 (64b2b71e-49e4-4792-b63e-fd105879e0ac): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 29 (64b2b71e-49e4-4792-b63e-fd105879e0ac): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 29 (64b2b71e-49e4-4792-b63e-fd105879e0ac): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 30 (be707dcf-d4cc-4788-8d23-551f5730e971): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 30 (be707dcf-d4cc-4788-8d23-551f5730e971): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 30 (be707dcf-d4cc-4788-8d23-551f5730e971): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 30 (be707dcf-d4cc-4788-8d23-551f5730e971): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 30 (be707dcf-d4cc-4788-8d23-551f5730e971): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 31 (672c0d1e-59af-46c1-b3ec-d3135a745b1b): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 31 (672c0d1e-59af-46c1-b3ec-d3135a745b1b): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 31 (672c0d1e-59af-46c1-b3ec-d3135a745b1b): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 31 (672c0d1e-59af-46c1-b3ec-d3135a745b1b): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 32 (0c28726e-c6d5-4df2-9056-a0f0f8499264): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 32 (0c28726e-c6d5-4df2-9056-a0f0f8499264): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 32 (0c28726e-c6d5-4df2-9056-a0f0f8499264): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 32 (0c28726e-c6d5-4df2-9056-a0f0f8499264): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 33 (4161c89d-9db9-473f-97ca-acf4ac83b968): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 33 (4161c89d-9db9-473f-97ca-acf4ac83b968): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 33 (4161c89d-9db9-473f-97ca-acf4ac83b968): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 33 (4161c89d-9db9-473f-97ca-acf4ac83b968): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 34 (b1c0882e-f674-473d-a6a4-5f8d1fea2b0f): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 34 (b1c0882e-f674-473d-a6a4-5f8d1fea2b0f): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 34 (b1c0882e-f674-473d-a6a4-5f8d1fea2b0f): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 34 (b1c0882e-f674-473d-a6a4-5f8d1fea2b0f): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 35 (53c8b9d0-82ce-4d29-8573-7a337a1da03e): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 35 (53c8b9d0-82ce-4d29-8573-7a337a1da03e): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 35 (53c8b9d0-82ce-4d29-8573-7a337a1da03e): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 35 (53c8b9d0-82ce-4d29-8573-7a337a1da03e): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 36 (76540c36-8b73-4400-931a-7b7afc7d9bdd): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 36 (76540c36-8b73-4400-931a-7b7afc7d9bdd): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 36 (76540c36-8b73-4400-931a-7b7afc7d9bdd): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 36 (76540c36-8b73-4400-931a-7b7afc7d9bdd): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 37 (7b60f329-d660-474c-a47f-1780c9c6f03b): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 37 (7b60f329-d660-474c-a47f-1780c9c6f03b): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 37 (7b60f329-d660-474c-a47f-1780c9c6f03b): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 37 (7b60f329-d660-474c-a47f-1780c9c6f03b): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 38 (3b94a40d-82de-4b73-8758-d7b722a9e771): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 38 (3b94a40d-82de-4b73-8758-d7b722a9e771): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 38 (3b94a40d-82de-4b73-8758-d7b722a9e771): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 38 (3b94a40d-82de-4b73-8758-d7b722a9e771): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 39 (50ec90c8-f48d-421b-a38b-23e79a131e18): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 39 (50ec90c8-f48d-421b-a38b-23e79a131e18): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 39 (50ec90c8-f48d-421b-a38b-23e79a131e18): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 39 (50ec90c8-f48d-421b-a38b-23e79a131e18): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 40 (e06fec69-cded-4629-b5dc-651402331d4c): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 40 (e06fec69-cded-4629-b5dc-651402331d4c): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 40 (e06fec69-cded-4629-b5dc-651402331d4c): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 40 (e06fec69-cded-4629-b5dc-651402331d4c): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 41 (5021e362-3f0e-44fa-aed1-c9e10a2392c0): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 41 (5021e362-3f0e-44fa-aed1-c9e10a2392c0): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 41 (5021e362-3f0e-44fa-aed1-c9e10a2392c0): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 41 (5021e362-3f0e-44fa-aed1-c9e10a2392c0): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 42 (2dbd7749-f70d-4021-b32c-79feb8e22e6e): regression "Abdução de Quadril com Miniband" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 42 (2dbd7749-f70d-4021-b32c-79feb8e22e6e): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 42 (2dbd7749-f70d-4021-b32c-79feb8e22e6e): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 42 (2dbd7749-f70d-4021-b32c-79feb8e22e6e): progression "sem método avançado com dor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 43 (49fbaae9-ff6f-468a-ad2b-c6c7ee357bfe): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 43 (49fbaae9-ff6f-468a-ad2b-c6c7ee357bfe): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 43 (49fbaae9-ff6f-468a-ad2b-c6c7ee357bfe): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 43 (49fbaae9-ff6f-468a-ad2b-c6c7ee357bfe): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 44 (caee0c7f-7b3a-481b-84a0-77d930e8a1a5): regression "Extensão de Quadril Banco Romano" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_regressions].
+- ⚠️ linha 44 (caee0c7f-7b3a-481b-84a0-77d930e8a1a5): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 44 (caee0c7f-7b3a-481b-84a0-77d930e8a1a5): progression "manter coluna neutra" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 44 (caee0c7f-7b3a-481b-84a0-77d930e8a1a5): progression "dor <= 3" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 45 (86749ad4-f622-4978-9c84-9ed335b13cff): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 45 (86749ad4-f622-4978-9c84-9ed335b13cff): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 45 (86749ad4-f622-4978-9c84-9ed335b13cff): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 46 (826d88a4-7f2f-45bd-927f-5e5cc5910626): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 46 (826d88a4-7f2f-45bd-927f-5e5cc5910626): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 46 (826d88a4-7f2f-45bd-927f-5e5cc5910626): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 47 (63374ce3-a255-4e87-9c76-2e23cd15a4ec): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 47 (63374ce3-a255-4e87-9c76-2e23cd15a4ec): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 47 (63374ce3-a255-4e87-9c76-2e23cd15a4ec): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 48 (90c13080-6ab3-4b9c-982f-984c50e224bc): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 48 (90c13080-6ab3-4b9c-982f-984c50e224bc): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 48 (90c13080-6ab3-4b9c-982f-984c50e224bc): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 49 (f6b33aae-c260-4759-b01c-ce85a045b9ab): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 49 (f6b33aae-c260-4759-b01c-ce85a045b9ab): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 49 (f6b33aae-c260-4759-b01c-ce85a045b9ab): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 50 (64ea4d35-daa5-4d8a-916f-cdd3784d29e2): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 50 (64ea4d35-daa5-4d8a-916f-cdd3784d29e2): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 50 (64ea4d35-daa5-4d8a-916f-cdd3784d29e2): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 51 (aa78feb2-704f-451a-9c40-f5ef29d2568d): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 51 (aa78feb2-704f-451a-9c40-f5ef29d2568d): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 51 (aa78feb2-704f-451a-9c40-f5ef29d2568d): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 52 (b5528218-4bd6-4f43-83a7-6be9663a6de1): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 52 (b5528218-4bd6-4f43-83a7-6be9663a6de1): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 52 (b5528218-4bd6-4f43-83a7-6be9663a6de1): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 53 (8f5a324b-b573-4b6b-87f6-49461b8cdbce): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 53 (8f5a324b-b573-4b6b-87f6-49461b8cdbce): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 53 (8f5a324b-b573-4b6b-87f6-49461b8cdbce): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 54 (b551a0d4-326f-4b4c-b909-8af4929130b2): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 54 (b551a0d4-326f-4b4c-b909-8af4929130b2): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 54 (b551a0d4-326f-4b4c-b909-8af4929130b2): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 55 (b10456d7-2463-41ee-9087-f7cf42006a00): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 55 (b10456d7-2463-41ee-9087-f7cf42006a00): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 55 (b10456d7-2463-41ee-9087-f7cf42006a00): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 56 (ea93a5a1-a755-4c12-8b5e-33a4741a7593): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 56 (ea93a5a1-a755-4c12-8b5e-33a4741a7593): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 56 (ea93a5a1-a755-4c12-8b5e-33a4741a7593): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 57 (c2df4c00-a3c7-4ed2-9310-a58b1971fa6f): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 57 (c2df4c00-a3c7-4ed2-9310-a58b1971fa6f): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 57 (c2df4c00-a3c7-4ed2-9310-a58b1971fa6f): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 58 (430e38a3-2815-45b1-af80-712184dd17c2): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 58 (430e38a3-2815-45b1-af80-712184dd17c2): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 58 (430e38a3-2815-45b1-af80-712184dd17c2): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 59 (277c2674-93e2-4aac-aa67-1c8ee82d0c55): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 59 (277c2674-93e2-4aac-aa67-1c8ee82d0c55): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 59 (277c2674-93e2-4aac-aa67-1c8ee82d0c55): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 60 (22b81e41-787c-467f-9cdf-73a3c26da25e): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 60 (22b81e41-787c-467f-9cdf-73a3c26da25e): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 60 (22b81e41-787c-467f-9cdf-73a3c26da25e): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 61 (0a136fd6-d641-4e21-be1c-dfd2f614b8cc): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 61 (0a136fd6-d641-4e21-be1c-dfd2f614b8cc): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 61 (0a136fd6-d641-4e21-be1c-dfd2f614b8cc): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 62 (d5462d44-a75c-4178-8d7c-1df92850cfd2): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 62 (d5462d44-a75c-4178-8d7c-1df92850cfd2): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 62 (d5462d44-a75c-4178-8d7c-1df92850cfd2): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 63 (aefecdad-cc83-4a92-94b7-6408a556b883): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 63 (aefecdad-cc83-4a92-94b7-6408a556b883): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 63 (aefecdad-cc83-4a92-94b7-6408a556b883): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 64 (561114a6-a613-4936-a51e-eda2cf36508b): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 64 (561114a6-a613-4936-a51e-eda2cf36508b): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 64 (561114a6-a613-4936-a51e-eda2cf36508b): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 65 (5d0985d2-a31d-46ff-9897-d916d74beb06): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 65 (5d0985d2-a31d-46ff-9897-d916d74beb06): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 65 (5d0985d2-a31d-46ff-9897-d916d74beb06): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 66 (1173e1a7-fa43-4cd2-a1fd-811419b9e7d2): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 66 (1173e1a7-fa43-4cd2-a1fd-811419b9e7d2): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 66 (1173e1a7-fa43-4cd2-a1fd-811419b9e7d2): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 67 (9160b4e1-9fbd-468c-b8e0-bc5868587078): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 67 (9160b4e1-9fbd-468c-b8e0-bc5868587078): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 67 (9160b4e1-9fbd-468c-b8e0-bc5868587078): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 68 (630de071-ce64-490d-9257-4e1e7260804f): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 68 (630de071-ce64-490d-9257-4e1e7260804f): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 68 (630de071-ce64-490d-9257-4e1e7260804f): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 69 (f1fed726-d7ce-4fec-9dcb-9f987df66ca8): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 69 (f1fed726-d7ce-4fec-9dcb-9f987df66ca8): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 69 (f1fed726-d7ce-4fec-9dcb-9f987df66ca8): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 70 (e28e4c41-5215-4cd6-b642-4322656f228d): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 70 (e28e4c41-5215-4cd6-b642-4322656f228d): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 70 (e28e4c41-5215-4cd6-b642-4322656f228d): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 71 (5c3558f8-01c1-43a4-bf9b-0d6993c80b80): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 71 (5c3558f8-01c1-43a4-bf9b-0d6993c80b80): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 71 (5c3558f8-01c1-43a4-bf9b-0d6993c80b80): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 72 (ef3553ff-17bc-4309-83ac-c3173f0256e2): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 72 (ef3553ff-17bc-4309-83ac-c3173f0256e2): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 72 (ef3553ff-17bc-4309-83ac-c3173f0256e2): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 73 (bfcb16f7-0b17-43c0-a487-42171c4d7f5c): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 73 (bfcb16f7-0b17-43c0-a487-42171c4d7f5c): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 73 (bfcb16f7-0b17-43c0-a487-42171c4d7f5c): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 74 (34966f6e-48c5-4757-ac4a-d0c9d6c79d23): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 74 (34966f6e-48c5-4757-ac4a-d0c9d6c79d23): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 74 (34966f6e-48c5-4757-ac4a-d0c9d6c79d23): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 75 (b61721db-87fe-41d8-b13e-f6b5833b8550): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 75 (b61721db-87fe-41d8-b13e-f6b5833b8550): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 75 (b61721db-87fe-41d8-b13e-f6b5833b8550): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 76 (2e826822-0e02-42bb-986b-d7b32fe5ec62): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 76 (2e826822-0e02-42bb-986b-d7b32fe5ec62): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 76 (2e826822-0e02-42bb-986b-d7b32fe5ec62): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 77 (8801e0c9-15b8-4b27-8847-1affbef93da8): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 77 (8801e0c9-15b8-4b27-8847-1affbef93da8): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 77 (8801e0c9-15b8-4b27-8847-1affbef93da8): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 78 (0f40befe-bf63-4884-b88a-37ebf683386a): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 78 (0f40befe-bf63-4884-b88a-37ebf683386a): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 78 (0f40befe-bf63-4884-b88a-37ebf683386a): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 79 (f5929365-dc60-4617-a45d-c27500404748): progression "Progredir reps antes de carga" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 79 (f5929365-dc60-4617-a45d-c27500404748): progression "ROM indolor" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+- ⚠️ linha 79 (f5929365-dc60-4617-a45d-c27500404748): progression "controle escapular" nao consta no manifesto (ambiguidade offline; confirmar na biblioteca) [suggested_progressions].
+
