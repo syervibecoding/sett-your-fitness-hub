@@ -56,7 +56,7 @@ Após o determinístico montar o plano válido, **se** `ANTHROPIC_API_KEY && fla
 ---
 
 ## 4. Gating + migrations aditivas
-- `ALTER TABLE company_ai_config ADD COLUMN ai_text_refinement_enabled boolean DEFAULT <ver decisão>, ADD COLUMN use_prescription_engine_v1 boolean DEFAULT true;`
+- `ALTER TABLE company_ai_config ADD COLUMN ai_text_refinement_enabled boolean DEFAULT false, ADD COLUMN use_prescription_engine_v1 boolean DEFAULT true;` (refino **desligado por padrão** — decisão do Matheus; opt-in por empresa).
 - `loadCompanyAiConfig` lê as flags; env global `AI_REFINEMENT` (off|on) como kill-switch (precedência: **global off vence empresa on** — decisão aberta).
 - Aplicar a MESMA flag ao `ai-running-plan` (hoje não tem nenhuma).
 - (Opcional, defesa em profundidade) `running_plans ADD COLUMN status text DEFAULT 'active'`, gravando `'incomplete'` em vez de casca visível.
@@ -77,12 +77,13 @@ Expor consistentemente nas 3 edges: `generated_by` (ex.: `bn_cardio_fallback`/`b
 
 ---
 
-## 7. Decisões do Matheus (pendentes — confirmar antes de codar regra)
-1. **Refino por IA por padrão:** ligado ou **desligado** (mais barato)? → recomendação: **desligado** (opt-in por empresa).
-2. **Fórmula de TMB oficial BN:** **Mifflin-St Jeor** (proposto) ou Harris-Benedict revisada (atual no prompt)?
-3. **Cascas já gravadas (11/12 `running_plans` vazios):** só prevenir daqui pra frente + regerar manual, ou limpar retroativamente? (limpeza = ação destrutiva — só com OK do Matheus).
-4. **Refino síncrono** (na request, +latência) **ou assíncrono** (plano volta na hora, refino aplica via update)?
-5. **Natação/ciclismo:** unidades min/voltas e articulações de risco entram já na v1 do `cardioEngine` ou depois?
+## 7. Decisões do Matheus (✅ FECHADAS 2026-06-17)
+1. **Refino por IA:** **DESLIGADO por padrão** (`ai_text_refinement_enabled DEFAULT false`); opt-in por empresa + kill-switch global. Operação roda 100% determinística (custo de IA ~zero).
+2. **Fórmula de TMB oficial BN:** **Mifflin-St Jeor** (Katch-McArdle quando houver %gordura; Harris-Benedict como secundária/comparação).
+3. **Cascas já gravadas (11/12 `running_plans` vazios):** **só prevenir daqui pra frente + regerar manual.** NÃO apagar retroativamente (ação destrutiva — fica a critério do Matheus depois).
+4. **Refino:** **assíncrono** — o plano determinístico volta na hora; o refino de texto (quando ligado) aplica depois via update (o front recarrega).
+5. **Natação/ciclismo:** entram **já na v1** do `cardioEngine`, com unidade própria (min/voltas/distância) e articulações de risco por esporte.
+6. **Quem implementa:** o **chat do motor de prescrição** (dono das edges/migrations) implementa e faz deploy; o **Claude** faz só o render do app do aluno quando o contrato de saída existir.
 
 ---
 
