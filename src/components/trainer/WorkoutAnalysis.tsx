@@ -217,13 +217,8 @@ export function WorkoutAnalysis({ studentId }: Props) {
     return `${m}min`;
   };
 
-  const getVolumeAlert = (mg: MuscleGroupVolume) => {
-    const weeksInPeriod = parseInt(period) / 7;
-    const weeklyExecuted = weeksInPeriod > 0 ? mg.executedSets / weeksInPeriod : 0;
-    if (weeklyExecuted < 10 && mg.prescribedSets > 0) return "sub";
-    if (weeklyExecuted > 20) return "over";
-    return "ok";
-  };
+
+
 
   if (loading) {
     return (
