@@ -5,6 +5,19 @@ import { useToast } from "@/hooks/use-toast";
 import { BodyMap } from "@/components/body/BodyMap";
 import { REGION_LABEL, type BodyRegionId } from "@/lib/bodyMap";
 import { resolveHslVar } from "@/lib/cssColor";
+import {
+  type Limitation,
+  type LimitationType,
+  type Severity,
+  LIMITATION_TYPES,
+  SEVERITIES,
+  TYPE_LABEL,
+  SEVERITY_LABEL,
+  SEVERITY_BADGE,
+  buildLimitationsByRegion,
+  buildLimitationPayload,
+  getRegionFill as resolveRegionFill,
+} from "@/lib/bodyLimitations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -13,48 +26,6 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Trash2 } from "lucide-react";
-
-type LimitationType = "muscular" | "articular" | "neural";
-type Severity = "leve" | "moderada" | "severa";
-
-interface Limitation {
-  id: string;
-  region: BodyRegionId;
-  type: LimitationType;
-  severity: Severity;
-  note: string | null;
-}
-
-const TYPE_LABEL: Record<LimitationType, string> = {
-  muscular: "Muscular",
-  articular: "Articular",
-  neural: "Neural",
-};
-
-const SEVERITY_LABEL: Record<Severity, string> = {
-  leve: "Leve",
-  moderada: "Moderada",
-  severa: "Severa",
-};
-
-// Severity → design token used for the body fill and the badge.
-const SEVERITY_TOKEN: Record<Severity, string> = {
-  leve: "--warning",
-  moderada: "--warning",
-  severa: "--destructive",
-};
-
-const SEVERITY_ALPHA: Record<Severity, number> = {
-  leve: 0.4,
-  moderada: 0.7,
-  severa: 1,
-};
-
-const SEVERITY_BADGE: Record<Severity, string> = {
-  leve: "bg-warning/15 text-warning border-warning/30",
-  moderada: "bg-warning/25 text-warning border-warning/40",
-  severa: "bg-destructive/15 text-destructive border-destructive/30",
-};
 
 interface BodyLimitationsEditorProps {
   studentId: string;
