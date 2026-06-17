@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, Fragment } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import { WorkoutTimer } from "@/components/student/WorkoutTimer";
 import { WorkoutSummary } from "@/components/student/WorkoutSummary";
 import { ExerciseCard } from "@/components/student/ExerciseCard";
+import { groupWorkoutExercises, WORKOUT_METHODS, type MethodId } from "@/lib/workoutMethods";
 import { StatsCharts } from "@/components/student/StatsCharts";
 import { VolumeInsights } from "@/components/student/VolumeInsights";
 import { useRestTimer } from "@/components/student/RestTimer";
@@ -50,6 +51,8 @@ interface WorkoutExercise {
   muscle_group: string;
   video_url: string | null;
   video_path: string | null;
+  group_id?: string | null;
+  method?: string | null;
   sets: string;
   reps: string;
   rest: string;
@@ -893,7 +896,8 @@ export default function StudentPortal() {
                         })()}
 
                         <div className="space-y-2">
-                          {selectedWorkout.exercises.map((ex, idx) => (
+                          {groupWorkoutExercises(selectedWorkout.exercises).map((grp) => {
+                            const cards = grp.items.map(({ ex, idx }) => (
                             <ExerciseCard
                               key={idx}
                               exercise={ex}
@@ -914,7 +918,21 @@ export default function StudentPortal() {
                               onAddSet={handleAddSet}
                               onRemoveSet={handleRemoveSet}
                             />
-                          ))}
+                            ));
+                            if (grp.grouping) {
+                              const meta = WORKOUT_METHODS[grp.method as MethodId];
+                              return (
+                                <div key={grp.key} className="space-y-2 rounded-2xl border-2 border-primary/40 bg-primary/5 p-2">
+                                  <div className="flex items-center gap-2 px-1 pt-1">
+                                    <Badge className="bg-primary text-[10px] text-primary-foreground">{meta?.short || grp.method}</Badge>
+                                    <span className="text-[11px] leading-tight text-muted-foreground">{meta?.hint}</span>
+                                  </div>
+                                  {cards}
+                                </div>
+                              );
+                            }
+                            return <Fragment key={grp.key}>{cards}</Fragment>;
+                          })}
                         </div>
 
                         <Button className="w-full" onClick={() => saveCurrentLogs()} disabled={savingLogs}>

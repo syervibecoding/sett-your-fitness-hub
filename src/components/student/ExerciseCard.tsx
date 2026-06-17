@@ -10,6 +10,7 @@ import { prFeedback } from "@/lib/feedback";
 import { RestTimer } from "./RestTimer";
 import { SET_TYPE_CONFIG, SET_TYPES, getSetLabel, type SetType } from "@/lib/setTypes";
 import { exerciseThumb } from "@/lib/exerciseCover";
+import { WORKOUT_METHODS, isGroupingMethod, type MethodId } from "@/lib/workoutMethods";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,8 @@ interface WorkoutExercise {
   video_url: string | null;
   video_path: string | null;
   youtube_video_id?: string | null;
+  group_id?: string | null;
+  method?: string | null;
   sets: string;
   reps: string;
   rest: string;
@@ -142,6 +145,9 @@ export function ExerciseCard({
             <p className="font-sans font-medium text-foreground text-sm truncate">{ex.exercise_name}</p>
             <div className="flex items-center gap-2">
               <p className="text-xs text-muted-foreground font-mono-data">{numSets}×{ex.reps} · {ex.rest}</p>
+              {ex.method && !isGroupingMethod(ex.method) && (
+                <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-700">{WORKOUT_METHODS[ex.method as MethodId]?.short}</span>
+              )}
               {completedSets > 0 && (
                 <span className="text-[10px] text-primary font-mono-data">{completedSets}/{numSets}</span>
               )}

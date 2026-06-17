@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, Fragment } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,6 +19,8 @@ import { useAssistantName } from "@/hooks/useAssistantName";
 import { BodyMap } from "@/components/body/BodyMap";
 import { regionForLibraryGroup, normalizeGender, BODY_REGION_LABELS, type BodyRegionId } from "@/lib/bodyMap";
 import { exerciseThumb, youtubeIdFromUrl, EXERCISE_CATEGORIES } from "@/lib/exerciseCover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { groupWorkoutExercises, WORKOUT_METHODS, GROUPING_METHODS, SINGLE_METHODS, isGroupingMethod, type MethodId } from "@/lib/workoutMethods";
 
 interface Exercise {
   id: string;
@@ -39,6 +41,8 @@ interface WorkoutExercise {
   muscle_group: string;
   video_url: string | null;
   video_path: string | null;
+  group_id?: string | null;
+  method?: string | null;
   sets: string;
   reps: string;
   rest: string;
@@ -154,6 +158,39 @@ export default function WorkoutBuilder() {
   // Capas resolvidas sob demanda (exercícios antigos sem youtube_video_id): id -> youtube id
   const [covers, setCovers] = useState<Record<string, string>>({});
   const coverRequested = useRef<Set<string>>(new Set());
+
+  // Métodos avançados (bi-set/tri-set/circuito/drop-set…): seleção por "wIdx-exIdx".
+  const [methodSel, setMethodSel] = useState<Record<string, boolean>>({});
+  const selKey = (wIdx: number, exIdx: number) => `${wIdx}-${exIdx}`;
+  const toggleMethodSel = (wIdx: number, exIdx: number) =>
+    setMethodSel((s) => ({ ...s, [selKey(wIdx, exIdx)]: !s[selKey(wIdx, exIdx)] }));
+  const clearMethodSel = (wIdx: number) =>
+    setMethodSel((s) => { const n = { ...s }; Object.keys(n).forEach((k) => { if (k.startsWith(`${wIdx}-`)) delete n[k]; }); return n; });
+
+  const applyMethod = (wIdx: number, method: MethodId) => {
+    const meta = WORKOUT_METHODS[method];
+    setWorkouts((prev) => prev.map((w, i) => {
+      if (i !== wIdx) return w;
+      const sel = w.exercises.map((_, k) => k).filter((k) => methodSel[selKey(wIdx, k)]);
+      if (sel.length === 0) return w;
+      if (meta.grouping) {
+        if (sel.length < meta.minItems) return w;
+        const gid = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `g${sel.join("")}${w.exercises[sel[0]].exercise_id}`;
+        const picked = sel.map((k) => ({ ...w.exercises[k], group_id: gid, method }));
+        const out: WorkoutExercise[] = []; let inserted = false;
+        w.exercises.forEach((e, k) => {
+          if (sel.includes(k)) { if (!inserted) { out.push(...picked); inserted = true; } }
+          else out.push(e);
+        });
+        return { ...w, exercises: out };
+      }
+      return { ...w, exercises: w.exercises.map((e, k) => sel.includes(k) ? { ...e, method, group_id: null } : e) };
+    }));
+    clearMethodSel(wIdx);
+  };
+
+  const ungroupBlock = (wIdx: number, idxs: number[]) =>
+    setWorkouts((prev) => prev.map((w, i) => i !== wIdx ? w : ({ ...w, exercises: w.exercises.map((e, k) => idxs.includes(k) ? { ...e, group_id: null, method: null } : e) })));
   const [videoModal, setVideoModal] = useState<{ type: "path" | "url"; value: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [cycleInfo, setCycleInfo] = useState<{ cycle_number: number; student_name: string; student_id?: string; company_id?: string | null; gender?: "male" | "female" } | null>(null);
@@ -772,12 +809,37 @@ export default function WorkoutBuilder() {
                     </Card>
                   )}
 
+                  {/* Toolbar de métodos avançados (aparece com seleção) */}
+                  {(() => {
+                    const selN = workout.exercises.filter((_, k) => methodSel[selKey(wIdx, k)]).length;
+                    if (selN === 0) return null;
+                    return (
+                      <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 p-2">
+                        <span className="text-xs font-medium text-primary">{selN} selecionado(s) — agrupar:</span>
+                        {GROUPING_METHODS.map((m) => (
+                          <Button key={m} size="sm" variant="outline" className="h-7 text-xs" disabled={selN < WORKOUT_METHODS[m].minItems} onClick={() => applyMethod(wIdx, m)}>
+                            {WORKOUT_METHODS[m].label}
+                          </Button>
+                        ))}
+                        <span className="mx-1 text-xs text-muted-foreground">técnica:</span>
+                        {SINGLE_METHODS.map((m) => (
+                          <Button key={m} size="sm" variant="outline" className="h-7 text-xs" onClick={() => applyMethod(wIdx, m)}>
+                            {WORKOUT_METHODS[m].label}
+                          </Button>
+                        ))}
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => clearMethodSel(wIdx)}>Cancelar</Button>
+                      </div>
+                    );
+                  })()}
+
                   <div className="space-y-3">
-                    {workout.exercises.map((ex, exIdx) => (
+                    {groupWorkoutExercises(workout.exercises).map((grp) => {
+                      const cards = grp.items.map(({ ex, idx: exIdx }) => (
                       <Card key={exIdx} className="bg-card border-border">
                         <CardContent className="p-4">
                           <div className="flex items-start gap-3">
-                            <div className="flex flex-col gap-0.5 pt-1">
+                            <div className="flex flex-col items-center gap-0.5 pt-1">
+                              <Checkbox className="mb-1" checked={!!methodSel[selKey(wIdx, exIdx)]} onCheckedChange={() => toggleMethodSel(wIdx, exIdx)} />
                               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => moveExercise(wIdx, exIdx, "up")} disabled={exIdx === 0}>
                                 <ChevronUp className="h-3.5 w-3.5" />
                               </Button>
@@ -811,6 +873,9 @@ export default function WorkoutBuilder() {
                                 <div className="flex items-center gap-2">
                                   <p className="font-sans font-medium text-foreground">{ex.exercise_name}</p>
                                   <Badge variant="outline" className="capitalize text-xs">{ex.muscle_group}</Badge>
+                                  {ex.method && !isGroupingMethod(ex.method) && (
+                                    <Badge className="border-amber-500/30 bg-amber-500/15 text-[10px] text-amber-700">{WORKOUT_METHODS[ex.method as MethodId]?.short}</Badge>
+                                  )}
                                   {hasVideo(ex) && (
                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openVideoForExercise(ex)}>
                                       <Play className="h-3.5 w-3.5 text-primary" />
@@ -909,7 +974,22 @@ export default function WorkoutBuilder() {
                           </div>
                         </CardContent>
                       </Card>
-                    ))}
+                      ));
+                      if (grp.grouping) {
+                        const meta = WORKOUT_METHODS[grp.method as MethodId];
+                        return (
+                          <div key={grp.key} className="space-y-2 rounded-2xl border-2 border-primary/40 bg-primary/5 p-2">
+                            <div className="flex items-center gap-2 px-1">
+                              <Badge className="bg-primary text-[10px] text-primary-foreground">{meta?.short || grp.method}</Badge>
+                              <span className="text-xs text-muted-foreground">{grp.items.length} exercícios em sequência</span>
+                              <Button variant="ghost" size="sm" className="ml-auto h-6 text-xs" onClick={() => ungroupBlock(wIdx, grp.items.map((it) => it.idx))}>Desagrupar</Button>
+                            </div>
+                            {cards}
+                          </div>
+                        );
+                      }
+                      return <Fragment key={grp.key}>{cards}</Fragment>;
+                    })}
                   </div>
                 </TabsContent>
               ))}
