@@ -192,6 +192,30 @@ export function CardioPlanView({
   const safety = plan.safety_check && typeof plan.safety_check === "object" ? plan.safety_check : null;
   const restrictions = safety ? asArray<unknown>(safety.restrictions).map(toText).filter(Boolean) : [];
 
+  // Plano "casca": existe no banco mas sem treinos reais (ex.: geração caiu no fallback por falta
+  // de crédito da IA). Em vez de um cabeçalho com acordeão vazio ("treinos não aparecem"), deixamos
+  // claro que o plano ainda não está pronto.
+  const totalSessions = weeks.reduce(
+    (n, w) => n + (asArray<CardioSession>(w.sessions).length || asArray<CardioSession>(w.dias).length),
+    0,
+  );
+  if (weeks.length === 0 || totalSessions === 0) {
+    return (
+      <Card className="border-amber-500/30 bg-amber-500/5">
+        <CardContent className="space-y-2 p-6 text-center">
+          <SportIcon className="mx-auto h-7 w-7 text-amber-600" />
+          <p className="font-display text-base text-foreground">
+            Seu plano de {sportLabel} está sendo finalizado
+          </p>
+          <p className="text-sm text-muted-foreground">
+            O plano foi criado, mas os treinos ainda não foram liberados. Fale com seu treinador —
+            assim que ele finalizar, suas semanas e sessões aparecem aqui.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-5">
       {/* Header */}
