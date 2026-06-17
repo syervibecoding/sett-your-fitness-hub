@@ -17,6 +17,7 @@ import { WorkoutTimer } from "@/components/student/WorkoutTimer";
 import { WorkoutSummary } from "@/components/student/WorkoutSummary";
 import { ExerciseCard } from "@/components/student/ExerciseCard";
 import { groupWorkoutExercises, WORKOUT_METHODS, type MethodId } from "@/lib/workoutMethods";
+import { MethodBadge } from "@/components/workout/MethodBadge";
 import { StatsCharts } from "@/components/student/StatsCharts";
 import { VolumeInsights } from "@/components/student/VolumeInsights";
 import { useRestTimer } from "@/components/student/RestTimer";
@@ -921,13 +922,25 @@ export default function StudentPortal() {
                             ));
                             if (grp.grouping) {
                               const meta = WORKOUT_METHODS[grp.method as MethodId];
+                              const rounds = parseInt(String(grp.items[0]?.ex.sets ?? "")) || null;
+                              const blockRest = grp.items[grp.items.length - 1]?.ex.rest;
+                              const isCircuit = grp.method === "circuito";
                               return (
-                                <div key={grp.key} className="space-y-2 rounded-2xl border-2 border-primary/40 bg-primary/5 p-2">
-                                  <div className="flex items-center gap-2 px-1 pt-1">
-                                    <Badge className="bg-primary text-[10px] text-primary-foreground">{meta?.short || grp.method}</Badge>
+                                <div key={grp.key} className="space-y-2 rounded-2xl border-2 border-primary/50 bg-primary/5 p-2 shadow-sm">
+                                  <div className="flex flex-wrap items-center gap-2 px-1 pt-1">
+                                    <MethodBadge method={grp.method} tone="primary" />
+                                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                                      {isCircuit && rounds ? `×${rounds} voltas` : `${grp.items.length} exercícios em sequência`}
+                                    </span>
                                     <span className="text-[11px] leading-tight text-muted-foreground">{meta?.hint}</span>
                                   </div>
                                   {cards}
+                                  {blockRest && (
+                                    <div className="flex items-center gap-1.5 px-1 pb-0.5 text-[11px] text-muted-foreground">
+                                      <Clock className="h-3 w-3" /> Descanso ao fim do bloco:
+                                      <span className="font-medium text-foreground">{blockRest}</span>
+                                    </div>
+                                  )}
                                 </div>
                               );
                             }

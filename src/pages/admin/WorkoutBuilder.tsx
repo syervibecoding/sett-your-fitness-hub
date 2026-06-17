@@ -13,14 +13,15 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, BrainCircuit, Sparkles, MessageCircle, Loader2, AlertCircle, Dumbbell, PersonStanding } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, BrainCircuit, Sparkles, MessageCircle, Loader2, AlertCircle, Dumbbell, PersonStanding, Clock } from "lucide-react";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 import { useAssistantName } from "@/hooks/useAssistantName";
 import { BodyMap } from "@/components/body/BodyMap";
 import { regionForLibraryGroup, normalizeGender, BODY_REGION_LABELS, type BodyRegionId } from "@/lib/bodyMap";
 import { exerciseThumb, youtubeIdFromUrl, EXERCISE_CATEGORIES } from "@/lib/exerciseCover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { groupWorkoutExercises, WORKOUT_METHODS, GROUPING_METHODS, SINGLE_METHODS, isGroupingMethod, type MethodId } from "@/lib/workoutMethods";
+import { groupWorkoutExercises, WORKOUT_METHODS, GROUPING_METHODS, SINGLE_METHODS, isGroupingMethod, methodNeedsSeconds, type MethodId } from "@/lib/workoutMethods";
+import { MethodBadge } from "@/components/workout/MethodBadge";
 import { useMaster } from "@/contexts/MasterContext";
 
 interface Exercise {
@@ -44,6 +45,7 @@ interface WorkoutExercise {
   video_path: string | null;
   group_id?: string | null;
   method?: string | null;
+  method_seconds?: number | null;
   sets: string;
   reps: string;
   rest: string;
@@ -176,6 +178,13 @@ export default function WorkoutBuilder() {
 
   const applyMethod = (wIdx: number, method: MethodId) => {
     const meta = WORKOUT_METHODS[method];
+    // Técnicas com sustentação (isometria, pico de contração/alongamento) pedem o tempo em segundos.
+    let methodSeconds: number | null = null;
+    if (methodNeedsSeconds(method)) {
+      const input = window.prompt(`Quantos segundos de sustentação no ${meta.label.toLowerCase()}?`, "3");
+      if (input === null) return; // cancelado
+      methodSeconds = Math.max(1, Math.min(600, parseInt(input) || 3));
+    }
     setWorkouts((prev) => prev.map((w, i) => {
       if (i !== wIdx) return w;
       const sel = w.exercises.map((_, k) => k).filter((k) => methodSel[selKey(wIdx, k)]);
@@ -183,7 +192,7 @@ export default function WorkoutBuilder() {
       if (meta.grouping) {
         if (sel.length < meta.minItems) return w;
         const gid = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `g${sel.join("")}${w.exercises[sel[0]].exercise_id}`;
-        const picked = sel.map((k) => ({ ...w.exercises[k], group_id: gid, method }));
+        const picked = sel.map((k) => ({ ...w.exercises[k], group_id: gid, method, method_seconds: null }));
         const out: WorkoutExercise[] = []; let inserted = false;
         w.exercises.forEach((e, k) => {
           if (sel.includes(k)) { if (!inserted) { out.push(...picked); inserted = true; } }
@@ -191,13 +200,13 @@ export default function WorkoutBuilder() {
         });
         return { ...w, exercises: out };
       }
-      return { ...w, exercises: w.exercises.map((e, k) => sel.includes(k) ? { ...e, method, group_id: null } : e) };
+      return { ...w, exercises: w.exercises.map((e, k) => sel.includes(k) ? { ...e, method, group_id: null, method_seconds: methodSeconds } : e) };
     }));
     clearMethodSel(wIdx);
   };
 
   const ungroupBlock = (wIdx: number, idxs: number[]) =>
-    setWorkouts((prev) => prev.map((w, i) => i !== wIdx ? w : ({ ...w, exercises: w.exercises.map((e, k) => idxs.includes(k) ? { ...e, group_id: null, method: null } : e) })));
+    setWorkouts((prev) => prev.map((w, i) => i !== wIdx ? w : ({ ...w, exercises: w.exercises.map((e, k) => idxs.includes(k) ? { ...e, group_id: null, method: null, method_seconds: null } : e) })));
   const [videoModal, setVideoModal] = useState<{ type: "path" | "url"; value: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [cycleInfo, setCycleInfo] = useState<{ cycle_number: number; student_name: string; student_id?: string; company_id?: string | null; gender?: "male" | "female" } | null>(null);
@@ -371,7 +380,8 @@ export default function WorkoutBuilder() {
         }],
       };
     }));
-    setLibraryOpen(false);
+    // Mantém a biblioteca aberta para adicionar vários — só fecha em "Ver treino completo".
+    toast({ title: "Adicionado ao treino", description: ex.name });
   };
 
   const removeExercise = (workoutIdx: number, exIdx: number) => {
@@ -932,7 +942,7 @@ export default function WorkoutBuilder() {
                                   <p className="font-sans font-medium text-foreground">{ex.exercise_name}</p>
                                   <Badge variant="outline" className="capitalize text-xs">{ex.muscle_group}</Badge>
                                   {ex.method && !isGroupingMethod(ex.method) && (
-                                    <Badge className="border-amber-500/30 bg-amber-500/15 text-[10px] text-amber-700">{WORKOUT_METHODS[ex.method as MethodId]?.short}</Badge>
+                                    <MethodBadge method={ex.method} seconds={(ex as any).method_seconds} tone="amber" />
                                   )}
                                   {hasVideo(ex) && (
                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openVideoForExercise(ex)}>
@@ -1035,14 +1045,26 @@ export default function WorkoutBuilder() {
                       ));
                       if (grp.grouping) {
                         const meta = WORKOUT_METHODS[grp.method as MethodId];
+                        const rounds = parseInt(String(grp.items[0]?.ex.sets ?? "")) || null;
+                        const blockRest = grp.items[grp.items.length - 1]?.ex.rest;
+                        const isCircuit = grp.method === "circuito";
                         return (
-                          <div key={grp.key} className="space-y-2 rounded-2xl border-2 border-primary/40 bg-primary/5 p-2">
-                            <div className="flex items-center gap-2 px-1">
-                              <Badge className="bg-primary text-[10px] text-primary-foreground">{meta?.short || grp.method}</Badge>
-                              <span className="text-xs text-muted-foreground">{grp.items.length} exercícios em sequência</span>
+                          <div key={grp.key} className="space-y-2 rounded-2xl border-2 border-primary/50 bg-primary/5 p-2 shadow-sm">
+                            <div className="flex flex-wrap items-center gap-2 px-1">
+                              <MethodBadge method={grp.method} tone="primary" />
+                              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                                {isCircuit && rounds ? `×${rounds} voltas` : `${grp.items.length} exercícios em sequência`}
+                              </span>
+                              <span className="text-xs text-muted-foreground">{meta?.hint}</span>
                               <Button variant="ghost" size="sm" className="ml-auto h-6 text-xs" onClick={() => ungroupBlock(wIdx, grp.items.map((it) => it.idx))}>Desagrupar</Button>
                             </div>
                             {cards}
+                            {blockRest && (
+                              <div className="flex items-center gap-1.5 px-1 pb-0.5 text-[11px] text-muted-foreground">
+                                <Clock className="h-3 w-3" /> Descanso ao fim do bloco:
+                                <span className="font-medium text-foreground">{blockRest}</span>
+                              </div>
+                            )}
                           </div>
                         );
                       }
@@ -1398,6 +1420,16 @@ export default function WorkoutBuilder() {
                 })}
               </div>
             )}
+          </div>
+
+          {/* Rodapé: continua na seleção; só vai para a prescrição em "Ver treino completo" */}
+          <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+            <span className="font-sans text-sm text-muted-foreground">
+              {(currentWorkout?.exercises?.length || 0)} exercício(s) no treino
+            </span>
+            <Button onClick={() => setLibraryOpen(false)}>
+              Ver treino completo
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
