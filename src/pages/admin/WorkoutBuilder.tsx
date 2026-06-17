@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,16 +13,19 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, BrainCircuit, Sparkles, MessageCircle, Loader2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, BrainCircuit, Sparkles, MessageCircle, Loader2, AlertCircle, Dumbbell, PersonStanding } from "lucide-react";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 import { useAssistantName } from "@/hooks/useAssistantName";
 import { BodyMap } from "@/components/body/BodyMap";
 import { regionForLibraryGroup, normalizeGender, BODY_REGION_LABELS, type BodyRegionId } from "@/lib/bodyMap";
+import { exerciseThumb, youtubeIdFromUrl, EXERCISE_CATEGORIES } from "@/lib/exerciseCover";
 
 interface Exercise {
   id: string;
   name: string;
   muscle_group: string;
+  category: string | null;
+  youtube_video_id: string | null;
   video_url: string | null;
   video_path: string | null;
   description: string | null;
@@ -142,7 +145,12 @@ export default function WorkoutBuilder() {
   const [libraryExercises, setLibraryExercises] = useState<Exercise[]>([]);
   const [libSearch, setLibSearch] = useState("");
   const [libGroup, setLibGroup] = useState("all");
+  const [libCategory, setLibCategory] = useState("all");
   const [bodyRegion, setBodyRegion] = useState<BodyRegionId | null>(null);
+  const [showBoneco, setShowBoneco] = useState(false);
+  // Capas resolvidas sob demanda (exercícios antigos sem youtube_video_id): id -> youtube id
+  const [covers, setCovers] = useState<Record<string, string>>({});
+  const coverRequested = useRef<Set<string>>(new Set());
   const [videoModal, setVideoModal] = useState<{ type: "path" | "url"; value: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [cycleInfo, setCycleInfo] = useState<{ cycle_number: number; student_name: string; student_id?: string; company_id?: string | null; gender?: "male" | "female" } | null>(null);
@@ -217,7 +225,7 @@ export default function WorkoutBuilder() {
   const loadLibrary = async () => {
     const { data } = await supabase
       .from("exercise_library")
-      .select("id, name, muscle_group, video_url, video_path, description")
+      .select("id, name, muscle_group, category, youtube_video_id, video_url, video_path, description")
       .order("muscle_group")
       .order("name");
     setLibraryExercises((data as Exercise[]) || []);
@@ -479,12 +487,46 @@ export default function WorkoutBuilder() {
     return "bg-red-500";
   };
 
-  const filteredLib = libraryExercises.filter((ex) => {
+  const filteredLib = useMemo(() => libraryExercises.filter((ex) => {
     const matchSearch = ex.name.toLowerCase().includes(libSearch.toLowerCase());
+    const matchCategory = libCategory === "all" || ex.category === libCategory;
     const matchGroup = libGroup === "all" || ex.muscle_group === libGroup;
     const matchRegion = !bodyRegion || regionForLibraryGroup(ex.muscle_group) === bodyRegion;
-    return matchSearch && matchGroup && matchRegion;
-  });
+    return matchSearch && matchCategory && matchGroup && matchRegion;
+  }), [libraryExercises, libSearch, libCategory, libGroup, bodyRegion]);
+
+  // Capa do exercício: thumbnail do YouTube (direto, ou resolvida sob demanda).
+  const coverFor = (ex: Exercise): string | null => {
+    const direct = exerciseThumb(ex);
+    if (direct) return direct;
+    const resolved = covers[ex.id];
+    return resolved ? `https://i.ytimg.com/vi/${resolved}/hqdefault.jpg` : null;
+  };
+
+  // Resolve capas dos exercícios visíveis que ainda não têm vídeo (lote pequeno, 1x cada).
+  useEffect(() => {
+    if (!libraryOpen) return;
+    const need = filteredLib
+      .filter((ex) => !exerciseThumb(ex) && !covers[ex.id] && !coverRequested.current.has(ex.id) && !ex.video_path)
+      .slice(0, 24);
+    need.forEach((ex) => {
+      coverRequested.current.add(ex.id);
+      supabase.functions
+        .invoke("youtube-exercise-video", { body: { exercise_id: ex.id, name: ex.name } })
+        .then(({ data }) => {
+          const vid = (data as { video_id?: string } | null)?.video_id;
+          if (vid) setCovers((c) => ({ ...c, [ex.id]: vid }));
+        })
+        .catch(() => {});
+    });
+  }, [filteredLib, libraryOpen, covers]);
+
+  const openPickerVideo = (ex: Exercise) => {
+    const id = ex.youtube_video_id || youtubeIdFromUrl(ex.video_url) || covers[ex.id];
+    if (ex.video_path) setVideoModal({ type: "path", value: getStoragePublicUrl(ex.video_path) });
+    else if (id) setVideoModal({ type: "url", value: `https://www.youtube.com/watch?v=${id}` });
+    else if (ex.video_url) setVideoModal({ type: "url", value: ex.video_url });
+  };
 
   const getEmbedUrl = (url: string) => {
     if (url.includes("youtube.com/watch")) {
@@ -1070,81 +1112,119 @@ export default function WorkoutBuilder() {
 
       {/* Library picker dialog */}
       <Dialog open={libraryOpen} onOpenChange={setLibraryOpen}>
-        <DialogContent className="bg-card border-border max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-primary">BIBLIOTECA DE EXERCÍCIOS</DialogTitle>
+        <DialogContent className="bg-card border-border max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+          <DialogHeader className="px-5 pt-5">
+            <DialogTitle className="text-primary">Biblioteca de exercícios</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            {/* Seleção visual por região (boneco anatômico) — sempre visível */}
-            <div className="rounded-lg border border-border bg-secondary/30 p-3">
-              <p className="text-xs font-medium text-foreground mb-1 text-center">
-                Selecione pelo boneco{bodyRegion ? ` · ${BODY_REGION_LABELS[bodyRegion]}` : ""}
-              </p>
-              <BodyMap
-                gender={cycleInfo?.gender ?? "male"}
-                onRegionClick={(id) => setBodyRegion((cur) => (cur === id ? null : id))}
-                activeRegions={bodyRegion ? [bodyRegion] : []}
-                getRegionFill={(id) => (id === bodyRegion ? "hsl(var(--primary))" : undefined)}
-                svgClassName="h-[380px] w-auto"
-                footer={
-                  bodyRegion ? (
-                    <button type="button" onClick={() => setBodyRegion(null)} className="text-xs text-primary underline">
-                      Limpar filtro ({BODY_REGION_LABELS[bodyRegion]})
-                    </button>
-                  ) : (
-                    <span className="text-[11px] text-muted-foreground">Clique num músculo para filtrar os exercícios.</span>
-                  )
-                }
-              />
+
+          <div className="space-y-3 border-b border-border px-5 pb-3 pt-3">
+            {/* Chips de categoria */}
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+              <button
+                type="button"
+                onClick={() => setLibCategory("all")}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition ${libCategory === "all" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}
+              >
+                Todos
+              </button>
+              {EXERCISE_CATEGORIES.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setLibCategory((cur) => (cur === c.id ? "all" : c.id))}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition ${libCategory === c.id ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}
+                >
+                  {c.label}
+                </button>
+              ))}
             </div>
 
-            <div className="flex gap-3">
+            {/* Busca + filtro por músculo (boneco) */}
+            <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input value={libSearch} onChange={(e) => setLibSearch(e.target.value)} placeholder="Buscar..." className="pl-10 bg-secondary border-border" />
+                <Input value={libSearch} onChange={(e) => setLibSearch(e.target.value)} placeholder="Buscar exercício..." className="pl-10 bg-secondary border-border" />
               </div>
-              <Select value={libGroup} onValueChange={setLibGroup}>
-                <SelectTrigger className="w-40 bg-secondary border-border">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {MUSCLE_GROUP_NAMES.map((g) => (
-                    <SelectItem key={g} value={g} className="capitalize">{g}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Button
+                type="button"
+                variant={bodyRegion || showBoneco ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowBoneco((v) => !v)}
+                className="shrink-0"
+              >
+                <PersonStanding className="mr-1 h-4 w-4" />
+                {bodyRegion ? BODY_REGION_LABELS[bodyRegion] : "Músculo"}
+              </Button>
+              {bodyRegion && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setBodyRegion(null)} className="shrink-0 text-xs">
+                  Limpar
+                </Button>
+              )}
             </div>
 
-            {filteredLib.length === 0 && (
-              <p className="text-center text-muted-foreground font-sans py-6">Nenhum exercício encontrado</p>
+            {showBoneco && (
+              <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                <BodyMap
+                  gender={cycleInfo?.gender ?? "male"}
+                  onRegionClick={(id) => setBodyRegion((cur) => (cur === id ? null : id))}
+                  activeRegions={bodyRegion ? [bodyRegion] : []}
+                  getRegionFill={(id) => (id === bodyRegion ? "hsl(var(--primary))" : undefined)}
+                  svgClassName="h-[300px] w-auto"
+                  footer={<span className="text-[11px] text-muted-foreground">Clique num músculo para filtrar os exercícios.</span>}
+                />
+              </div>
             )}
 
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {filteredLib.map((ex) => {
-                const currentExercises = currentWorkout?.exercises || [];
-                const alreadyAdded = currentExercises.some((w) => w.exercise_id === ex.id);
-                return (
-                  <div
-                    key={ex.id}
-                    className="flex items-center justify-between p-3 rounded-md bg-secondary hover:bg-muted transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <p className="font-sans font-medium text-foreground text-sm">{ex.name}</p>
-                      <Badge variant="outline" className="capitalize text-xs">{ex.muscle_group}</Badge>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant={alreadyAdded ? "secondary" : "default"}
+            <p className="font-sans text-xs text-muted-foreground">{filteredLib.length} exercícios</p>
+          </div>
+
+          {/* Grid de cards com "capa" em vídeo */}
+          <div className="flex-1 overflow-y-auto px-5 py-4">
+            {filteredLib.length === 0 ? (
+              <p className="py-10 text-center font-sans text-muted-foreground">Nenhum exercício encontrado</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                {filteredLib.map((ex) => {
+                  const currentExercises = currentWorkout?.exercises || [];
+                  const alreadyAdded = currentExercises.some((w) => w.exercise_id === ex.id);
+                  const cover = coverFor(ex);
+                  return (
+                    <button
+                      key={ex.id}
+                      type="button"
                       disabled={alreadyAdded}
                       onClick={() => addExercise(ex)}
+                      title={ex.name}
+                      className={`group relative aspect-[4/3] overflow-hidden rounded-xl border text-left transition ${alreadyAdded ? "border-primary/60 opacity-80" : "border-border hover:-translate-y-0.5 hover:border-primary"}`}
                     >
-                      {alreadyAdded ? "Adicionado" : "Adicionar"}
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
+                      {cover ? (
+                        <img src={cover} alt={ex.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-secondary to-muted">
+                          <Dumbbell className="h-8 w-8 text-muted-foreground/50" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent" />
+                      <span
+                        role="button"
+                        tabIndex={-1}
+                        onClick={(e) => { e.stopPropagation(); openPickerVideo(ex); }}
+                        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition hover:bg-black/80 group-hover:opacity-100"
+                      >
+                        <Play className="h-3.5 w-3.5" />
+                      </span>
+                      {alreadyAdded && (
+                        <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">Adicionado</span>
+                      )}
+                      <div className="absolute bottom-0 left-0 right-0 p-2">
+                        <p className="line-clamp-2 text-[11px] font-medium leading-tight text-white">{ex.name}</p>
+                        <p className="mt-0.5 text-[9px] uppercase tracking-wide text-white/60">{ex.muscle_group}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
