@@ -7,7 +7,7 @@
 -- table:         public.exercise_metadata
 -- total rows:    0
 -- status:        NO_APPROVED_ROWS
--- generated_at:  2026-06-17T01:44:37.932Z
+-- generated_at:  2026-06-17T12:48:16.868Z
 -- -------------------------------------------------------------------------------------
 -- SCHEMA_GAP (campos do manifesto SEM coluna em exercise_metadata — NAO inventar coluna):
 --   * equipment (vive em exercise_library.equipment, text unico; nao em exercise_metadata)

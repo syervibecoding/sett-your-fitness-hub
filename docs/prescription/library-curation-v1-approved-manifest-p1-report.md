@@ -7,7 +7,7 @@
 
 ## Entradas
 - Manifesto: `docs/prescription/library-curation-v1-consolidated-manifest.csv`
-- Review CSV: `docs/prescription/library-curation-v1-review-board-p1.csv`
+- Review CSV: `docs/prescription/library-curation-v1-p1-human-review.csv`
 - Prioridade esperada: `P1`
 - Saída CSV: `docs/prescription/library-curation-v1-approved-manifest-p1.csv`
 
