@@ -650,6 +650,34 @@ export default function WorkoutBuilder() {
             <DialogTitle className="text-primary">BIBLIOTECA DE EXERCÍCIOS</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Anatomical body picker */}
+            <div className="rounded-lg border border-border bg-secondary/40 p-4">
+              <p className="text-center text-sm font-sans text-muted-foreground mb-2">
+                Selecione pelo boneco
+                {libRegion ? <> · <span className="text-foreground font-medium">{REGION_LABEL[libRegion]}</span></> : null}
+              </p>
+              <BodyMap
+                activeRegions={libRegion ? [libRegion] : regionsWithExercises}
+                onRegionClick={(region) =>
+                  setLibRegion((prev) => (prev === region ? null : region))
+                }
+                scale={0.85}
+                footer={
+                  libRegion ? (
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => setLibRegion(null)}
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Limpar filtro ({REGION_LABEL[libRegion]})
+                    </Button>
+                  ) : null
+                }
+              />
+            </div>
+
             <div className="flex gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
