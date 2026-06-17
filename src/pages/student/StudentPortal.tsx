@@ -768,7 +768,7 @@ export default function StudentPortal() {
 
         {/* STATS VIEW */}
         {activeView === "stats" && (
-          <StatsCharts allLogs={allLogs} cycles={cycles} todayStr={todayStr} />
+          <StatsCharts allLogs={allLogs} cycles={cycles} todayStr={todayStr} gender={gender ?? "male"} />
         )}
 
         {/* CALENDARIO VIEW */}
