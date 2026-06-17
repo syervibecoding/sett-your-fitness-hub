@@ -111,6 +111,9 @@ export default function StudentPortal() {
 
   const session = useWorkoutSession(studentId, companyId);
 
+  // Keep the screen awake while a workout session is in progress.
+  useWakeLock(session.isActive);
+
   const { activeRest, startRest, clearRest } = useRestTimer();
 
   useEffect(() => {
