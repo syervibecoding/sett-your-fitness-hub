@@ -4,15 +4,10 @@ import "./index.css";
 
 createRoot(document.getElementById("root")!).render(<App />);
 
-// Service worker DESATIVADO: o cache agressivo causava bundle/dados velhos (treino/nutrição não
-// apareciam após deploy). Em vez de registrar, removemos qualquer SW antigo e limpamos os caches —
-// o app passa a buscar tudo da rede (sempre a versão mais recente).
+// Service worker NETWORK-FIRST: HTML sempre da rede (sem bundle velho), assets hasheados do cache.
+// Habilita PWA instalável (Android 1-toque) + offline, sem o bug de cache antigo.
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker
-    .getRegistrations()
-    .then((regs) => regs.forEach((r) => r.unregister()))
-    .catch(() => {});
-}
-if (typeof caches !== "undefined") {
-  caches.keys().then((keys) => keys.forEach((k) => caches.delete(k))).catch(() => {});
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
 }
