@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { assertTenantAccess, HttpError } from "../_shared/tenant-auth.ts";
+import { buildNutritionProgram, assertNutritionPlanComplete } from "../_shared/nutrition/nutritionEngine.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -411,11 +412,7 @@ INSTRUÇÃO DE SAÍDA — APENAS JSON VÁLIDO
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  if (!ANTHROPIC_API_KEY) {
-    return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY não configurada. Adicione o segredo para usar a IA." }), {
-      status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
+  // Fallback-first: o plano é determinístico e NÃO depende de ANTHROPIC_API_KEY (sem mais 503).
   const claims = await requireUser(req);
   if (!claims) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -512,45 +509,13 @@ INSTRUÇÕES:
 14. Priorize JSON válido completo; não escreva cardápio fechado nem explicações longas.
     `.trim();
 
-    let rawText = "";
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 55000);
-      const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        signal: controller.signal,
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          max_tokens: 5000,
-          system: `${SYSTEM_PROMPT}\n\n${companyAiSystem(aiConfig)}`,
-          messages: [{ role: "user", content: clean(athleteContext) }],
-        }),
-      });
-      clearTimeout(timeout);
-
-      if (!aiResponse.ok) {
-        const errorText = await aiResponse.text().catch(() => "");
-        console.warn("ai-nutrition-plan fallback: Anthropic non-2xx", aiResponse.status, errorText.slice(0, 300));
-      } else {
-        const aiData = await aiResponse.json();
-        rawText = aiData.content?.[0]?.text ?? "";
-      }
-    } catch (error) {
-      console.warn("ai-nutrition-plan fallback: Anthropic timeout/error", error instanceof Error ? error.message : String(error));
-    }
-
-    let planJson = null;
-    try {
-      planJson = rawText ? JSON.parse(rawText.replace(/```json|```/g, "").trim()) : null;
-    } catch {
-      planJson = fallbackNutritionPlan(input, rawText);
-    }
-    planJson = normalizeNutritionPlan(planJson, input, rawText);
+    // GERAÇÃO DETERMINÍSTICA (fallback-first): plano BN Nutri completo e enviável SEM IA/crédito.
+    // Mifflin-St Jeor (Katch se %gordura), GET por atividade, macros por objetivo, carb cycling,
+    // hidratação, pisos de segurança e refeições — tudo em código (nutritionEngine.ts). A IA fica
+    // como refino de TEXTO opcional, desligado por padrão e nunca alterando estrutura.
+    const planJson: any = buildNutritionProgram(input);
+    planJson.enrichment = { status: "deterministic_only" };
+    void athleteContext; // contexto mantido p/ futura camada de refino por IA
     if (prescription_integration) {
       planJson.prescription_integration = {
         readiness: prescription_integration.readiness ?? null,
@@ -567,6 +532,9 @@ INSTRUÇÕES:
       };
     }
 
+    // Invariante: nunca persistir plano sem energia/macros/refeições.
+    assertNutritionPlanComplete(planJson);
+
     // Salva no banco
     const planId = crypto.randomUUID();
     await supabase.from("nutrition_plans").insert({
@@ -574,10 +542,18 @@ INSTRUÇÕES:
       company_id: authorizedCompanyId, student_id,
       plan_name: planJson.plan_name,
       objective,
-      total_calories: planJson.energy_summary?.target_kcal,
-      protein_g: planJson.energy_summary?.protein_total_g,
-      carbs_g: planJson.energy_summary?.carbs_total_g,
-      fat_g: planJson.energy_summary?.fat_total_g,
+      total_calories: planJson.total_calories,
+      protein_g: planJson.protein_g,
+      carbs_g: planJson.carbs_g,
+      fat_g: planJson.fat_g,
+      // Aliases que o ai-nutrition-meals lê (alinha o schema das duas funções):
+      target_calories: planJson.total_calories,
+      target_protein_g: planJson.protein_g,
+      target_carbs_g: planJson.carbs_g,
+      target_fat_g: planJson.fat_g,
+      goal: objective,
+      context_dietary_restrictions: textValue(food_restrictions),
+      meals: planJson.meals,
       energy_summary: planJson.energy_summary,
       carb_cycling: planJson.carb_cycling,
       nutrition_tips: planJson.nutrition_tips,
