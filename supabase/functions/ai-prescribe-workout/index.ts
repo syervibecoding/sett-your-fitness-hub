@@ -6,7 +6,11 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-const MODEL = "claude-sonnet-4-5-20250929";
+const MODEL = Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-4-5-20250929";
+// Fallback-first: por padrão NÃO chama a IA — o plano sai do gerador determinístico
+// (buildEmergencyFallbackPlan: completo, só biblioteca, passa o validator pre_save).
+// Para voltar a IA como gerador primário, defina PRESCRIPTION_AI_FIRST=on.
+const AI_FIRST = (Deno.env.get("PRESCRIPTION_AI_FIRST") ?? "off").trim().toLowerCase() === "on";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1234,7 +1238,7 @@ INSTRUÇÕES:
     let planJson: any = null;
     let fallbackReason: string | null = null;
 
-    if (ANTHROPIC_API_KEY) {
+    if (AI_FIRST && ANTHROPIC_API_KEY) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 65000);
@@ -1274,8 +1278,8 @@ INSTRUÇÕES:
         console.warn("ai-prescribe-workout emergency fallback", fallbackReason);
       }
     } else {
-      fallbackReason = "anthropic_key_missing";
-      console.warn("ai-prescribe-workout emergency fallback", fallbackReason);
+      fallbackReason = AI_FIRST ? "anthropic_key_missing" : "deterministic_first";
+      if (AI_FIRST) console.warn("ai-prescribe-workout emergency fallback", fallbackReason);
     }
 
     if (!planJson) {
