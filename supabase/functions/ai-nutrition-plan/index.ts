@@ -537,37 +537,31 @@ INSTRUÇÕES:
 
     // Salva no banco
     const planId = crypto.randomUUID();
+    // Schema LIVE de nutrition_plans (studio): name(NOT NULL)/goal/target_*/total_*/meals.
     await supabase.from("nutrition_plans").insert({
       id: planId,
       company_id: authorizedCompanyId, student_id,
+      name: planJson.plan_name,
       plan_name: planJson.plan_name,
-      objective,
-      total_calories: planJson.total_calories,
-      protein_g: planJson.protein_g,
-      carbs_g: planJson.carbs_g,
-      fat_g: planJson.fat_g,
-      // Aliases que o ai-nutrition-meals lê (alinha o schema das duas funções):
+      goal: objective,
       target_calories: planJson.total_calories,
       target_protein_g: planJson.protein_g,
       target_carbs_g: planJson.carbs_g,
       target_fat_g: planJson.fat_g,
-      goal: objective,
+      target_water_ml: planJson.energy_summary?.hydration_ml ?? null,
+      total_calories: planJson.total_calories,
+      protein_g: planJson.protein_g,
+      carbs_g: planJson.carbs_g,
+      fat_g: planJson.fat_g,
+      context_weight_kg: weight_kg ?? null,
+      context_body_fat_pct: body_fat_percent ?? null,
+      context_activity_level: activity_level ?? null,
       context_dietary_restrictions: textValue(food_restrictions),
       meals: planJson.meals,
-      energy_summary: planJson.energy_summary,
-      carb_cycling: planJson.carb_cycling,
-      nutrition_tips: planJson.nutrition_tips,
-      supplementation: planJson.supplementation,
-      substitutions: planJson.substitutions,
-      pre_race_gi_protocol: textValue(planJson.pre_race_gi_protocol),
-      intra_workout_protocol: textValue(planJson.intra_workout_protocol),
-      rest_day_adjustments: textValue(planJson.rest_day_adjustments),
-      general_notes: textValue(planJson.general_notes),
-      warnings: Array.isArray(planJson.warnings) ? planJson.warnings.map(textValue) : null,
-      plan: planJson,
+      ai_rationale: textValue(planJson.general_notes),
+      observations: textValue(planJson.general_notes),
       anamnese_id,
       bundle_id,
-      observations: textValue(planJson.general_notes),
     });
 
     return new Response(
