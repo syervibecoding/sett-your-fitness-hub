@@ -161,7 +161,9 @@ export function NutritionPlanView({ studentId }: { studentId: string }) {
   const protein = row.target_protein_g ?? row.protein_g ?? 0;
   const carbs = row.target_carbs_g ?? row.carbs_g ?? 0;
   const fat = row.target_fat_g ?? row.fat_g ?? 0;
-  const title = row.plan_name || row.name || "Plano nutricional";
+  // Título limpo: remove o sufixo técnico "— objetivo | nome" que vem da geração automática.
+  const rawTitle = row.plan_name || row.name || "";
+  const title = rawTitle.split(/\s*[—|]\s*/)[0].trim() || "Plano nutricional";
   const goal = row.goal ? GOAL_LABEL[row.goal] || row.goal : null;
   const meals = asArray<MealItem>(row.meals).filter((m) => m && (m.meal || (m.eat && m.eat.length)));
 
@@ -185,7 +187,7 @@ export function NutritionPlanView({ studentId }: { studentId: string }) {
       <div className="flex items-start gap-2">
         <Utensils className="h-5 w-5 text-primary shrink-0 mt-1" />
         <div>
-          <h2 className="font-display text-2xl text-foreground capitalize leading-tight">{title}</h2>
+          <h2 className="font-display text-2xl text-foreground leading-tight">{title}</h2>
           <div className="flex flex-wrap items-center gap-2 mt-1">
             {goal && <Badge variant="outline" className="text-primary border-primary/30">{goal}</Badge>}
             {row.context_dietary_restrictions && (
@@ -196,6 +198,42 @@ export function NutritionPlanView({ studentId }: { studentId: string }) {
           </div>
         </div>
       </div>
+
+      {/* Hidratação (interativo) — no topo */}
+      {totalGlasses > 0 && (
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-eyebrow text-muted-foreground">Hidratação de hoje</p>
+              <span className="font-mono-data text-xs text-sky-600">
+                {Math.min(glasses, totalGlasses)}/{totalGlasses} copos · {((Math.min(glasses, totalGlasses) * GLASS_ML) / 1000).toFixed(1)} L de {(waterMl / 1000).toFixed(1)} L
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {Array.from({ length: totalGlasses }).map((_, i) => {
+                const filled = i < glasses;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    aria-label={`Copo ${i + 1}`}
+                    onClick={() => setGlassesPersist(glasses === i + 1 ? i : i + 1)}
+                    className={cn(
+                      "flex h-8 w-8 items-center justify-center rounded-md border transition-colors",
+                      filled ? "border-sky-500 bg-sky-500/15 text-sky-600" : "border-border bg-background text-muted-foreground hover:border-sky-400",
+                    )}
+                  >
+                    <Droplets className={cn("h-4 w-4", filled && "fill-sky-500/30")} />
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-sky-500 transition-all" style={{ width: `${waterPctDone}%` }} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Macros do dia */}
       <div>
@@ -290,42 +328,6 @@ export function NutritionPlanView({ studentId }: { studentId: string }) {
           </Card>
         )}
       </div>
-
-      {/* Hidratação (interativo) */}
-      {totalGlasses > 0 && (
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-eyebrow text-muted-foreground">Hidratação de hoje</p>
-              <span className="font-mono-data text-xs text-sky-600">
-                {Math.min(glasses, totalGlasses)}/{totalGlasses} copos · {((Math.min(glasses, totalGlasses) * GLASS_ML) / 1000).toFixed(1)} L de {(waterMl / 1000).toFixed(1)} L
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {Array.from({ length: totalGlasses }).map((_, i) => {
-                const filled = i < glasses;
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    aria-label={`Copo ${i + 1}`}
-                    onClick={() => setGlassesPersist(glasses === i + 1 ? i : i + 1)}
-                    className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded-md border transition-colors",
-                      filled ? "border-sky-500 bg-sky-500/15 text-sky-600" : "border-border bg-background text-muted-foreground hover:border-sky-400",
-                    )}
-                  >
-                    <Droplets className={cn("h-4 w-4", filled && "fill-sky-500/30")} />
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-sky-500 transition-all" style={{ width: `${waterPctDone}%` }} />
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <p className="text-[11px] text-muted-foreground text-center px-4">
         Sugestões nutricionais educativas do seu treinador — não substituem o acompanhamento de um nutricionista.
