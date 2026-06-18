@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { assertTenantAccess, HttpError } from "../_shared/tenant-auth.ts";
+import { buildCardioProgram, assertCardioPlanComplete } from "../_shared/prescription/cardio/cardioEngine.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -436,61 +437,14 @@ INSTRUÇÕES:
 10. Retorne APENAS o JSON conforme instruído, sem texto adicional
     `.trim();
 
-    let planJson: any = null;
-    let rawText = "";
-    let fallbackReason = "";
-
-    if (ANTHROPIC_API_KEY) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 65000);
-        const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          signal: controller.signal,
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify({
-            model: MODEL,
-            max_tokens: 12000,
-            system: `${SYSTEM_PROMPT}\n\n${companyAiSystem(aiConfig)}`,
-            messages: [{ role: "user", content: clean(athleteContext) }],
-          }),
-        });
-        clearTimeout(timeoutId);
-
-        if (!aiResponse.ok) {
-          const details = await aiResponse.text().catch(() => "");
-          fallbackReason = `anthropic_${aiResponse.status}: ${details.slice(0, 240)}`;
-          console.warn("ai-running-plan fallback", fallbackReason);
-        } else {
-          const aiData = await aiResponse.json();
-          rawText = aiData.content?.[0]?.text ?? "";
-          try {
-            const cleaned = rawText.replace(/```json|```/g, "").trim();
-            planJson = JSON.parse(cleaned);
-          } catch {
-            fallbackReason = `json_parse_failed: ${rawText.slice(0, 240)}`;
-            console.warn("ai-running-plan fallback", fallbackReason);
-          }
-        }
-      } catch (error) {
-        fallbackReason = `anthropic_error: ${error instanceof Error ? error.message : String(error)}`;
-        console.warn("ai-running-plan fallback", fallbackReason);
-      }
-    } else {
-      fallbackReason = "anthropic_key_missing";
-      console.warn("ai-running-plan fallback", fallbackReason);
-    }
-
-    if (!planJson) {
-      planJson = fallbackCardioPlan(input, fallbackReason || rawText);
-      planJson.generated_by = "bn_cardio_fallback";
-      planJson.fallback_reason = fallbackReason || "anthropic_unavailable";
-    }
-    planJson = normalizeCardioPlan(planJson, input, rawText);
+    // GERAÇÃO DETERMINÍSTICA (fallback-first): plano BN completo e enviável SEM depender de IA/crédito.
+    // A metodologia (Karvonen, regra dos 10%, deload, linhas vermelhas TSB/EVA, polarizado/piramidal,
+    // sincronização com a musculação) vive agora em código (cardioEngine.ts). A IA fica como camada de
+    // refino de TEXTO opcional — desligada por padrão e NUNCA gerando estrutura. Isso elimina as cascas
+    // vazias e tira a dependência do saldo da Anthropic para prescrever cardio.
+    const planJson: any = buildCardioProgram(input);
+    planJson.enrichment = { status: "deterministic_only" };
+    void athleteContext; // contexto mantido p/ futura camada de refino por IA
     const persistedPlanName = clean(planJson.plan_name || `Plano de ${sport || "corrida"}`);
     planJson.plan_name = persistedPlanName;
     if (prescription_integration) {
@@ -509,6 +463,9 @@ INSTRUÇÕES:
         synchronization_rules: bnito_orchestration.synchronization_rules ?? null,
       };
     }
+
+    // Invariante: nunca persistir casca vazia. O determinístico sempre preenche, mas garantimos.
+    assertCardioPlanComplete(planJson);
 
     // Salva no banco
     const planId = crypto.randomUUID();
