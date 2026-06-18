@@ -193,7 +193,7 @@ function buildSession(spec: SessionSpec, day: string, sport: string, sessionMin:
   const dist = spec.kind === "descanso" ? null : distanceFor(sport, zk, main);
 
   const titles: Record<SessionSpec["kind"], string> = {
-    longo: "Longo aeróbico", facil: "Rodagem fácil", limiar: "Limiar", qualidade: "Intervalado de qualidade",
+    longo: "Longo aeróbico", facil: "Treino leve", limiar: "Limiar", qualidade: "Intervalado de qualidade",
     regeneracao: "Regenerativo", descanso: "Descanso / mobilidade",
   };
   const types: Record<SessionSpec["kind"], string> = {
@@ -209,7 +209,7 @@ function buildSession(spec: SessionSpec, day: string, sport: string, sessionMin:
   else notes = "Dia de descanso ativo: mobilidade, alongamento leve e respiração.";
 
   const swimNote = sport === "natacao" && spec.kind !== "descanso"
-    ? ` Distância em metros conforme pace; ~${Math.round((main / 1.8))} m de volume principal.` : "";
+    ? " Volume em metros conforme o pace das séries (sem distância em km)." : "";
 
   return {
     day, type: types[spec.kind], title: titles[spec.kind], sport: spec.kind === "descanso" ? "descanso" : sport,
@@ -294,7 +294,7 @@ export function buildCardioProgram(input: CardioInput): CardioPlan {
     const volume_hours = round1(sessions.reduce((s, x) => s + x.total_min / 60, 0));
     const volume_km = sport === "natacao" ? null : round1(sessions.reduce((s, x) => s + (x.distance_km || 0), 0));
     const focusMap: Record<CardioWeek["type"], string> = {
-      base: "Base aeróbica e técnica — correr fácil com folga de esforço.",
+      base: "Base aeróbica e técnica — ritmo fácil com folga de esforço.",
       desenvolvimento: "Acúmulo de volume com um estímulo de limiar controlado.",
       qualidade: "Intensidade e qualidade — pico do bloco, perto do limiar/VO₂.",
       deload: "Semana regenerativa (deload): volume e intensidade reduzidos para supercompensar.",
