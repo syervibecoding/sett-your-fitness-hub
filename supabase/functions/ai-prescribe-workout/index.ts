@@ -281,23 +281,33 @@ async function loadExerciseCatalog(
   supabase: any,
   companyId: string | null,
 ): Promise<ExerciseCatalog> {
-  let exerciseQuery = supabase
-    .from("exercise_library")
-    .select("id, name, description, muscle_group, is_global, company_id")
-    .order("muscle_group", { ascending: true })
-    .order("name", { ascending: true })
-    .limit(700);
+  // Catálogo COMPLETO via paginação: considerar TODOS os exercícios disponíveis como pool de
+  // candidatos (sem teto fixo antigo de 700). PostgREST limita ~1000 linhas/requisição, então
+  // paginamos com range() até a biblioteca acabar. Filtros/select/ordem preservados por página.
+  const CATALOG_PAGE_SIZE = 1000;
+  const makeExerciseLibraryQuery = (from: number, to: number) => {
+    const q = supabase
+      .from("exercise_library")
+      .select("id, name, description, muscle_group, is_global, company_id")
+      .order("muscle_group", { ascending: true })
+      .order("name", { ascending: true })
+      .range(from, to);
+    return companyId
+      ? q.or(`is_global.eq.true,company_id.eq.${companyId}`)
+      : q.eq("is_global", true);
+  };
 
-  exerciseQuery = companyId
-    ? exerciseQuery.or(`is_global.eq.true,company_id.eq.${companyId}`)
-    : exerciseQuery.eq("is_global", true);
-
-  const { data: exercises, error: exerciseError } = await exerciseQuery;
-  if (exerciseError) {
-    throw new Error(`Falha ao carregar biblioteca de exercicios: ${exerciseError.message}`);
+  const exerciseRows: any[] = [];
+  for (let from = 0; ; from += CATALOG_PAGE_SIZE) {
+    const { data, error: exerciseError } = await makeExerciseLibraryQuery(from, from + CATALOG_PAGE_SIZE - 1);
+    if (exerciseError) {
+      throw new Error(`Falha ao carregar biblioteca de exercicios: ${exerciseError.message}`);
+    }
+    const page = (data ?? []) as any[];
+    if (page.length === 0) break;
+    exerciseRows.push(...page);
+    if (page.length < CATALOG_PAGE_SIZE) break;
   }
-
-  const exerciseRows = (exercises ?? []) as any[];
   const exerciseIds = exerciseRows.map((exercise) => exercise.id as string).filter(Boolean);
 
   const [targetsResult, groupsResult, overridesResult, metadataResult] = await Promise.all([
