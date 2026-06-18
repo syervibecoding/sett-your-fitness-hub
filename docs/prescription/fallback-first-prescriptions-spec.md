@@ -87,7 +87,12 @@ Expor consistentemente nas 3 edges: `generated_by` (ex.: `bn_cardio_fallback`/`b
 
 ---
 
-## 8. O que o Claude (área do aluno) já fez / fará
-- ✅ `CardioPlanView.tsx`: plano sem `weeks`/sessões → estado "em finalização" (não mostra casca).
-- ⏳ Quando o contrato (`generated_by`/`fallback_reason`/`enrichment`) existir: badge "plano base — em revisão"; leitura defensiva dos campos novos; destaque de FC estimada e `safety_check.restrictions`.
-- **Não toco** em `supabase/functions/*`, migrations, nem faço deploy de edge — isso é do chat do motor.
+## 8. STATUS DE IMPLEMENTAÇÃO (✅ 2026-06-18 — implementado pelo Claude por ordem direta do Matheus)
+> O Matheus pediu "faça você, tudo implementado". Implementado, deployado e commitado:
+
+- ✅ **CARDIO** — `_shared/prescription/cardio/cardioEngine.ts` (novo) + `ai-running-plan` determinístico-first + `assertCardioPlanComplete`. Deploy v+1, smoke 401 OK. 6 cenários testados (Karvonen, TSB<-20→Z2, EVA≥7→descanso, iniciante, natação).
+- ✅ **NUTRIÇÃO** — `_shared/nutrition/nutritionEngine.ts` (novo) + `ai-nutrition-plan` determinístico-first (503 removido) + `assertNutritionPlanComplete` + migration aditiva `nutrition_plans` (meals/target_*/goal/context) que **corrige o bug do meals**. Deploy + smoke 401 OK. 5 cenários testados (Mifflin/Katch, pisos 1200/1500, endurance, veg).
+- ✅ **FORÇA** — `ai-prescribe-workout` determinístico-first por padrão (usa `buildEmergencyFallbackPlan`, que passa o validator pre_save) + modelo via env. Reversível com `PRESCRIPTION_AI_FIRST=on`. Deploy + smoke 401 OK. **Cutover do `engine.ts` NÃO flipado** (gate documentado do time + sem teste E2E aqui) — segue como flag p/ o engine_chat autorizar.
+- ✅ **GATING** — migration aditiva `company_ai_config.ai_text_refinement_enabled` (default false) + `use_prescription_engine_v1` (default true).
+- ✅ **RENDER DO ALUNO** — `CardioPlanView` (empty-state) e `NutritionPlanView` (lê target_calories/meals) já consomem os contratos. Sem mudança necessária.
+- ⏳ **PENDENTE (opcional, refino off por padrão):** a camada `refine_text` (IA refina só texto, Haiku, gateada) NÃO foi ligada — coerente com "refino desligado". Pronta p/ wirar quando quiserem. Cutover do `engine.ts` de força idem.
