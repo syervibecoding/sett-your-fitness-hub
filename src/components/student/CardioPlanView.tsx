@@ -185,7 +185,9 @@ export function CardioPlanView({
     : [];
 
   const weeks = asArray<CardioWeek>(plan.weeks);
-  const warnings = asArray<unknown>(plan.warnings).map(toText).filter(Boolean);
+  // O aluno NÃO vê notas internas/para o treinador (disclaimer, FC estimada, nível assumido, sync).
+  const INTERNAL_WARNING = /revise antes de prescrever|metodologia bn|plano base gerado|determin[íi]st|fc estimad|estimad[ao]s|n[íi]vel de experi|assumid|sincronizad/i;
+  const warnings = asArray<unknown>(plan.warnings).map(toText).filter(Boolean).filter((w) => !INTERNAL_WARNING.test(w));
   const strength = asArray<unknown>(plan.complementary_strength)
     .map(toText)
     .filter(Boolean);
@@ -271,7 +273,9 @@ export function CardioPlanView({
         <div>
           <div className="flex items-center gap-2 mb-2">
             <Heart className="h-4 w-4 text-primary" />
-            <span className="text-eyebrow text-muted-foreground">Zonas de FC (bpm)</span>
+            <span className="text-eyebrow text-muted-foreground">
+              Zonas de FC (bpm){(fcZones as { estimated?: boolean } | null)?.estimated ? " · estimadas" : ""}
+            </span>
           </div>
           <div className="grid grid-cols-5 gap-1.5">
             {orderedZoneKeys.map((key) => {

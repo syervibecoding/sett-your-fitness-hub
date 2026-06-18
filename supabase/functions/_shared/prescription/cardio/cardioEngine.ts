@@ -51,6 +51,7 @@ export interface CardioPlan {
   weeks: CardioWeek[];
   complementary_strength: string[];
   nutrition_alert: string; general_tips: string; warnings: string[];
+  coach_notes?: string[];
   generated_by: string;
 }
 
@@ -307,12 +308,14 @@ export function buildCardioProgram(input: CardioInput): CardioPlan {
   // Volume de referência (1ª semana não-deload)
   const ref = weeks.find((w) => w.type !== "deload") || weeks[0];
 
-  const warnings: string[] = [];
-  if (zones.estimated) warnings.push("⚠️ Zonas de FC estimadas (FCmax/FCrep aproximados). Recomenda-se teste de esforço para maior precisão.");
-  if (assumed) warnings.push("Nível de experiência não informado — assumido conservador (iniciante). Ajuste se o atleta tiver mais base.");
-  for (const r of safety.restrictions) warnings.push(r);
-  if (input.strength_plan_context) warnings.push("Sincronizado com a musculação: evite Z4/Z5 no dia e na véspera de treino pesado de MMII; corrida fácil só após a força, com ≥6h de intervalo.");
-  warnings.push("Plano base gerado pela metodologia BN (determinístico). Revise antes de prescrever ao aluno.");
+  // ALUNO vê (alertas, vermelho) = SOMENTE restrições de segurança reais (TSB/EVA/contraindicação).
+  const warnings: string[] = [...safety.restrictions];
+  // Notas internas / para o treinador — NUNCA exibidas ao aluno (não vão pro canal de warnings).
+  const coach_notes: string[] = [];
+  if (zones.estimated) coach_notes.push("Zonas de FC estimadas (FCmax/FCrep aproximados). Recomende teste de esforço para maior precisão.");
+  if (assumed) coach_notes.push("Nível de experiência não informado — assumido conservador (iniciante). Ajuste se o atleta tiver mais base.");
+  if (input.strength_plan_context) coach_notes.push("Sincronizado com a musculação: evite Z4/Z5 no dia e na véspera de MMII pesado; corrida fácil só após a força, ≥6h de intervalo.");
+  coach_notes.push("Plano base gerado pela metodologia BN (determinístico). Revise antes de prescrever ao aluno.");
 
   let tips = "Aqueça progressivamente e desaqueça em toda sessão. Hidrate-se antes, durante e depois — principalmente nos longos. Priorize 7–9h de sono: é onde a adaptação acontece. Respeite as zonas: correr fácil de verdade é o que sustenta a evolução. Dor articular acima de leve → reduza o impacto e avise o treinador.";
   if (input.strength_plan_context) tips += " Nos dias de musculação pesada de pernas, faça só cardio leve (Z1–Z2) e depois da força.";
@@ -329,6 +332,7 @@ export function buildCardioProgram(input: CardioInput): CardioPlan {
     nutrition_alert: nutritionAlert(input.diet_type),
     general_tips: tips,
     warnings,
+    coach_notes,
     generated_by: "bn_cardio_engine_v1",
   };
 }
