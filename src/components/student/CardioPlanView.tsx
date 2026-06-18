@@ -188,9 +188,6 @@ export function CardioPlanView({
   // O aluno NÃO vê notas internas/para o treinador (disclaimer, FC estimada, nível assumido, sync).
   const INTERNAL_WARNING = /revise antes de prescrever|metodologia bn|plano base gerado|determin[íi]st|fc estimad|estimad[ao]s|n[íi]vel de experi|assumid|sincronizad/i;
   const warnings = asArray<unknown>(plan.warnings).map(toText).filter(Boolean).filter((w) => !INTERNAL_WARNING.test(w));
-  const strength = asArray<unknown>(plan.complementary_strength)
-    .map(toText)
-    .filter(Boolean);
   const safety = plan.safety_check && typeof plan.safety_check === "object" ? plan.safety_check : null;
   const restrictions = safety ? asArray<unknown>(safety.restrictions).map(toText).filter(Boolean) : [];
 
@@ -466,53 +463,8 @@ export function CardioPlanView({
         </Card>
       )}
 
-      {/* Complementary strength */}
-      {strength.length > 0 && (
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Dumbbell className="h-4 w-4 text-primary" />
-              <span className="text-eyebrow text-muted-foreground">Força complementar</span>
-            </div>
-            <ul className="space-y-1">
-              {strength.map((item, i) => (
-                <li key={i} className="text-sm text-foreground flex gap-2">
-                  <span className="text-primary mt-1">•</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Nutrition alert */}
-      {toText(plan.nutrition_alert).trim() && (
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1.5">
-              <Apple className="h-4 w-4 text-primary" />
-              <span className="text-eyebrow text-muted-foreground">Nutrição</span>
-            </div>
-            <p className="text-sm text-foreground">{toText(plan.nutrition_alert)}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* General tips */}
-      {toText(plan.general_tips).trim() && (
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1.5">
-              <Lightbulb className="h-4 w-4 text-primary" />
-              <span className="text-eyebrow text-muted-foreground">Orientações gerais</span>
-            </div>
-            <p className="text-sm text-foreground whitespace-pre-line">
-              {toText(plan.general_tips)}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      {/* Força complementar, nutrição e orientações gerais NÃO aparecem aqui de propósito:
+          cada modalidade tem sua aba (treino / nutrição). A corrida mostra só o plano de corrida. */}
     </div>
   );
 }
