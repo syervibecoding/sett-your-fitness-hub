@@ -309,7 +309,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
                 type="button"
                 aria-label={`Abrir ${name}`}
                 onClick={() => setOpen(true)}
-                className="fixed bottom-24 right-5 z-40 flex h-16 w-16 items-center justify-center rounded-full border border-white/70 bg-navy text-primary-foreground shadow-[0_18px_45px_rgba(29,45,92,0.32)] ring-8 ring-navy/10 transition duration-200 hover:-translate-y-0.5 hover:bg-navy/95 focus:outline-none focus:ring-4 focus:ring-ring focus:ring-offset-2 md:bottom-6 md:right-6"
+                className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] right-[calc(1.25rem+env(safe-area-inset-right,0px))] z-40 flex h-16 w-16 items-center justify-center rounded-full border border-white/70 bg-navy text-primary-foreground shadow-[0_18px_45px_rgba(29,45,92,0.32)] ring-8 ring-navy/10 transition duration-200 hover:-translate-y-0.5 hover:bg-navy/95 focus:outline-none focus:ring-4 focus:ring-ring focus:ring-offset-2 md:bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] md:right-6"
               >
                 <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/45 bg-white/10">
                   <BrainCircuit className="h-7 w-7" />
@@ -320,7 +320,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
           </Tooltip>
 
           {!open && mission && !missionDismissed && (
-            <div className="fixed bottom-44 right-4 z-40 w-[min(20rem,calc(100vw-2rem))] rounded-[22px] border border-line bg-background/95 p-3 text-sm shadow-xl backdrop-blur md:bottom-24 md:right-6">
+            <div className="fixed bottom-[calc(11rem+env(safe-area-inset-bottom,0px))] right-4 z-40 w-[min(20rem,calc(100vw-2rem))] rounded-[22px] border border-line bg-background/95 p-3 text-sm shadow-xl backdrop-blur [@media(max-height:740px)]:hidden md:bottom-24 md:right-6">
               <div className="flex items-start gap-2">
                 <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-navy text-primary-foreground">
                   <BrainCircuit className="h-4 w-4" />
@@ -353,7 +353,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
             </div>
           )}
 
-          <DialogContent className="flex max-h-[88vh] w-[calc(100vw-2rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-[30px] border-line bg-paper p-0 shadow-2xl [&>button]:rounded-full">
+          <DialogContent className="flex max-h-[88dvh] w-[calc(100vw-1.5rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-[24px] border-line bg-paper p-0 shadow-2xl [&>button]:rounded-full">
             <DialogHeader className="shrink-0 border-b border-line bg-background px-5 py-4 text-left">
               <div className="flex items-start gap-3 pr-8">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-navy text-primary-foreground shadow-md">
@@ -383,7 +383,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
               <span className="font-medium text-navy">Contexto:</span> {pageLabel}. O {name} usa seu treino salvo e seus registros para responder melhor.
             </div>
 
-            <div className="shrink-0 space-y-3 px-5 py-4">
+            <div className="hidden shrink-0 space-y-3 px-5 py-4 sm:block">
               {mission && (
                 <div className="rounded-[18px] border border-navy/20 bg-navy/5 p-3 text-sm text-navy">
                   <span className="font-semibold">{mission.title}:</span> {mission.body}
@@ -426,7 +426,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
               </div>
             </ScrollArea>
 
-            <div className="shrink-0 border-t border-line bg-background px-5 py-4">
+            <div className="shrink-0 border-t border-line bg-background px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
               <div className="mb-3 flex flex-wrap gap-2">
                 {quickPrompts.map((item) => (
                   <button

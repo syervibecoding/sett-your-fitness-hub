@@ -2,7 +2,16 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <script>
+      // Captura cedo o evento de instalação (Android/Chrome) — antes do React montar.
+      window.addEventListener("beforeinstallprompt", function (e) {
+        e.preventDefault();
+        window.__bip = e;
+        try { window.dispatchEvent(new Event("bip-ready")); } catch (_) {}
+      });
+      window.addEventListener("appinstalled", function () { window.__bip = null; });
+    </script>
     <title>Set Training App — A plataforma onde o treino vira dado</title>
     <meta name="description" content="SaaS de prescrição e log para personal trainers de bodybuilding. Matriz de volume biomecânico, sobrecarga progressiva auditável e evolução em gráfico.">
     <meta name="author" content="Set Training App" />

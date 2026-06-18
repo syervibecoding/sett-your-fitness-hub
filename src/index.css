@@ -66,6 +66,31 @@
 }
 
 @layer base {
+  /* Hardening mobile (padrão Femme/IZone): sem arrastar/overscroll, sem double-tap zoom,
+     sem ajuste de fonte do iOS, tap-highlight off, safe-area tokens. Zoom de pinça é MANTIDO
+     (acessibilidade/WCAG) — não usamos user-scalable=no. */
+  :root {
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+  }
+
+  html, body {
+    overscroll-behavior-y: none;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    min-height: 100dvh;
+    touch-action: manipulation; /* mata o double-tap-to-zoom; preserva o pinch-zoom */
+  }
+
+  button, a, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   * {
     @apply border-border;
   }
