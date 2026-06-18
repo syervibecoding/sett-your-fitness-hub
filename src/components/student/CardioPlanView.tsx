@@ -271,23 +271,20 @@ export function CardioPlanView({
         <div>
           <div className="flex items-center gap-2 mb-2">
             <Heart className="h-4 w-4 text-primary" />
-            <span className="text-eyebrow text-muted-foreground">Zonas de FC</span>
+            <span className="text-eyebrow text-muted-foreground">Zonas de FC (bpm)</span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+          <div className="grid grid-cols-5 gap-1.5">
             {orderedZoneKeys.map((key) => {
               const zone = (fcZones as Record<string, FcZone | number | string>)[key];
               return (
-                <Card key={key} className="bg-card border-border">
-                  <CardContent className="p-3 text-center">
-                    <p className="text-eyebrow text-muted-foreground mb-1">
-                      {ZONE_LABEL[key.toLowerCase()] || key.toUpperCase()}
-                    </p>
-                    <p className="font-mono-data text-base text-primary">
-                      {formatZoneRange(zone)}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">bpm</p>
-                  </CardContent>
-                </Card>
+                <div key={key} className="rounded-md border border-border bg-card px-1 py-1.5 text-center">
+                  <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {ZONE_LABEL[key.toLowerCase()] || key.toUpperCase()}
+                  </p>
+                  <p className="font-mono-data text-[11px] leading-tight text-primary">
+                    {formatZoneRange(zone)}
+                  </p>
+                </div>
               );
             })}
           </div>
@@ -315,32 +312,32 @@ export function CardioPlanView({
                   className="border border-border rounded-lg bg-card px-3"
                 >
                   <AccordionTrigger className="hover:no-underline py-3">
-                    <div className="flex flex-1 items-center justify-between gap-2 pr-2 text-left">
-                      <div className="min-w-0">
-                        <span className="text-sm font-medium text-foreground">
+                    <div className="flex w-full min-w-0 flex-col gap-1 pr-2 text-left">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
                           {weekLabel}
                         </span>
-                        {week.focus && (
-                          <p className="text-xs text-muted-foreground truncate">
-                            {toText(week.focus)}
-                          </p>
-                        )}
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {week.type && (
+                            <Badge
+                              variant="outline"
+                              className="border-border text-muted-foreground text-[10px] capitalize"
+                            >
+                              {toText(week.type)}
+                            </Badge>
+                          )}
+                          {week.volume_km != null && week.volume_km !== "" && (
+                            <span className="font-mono-data text-xs text-primary whitespace-nowrap">
+                              {toText(week.volume_km)}km
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1.5">
-                        {week.type && (
-                          <Badge
-                            variant="outline"
-                            className="border-border text-muted-foreground text-[10px] capitalize"
-                          >
-                            {toText(week.type)}
-                          </Badge>
-                        )}
-                        {week.volume_km != null && week.volume_km !== "" && (
-                          <span className="font-mono-data text-xs text-primary">
-                            {toText(week.volume_km)}km
-                          </span>
-                        )}
-                      </div>
+                      {week.focus && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {toText(week.focus)}
+                        </p>
+                      )}
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="pb-3">
