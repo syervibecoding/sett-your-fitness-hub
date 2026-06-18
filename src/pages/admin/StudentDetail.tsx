@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { StudentGoalsManager } from "@/components/admin/StudentGoalsManager";
 import { StudentTimeline } from "@/components/admin/StudentTimeline";
 import { StudentFilesPanel } from "@/components/admin/StudentFilesPanel";
 import { WeeklyContactToggle } from "@/components/admin/WeeklyContactToggle";
@@ -976,6 +977,15 @@ export default function StudentDetail() {
 
           {/* ===== PROGRAMA DE TREINO ===== */}
           <TabsContent value="program" className="space-y-4">
+            {/* Provas e metas alvo (aparecem no calendário do aluno e na agenda) */}
+            {id && (
+              <StudentGoalsManager
+                studentId={id}
+                companyId={student?.company_id}
+                createdBy={session?.user?.id}
+              />
+            )}
+
             {/* Enrollments */}
             <Card className="bg-card border-border">
               <CardHeader className="flex flex-row items-center justify-between">

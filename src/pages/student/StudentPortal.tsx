@@ -120,6 +120,7 @@ export default function StudentPortal() {
   const [savingLogs, setSavingLogs] = useState(false);
   const [enrollmentInfo, setEnrollmentInfo] = useState<{ plan_name: string; start_date: string; end_date: string } | null>(null);
   const [allLogs, setAllLogs] = useState<any[]>([]);
+  const [studentGoals, setStudentGoals] = useState<any[]>([]);
   const [extraSets, setExtraSets] = useState<Record<number, number>>({});
   const [companyWhatsapp, setCompanyWhatsapp] = useState<string | null>(null);
   const [workoutSessions, setWorkoutSessions] = useState<any[]>([]);
@@ -143,6 +144,17 @@ export default function StudentPortal() {
   useEffect(() => {
     if (user) loadStudentData();
   }, [user]);
+
+  // Provas/metas alvo do aluno (exibidas no calendário).
+  useEffect(() => {
+    if (!studentId) return;
+    (supabase as any)
+      .from("student_goals")
+      .select("id, target_date, title, kind, status, description, metric")
+      .eq("student_id", studentId)
+      .order("target_date")
+      .then(({ data }: any) => setStudentGoals(data || []));
+  }, [studentId]);
 
   const loadStudentData = async () => {
     try {
@@ -1011,6 +1023,7 @@ export default function StudentPortal() {
             cycleStartDate={selectedCycle.start_date}
             cycleEndDate={selectedCycle.end_date}
             workoutSessions={workoutSessions}
+            goals={studentGoals}
           />
         )}
 

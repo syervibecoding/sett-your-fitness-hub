@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Dumbbell, CheckCircle2, ArrowRight, TrendingUp, TrendingDown, Clock, Target } from "lucide-react";
+import { ChevronLeft, ChevronRight, Dumbbell, CheckCircle2, ArrowRight, TrendingUp, TrendingDown, Clock, Target, Flag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
@@ -47,6 +47,16 @@ interface WorkoutSession {
   completed_at?: string | null;
 }
 
+interface StudentGoal {
+  id: string;
+  target_date: string;   // yyyy-MM-dd
+  title: string;
+  kind?: string | null;  // 'prova' | 'meta'
+  status?: string | null;
+  description?: string | null;
+  metric?: string | null;
+}
+
 interface StudentCalendarProps {
   workouts: Workout[];
   trainedDays: Set<number>;
@@ -56,9 +66,10 @@ interface StudentCalendarProps {
   cycleStartDate?: string;
   cycleEndDate?: string;
   workoutSessions?: WorkoutSession[];
+  goals?: StudentGoal[];
 }
 
-export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], workoutSessions = [] }: StudentCalendarProps) {
+export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], workoutSessions = [], goals = [] }: StudentCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
@@ -110,6 +121,14 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
   }, [workoutSessions]);
 
   const trainedDates = useMemo(() => new Set(Object.keys(logsByDate)), [logsByDate]);
+
+  const goalsByDate = useMemo(() => {
+    const map: Record<string, StudentGoal[]> = {};
+    goals.forEach((g) => { if (g.target_date) (map[g.target_date] ||= []).push(g); });
+    return map;
+  }, [goals]);
+  const goalDates = useMemo(() => new Set(Object.keys(goalsByDate)), [goalsByDate]);
+  const selectedDateGoals = selectedDate ? (goalsByDate[format(selectedDate, "yyyy-MM-dd")] || []) : [];
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -204,6 +223,9 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
               {trained && inMonth && !isSelected && (
                 <CheckCircle2 className="absolute bottom-0.5 h-3 w-3 text-green-500" />
               )}
+              {inMonth && goalDates.has(format(day, "yyyy-MM-dd")) && (
+                <Flag className={cn("absolute right-0.5 top-0.5 h-3 w-3", isSelected ? "text-primary-foreground" : "text-amber-500")} />
+              )}
             </button>
           );
         })}
@@ -214,6 +236,10 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
         <div className="flex items-center gap-1">
           <CheckCircle2 className="h-3 w-3 text-green-500" />
           Treinado
+        </div>
+        <div className="flex items-center gap-1">
+          <Flag className="h-3 w-3 text-amber-500" />
+          Prova / Meta
         </div>
       </div>
 
@@ -231,6 +257,26 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
                 </Badge>
               )}
             </div>
+
+            {selectedDateGoals.length > 0 && (
+              <div className="mb-3 space-y-2">
+                {selectedDateGoals.map((g) => (
+                  <div key={g.id} className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5">
+                    <Flag className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground font-sans">
+                        {g.title}
+                        <span className="ml-1.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-700">
+                          {g.kind === "meta" ? "Meta" : "Prova"}
+                        </span>
+                      </p>
+                      {g.metric && <p className="text-xs text-muted-foreground font-sans">{g.metric}</p>}
+                      {g.description && <p className="mt-0.5 text-xs text-muted-foreground font-sans">{g.description}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {selectedDateTrained && selectedDateWorkouts.length > 0 ? (
               <div className="space-y-5">

@@ -5,7 +5,7 @@ import { useMaster } from "@/contexts/MasterContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, RefreshCw, ClipboardList, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, RefreshCw, ClipboardList, CheckCircle, ChevronLeft, ChevronRight, Flag } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, isToday, isBefore } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 interface AgendaEvent {
   id: string;
   date: string;
-  type: "contract_renewal" | "prescription_pending" | "prescription_done";
+  type: "contract_renewal" | "prescription_pending" | "prescription_done" | "goal";
   label: string;
   studentName: string;
   studentId?: string;
@@ -23,12 +23,14 @@ interface AgendaEvent {
 }
 
 const typeConfig = {
+  goal: { icon: Flag, label: "Prova/Meta", color: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
   contract_renewal: { icon: RefreshCw, label: "Renovação", color: "bg-red-500/15 text-red-600 border-red-500/30" },
   prescription_pending: { icon: ClipboardList, label: "Prescrever", color: "bg-yellow-500/15 text-yellow-600 border-yellow-500/30" },
   prescription_done: { icon: CheckCircle, label: "Entregue", color: "bg-green-500/15 text-green-600 border-green-500/30" },
 };
 
 const dotColors: Record<string, string> = {
+  goal: "bg-amber-500",
   contract_renewal: "bg-red-500",
   prescription_pending: "bg-yellow-500",
   prescription_done: "bg-green-500",
@@ -121,6 +123,25 @@ export default function AdminAgenda() {
       });
     }
 
+    // Provas / metas alvo do aluno (target_date no mês)
+    let goalsQuery = (supabase as any)
+      .from("student_goals")
+      .select("id, target_date, title, kind, metric, student_id, students(full_name)")
+      .gte("target_date", monthStart)
+      .lte("target_date", monthEnd);
+    if (effectiveCompanyId) goalsQuery = goalsQuery.eq("company_id", effectiveCompanyId);
+    const { data: goals } = await goalsQuery;
+    (goals || []).forEach((g: any) => {
+      collected.push({
+        id: `goal-${g.id}`,
+        date: g.target_date,
+        type: "goal",
+        label: `${g.kind === "meta" ? "Meta" : "Prova"}: ${g.title}${g.metric ? ` (${g.metric})` : ""}`,
+        studentName: g.students?.full_name || "—",
+        studentId: g.student_id,
+      });
+    });
+
     setEvents(collected);
     setLoading(false);
   };
@@ -130,7 +151,7 @@ export default function AdminAgenda() {
   const getEventsForDay = (day: Date) => events.filter((e) => isSameDay(new Date(e.date + "T12:00:00"), day));
   const selectedEvents = selectedDate ? getEventsForDay(selectedDate) : [];
   // Sort: renewals first, then overdue, pending, done
-  const typePriority: Record<string, number> = { contract_renewal: 0, prescription_pending: 1, prescription_done: 2 };
+  const typePriority: Record<string, number> = { goal: 0, contract_renewal: 1, prescription_pending: 2, prescription_done: 3 };
   const sortedEvents = [...events].sort((a, b) => {
     const pa = typePriority[a.type] ?? 9;
     const pb = typePriority[b.type] ?? 9;
