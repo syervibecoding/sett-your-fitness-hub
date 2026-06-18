@@ -24,6 +24,7 @@ import { VolumeInsights } from "@/components/student/VolumeInsights";
 import { useRestTimer } from "@/components/student/RestTimer";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { WeeklyBar } from "@/components/student/WeeklyBar";
+import { AnnouncementsBell } from "@/components/student/AnnouncementsBell";
 import { StudentHome } from "@/components/student/StudentHome";
 import { NutritionPlanView } from "@/components/student/NutritionPlanView";
 import { CardioPlanView } from "@/components/student/CardioPlanView";
@@ -430,6 +431,16 @@ export default function StudentPortal() {
         .from("workout_logs" as any)
         .upsert(rows, { onConflict: "student_id,workout_id,exercise_index,set_number,session_date" });
       if (error) { hadError = true; console.error("Erro ao salvar carga:", error); }
+      else {
+        // Reflete o check-in na hora: mescla as linhas de hoje em allLogs (WeeklyBar/streak/trainedDays
+        // derivam disso). Sem isso, o dia só ficava verde após recarregar a página.
+        setAllLogs((prev) => {
+          const keyOf = (r: any) => `${r.workout_id}|${r.exercise_index}|${r.set_number}|${r.session_date}`;
+          const map = new Map((prev || []).map((r: any) => [keyOf(r), r]));
+          for (const r of rows) map.set(keyOf(r), { ...(map.get(keyOf(r)) || {}), ...r });
+          return Array.from(map.values());
+        });
+      }
     }
     if (!silent) setSavingLogs(false);
     if (silent) return; // autosave: sem toast para não poluir
@@ -705,9 +716,12 @@ export default function StudentPortal() {
                 {viewTitles[activeView]}
               </h1>
             </div>
-            <Button variant="ghost" size="icon" onClick={signOut}>
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              {studentId && companyId && <AnnouncementsBell studentId={studentId} companyId={companyId} />}
+              <Button variant="ghost" size="icon" onClick={signOut}>
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
           {activeView === "home" && (
             <p className="text-foreground font-sans text-lg">{studentName}</p>

@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Dumbbell, BarChart3, CalendarDays, History, Activity, Megaphone, Play, Moon, ArrowRight, Utensils, Footprints, Waves, Bike } from "lucide-react";
+import { Dumbbell, BarChart3, CalendarDays, History, Megaphone, Play, Moon, ArrowRight, Utensils, Footprints, Waves, Bike } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -50,8 +50,8 @@ const NAV_ITEMS: readonly NavItem[] = [
   { view: "stats", label: "Estatísticas", icon: BarChart3, sub: "Volume e força" },
   { view: "calendario", label: "Calendário", icon: CalendarDays, sub: "Histórico mensal" },
   { view: "historico", label: "Histórico", icon: History },
-  { view: "atividades", label: "Atividades", icon: Activity, sub: "Corrida, natação e mais" },
-  { view: "avisos", label: "Avisos", icon: Megaphone, sub: "Mural do treinador" },
+  // "Atividades" removido: cada modalidade prescrita (corrida/natação/ciclismo/nutrição) tem sua própria aba.
+  // "Avisos" removido daqui: virou o sino no topo (AnnouncementsBell).
 ];
 
 export function StudentHome({

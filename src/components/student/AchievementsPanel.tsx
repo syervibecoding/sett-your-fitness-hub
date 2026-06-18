@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Trophy, Flame, Dumbbell, Medal, Bike, Route, CheckCircle, Crown, Lock,
 } from "lucide-react";
@@ -66,64 +65,36 @@ export function AchievementsPanel({ studentId }: Props) {
 
   if (loading) return null;
 
+  // Compacto: uma linha só — XP + contagem + rank + faixa de ícones de desbloqueio (rolável).
   return (
     <Card className="bg-card border-border">
-      <CardContent className="p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-primary font-mono-data">
-                {xp.toLocaleString("pt-BR")}
+      <CardContent className="flex items-center gap-2 overflow-x-auto p-3">
+        <Trophy className="h-4 w-4 shrink-0 text-primary" />
+        <span className="shrink-0 font-mono-data text-sm font-bold text-primary">{xp.toLocaleString("pt-BR")}</span>
+        <span className="shrink-0 text-[11px] text-muted-foreground">XP · {unlocked.size}/{achievements.length}</span>
+        {rank && rank.total_students > 1 && (
+          <span className="shrink-0 text-[11px] text-muted-foreground">· #{rank.rank_position}/{rank.total_students}</span>
+        )}
+        {achievements.length > 0 && <span className="mx-0.5 h-4 w-px shrink-0 bg-border" />}
+        <div className="flex items-center gap-1.5">
+          {achievements.map(a => {
+            const Icon = ICONS[a.icon ?? "trophy"] ?? Trophy;
+            const isUnlocked = unlocked.has(a.id);
+            return (
+              <span
+                key={a.id}
+                title={`${a.title} — ${a.description ?? ""} (+${a.xp_reward} XP)`}
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${
+                  isUnlocked
+                    ? "border-primary/50 bg-primary/10 text-primary"
+                    : "border-border bg-muted/30 text-muted-foreground/50"
+                }`}
+              >
+                {isUnlocked ? <Icon className="h-3.5 w-3.5" /> : <Lock className="h-3 w-3" />}
               </span>
-              <span className="text-xs text-muted-foreground font-sans">XP</span>
-            </div>
-            <p className="text-[11px] text-muted-foreground font-sans mt-0.5">
-              {unlocked.size} de {achievements.length} conquistas
-            </p>
-          </div>
-          {rank && rank.total_students > 1 && (
-            <div className="text-right">
-              <div className="text-lg font-bold text-foreground font-sans">
-                #{rank.rank_position}
-                <span className="text-xs text-muted-foreground font-normal"> / {rank.total_students}</span>
-              </div>
-              <p className="text-[10px] text-muted-foreground font-sans">na sua empresa</p>
-            </div>
-          )}
+            );
+          })}
         </div>
-
-        {achievements.length > 0 && (
-          <div className="grid grid-cols-4 gap-2">
-            {achievements.map(a => {
-              const Icon = ICONS[a.icon ?? "trophy"] ?? Trophy;
-              const isUnlocked = unlocked.has(a.id);
-              return (
-                <div
-                  key={a.id}
-                  title={`${a.title} — ${a.description ?? ""} (+${a.xp_reward} XP)`}
-                  className={`aspect-square rounded-lg border flex flex-col items-center justify-center gap-1 p-1 transition-all ${
-                    isUnlocked
-                      ? "border-primary/50 bg-primary/5 text-primary"
-                      : "border-border bg-muted/30 text-muted-foreground"
-                  }`}
-                >
-                  {isUnlocked ? <Icon className="h-5 w-5" /> : <Lock className="h-4 w-4" />}
-                  <span className="text-[8px] font-sans leading-tight text-center line-clamp-2">{a.title}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {unlocked.size > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {achievements.filter(a => unlocked.has(a.id)).slice(-3).map(a => (
-              <Badge key={a.id} variant="outline" className="border-primary/40 text-primary text-[10px]">
-                +{a.xp_reward} {a.title}
-              </Badge>
-            ))}
-          </div>
-        )}
       </CardContent>
     </Card>
   );
