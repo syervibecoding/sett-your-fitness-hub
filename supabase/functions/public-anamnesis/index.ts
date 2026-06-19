@@ -251,7 +251,7 @@ async function getInvite(token: string | undefined) {
   if (!token) return null;
   const { data } = await supabase
     .from("anamnese_invites")
-    .select("id, company_id, student_id, student_name, status, expires_at, completed_at")
+    .select("id, company_id, student_id, student_name, status, completed_at")
     .eq("token", token)
     .maybeSingle();
   return data ?? null;
