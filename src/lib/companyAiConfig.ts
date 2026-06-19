@@ -16,6 +16,8 @@ export interface CompanyAiConfig {
   niche_audience: string | null;
   exercise_preferences: string | null;
   progression_model: string | null;
+  periodization_doctrine: string | null;
+  strength_endurance_integration: string | null;
   assessment_protocol: string | null;
   red_lines: string | null;
   communication_style: string | null;
@@ -36,6 +38,8 @@ export const DEFAULT_AI_CONFIG: CompanyAiConfig = {
   niche_audience: null,
   exercise_preferences: null,
   progression_model: null,
+  periodization_doctrine: null,
+  strength_endurance_integration: null,
   assessment_protocol: null,
   red_lines: null,
   communication_style: null,
@@ -48,7 +52,7 @@ export async function fetchCompanyAiConfig(companyId: string | null | undefined)
   if (!companyId) return DEFAULT_AI_CONFIG;
   const { data } = await (supabase as any)
     .from("company_ai_config")
-    .select("assistant_name, consultancy_name, methodology, plans_payment, tone, owner_credentials, niche_audience, exercise_preferences, progression_model, assessment_protocol, red_lines, communication_style, nutrition_scope, ethical_limits, onboarding_completed")
+    .select("assistant_name, consultancy_name, methodology, plans_payment, tone, owner_credentials, niche_audience, exercise_preferences, progression_model, periodization_doctrine, strength_endurance_integration, assessment_protocol, red_lines, communication_style, nutrition_scope, ethical_limits, onboarding_completed")
     .eq("company_id", companyId)
     .maybeSingle();
   if (!data) return DEFAULT_AI_CONFIG;

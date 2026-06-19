@@ -16,6 +16,7 @@ import { fetchCompanyAiConfig, saveCompanyAiConfig, type CompanyAiConfig } from 
 const EMPTY: CompanyAiConfig = {
   assistant_name: "", consultancy_name: "", methodology: "", plans_payment: "", tone: "",
   owner_credentials: "", niche_audience: "", exercise_preferences: "", progression_model: "",
+  periodization_doctrine: "", strength_endurance_integration: "",
   assessment_protocol: "", red_lines: "", communication_style: "", nutrition_scope: "", ethical_limits: "",
   onboarding_completed: false,
 };
@@ -54,6 +55,8 @@ export default function CompanyOnboarding() {
       methodology: t(form.methodology),
       exercise_preferences: t(form.exercise_preferences),
       progression_model: t(form.progression_model),
+      periodization_doctrine: t(form.periodization_doctrine),
+      strength_endurance_integration: t(form.strength_endurance_integration),
       assessment_protocol: t(form.assessment_protocol),
       communication_style: t(form.communication_style),
       red_lines: t(form.red_lines),
@@ -141,6 +144,15 @@ export default function CompanyOnboarding() {
           "Ex: priorizo agachamento livre, terra, supino, remada; gosto de unilaterais; evito leg press pesado p/ joelho sensível.")}
         {ta("progression_model", "Como você faz a progressão de carga e evolução?",
           "Ex: progressão dupla (reps depois carga), +2,5-5% ao completar a faixa; deload a cada 6-8 semanas; uso RPE/RIR 1-3.")}
+      </>)}
+
+      {section("Periodização & integração entre modalidades", <>
+        {ta("periodization_doctrine", "Como você periodiza o plano ao longo das semanas?",
+          "Ex: base/força nas primeiras semanas → blocos ordinários reduzindo o volume da musculação e subindo o da modalidade; microciclos (ordinário/choque/regenerativo) e troca de estímulo (séries/reps/sistema) a cada 2 semanas; deload na semana 4/6.",
+          "A IA usa isto para ordenar as fases e os microciclos de TODAS as modalidades.", 130)}
+        {ta("strength_endurance_integration", "Como integrar força + corrida/natação/ciclismo sem overtraining?",
+          "Ex: quando o volume da modalidade sobe, reduzo o volume-load da musculação; nada de Z4/Z5 na véspera de perna pesada; deload sincronizado entre força e cardio.",
+          "Regra anti-overtraining — sincroniza o pico de uma modalidade com o recuo da outra.", 110)}
       </>)}
 
       {section("Avaliação & acompanhamento", <>
