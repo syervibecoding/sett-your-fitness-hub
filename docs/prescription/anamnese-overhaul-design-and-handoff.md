@@ -37,13 +37,16 @@ Criar `supabase/functions/_shared/prescription/orchestration.ts`:
 
 ---
 
-## CLAUDE — roteiro (minha área)
-1. ✅ Migração `student_anamneses`: flags de gate da anamnese viva (`wants_*`, `has_nutritionist`, `has_endurance_coach`, `shown_blocks`). **FEITO** (migration `anamnese_gate_flags_viva`).
-2. Campos de conteúdo por modalidade em `student_anamneses` (alinhar nomes ao form ao construir).
-3. `StudioAnamnese.tsx` = fonte única + **gates condicionais** (item 4) gravando `shown_blocks`.
-4. Aba Admin "Anamnese" (`AnamnesisManager.tsx`) passa a hospedar o form estruturado + botão **"Gerar link e enviar no WhatsApp"** (reusa `createInvite`/`sendAnamneseWhatsApp` do `PrescriptionStudio`).
-5. Form da **Central de IA** (`CompanyOnboarding.tsx` + `companyAiConfig.ts` + migração `company_ai_config`): seções de periodização/integração (insumo do item 2).
-6. **NPS intra-ciclo**: evoluir `CycleFeedbackBanner` p/ mini-form + tabela `cycle_feedback` + a UI do professor (mostrar NPS na revisão antes de liberar).
+## CLAUDE — roteiro (minha área) — ✅ TUDO FEITO E DEPLOYADO (2026-06-18)
+1. ✅ Migração `student_anamneses`: flags de gate (`wants_*`, `has_nutritionist`, `has_endurance_coach`, `shown_blocks`) — `anamnese_gate_flags_viva`.
+2. ✅ `StudioAnamnese.tsx` = fonte única + **gates condicionais** (item 4): "tem nutri? quer dicas?" pula os passos de nutrição (fluxo de passos dinâmico); persiste flags + `shown_blocks`. Edge `public-anamnesis` whitelist atualizada + redeployada. (commit `c88d768`)
+3. ✅ Aba Admin "Anamnese" (`AnamnesisManager.tsx`): painel da anamnese ÚNICA — seleciona aluno → gera link → **envia no WhatsApp (wa.me)** / copia. (commit `c88d768`)
+4. ✅ Form da **Central de IA** (`CompanyOnboarding.tsx` + `companyAiConfig.ts` + migration `company_ai_config_periodization_fields`): seção **Periodização & integração** (`periodization_doctrine`, `strength_endurance_integration`). (commit `a2348bc`)
+5. ✅ **NPS intra-ciclo**: `cycle_feedback` (tabela+RLS, `cycle_feedback_nps_intra_ciclo`); `CycleFeedbackBanner` virou mini-form NPS; `StudentCycleFeedbackCard` no perfil do aluno mostra o NPS+ajuste pro professor revisar (liberação manual). (commit `9ec8844`)
+
+### ⚠️ Falta o engine_chat consumir (pra fechar item 2 e 3):
+- **Edges** `ai-running-plan`/`ai-prescribe-workout`/`ai-nutrition-plan`: no `loadCompanyAiConfig` + `companyAiSystem`, **adicionar** `periodization_doctrine` e `strength_endurance_integration` ao select e ao prompt (hoje só leem os campos antigos). Sem isso, os campos novos da Central não chegam à prescrição.
+- **Consumir** `student_anamneses` (flags `wants_*`/`has_*` → quais prescrições gerar; `shown_blocks` → o que foi coletado) e `cycle_feedback` (NPS/ajuste) no contexto.
 
 ## Riscos / decisões pendentes
 - Padrão de plano (6/12/18 sem) define quantos ciclos a multi-prescrição cria — confirmar com Matheus.
