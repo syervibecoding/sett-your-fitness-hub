@@ -1,0 +1,72 @@
+{
+  "outbox_version": "v1",
+  "generated_at": "2026-06-19T12:26:44.934Z",
+  "files": [
+    {
+      "file": "p1-core-human-review.csv",
+      "sha256": "6005900d2b5fdd2c3b828dc0f4aa0769a444cfe1f8404b52c76e2647011be3ff",
+      "rows": 51,
+      "priority": "P1",
+      "package": "core",
+      "expected_status": "needs_review",
+      "approved_rows": 0,
+      "ready_for_upsert_true": 0
+    },
+    {
+      "file": "p2-core-human-review.csv",
+      "sha256": "6148e4122ed0ea17ff343d0d2bb918ef91f5c7dedd4a9bfeaf68b72032ed8bbf",
+      "rows": 78,
+      "priority": "P2",
+      "package": "core",
+      "expected_status": "needs_review",
+      "approved_rows": 0,
+      "ready_for_upsert_true": 0
+    },
+    {
+      "file": "p3-core-human-review.csv",
+      "sha256": "b0a844e08c3716d596b7bd5386103a113e468a7a1c13ba7e880018f8a545a56d",
+      "rows": 86,
+      "priority": "P3",
+      "package": "core",
+      "expected_status": "needs_review",
+      "approved_rows": 0,
+      "ready_for_upsert_true": 0
+    },
+    {
+      "file": "p1-catalog-delta-human-review.csv",
+      "sha256": "7e0ca565e612c9dcbd835d70d2312f124c29b2986e35416b25a9094f6abe4f62",
+      "rows": 134,
+      "priority": "P1",
+      "package": "delta",
+      "expected_status": "needs_review",
+      "approved_rows": 0,
+      "ready_for_upsert_true": 0
+    },
+    {
+      "file": "p2-catalog-delta-human-review.csv",
+      "sha256": "164332f5f0da1f5fe3833f050bd0f60850c26b8b0a875438b557f2ee96d7ccdc",
+      "rows": 248,
+      "priority": "P2",
+      "package": "delta",
+      "expected_status": "needs_review",
+      "approved_rows": 0,
+      "ready_for_upsert_true": 0
+    },
+    {
+      "file": "p3-catalog-delta-human-review.csv",
+      "sha256": "b180d7014a2f6d3eef4271c21d9e97fd23b32667d38feec957d81739d871da40",
+      "rows": 152,
+      "priority": "P3",
+      "package": "delta",
+      "expected_status": "needs_review",
+      "approved_rows": 0,
+      "ready_for_upsert_true": 0
+    }
+  ],
+  "summary": {
+    "total_files": 6,
+    "total_rows": 749,
+    "approved_rows": 0,
+    "ready_for_upsert_true": 0
+  }
+}
