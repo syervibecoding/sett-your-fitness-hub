@@ -37,15 +37,17 @@ export interface MethodAwareExercise {
 }
 
 export interface AdvancedMethodCtx {
-  microcycle: "ordinario" | "choque" | "regenerativo";
+  // O motor JÁ tem estes hoje (mapear presetKey/stimulus → mesocycle; fitnessLevel → level):
   mesocycle: "base" | "acumulacao" | "intensificacao" | "polimento";
-  week: number;                                 // 1-based
   level: "iniciante" | "intermediario" | "avancado";
-  hasPain?: boolean;                            // dor geral relevante → conservador
-  groupIdFor?: (i: number) => string;           // gerador de id estável (sem random); default abaixo
+  // OPCIONAIS — o motor ainda NÃO rastreia microciclo/semana. Com default a função já roda hoje;
+  // quando o motor passar week/microcycle, ligam a rotação por bloco + o skip de deload.
+  microcycle?: "ordinario" | "choque" | "regenerativo"; // default "ordinario"
+  week?: number;                                         // 1-based; default 1 (bloco 0)
+  hasPain?: boolean;                                     // dor relevante → conservador (nenhum método)
+  sessionKey?: string;                                   // ex.: workout_id/dia — evita colisão de group_id entre sessões
+  groupIdFor?: (i: number) => string;                    // override do gerador de id (sem random)
 }
-
-const defaultGid = (week: number, i: number) => `m${week}_${i}`;
 
 // Heurística simples de isolador quando o motor não marca is_isolation.
 const COMPOUND_RE = /(agachamento|terra|levantamento|supino|desenvolvimento|remada|barra fixa|leg press|stiff|avanço|afundo|clean|snatch|push press|thruster)/i;
@@ -60,10 +62,14 @@ function isIsolation(ex: MethodAwareExercise): boolean {
  */
 export function planAdvancedMethods<T extends MethodAwareExercise>(exercises: T[], ctx: AdvancedMethodCtx): T[] {
   const out = (exercises || []).map((e) => ({ ...e }));
-  const gid = ctx.groupIdFor || ((i: number) => defaultGid(ctx.week, i));
+  const micro = ctx.microcycle ?? "ordinario";   // motor ainda não rastreia microciclo → ordinário
+  const week = ctx.week ?? 1;                     // nem semana → bloco 0 (sem rotação) até passarem
+  // group_id único DENTRO da lista da sessão (o app só agrupa consecutivos numa lista).
+  // sessionKey (ex.: workout_id) evita colisão se o motor combinar sessões da mesma semana.
+  const gid = ctx.groupIdFor || ((i: number) => `m${ctx.sessionKey ? ctx.sessionKey + "_" : ""}${week}_${i}`);
 
   // Bloqueios duros: nada de método avançado.
-  if (ctx.level === "iniciante" || ctx.microcycle === "regenerativo" || ctx.mesocycle === "base" || ctx.hasPain) {
+  if (ctx.level === "iniciante" || micro === "regenerativo" || ctx.mesocycle === "base" || ctx.hasPain) {
     return out;
   }
 
@@ -74,15 +80,15 @@ export function planAdvancedMethods<T extends MethodAwareExercise>(exercises: T[
     .map(({ i }) => i);
   if (idxs.length === 0) return out;
 
-  const block = Math.floor((ctx.week - 1) / 2); // troca de estímulo a cada 2 semanas
+  const block = Math.floor((week - 1) / 2); // troca de estímulo a cada 2 semanas
   const adv = ctx.level === "avancado";
-  const choque = ctx.microcycle === "choque" || ctx.mesocycle === "intensificacao";
+  const choque = micro === "choque" || ctx.mesocycle === "intensificacao";
 
   // Catálogo permitido por nível + intensidade da fase, rotacionado por bloco.
   const grouping: MethodId[] = adv ? ["biset", "triset", "giantset"] : ["biset"];
   const single: MethodId[] = choque
     ? (adv ? ["dropset", "cluster", "restpause"] : ["dropset", "restpause"])
-    : ["restpause", "dropset"]; // acumulação = mais leve
+    : ["pico_contracao", "restpause", "pico_alongamento", "dropset"]; // acumulação = hipertrofia/controle (picos usam method_seconds)
 
   if (choque) {
     // Intensificação/choque: tenta 1 bi-set (par de isoladores consecutivos) + 1 técnica single.

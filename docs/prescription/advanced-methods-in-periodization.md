@@ -43,31 +43,50 @@ Regras adicionais:
 - **Intermediário** libera até bi-set + drop-set/rest-pause; **avançado** libera tri-set/giant/cluster.
 - "**Não sempre**": aplica a no máximo 1–2 exercícios por sessão; o resto fica reto.
 
+## Estado atual do motor (verificado por workflow 2026-06-19)
+
+| Ponto | Verificado |
+|---|---|
+| `engine.ts::generateTrainingProgram` | existe (**L224**). Em **shadow/off** — não serve prod (flag `PRESCRIPTION_ENGINE_V1` em ai-prescribe-workout L1366). |
+| `ai-prescribe-workout::buildEmergencyFallbackPlan` | existe (**L798**); monta exercícios via `fallbackExercise()` (L769-796) dentro de `makeWorkout()` (L822). **É o que SERVE em prod hoje** (`PRESCRIPTION_AI_FIRST=off`, L13). |
+| Campos do exercício hoje | `phase, exercise_id, exercise_name, muscle_group, sets, reps, load_percent_1rm, rir, rest_seconds, tempo, exercise_order, cues, biomechanical_note, regression, progression`. **NÃO tem** `method`/`group_id`/`method_seconds`/`is_isolation` ainda (adicionar é trivial — campos extras no objeto). |
+| Em escopo HOJE | ✅ `mesocycle` (via `presetKey`/`selectedPreset` no fallback; `stimulus`/`PeriodizationBlock` no engine) · ✅ `level` (`args.fitnessLevel`/`input.fitnessLevel`) · ✅ dor/restrição (`riskText`, `args.restrictions`/`assessmentContext`; `painReports`/`painEva` no engine). |
+| **Faltando** no escopo | ❌ `microcycle` (não implementado) · ❌ número da `week` (fallback é template único de 6 sem, sem variação por semana). |
+
+**Implicação:** o módulo já roda HOJE só com o que o motor tem (`mesocycle`+`level`+`hasPain`). `microcycle`/`week`
+são **opcionais com default** (`ordinario`/semana 1 = bloco 0). Quando o motor passar a variar por semana,
+a rotação de estímulo (2 em 2 semanas) e o skip de deload acendem sozinhos — sem mudar a assinatura.
+
 ## Como plugar (engine_chat — território do motor de força)
 
-Chamar `planAdvancedMethods` **por semana**, depois de montar os exercícios da sessão e **já conhecendo
-a fase** (o motor já nomeia microciclo/mesociclo — ver `periodization-handoff-to-engine-chat.md`):
+Chamar `planAdvancedMethods` **por sessão/workout** (o `group_id` é único dentro da lista renderizada;
+passe `sessionKey` = workout_id/dia se combinar sessões). Mapear o que o motor já tem:
 
 ```ts
 import { planAdvancedMethods } from "../_shared/prescription/advancedMethods.ts";
 
-// dentro de generateTrainingProgram() e/ou buildEmergencyFallbackPlan(),
-// por sessão/semana:
-session.exercises = planAdvancedMethods(session.exercises, {
-  microcycle,            // "ordinario" | "choque" | "regenerativo"
-  mesocycle,             // "base" | "acumulacao" | "intensificacao" | "polimento"
-  week,                  // 1-based dentro do ciclo
-  level,                 // "iniciante" | "intermediario" | "avancado" (da anamnese)
-  hasPain,               // se a anamnese sinaliza dor relevante → conservador
+// em buildEmergencyFallbackPlan (prod) e/ou generateTrainingProgram, por workout:
+workout.exercises = planAdvancedMethods(workout.exercises, {
+  mesocycle,             // OBRIGATÓRIO — mapear presetKey/selectedPreset (ou stimulus) → base|acumulacao|intensificacao|polimento
+  level,                 // OBRIGATÓRIO — fitnessLevel → iniciante|intermediario|avancado
+  hasPain,               // recomendado — derivar de riskText/kneeRisk/backRisk/painReports (true → conservador)
+  // opcionais (ligam a granularidade fina quando existirem):
+  microcycle,            // default "ordinario"; passe "regenerativo" nas semanas de deload p/ zerar métodos
+  week,                  // default 1; passe a semana 1-based p/ ativar a rotação 2-em-2
+  sessionKey,            // ex.: workout_id — evita colisão de group_id entre sessões da mesma semana
 });
 ```
 
-Pontos de integração nas edges (arquivos do motor — **claude não edita**):
-- `supabase/functions/_shared/prescription/engine.ts` → `generateTrainingProgram`.
-- `supabase/functions/ai-prescribe-workout/index.ts` → `buildEmergencyFallbackPlan` (o que serve em prod hoje).
+Pontos de integração (arquivos do motor — **claude não edita**):
+- `ai-prescribe-workout/index.ts` → `buildEmergencyFallbackPlan` / `fallbackExercise` (**prioridade: é o prod hoje**).
+- `_shared/prescription/engine.ts` → `generateTrainingProgram` (quando o cutover V1 for ligado).
 
-Se o motor já marca `is_isolation` por exercício, passe-o no objeto (a heurística por nome é só fallback).
-Para `painful`, marque o exercício a partir das restrições/dores da anamnese.
+Notas:
+- O fallback não tem `is_isolation`; a heurística por nome (`COMPOUND_RE`) cobre — mas se quiser precisão,
+  derive `is_isolation` da `phase` (`forca_especifica` ≈ acessório/isolador) ou do `muscle_group`.
+- `method_seconds` é setado p/ pico de contração/alongamento (técnicas com tempo) na fase de acumulação.
+- O contrato de render foi confirmado: o app agrupa exercícios **consecutivos** com **mesmo `group_id` E mesmo
+  `method`** (de agrupamento); `minItems` é validado só na criação, então o módulo manter o bloco íntegro basta.
 
 ## Por que isso é seguro
 - É **aditivo**: sem chamada a `planAdvancedMethods`, nada muda (o fallback atual continua igual).
