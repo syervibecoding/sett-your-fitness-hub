@@ -750,6 +750,7 @@ export default function StudentPortal() {
               companyId={companyId}
               enrollmentId={activeEnrollmentId}
               enrollmentEndDate={enrollmentInfo.end_date}
+              cycleId={selectedCycle?.id ?? null}
               whatsappUrl={companyWhatsapp ? `https://wa.me/${companyWhatsapp}` : null}
             />
           </div>

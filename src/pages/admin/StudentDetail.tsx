@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { StudentCycleFeedbackCard } from "@/components/admin/StudentCycleFeedbackCard";
 import { StudentGoalsManager } from "@/components/admin/StudentGoalsManager";
 import { StudentTimeline } from "@/components/admin/StudentTimeline";
 import { StudentFilesPanel } from "@/components/admin/StudentFilesPanel";
@@ -872,6 +873,7 @@ export default function StudentDetail() {
 
           {/* ===== VISÃO GERAL ===== */}
           <TabsContent value="overview">
+            {id && <StudentCycleFeedbackCard studentId={id} />}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Left: Active enrollment + cycles + notes */}
               <div className="space-y-4">

@@ -1,64 +1,140 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CalendarClock, X } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { CalendarClock, X, Loader2, CheckCircle2 } from "lucide-react";
 import { differenceInCalendarDays, parseISO } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 interface Props {
   studentId: string;
   companyId: string;
   enrollmentId: string | null;
   enrollmentEndDate: string | null;
+  cycleId?: string | null;
   whatsappUrl?: string | null;
 }
 
-// Fallback BN — usado só quando a empresa do aluno não tem WhatsApp configurado (white-label).
 const WHATSAPP_FEEDBACK_FALLBACK = "https://wa.me/message/GZWXMSEEKWGII1";
 const DISMISS_KEY = (id: string) => `cycle_feedback_dismissed_${id}`;
+const DONE_KEY = (id: string) => `cycle_feedback_done_${id}`;
 
-export function CycleFeedbackBanner({ enrollmentId, enrollmentEndDate, whatsappUrl }: Props) {
+// Banner de fim de ciclo → anamnese RÁPIDA + NPS (item 3). Grava em cycle_feedback;
+// o professor vê na hora de liberar a próxima prescrição (liberação manual).
+export function CycleFeedbackBanner({ studentId, companyId, enrollmentId, enrollmentEndDate, cycleId, whatsappUrl }: Props) {
   const feedbackUrl = whatsappUrl || WHATSAPP_FEEDBACK_FALLBACK;
   const [dismissed, setDismissed] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const [nps, setNps] = useState<number | null>(null);
+  const [goalsAligned, setGoalsAligned] = useState<boolean | null>(null);
+  const [wantsAdjustment, setWantsAdjustment] = useState<boolean | null>(null);
+  const [adjustmentNotes, setAdjustmentNotes] = useState("");
 
   useEffect(() => {
     if (!enrollmentId) return;
     setDismissed(localStorage.getItem(DISMISS_KEY(enrollmentId)) === "1");
+    setDone(localStorage.getItem(DONE_KEY(enrollmentId)) === "1");
   }, [enrollmentId]);
 
-  if (!enrollmentId || !enrollmentEndDate || dismissed) return null;
-
+  if (!enrollmentId || !enrollmentEndDate || dismissed || done) return null;
   const daysLeft = differenceInCalendarDays(parseISO(enrollmentEndDate), new Date());
   if (daysLeft < 0 || daysLeft > 7) return null;
 
-  const dismiss = () => {
-    localStorage.setItem(DISMISS_KEY(enrollmentId), "1");
-    setDismissed(true);
+  const dismiss = () => { localStorage.setItem(DISMISS_KEY(enrollmentId), "1"); setDismissed(true); };
+
+  const canSubmit = nps !== null && goalsAligned !== null && wantsAdjustment !== null && !(wantsAdjustment && !adjustmentNotes.trim());
+
+  const submit = async () => {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    const { error } = await (supabase as any).from("cycle_feedback").insert({
+      company_id: companyId, student_id: studentId, cycle_id: cycleId ?? null,
+      nps, goals_aligned: goalsAligned, wants_adjustment: wantsAdjustment,
+      adjustment_notes: wantsAdjustment ? adjustmentNotes.trim() : null,
+      answers: { nps, goals_aligned: goalsAligned, wants_adjustment: wantsAdjustment, adjustment: adjustmentNotes.trim() || null },
+    });
+    setSubmitting(false);
+    if (!error) {
+      localStorage.setItem(DONE_KEY(enrollmentId), "1");
+      setDone(true);
+    }
   };
 
-  return (
-    <Card className="bg-primary/5 border-primary/30">
-      <CardContent className="p-4 flex items-start gap-3">
-        <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <CalendarClock className="h-4 w-4 text-primary" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-sans font-medium text-foreground">
-            Seu ciclo termina em {daysLeft === 0 ? "hoje" : `${daysLeft} dia${daysLeft > 1 ? "s" : ""}`}
-          </p>
-          <p className="text-xs text-muted-foreground font-sans mt-0.5">
-            Conte para o seu treinador como foi essa jornada — ajuda na próxima prescrição.
-          </p>
-          <Button
-            size="sm"
-            onClick={() => window.open(feedbackUrl, "_blank")}
-            className="mt-3 h-8"
-          >
-            Falar com o treinador no WhatsApp
-          </Button>
-        </div>
-        <button onClick={dismiss} className="text-muted-foreground hover:text-foreground p-1">
-          <X className="h-4 w-4" />
+  const YesNo = ({ value, onChange }: { value: boolean | null; onChange: (v: boolean) => void }) => (
+    <div className="flex gap-2">
+      {[["Sim", true], ["Não", false]].map(([lbl, v]) => (
+        <button key={String(v)} type="button" onClick={() => onChange(v as boolean)}
+          className={cn("rounded-full border px-3 py-1 text-xs font-medium transition",
+            value === v ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:border-primary/50")}>
+          {lbl as string}
         </button>
+      ))}
+    </div>
+  );
+
+  return (
+    <Card className="border-primary/30 bg-primary/5">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+            <CalendarClock className="h-4 w-4 text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-sans text-sm font-medium text-foreground">
+              Seu ciclo termina {daysLeft === 0 ? "hoje" : `em ${daysLeft} dia${daysLeft > 1 ? "s" : ""}`}
+            </p>
+            <p className="mt-0.5 font-sans text-xs text-muted-foreground">
+              Responde rapidinho pra gente ajustar a próxima fase do seu plano (1 min).
+            </p>
+
+            {!open ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" className="h-8" onClick={() => setOpen(true)}>Responder (1 min)</Button>
+                <Button size="sm" variant="outline" className="h-8" onClick={() => window.open(feedbackUrl, "_blank")}>
+                  Falar no WhatsApp
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-3 space-y-3">
+                <div>
+                  <p className="mb-1 text-xs font-medium text-foreground">De 0 a 10, o quanto você recomendaria seu treinador?</p>
+                  <div className="flex flex-wrap gap-1">
+                    {Array.from({ length: 11 }, (_, n) => (
+                      <button key={n} type="button" onClick={() => setNps(n)}
+                        className={cn("h-7 w-7 rounded-md border text-xs font-semibold transition",
+                          nps === n ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:border-primary/50")}>
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-foreground">Seus objetivos seguem os mesmos?</p>
+                  <YesNo value={goalsAligned} onChange={setGoalsAligned} />
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-foreground">Quer algum ajuste na próxima fase?</p>
+                  <YesNo value={wantsAdjustment} onChange={setWantsAdjustment} />
+                  {wantsAdjustment && (
+                    <Textarea value={adjustmentNotes} onChange={(e) => setAdjustmentNotes(e.target.value)}
+                      placeholder="Ex.: reduzir o tempo de treino, focar mais em corrida, menos impacto no joelho…"
+                      className="mt-2 min-h-[60px] text-sm" />
+                  )}
+                </div>
+                <Button size="sm" className="h-8 w-full" onClick={submit} disabled={!canSubmit || submitting}>
+                  {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enviando…</> : "Enviar"}
+                </Button>
+              </div>
+            )}
+          </div>
+          <button onClick={dismiss} className="p-1 text-muted-foreground hover:text-foreground" aria-label="Dispensar">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </CardContent>
     </Card>
   );
