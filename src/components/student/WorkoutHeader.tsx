@@ -7,8 +7,8 @@ import { differenceInCalendarDays, parseISO } from "date-fns";
 
 interface WorkoutHeaderProps {
   cycleNumber: number;
-  cycleStartDate: string;
-  cycleEndDate: string;
+  cycleStartDate: string | null;
+  cycleEndDate: string | null;
   workoutTitle: string;
   workoutDescription?: string | null;
 }
@@ -22,13 +22,14 @@ export function WorkoutHeader({
 }: WorkoutHeaderProps) {
   const [open, setOpen] = useState(false);
 
-  const start = parseISO(cycleStartDate);
-  const end = parseISO(cycleEndDate);
+  const hasDates = !!cycleStartDate && !!cycleEndDate;
+  const start = hasDates ? parseISO(cycleStartDate as string) : null;
+  const end = hasDates ? parseISO(cycleEndDate as string) : null;
   const today = new Date();
-  const totalDays = Math.max(1, differenceInCalendarDays(end, start) + 1);
-  const elapsedDays = Math.max(0, differenceInCalendarDays(today, start));
-  const totalWeeks = Math.max(1, Math.ceil(totalDays / 7));
-  const currentWeek = Math.min(totalWeeks, Math.floor(elapsedDays / 7) + 1);
+  const totalDays = start && end ? Math.max(1, differenceInCalendarDays(end, start) + 1) : 0;
+  const elapsedDays = start ? Math.max(0, differenceInCalendarDays(today, start)) : 0;
+  const totalWeeks = totalDays ? Math.max(1, Math.ceil(totalDays / 7)) : 0;
+  const currentWeek = totalWeeks ? Math.min(totalWeeks, Math.floor(elapsedDays / 7) + 1) : 0;
 
   return (
     <Card className="bg-card border-border">
@@ -38,9 +39,11 @@ export function WorkoutHeader({
             <Badge variant="outline" className="border-primary/40 text-primary font-mono text-[10px] uppercase tracking-wider">
               Ciclo {cycleNumber}
             </Badge>
-            <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wider">
-              Semana {currentWeek} de {totalWeeks}
-            </Badge>
+            {totalWeeks > 0 && (
+              <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wider">
+                Semana {currentWeek} de {totalWeeks}
+              </Badge>
+            )}
           </div>
         </div>
         <p className="text-sm font-sans text-foreground font-medium">{workoutTitle}</p>

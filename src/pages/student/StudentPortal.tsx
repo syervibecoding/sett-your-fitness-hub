@@ -540,7 +540,7 @@ export default function StudentPortal() {
   };
 
   const getOverallProgress = () => {
-    if (!enrollmentInfo) return 0;
+    if (!enrollmentInfo || !enrollmentInfo.start_date || !enrollmentInfo.end_date) return 0;
     const today = new Date();
     const start = parseISO(enrollmentInfo.start_date);
     const end = parseISO(enrollmentInfo.end_date);
@@ -551,6 +551,7 @@ export default function StudentPortal() {
   };
 
   const getCycleProgress = (cycle: Cycle) => {
+    if (!cycle?.start_date || !cycle?.end_date) return 0;
     const today = new Date();
     const start = parseISO(cycle.start_date);
     const end = parseISO(cycle.end_date);
@@ -836,9 +837,11 @@ export default function StudentPortal() {
                   <CardContent className="p-4 space-y-2">
                     <div className="flex items-center justify-between">
                       <h3 className="text-primary font-mono-data text-sm font-semibold uppercase tracking-[0.12em]">CICLO {selectedCycle.cycle_number}</h3>
-                      <span className="text-xs text-muted-foreground font-sans">
-                        {format(parseISO(selectedCycle.start_date), "dd/MM", { locale: ptBR })} — {format(parseISO(selectedCycle.end_date), "dd/MM", { locale: ptBR })}
-                      </span>
+                      {selectedCycle.start_date && selectedCycle.end_date && (
+                        <span className="text-xs text-muted-foreground font-sans">
+                          {format(parseISO(selectedCycle.start_date), "dd/MM", { locale: ptBR })} — {format(parseISO(selectedCycle.end_date), "dd/MM", { locale: ptBR })}
+                        </span>
+                      )}
                     </div>
                     <Progress value={getCycleProgress(selectedCycle)} className="h-1.5" />
                   </CardContent>
