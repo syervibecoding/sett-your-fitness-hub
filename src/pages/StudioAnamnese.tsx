@@ -52,6 +52,8 @@ export default function StudentAnamnese() {
     // Modalidades de interesse
     interest_strength: false, interest_running: false,
     interest_swimming: false, interest_cycling: false, interest_nutrition: false,
+    // Anamnese "viva" — gates por modalidade
+    has_nutritionist: "nao", wants_nutrition_tips: "sim", has_endurance_coach: "nao",
     // Específico cardio
     sport_goal: "", current_volume_weekly: "",
     fcmax: "", fcrep: "", perceived_recovery: "",
@@ -86,6 +88,14 @@ export default function StudentAnamnese() {
     const next = cur.includes(val) ? cur.filter((x: string) => x !== val) : [...cur, val];
     set(field, next.join(", "));
   };
+
+  // Anamnese "viva": pula os passos de nutrição se o aluno já tem nutri ou não quer dicas.
+  const wantsNutrition = f.interest_nutrition && f.wants_nutrition_tips !== "nao" && f.has_nutritionist !== "sim";
+  const STEP_SEQ = [1, 2, 3, 4, 5, ...(wantsNutrition ? [6, 7] : [])];
+  const stepIdx = Math.max(0, STEP_SEQ.indexOf(step));
+  const isLast = stepIdx === STEP_SEQ.length - 1;
+  const goNext = () => { if (isLast) { void submit(); } else setStep(STEP_SEQ[stepIdx + 1]); };
+  const goPrev = () => { if (stepIdx > 0) setStep(STEP_SEQ[stepIdx - 1]); };
 
   // Carrega o convite pelo token
   useEffect(() => {
@@ -187,6 +197,22 @@ export default function StudentAnamnese() {
         budget_food: f.budget_food,
         meals_per_day: Number(f.meals_per_day) || 5,
         has_kitchen: f.has_kitchen,
+        // Anamnese "viva" — o que o aluno quer (gateia as prescrições) + o que foi coletado
+        wants_strength: f.interest_strength,
+        wants_running: f.interest_running,
+        wants_cycling: f.interest_cycling,
+        wants_swimming: f.interest_swimming,
+        wants_nutrition: wantsNutrition,
+        has_nutritionist: f.has_nutritionist === "sim",
+        has_endurance_coach: f.has_endurance_coach === "sim",
+        shown_blocks: [
+          "dados", "objetivo", "treino", "saude", "clinica",
+          f.interest_strength && "musculacao",
+          f.interest_running && "corrida",
+          f.interest_swimming && "natacao",
+          f.interest_cycling && "ciclismo",
+          wantsNutrition && "nutricao",
+        ].filter(Boolean),
         notes: [
           f.main_goal && `Objetivo principal: ${sanitizeText(f.main_goal)}`,
           f.training_history && `Histórico: ${sanitizeText(f.training_history)}`,
@@ -260,14 +286,14 @@ export default function StudentAnamnese() {
 
         {/* Progress */}
         <div className="flex gap-1 mb-6">
-          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-            <div key={i} className={`h-1.5 flex-1 rounded-full ${i < step ? "bg-[#8B7355]" : "bg-slate-200"}`} />
+          {STEP_SEQ.map((_, i) => (
+            <div key={i} className={`h-1.5 flex-1 rounded-full ${i <= stepIdx ? "bg-[#8B7355]" : "bg-slate-200"}`} />
           ))}
         </div>
 
         <Card>
           <CardHeader className="pb-2">
-            <p className="text-xs text-[#8B7355] font-semibold">PASSO {step} DE {TOTAL_STEPS}</p>
+            <p className="text-xs text-[#8B7355] font-semibold">PASSO {stepIdx + 1} DE {STEP_SEQ.length}</p>
             <h2 className="text-lg font-bold text-slate-800">
               {step === 1 && "Seus dados"}
               {step === 2 && "Seu objetivo"}
@@ -325,6 +351,27 @@ export default function StudentAnamnese() {
                     ))}
                   </div>
                 </div>
+
+                {/* Gates da anamnese "viva" — quem já tem acompanhamento pula o bloco */}
+                {f.interest_nutrition && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-3">
+                    <p className="text-xs font-medium text-slate-600">Sobre nutrição</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <F label="Já tem nutricionista?"><SS value={f.has_nutritionist} onChange={(v: string) => set("has_nutritionist", v)} opts={[["nao","Não"],["sim","Sim"]]} /></F>
+                      <F label="Quer dicas de nutrição?"><SS value={f.wants_nutrition_tips} onChange={(v: string) => set("wants_nutrition_tips", v)} opts={[["sim","Sim"],["nao","Não"]]} /></F>
+                    </div>
+                    {(f.has_nutritionist === "sim" || f.wants_nutrition_tips === "nao") && (
+                      <p className="text-[11px] text-slate-500">Beleza — vamos pular as perguntas de alimentação; seu plano foca no treino.</p>
+                    )}
+                  </div>
+                )}
+                {(f.interest_running || f.interest_swimming || f.interest_cycling) && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                    <F label="Já tem assessoria/treinador para corrida, natação ou ciclismo?">
+                      <SS value={f.has_endurance_coach} onChange={(v: string) => set("has_endurance_coach", v)} opts={[["nao","Não — quero o plano aqui"],["sim","Sim, já tenho"]]} />
+                    </F>
+                  </div>
+                )}
               </div>
             )}
 
@@ -501,11 +548,11 @@ export default function StudentAnamnese() {
 
             {/* Navegação */}
             <div className="flex gap-2 pt-2">
-              {step > 1 && (
-                <Button variant="outline" className="flex-1" onClick={() => setStep(step - 1)}>Voltar</Button>
+              {stepIdx > 0 && (
+                <Button variant="outline" className="flex-1" onClick={goPrev}>Voltar</Button>
               )}
-              {step < TOTAL_STEPS ? (
-                <Button className="flex-1 bg-[#1B2B4A] hover:bg-[#1B2B4A]/90" onClick={() => setStep(step + 1)}>Próximo</Button>
+              {!isLast ? (
+                <Button className="flex-1 bg-[#1B2B4A] hover:bg-[#1B2B4A]/90" onClick={goNext}>Próximo</Button>
               ) : (
                 <Button className="flex-1 bg-[#8B7355] hover:bg-[#8B7355]/90" onClick={submit} disabled={submitting}>
                   {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enviando...</> : "Enviar anamnese"}

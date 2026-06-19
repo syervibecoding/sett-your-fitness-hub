@@ -27,6 +27,9 @@ const STUDIO_ANAMNESE_FIELDS = [
   "fcrep", "current_volume_weekly", "cardio_goal", "stress_score", "sleep_quality",
   "injuries", "food_restrictions", "nutrition_context", "budget_food",
   "meals_per_day", "has_kitchen", "notes",
+  // Anamnese "viva" / condicional (gates por modalidade):
+  "wants_strength", "wants_running", "wants_cycling", "wants_swimming", "wants_nutrition",
+  "has_nutritionist", "has_endurance_coach", "shown_blocks",
 ];
 
 function cleanText(value: unknown, maxLength = 2000) {
