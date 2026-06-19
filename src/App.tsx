@@ -37,6 +37,7 @@ const AppearanceSettings = lazy(() => import("./pages/admin/AppearanceSettings")
 const ExerciseLibrary = lazy(() => import("./pages/admin/ExerciseLibrary"));
 const WorkoutBuilder = lazy(() => import("./pages/admin/WorkoutBuilder"));
 const WorkoutLibrary = lazy(() => import("./pages/admin/WorkoutLibrary"));
+const Biblioteca = lazy(() => import("./pages/admin/Biblioteca"));
 const WorkoutPrescriptions = lazy(() => import("./pages/admin/WorkoutPrescriptions"));
 const Announcements = lazy(() => import("./pages/admin/Announcements"));
 const UnifiedPrescriber = lazy(() => import("./pages/admin/UnifiedPrescriber"));
@@ -198,6 +199,7 @@ const App = () => (
           <Route path="/master" element={<ProtectedRoute allowedRoles={["master"]}><MasterDashboard /></ProtectedRoute>} />
           <Route path="/master/companies" element={<ProtectedRoute allowedRoles={["master"]}><CompaniesManager /></ProtectedRoute>} />
           <Route path="/master/exercises" element={<ProtectedRoute allowedRoles={["master"]}><ExerciseLibrary /></ProtectedRoute>} />
+          <Route path="/master/biblioteca" element={<ProtectedRoute allowedRoles={["master"]}><Biblioteca /></ProtectedRoute>} />
 
           {/* Admin Routes */}
           <Route path="/admin" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasDashboard"><AdminDashboard /></FeatureRoute>} />
@@ -217,6 +219,7 @@ const App = () => (
           <Route path="/admin/appearance" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasAppearance"><AppearanceSettings /></FeatureRoute>} />
           <Route path="/admin/exercises" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><ExerciseLibrary /></FeatureRoute>} />
           <Route path="/admin/biblioteca-treinos" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><WorkoutLibrary /></FeatureRoute>} />
+          <Route path="/admin/biblioteca" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><Biblioteca /></FeatureRoute>} />
           <Route path="/admin/prescriptions" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><WorkoutPrescriptions /></FeatureRoute>} />
           <Route path="/admin/workout/:cycleId" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><WorkoutBuilder /></FeatureRoute>} />
           <Route path="/admin/prescricao" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><UnifiedPrescriber /></FeatureRoute>} />
@@ -243,6 +246,7 @@ const App = () => (
           <Route path="/coordinator/appearance" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasAppearance" requiredModule="appearance"><AppearanceSettings /></FeatureRoute>} />
           <Route path="/coordinator/exercises" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><ExerciseLibrary /></FeatureRoute>} />
           <Route path="/coordinator/biblioteca-treinos" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutLibrary /></FeatureRoute>} />
+          <Route path="/coordinator/biblioteca" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><Biblioteca /></FeatureRoute>} />
           <Route path="/coordinator/prescriptions" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutPrescriptions /></FeatureRoute>} />
           <Route path="/coordinator/workout/:cycleId" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutBuilder /></FeatureRoute>} />
           <Route path="/coordinator/prescricao" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><UnifiedPrescriber /></FeatureRoute>} />
@@ -268,6 +272,7 @@ const App = () => (
           <Route path="/trainer/appearance" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasAppearance" requiredModule="appearance"><AppearanceSettings /></FeatureRoute>} />
           <Route path="/trainer/exercises" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><ExerciseLibrary /></FeatureRoute>} />
           <Route path="/trainer/biblioteca-treinos" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutLibrary /></FeatureRoute>} />
+          <Route path="/trainer/biblioteca" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><Biblioteca /></FeatureRoute>} />
           <Route path="/trainer/prescriptions" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutPrescriptions /></FeatureRoute>} />
           <Route path="/trainer/workout/:cycleId" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutBuilder /></FeatureRoute>} />
           <Route path="/trainer/prescricao" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPrescription" requiredModule="exercises"><UnifiedPrescriber /></FeatureRoute>} />

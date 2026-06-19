@@ -253,7 +253,7 @@ export default function WorkoutBuilder() {
     if (error) { toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" }); return; }
     toast({ title: "Treino salvo na biblioteca!" });
     const prefix = window.location.pathname.split("/").filter(Boolean)[0] || "admin";
-    navigate(`/${prefix}/biblioteca-treinos`);
+    navigate(`/${prefix}/biblioteca?tab=treinos`);
   };
 
   const saveAsTemplate = async () => {

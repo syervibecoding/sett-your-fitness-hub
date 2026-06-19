@@ -72,7 +72,7 @@ const moduleMap: Record<string, PermissionModule> = {
 const masterItems = [
   { title: "Dashboard", url: "/master", icon: LayoutDashboard },
   { title: "Empresas", url: "/master/companies", icon: Building2 },
-  { title: "Biblioteca de Exercícios", url: "/master/exercises", icon: Dumbbell },
+  { title: "Biblioteca", url: "/master/biblioteca", icon: Dumbbell },
 ];
 
 const baseAdminItems: typeof managementItems = [];
@@ -82,7 +82,6 @@ const managementItems = [
   { title: "Cadastro", url: "/admin/registration", icon: UserPlus },
   { title: "Anamnese", url: "/admin/anamnesis", icon: FileText },
   { title: "Planos", url: "/admin/plans", icon: ClipboardList },
-  { title: "Biblioteca de Treinos", url: "/admin/biblioteca-treinos", icon: BookOpen },
   { title: "Alunos", url: "/admin/students", icon: Users },
   { title: "Equipe", url: "/admin/team", icon: Users },
   { title: "Agenda", url: "/admin/agenda", icon: CalendarDays },
@@ -107,7 +106,6 @@ const coordinatorAllItems = [
   { title: "Cadastro", url: "/coordinator/registration", icon: UserPlus },
   { title: "Anamnese", url: "/coordinator/anamnesis", icon: FileText },
   { title: "Planos", url: "/coordinator/plans", icon: ClipboardList },
-  { title: "Biblioteca de Treinos", url: "/coordinator/biblioteca-treinos", icon: BookOpen },
   { title: "Alunos", url: "/coordinator/students", icon: Users },
   { title: "Equipe", url: "/coordinator/team", icon: Users },
   { title: "Agenda", url: "/coordinator/agenda", icon: CalendarDays },
@@ -136,7 +134,6 @@ const trainerAllItems = [
   { title: "Cadastro", url: "/trainer/registration", icon: UserPlus },
   { title: "Anamnese", url: "/trainer/anamnesis", icon: FileText },
   { title: "Planos", url: "/trainer/plans", icon: ClipboardList },
-  { title: "Biblioteca de Treinos", url: "/trainer/biblioteca-treinos", icon: BookOpen },
   { title: "Alunos", url: "/trainer/students", icon: Users },
   { title: "Equipe", url: "/trainer/team", icon: Users },
   { title: "Agenda", url: "/trainer/agenda", icon: CalendarDays },
@@ -298,8 +295,8 @@ export function AppSidebar() {
                     <CollapsibleContent>
                       <SidebarMenuSub>
                         <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/exercises`}>
-                            <NavLink to={`${exercisePrefix}/exercises`} end>
+                          <SidebarMenuSubButton asChild isActive={location.pathname.endsWith("/biblioteca") || location.pathname.endsWith("/exercises") || location.pathname.endsWith("/biblioteca-treinos")}>
+                            <NavLink to={`${exercisePrefix}/biblioteca`} end>
                               <BookOpen className="h-4 w-4" />
                               <span>Biblioteca</span>
                             </NavLink>
