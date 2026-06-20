@@ -21,7 +21,7 @@ import { StudentTimeline } from "@/components/admin/StudentTimeline";
 import { StudentFilesPanel } from "@/components/admin/StudentFilesPanel";
 import { WeeklyContactToggle } from "@/components/admin/WeeklyContactToggle";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Mail, Phone, Cake, CalendarDays, Dumbbell, Plus, CalendarIcon, MapPin, CreditCard, MessageCircle, Pencil, DollarSign, Upload, Image, Mic, FileText, Download, Square, MicOff, RefreshCw, ExternalLink, Copy, Link, Check, Trash2, UserPlus, BarChart3, Clock, CheckCircle2, Edit } from "lucide-react";
+import { ArrowLeft, Mail, Phone, Cake, CalendarDays, Dumbbell, Plus, CalendarIcon, MapPin, CreditCard, MessageCircle, Pencil, DollarSign, Upload, Image, Mic, FileText, Download, Square, MicOff, RefreshCw, ExternalLink, Copy, Link, Check, Trash2, UserPlus, BarChart3, Clock, CheckCircle2, Edit, KeyRound } from "lucide-react";
 import { format, parseISO, eachDayOfInterval, addWeeks, addDays, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -285,6 +285,9 @@ export default function StudentDetail() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [activatingAccess, setActivatingAccess] = useState(false);
+  const [loginCreds, setLoginCreds] = useState<{ email: string; password: string } | null>(null);
+  const [loadingLogin, setLoadingLogin] = useState(false);
+  const [copiedLogin, setCopiedLogin] = useState(false);
 
   const handleActivateStudentAccess = async () => {
     if (!student?.email) {
@@ -308,6 +311,84 @@ export default function StudentDetail() {
       toast({ title: "Erro ao ativar acesso", description: err?.message, variant: "destructive" });
     }
     setActivatingAccess(false);
+  };
+
+  // ===== Acesso do app: gerar/copiar/enviar login do aluno =====
+  const studentLoginUrl = `${window.location.origin}/auth?as=student`;
+
+  const waDigits = (phone?: string | null): string | null => {
+    if (!phone) return null;
+    let d = phone.replace(/\D/g, "");
+    if (!d) return null;
+    if (d.length <= 11) d = "55" + d; // assume Brasil se vier sem DDI
+    return d;
+  };
+
+  const buildLoginMessage = (creds: { email: string; password: string }) => {
+    const first = (student?.full_name || "").trim().split(/\s+/)[0] || "";
+    return (
+      `Olá${first ? ", " + first : ""}! Seu acesso ao app de treino está pronto 💪\n\n` +
+      `🔗 Acesse: ${studentLoginUrl}\n` +
+      `📧 Email: ${creds.email}\n` +
+      `🔑 Senha: ${creds.password}\n\n` +
+      `É só entrar e começar. Qualquer dúvida, me chama por aqui!`
+    );
+  };
+
+  // Gera/redefine a senha no servidor e devolve as credenciais (cacheia no estado).
+  const fetchLoginCreds = async (): Promise<{ email: string; password: string } | null> => {
+    if (loginCreds) return loginCreds;
+    if (!student?.id) return null;
+    if (!student.email) {
+      toast({ title: "Sem e-mail", description: "Cadastre um e-mail no aluno para gerar o acesso.", variant: "destructive" });
+      return null;
+    }
+    setLoadingLogin(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("student-login-credentials", {
+        body: { student_id: student.id },
+      });
+      if (error || (data as any)?.error) {
+        toast({ title: "Erro", description: (data as any)?.error || error?.message || "Falha ao gerar acesso", variant: "destructive" });
+        return null;
+      }
+      const creds = { email: (data as any).email, password: (data as any).password };
+      setLoginCreds(creds);
+      return creds;
+    } catch (err: any) {
+      toast({ title: "Erro ao gerar acesso", description: err?.message, variant: "destructive" });
+      return null;
+    } finally {
+      setLoadingLogin(false);
+    }
+  };
+
+  const copyStudentLogin = async () => {
+    const creds = await fetchLoginCreds();
+    if (!creds) return;
+    const msg = buildLoginMessage(creds);
+    try {
+      await navigator.clipboard.writeText(msg);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = msg; ta.style.position = "fixed"; ta.style.left = "-9999px";
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      document.execCommand("copy"); document.body.removeChild(ta);
+    }
+    setCopiedLogin(true);
+    setTimeout(() => setCopiedLogin(false), 1800);
+    toast({ title: "Login copiado!", description: "Email, senha e link prontos pra colar no chat do aluno." });
+  };
+
+  const sendStudentLoginWhatsApp = async () => {
+    const digits = waDigits(student?.whatsapp || student?.phone);
+    if (!digits) {
+      toast({ title: "Sem WhatsApp", description: "Cadastre o WhatsApp do aluno para enviar.", variant: "destructive" });
+      return;
+    }
+    const creds = await fetchLoginCreds();
+    if (!creds) return;
+    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(buildLoginMessage(creds))}`, "_blank", "noopener");
   };
 
   useEffect(() => {
@@ -873,6 +954,41 @@ export default function StudentDetail() {
 
           {/* ===== VISÃO GERAL ===== */}
           <TabsContent value="overview">
+            {/* Acesso do app: copiar login (email+senha+link) ou enviar no WhatsApp */}
+            <Card className="bg-card border-border mb-4">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-primary text-lg">
+                  <KeyRound className="h-4 w-4" /> ACESSO DO APP
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground font-sans">
+                  Envie o login do aluno no WhatsApp ou copie pra colar no chat. Ao gerar, uma senha nova é definida.
+                </p>
+                {loginCreds && (
+                  <div className="rounded-lg border border-border bg-secondary/40 p-3 space-y-1.5 text-sm font-mono-data break-all">
+                    <div className="flex items-center gap-2"><Mail className="h-3.5 w-3.5 text-primary shrink-0" /> {loginCreds.email}</div>
+                    <div className="flex items-center gap-2"><KeyRound className="h-3.5 w-3.5 text-primary shrink-0" /> {loginCreds.password}</div>
+                    <div className="flex items-center gap-2 text-muted-foreground text-xs"><Link className="h-3.5 w-3.5 shrink-0" /> {studentLoginUrl}</div>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    onClick={sendStudentLoginWhatsApp}
+                    disabled={loadingLogin}
+                    className="bg-[#25D366] text-white hover:bg-[#25D366]/90"
+                  >
+                    <MessageCircle className="h-4 w-4 mr-1.5" />
+                    {loadingLogin ? "Gerando..." : "Enviar no WhatsApp"}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={copyStudentLogin} disabled={loadingLogin}>
+                    {copiedLogin ? <Check className="h-4 w-4 mr-1.5 text-green-600" /> : <Copy className="h-4 w-4 mr-1.5" />}
+                    {loadingLogin ? "Gerando..." : "Copiar login"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
             {id && <StudentCycleFeedbackCard studentId={id} />}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Left: Active enrollment + cycles + notes */}
