@@ -60,6 +60,7 @@ const moduleMap: Record<string, PermissionModule> = {
   "Dashboard": "dashboard",
   "Cadastro": "registration",
   "Anamnese": "anamnesis",
+  "Questionários": "registration",
   "Alunos": "students",
   "Agenda": "agenda",
   "Exercícios": "exercises",
@@ -79,15 +80,13 @@ const baseAdminItems: typeof managementItems = [];
 
 const managementItems = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
-  { title: "Cadastro", url: "/admin/registration", icon: UserPlus },
-  { title: "Anamnese", url: "/admin/anamnesis", icon: FileText },
+  { title: "Questionários", url: "/admin/questionarios", icon: FileText },
   { title: "Planos", url: "/admin/plans", icon: ClipboardList },
   { title: "Alunos", url: "/admin/students", icon: Users },
   { title: "Equipe", url: "/admin/team", icon: Users },
   { title: "Agenda", url: "/admin/agenda", icon: CalendarDays },
   { title: "Aparência", url: "/admin/appearance", icon: Palette },
   { title: "Mural", url: "/admin/announcements", icon: Megaphone },
-  { title: "Evasão", url: "/admin/evasao", icon: Activity },
 ];
 
 
@@ -103,8 +102,7 @@ const whatsappSubItems = [
 
 const coordinatorAllItems = [
   { title: "Dashboard", url: "/coordinator", icon: LayoutDashboard },
-  { title: "Cadastro", url: "/coordinator/registration", icon: UserPlus },
-  { title: "Anamnese", url: "/coordinator/anamnesis", icon: FileText },
+  { title: "Questionários", url: "/coordinator/questionarios", icon: FileText },
   { title: "Planos", url: "/coordinator/plans", icon: ClipboardList },
   { title: "Alunos", url: "/coordinator/students", icon: Users },
   { title: "Equipe", url: "/coordinator/team", icon: Users },
@@ -131,8 +129,7 @@ const trainerWhatsappSubItems = [
 
 const trainerAllItems = [
   { title: "Dashboard", url: "/trainer", icon: LayoutDashboard },
-  { title: "Cadastro", url: "/trainer/registration", icon: UserPlus },
-  { title: "Anamnese", url: "/trainer/anamnesis", icon: FileText },
+  { title: "Questionários", url: "/trainer/questionarios", icon: FileText },
   { title: "Planos", url: "/trainer/plans", icon: ClipboardList },
   { title: "Alunos", url: "/trainer/students", icon: Users },
   { title: "Equipe", url: "/trainer/team", icon: Users },

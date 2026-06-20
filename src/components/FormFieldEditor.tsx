@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, GripVertical, Pencil, Trash2, ChevronUp, ChevronDown, X, Copy, Check } from "lucide-react";
+import { Plus, GripVertical, Pencil, Trash2, ChevronUp, ChevronDown, X, Copy, Check, Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface FormField {
@@ -275,6 +275,16 @@ export default function FormFieldEditor({ formType, title, subtitle, publicPath 
         )}
       </div>
 
+      <div className="flex items-start gap-2 rounded-lg border border-border bg-secondary/40 p-3 text-xs text-muted-foreground font-sans">
+        <Lock className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" />
+        <span>
+          As perguntas marcadas como <strong>Sistema</strong> (<Lock className="h-3 w-3 inline" /> fixa) são padrão e
+          alimentam {formType === "anamnesis" ? "as prescrições" : "o cadastro"} — não podem ser editadas nem removidas.
+          Você pode <strong>adicionar</strong> perguntas suas e remover/editar <strong>apenas as que você criar</strong>
+          {formType === "anamnesis" ? "; elas aparecem para o aluno no fim da anamnese." : "."}
+        </span>
+      </div>
+
       {loading ? (
         <p className="text-muted-foreground font-sans text-center py-12">Carregando...</p>
       ) : (
@@ -304,28 +314,36 @@ export default function FormFieldEditor({ formType, title, subtitle, publicPath 
                   </div>
 
                   <div className="flex items-center gap-1">
-                    <Switch checked={f.is_active} onCheckedChange={() => handleToggleActive(f)} />
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(f)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    {!f.field_key && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent className="bg-card border-border">
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Remover campo?</AlertDialogTitle>
-                            <AlertDialogDescription>Esta ação não pode ser desfeita. O campo "{f.label}" será removido permanentemente.</AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(f.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Remover</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                    {f.field_key ? (
+                      // Pergunta pré-definida (sistema): travada — alimenta prescrições/cadastro.
+                      // Não pode editar, desativar nem excluir; só reordenar.
+                      <span className="flex items-center gap-1 pr-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                        <Lock className="h-3 w-3" /> fixa
+                      </span>
+                    ) : (
+                      <>
+                        <Switch checked={f.is_active} onCheckedChange={() => handleToggleActive(f)} />
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(f)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="bg-card border-border">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Remover campo?</AlertDialogTitle>
+                              <AlertDialogDescription>Esta ação não pode ser desfeita. O campo "{f.label}" será removido permanentemente.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(f.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Remover</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </>
                     )}
                   </div>
                 </div>

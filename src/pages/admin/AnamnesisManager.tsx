@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ClipboardCheck, Copy, Check, Link2, Loader2, MessageCircle } from "lucide-react";
+import { ClipboardCheck, Copy, Check, Link2, Loader2, MessageCircle, Pencil, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
+import FormFieldEditor from "@/components/FormFieldEditor";
 
 // Anamnese ÚNICA (estúdio integrado). A aba Anamnese seleciona o aluno, gera o link da
 // anamnese estruturada e envia direto no WhatsApp dele (ou copia o link).
@@ -39,6 +40,7 @@ export default function AnamnesisManager() {
   const [link, setLink] = useState("");
   const [creating, setCreating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     if (!effectiveCompanyId) { setStudents([]); return; }
@@ -95,6 +97,23 @@ export default function AnamnesisManager() {
     toast.success("Link copiado!");
   }
 
+  // Modo editor de perguntas — reusa o FormFieldEditor (perguntas de sistema travadas).
+  if (editing) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
+          <ArrowLeft className="mr-1.5 h-4 w-4" /> Voltar ao envio
+        </Button>
+        <FormFieldEditor
+          formType="anamnesis"
+          title="EDITAR ANAMNESE"
+          subtitle="Adicione perguntas suas à anamnese. As perguntas padrão são fixas e não podem ser removidas."
+          publicPath="/anamnese-convite"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -104,12 +123,17 @@ export default function AnamnesisManager() {
             Anamnese única do estúdio — gere o link e envie direto no WhatsApp do aluno.
           </p>
         </div>
-        <BnitoContextButton
-          label="anamnese do estúdio"
-          context="Anamnese estruturada única (dados, objetivo, modalidades, rotina, saúde, PAR-Q, nutrição condicional) que alimenta todas as prescrições."
-          question="Quais respostas da anamnese mais impactam a qualidade e a segurança da prescrição?"
-          text="BNITO da anamnese"
-        />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+            <Pencil className="mr-2 h-4 w-4" /> Editar anamnese
+          </Button>
+          <BnitoContextButton
+            label="anamnese do estúdio"
+            context="Anamnese estruturada única (dados, objetivo, modalidades, rotina, saúde, PAR-Q, nutrição condicional) que alimenta todas as prescrições."
+            question="Quais respostas da anamnese mais impactam a qualidade e a segurança da prescrição?"
+            text="BNITO da anamnese"
+          />
+        </div>
       </div>
 
       <Card className="bg-card">

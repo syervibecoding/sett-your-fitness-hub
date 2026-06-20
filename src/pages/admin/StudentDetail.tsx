@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StudentCycleFeedbackCard } from "@/components/admin/StudentCycleFeedbackCard";
+import { StudentCustomAnswersCard } from "@/components/admin/StudentCustomAnswersCard";
 import { StudentGoalsManager } from "@/components/admin/StudentGoalsManager";
 import { StudentTimeline } from "@/components/admin/StudentTimeline";
 import { StudentFilesPanel } from "@/components/admin/StudentFilesPanel";
@@ -1459,6 +1460,7 @@ export default function StudentDetail() {
 
           {/* ===== ANAMNESE ===== */}
           <TabsContent value="anamnesis">
+            {id && <StudentCustomAnswersCard studentId={id} />}
             <Card className="bg-card border-border">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-primary text-lg">

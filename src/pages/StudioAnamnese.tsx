@@ -38,6 +38,9 @@ export default function StudentAnamnese() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone]       = useState(false);
   const [error, setError]     = useState("");
+  // Perguntas extras criadas pelo professor (vêm do edge studio_context)
+  const [customFields, setCustomFields]   = useState<any[]>([]);
+  const [customAnswers, setCustomAnswers] = useState<Record<string, any>>({});
 
   const [f, setF] = useState({
     // Identificação
@@ -91,7 +94,7 @@ export default function StudentAnamnese() {
 
   // Anamnese "viva": pula os passos de nutrição se o aluno já tem nutri ou não quer dicas.
   const wantsNutrition = f.interest_nutrition && f.wants_nutrition_tips !== "nao" && f.has_nutritionist !== "sim";
-  const STEP_SEQ = [1, 2, 3, 4, 5, ...(wantsNutrition ? [6, 7] : [])];
+  const STEP_SEQ = [1, 2, 3, 4, 5, ...(wantsNutrition ? [6, 7] : []), ...(customFields.length ? [8] : [])];
   const stepIdx = Math.max(0, STEP_SEQ.indexOf(step));
   const isLast = stepIdx === STEP_SEQ.length - 1;
   const goNext = () => { if (isLast) { void submit(); } else setStep(STEP_SEQ[stepIdx + 1]); };
@@ -111,6 +114,7 @@ export default function StudentAnamnese() {
       }
       if (data.invite.status === "completed") { setDone(true); }
       setInvite(data.invite);
+      setCustomFields(Array.isArray(data.custom_fields) ? data.custom_fields : []);
       if (data.invite.student_name || data.student?.full_name) set("name", data.invite.student_name || data.student.full_name);
       setLoading(false);
     })();
@@ -159,9 +163,18 @@ export default function StudentAnamnese() {
         f.food_dislikes && `NÃO gosta / evitar nas sugestões e substituições: ${sanitizeText(f.food_dislikes)}`,
       ].filter(Boolean).join(" | ");
 
+      // Respostas das perguntas extras → { id: { label, value } }
+      const custom_answers: Record<string, any> = {};
+      for (const cf of customFields) {
+        const v = customAnswers[cf.id];
+        if (v === undefined || v === "" || (Array.isArray(v) && v.length === 0)) continue;
+        custom_answers[cf.id] = { label: cf.label, value: v };
+      }
+
       const payload = {
         student_id: invite.student_id,
         company_id: invite.company_id,
+        custom_answers,
         age: f.age ? Number(f.age) : null,
         body_fat_percent: f.body_fat_percent ? Number(f.body_fat_percent) : null,
         objective: sanitizeShort(f.objective),
@@ -302,6 +315,7 @@ export default function StudentAnamnese() {
               {step === 5 && "Triagem clínica"}
               {step === 6 && "Rotina alimentar e treino"}
               {step === 7 && "Preferências & substituições"}
+              {step === 8 && "Perguntas do seu treinador"}
             </h2>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -541,6 +555,45 @@ export default function StudentAnamnese() {
                 <F label="Algo mais que queira contar?">
                   <Textarea value={f.notes} onChange={e => set("notes", e.target.value)} className="min-h-[44px]" placeholder="opcional" />
                 </F>
+              </div>
+            )}
+
+            {/* PASSO 8 — Perguntas extras do professor (custom) */}
+            {step === 8 && (
+              <div className="space-y-4">
+                <p className="text-xs text-slate-500">Perguntas adicionais do seu treinador.</p>
+                {customFields.map((cf: any) => {
+                  const val = customAnswers[cf.id];
+                  const setVal = (v: any) => setCustomAnswers(p => ({ ...p, [cf.id]: v }));
+                  return (
+                    <F key={cf.id} label={cf.label + (cf.is_required ? " *" : "")}>
+                      {cf.field_type === "textarea" ? (
+                        <Textarea value={val || ""} onChange={e => setVal(e.target.value)} className="min-h-[60px]" />
+                      ) : cf.field_type === "number" ? (
+                        <Input type="number" value={val || ""} onChange={e => setVal(e.target.value)} className="h-10" />
+                      ) : cf.field_type === "date" ? (
+                        <Input type="date" value={val || ""} onChange={e => setVal(e.target.value)} className="h-10" />
+                      ) : (cf.field_type === "select" || cf.field_type === "radio") ? (
+                        <SS value={val || ""} onChange={(v: string) => setVal(v)} placeholder="Selecione..."
+                          opts={(cf.options || []).map((o: string) => [o, o])} />
+                      ) : cf.field_type === "checkbox" ? (
+                        <div className="space-y-1.5">
+                          {(cf.options || []).map((o: string) => {
+                            const arr: string[] = Array.isArray(val) ? val : [];
+                            return (
+                              <label key={o} className="flex items-center gap-2 text-sm cursor-pointer">
+                                <Checkbox checked={arr.includes(o)} onCheckedChange={c => setVal(c ? [...arr, o] : arr.filter(x => x !== o))} />
+                                {o}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <Input value={val || ""} onChange={e => setVal(e.target.value)} className="h-10" />
+                      )}
+                    </F>
+                  );
+                })}
               </div>
             )}
 

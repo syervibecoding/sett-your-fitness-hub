@@ -283,10 +283,21 @@ Deno.serve(async (req) => {
         .eq("id", invite.student_id)
         .maybeSingle();
       const branding = await getBranding(invite.company_id);
+      // Perguntas EXTRAS criadas pelo professor (custom, field_key null, ativas) — anônimo não lê
+      // form_fields direto (RLS), então mandamos aqui pelo edge (service role).
+      const { data: customFields } = await supabase
+        .from("form_fields")
+        .select("id, label, field_type, options, is_required, sort_order")
+        .eq("form_type", "anamnesis")
+        .is("field_key", null)
+        .eq("is_active", true)
+        .or(`company_id.eq.${invite.company_id},company_id.is.null`)
+        .order("sort_order", { ascending: true });
       return new Response(JSON.stringify({
         invite,
         student,
         branding,
+        custom_fields: (customFields || []).map((c: any) => ({ ...c, options: Array.isArray(c.options) ? c.options : [] })),
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -320,6 +331,20 @@ Deno.serve(async (req) => {
       };
       for (const key of STUDIO_ANAMNESE_FIELDS) {
         if (incoming[key] !== undefined) payload[key] = incoming[key];
+      }
+      // Respostas das perguntas extras (custom) → jsonb sanitizado { id: { label, value } }
+      if (incoming.custom_answers && typeof incoming.custom_answers === "object" && !Array.isArray(incoming.custom_answers)) {
+        const ca: Record<string, any> = {};
+        for (const [k, v] of Object.entries(incoming.custom_answers as Record<string, any>)) {
+          if (typeof k !== "string" || !v || typeof v !== "object") continue;
+          const label = typeof (v as any).label === "string" ? (v as any).label.slice(0, 200) : "";
+          let value: any = (v as any).value;
+          if (Array.isArray(value)) value = value.slice(0, 50).map((x) => String(x).slice(0, 200));
+          else if (value != null) value = String(value).slice(0, 2000);
+          else value = "";
+          ca[k.slice(0, 80)] = { label, value };
+        }
+        if (Object.keys(ca).length) payload.custom_answers = ca;
       }
 
       const { data: existing } = await supabase
