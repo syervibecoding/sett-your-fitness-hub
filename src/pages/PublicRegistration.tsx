@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CheckCircle } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
+import { lookupCep, lookupCepByAddress } from "@/lib/cep";
 import { applyTheme } from "@/contexts/ThemeContext";
 
 interface CompanyBranding {
@@ -41,6 +42,24 @@ export default function PublicRegistration() {
   const [state, setState] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [email, setEmail] = useState("");
+
+  // CEP → endereço (e endereço → CEP) automático via ViaCEP
+  const fillFromCep = async (cepValue: string) => {
+    const r = await lookupCep(cepValue);
+    if (!r) return;
+    if (r.logradouro) setAddress(r.logradouro);
+    if (r.bairro) setNeighborhood(r.bairro);
+    if (r.cidade) setCity(r.cidade);
+    if (r.uf) setState(r.uf);
+  };
+  const fillCepFromAddress = async () => {
+    if (cep.replace(/\D/g, "").length === 8) return; // já tem CEP, não sobrescreve
+    const r = await lookupCepByAddress(state, city, address);
+    if (r?.cep) {
+      setCep(formatCEP(r.cep));
+      if (!neighborhood && r.bairro) setNeighborhood(r.bairro);
+    }
+  };
 
   // Resolve company + branding via public edge function (no anon RLS).
   // NOTE: Plano e pagamento foram desacoplados — agora vivem apenas em /pagamento/:studentId.
@@ -172,11 +191,11 @@ export default function PublicRegistration() {
             </div>
             <div className="space-y-2">
               <Label className="font-sans">CEP *</Label>
-              <Input value={cep} onChange={e => setCep(formatCEP(e.target.value))} placeholder="00000-000" />
+              <Input value={cep} onChange={e => { const m = formatCEP(e.target.value); setCep(m); if (m.replace(/\D/g, "").length === 8) void fillFromCep(m); }} placeholder="00000-000" />
             </div>
             <div className="space-y-2">
               <Label className="font-sans">Rua *</Label>
-              <Input value={address} onChange={e => setAddress(e.target.value)} placeholder="Nome da rua" />
+              <Input value={address} onChange={e => setAddress(e.target.value)} onBlur={fillCepFromAddress} placeholder="Nome da rua" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -191,11 +210,11 @@ export default function PublicRegistration() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="font-sans">Cidade *</Label>
-                <Input value={city} onChange={e => setCity(e.target.value)} placeholder="Cidade" />
+                <Input value={city} onChange={e => setCity(e.target.value)} onBlur={fillCepFromAddress} placeholder="Cidade" />
               </div>
               <div className="space-y-2">
                 <Label className="font-sans">Estado *</Label>
-                <Input value={state} onChange={e => setState(e.target.value)} placeholder="UF" maxLength={2} />
+                <Input value={state} onChange={e => setState(e.target.value)} onBlur={fillCepFromAddress} placeholder="UF" maxLength={2} />
               </div>
             </div>
             <div className="space-y-2">

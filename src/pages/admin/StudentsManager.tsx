@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMaster } from "@/contexts/MasterContext";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
+import { lookupCep, lookupCepByAddress } from "@/lib/cep";
 import { format, addWeeks } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
@@ -73,6 +74,25 @@ export default function StudentsManager() {
   const [editing, setEditing] = useState<Student | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+
+  // CEP ↔ endereço automático no Novo Aluno
+  const fillFromCepNew = async (cepValue: string) => {
+    const r = await lookupCep(cepValue);
+    if (!r) return;
+    setForm((f) => ({
+      ...f,
+      cep: formatCEP(r.cep),
+      address: r.logradouro || f.address,
+      neighborhood: r.bairro || f.neighborhood,
+      city: r.cidade || f.city,
+      state: r.uf || f.state,
+    }));
+  };
+  const fillCepFromAddressNew = async () => {
+    if (form.cep.replace(/\D/g, "").length === 8) return;
+    const r = await lookupCepByAddress(form.state, form.city, form.address);
+    if (r?.cep) setForm((f) => ({ ...f, cep: formatCEP(r.cep), neighborhood: f.neighborhood || r.bairro }));
+  };
   const { toast } = useToast();
   const { session, role, companyId } = useAuth();
   const navigate = useNavigate();
@@ -401,19 +421,19 @@ export default function StudentsManager() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2"><Label className="font-sans">CPF</Label><Input value={form.cpf} onChange={e => setForm({ ...form, cpf: formatCPF(e.target.value) })} className="bg-secondary border-border" placeholder="000.000.000-00" /></div>
-                <div className="space-y-2"><Label className="font-sans">CEP</Label><Input value={form.cep} onChange={e => setForm({ ...form, cep: formatCEP(e.target.value) })} className="bg-secondary border-border" placeholder="00000-000" /></div>
+                <div className="space-y-2"><Label className="font-sans">CEP</Label><Input value={form.cep} onChange={e => { const m = formatCEP(e.target.value); setForm(f => ({ ...f, cep: m })); if (m.replace(/\D/g, "").length === 8) void fillFromCepNew(m); }} className="bg-secondary border-border" placeholder="00000-000" /></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2"><Label className="font-sans">Data de nascimento</Label><Input type="date" value={form.birth_date} onChange={e => setForm({ ...form, birth_date: e.target.value })} className="bg-secondary border-border" /></div>
               </div>
-              <div className="space-y-2"><Label className="font-sans">Rua</Label><Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="bg-secondary border-border" /></div>
+              <div className="space-y-2"><Label className="font-sans">Rua</Label><Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} onBlur={fillCepFromAddressNew} className="bg-secondary border-border" /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2"><Label className="font-sans">Número</Label><Input value={form.address_number} onChange={e => setForm({ ...form, address_number: e.target.value })} className="bg-secondary border-border" /></div>
                 <div className="space-y-2"><Label className="font-sans">Bairro</Label><Input value={form.neighborhood} onChange={e => setForm({ ...form, neighborhood: e.target.value })} className="bg-secondary border-border" /></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label className="font-sans">Cidade</Label><Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} className="bg-secondary border-border" /></div>
-                <div className="space-y-2"><Label className="font-sans">Estado</Label><Input value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} className="bg-secondary border-border" maxLength={2} /></div>
+                <div className="space-y-2"><Label className="font-sans">Cidade</Label><Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} onBlur={fillCepFromAddressNew} className="bg-secondary border-border" /></div>
+                <div className="space-y-2"><Label className="font-sans">Estado</Label><Input value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} onBlur={fillCepFromAddressNew} className="bg-secondary border-border" maxLength={2} /></div>
               </div>
               <div className="space-y-2">
                 <Label className="font-sans">Status</Label>

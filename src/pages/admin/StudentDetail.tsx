@@ -42,6 +42,7 @@ function safeFormatDate(value: string | null | undefined, fmt: string, opts?: Pa
   }
 }
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
+import { lookupCep, lookupCepByAddress } from "@/lib/cep";
 // Heavy children loaded only when their tab is opened (chunk size win)
 const WorkoutAnalysis = lazy(() => import("@/components/trainer/WorkoutAnalysis").then(m => ({ default: m.WorkoutAnalysis })));
 const TrainerWeeklyBar = lazy(() => import("@/components/trainer/TrainerWeeklyBar").then(m => ({ default: m.TrainerWeeklyBar })));
@@ -399,6 +400,25 @@ export default function StudentDetail() {
     const creds = await fetchLoginCreds();
     if (!creds) return;
     window.open(`https://wa.me/${digits}?text=${encodeURIComponent(buildLoginMessage(creds))}`, "_blank", "noopener");
+  };
+
+  // CEP ↔ endereço automático no editar aluno
+  const fillFromCepStudent = async (cepValue: string) => {
+    const r = await lookupCep(cepValue);
+    if (!r) return;
+    setStudentForm((f) => ({
+      ...f,
+      cep: formatCEP(r.cep),
+      address: r.logradouro || f.address,
+      neighborhood: r.bairro || f.neighborhood,
+      city: r.cidade || f.city,
+      state: r.uf || f.state,
+    }));
+  };
+  const fillCepFromAddressStudent = async () => {
+    if (studentForm.cep.replace(/\D/g, "").length === 8) return;
+    const r = await lookupCepByAddress(studentForm.state, studentForm.city, studentForm.address);
+    if (r?.cep) setStudentForm((f) => ({ ...f, cep: formatCEP(r.cep), neighborhood: f.neighborhood || r.bairro }));
   };
 
   useEffect(() => {
@@ -1768,16 +1788,16 @@ export default function StudentDetail() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2"><Label className="font-sans">CPF</Label><Input value={studentForm.cpf} onChange={e => setStudentForm({ ...studentForm, cpf: formatCPF(e.target.value) })} className="bg-secondary border-border" placeholder="000.000.000-00" /></div>
-                <div className="space-y-2"><Label className="font-sans">CEP</Label><Input value={studentForm.cep} onChange={e => setStudentForm({ ...studentForm, cep: formatCEP(e.target.value) })} className="bg-secondary border-border" placeholder="00000-000" /></div>
+                <div className="space-y-2"><Label className="font-sans">CEP</Label><Input value={studentForm.cep} onChange={e => { const m = formatCEP(e.target.value); setStudentForm(f => ({ ...f, cep: m })); if (m.replace(/\D/g, "").length === 8) void fillFromCepStudent(m); }} className="bg-secondary border-border" placeholder="00000-000" /></div>
               </div>
-              <div className="space-y-2"><Label className="font-sans">Rua</Label><Input value={studentForm.address} onChange={e => setStudentForm({ ...studentForm, address: e.target.value })} className="bg-secondary border-border" /></div>
+              <div className="space-y-2"><Label className="font-sans">Rua</Label><Input value={studentForm.address} onChange={e => setStudentForm({ ...studentForm, address: e.target.value })} onBlur={fillCepFromAddressStudent} className="bg-secondary border-border" /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2"><Label className="font-sans">Número</Label><Input value={studentForm.address_number} onChange={e => setStudentForm({ ...studentForm, address_number: e.target.value })} className="bg-secondary border-border" /></div>
                 <div className="space-y-2"><Label className="font-sans">Bairro</Label><Input value={studentForm.neighborhood} onChange={e => setStudentForm({ ...studentForm, neighborhood: e.target.value })} className="bg-secondary border-border" /></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label className="font-sans">Cidade</Label><Input value={studentForm.city} onChange={e => setStudentForm({ ...studentForm, city: e.target.value })} className="bg-secondary border-border" /></div>
-                <div className="space-y-2"><Label className="font-sans">Estado</Label><Input value={studentForm.state} onChange={e => setStudentForm({ ...studentForm, state: e.target.value })} className="bg-secondary border-border" maxLength={2} /></div>
+                <div className="space-y-2"><Label className="font-sans">Cidade</Label><Input value={studentForm.city} onChange={e => setStudentForm({ ...studentForm, city: e.target.value })} onBlur={fillCepFromAddressStudent} className="bg-secondary border-border" /></div>
+                <div className="space-y-2"><Label className="font-sans">Estado</Label><Input value={studentForm.state} onChange={e => setStudentForm({ ...studentForm, state: e.target.value })} onBlur={fillCepFromAddressStudent} className="bg-secondary border-border" maxLength={2} /></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2"><Label className="font-sans">Data de nascimento</Label><Input type="date" value={studentForm.birth_date} onChange={e => setStudentForm({ ...studentForm, birth_date: e.target.value })} className="bg-secondary border-border" /></div>
