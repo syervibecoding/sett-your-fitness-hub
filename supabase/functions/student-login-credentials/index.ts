@@ -65,41 +65,54 @@ Deno.serve(async (req) => {
 
     const password = generatePassword();
     let userId = student.user_id as string | null;
+    let needsLink = false;
 
+    // 1) Se já tem user_id, confirma que a conta de auth ainda existe (pode ser órfã = foi apagada).
     if (userId) {
-      // Já tem conta → apenas redefine a senha para um valor conhecido
-      const { error } = await adminClient.auth.admin.updateUserById(userId, { password, email_confirm: true });
-      if (error) return json(400, { error: error.message });
-    } else {
-      // Cria conta com a senha gerada (ou reutiliza auth existente com o mesmo e-mail)
-      const { data: created, error: createError } = await adminClient.auth.admin.createUser({
-        email: student.email,
-        password,
-        email_confirm: true,
-        user_metadata: { full_name: student.full_name },
-      });
-      if (createError) {
-        if (/already.*regist/i.test(createError.message || "")) {
-          const { data: list } = await adminClient.auth.admin.listUsers();
-          const existing = list?.users?.find(
-            (u: any) => (u.email || "").toLowerCase() === String(student.email).toLowerCase(),
-          );
-          if (!existing) return json(400, { error: "Conta de auth existente não encontrada para este e-mail" });
-          userId = existing.id;
-          const { error: updErr } = await adminClient.auth.admin.updateUserById(userId, { password, email_confirm: true });
-          if (updErr) return json(400, { error: updErr.message });
-        } else {
-          return json(400, { error: createError.message });
-        }
+      const { data: got, error: getErr } = await adminClient.auth.admin.getUserById(userId);
+      if (getErr || !got?.user) userId = null; // órfão → re-resolve pelo e-mail
+    }
+
+    // 2) Sem conta válida → acha pelo e-mail (já existe) ou cria.
+    if (!userId) {
+      const { data: list } = await adminClient.auth.admin.listUsers();
+      const existing = list?.users?.find(
+        (u: any) => (u.email || "").toLowerCase() === String(student.email).toLowerCase(),
+      );
+      if (existing) {
+        userId = existing.id;
       } else {
+        const { data: created, error: createError } = await adminClient.auth.admin.createUser({
+          email: student.email,
+          password,
+          email_confirm: true,
+          user_metadata: { full_name: student.full_name },
+        });
+        if (createError || !created?.user) return json(400, { error: createError?.message || "Falha ao criar conta" });
         userId = created.user.id;
       }
-      // Vincula o aluno à conta
+      // Guarda contra duplicado: esse login já pertence a OUTRO cadastro?
+      const { data: others } = await adminClient
+        .from("students").select("id").eq("user_id", userId).neq("id", student_id);
+      if (others && others.length) {
+        return json(409, {
+          error: "Este e-mail já tem login vinculado a OUTRO cadastro deste aluno (cadastro duplicado). Use o cadastro principal ou consolide os cadastros.",
+        });
+      }
+      needsLink = true;
+    }
+
+    // 3) Redefine a senha (valor conhecido) na conta resolvida.
+    {
+      const { error } = await adminClient.auth.admin.updateUserById(userId!, { password, email_confirm: true });
+      if (error) return json(400, { error: error.message });
+    }
+
+    // 4) Vincula (se mudou) + papel de aluno + empresa.
+    if (needsLink) {
       const { error: linkError } = await adminClient.from("students").update({ user_id: userId }).eq("id", student_id);
       if (linkError) console.error("students link error", linkError);
     }
-
-    // Garante papel de aluno + pertencimento à empresa
     await adminClient.from("user_roles").upsert({ user_id: userId, role: "student" }, { onConflict: "user_id,role" });
     if (student.company_id) {
       await adminClient
