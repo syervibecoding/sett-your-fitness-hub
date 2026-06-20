@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StudentCycleFeedbackCard } from "@/components/admin/StudentCycleFeedbackCard";
 import { StudentCustomAnswersCard } from "@/components/admin/StudentCustomAnswersCard";
+import { CollapsibleCard } from "@/components/admin/CollapsibleCard";
 import { StudentGoalsManager } from "@/components/admin/StudentGoalsManager";
 import { StudentTimeline } from "@/components/admin/StudentTimeline";
 import { StudentFilesPanel } from "@/components/admin/StudentFilesPanel";
@@ -978,13 +979,7 @@ export default function StudentDetail() {
           {/* ===== VISÃO GERAL ===== */}
           <TabsContent value="overview">
             {/* Acesso do app: copiar login (email+senha+link) ou enviar no WhatsApp */}
-            <Card className="bg-card border-border mb-4">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-primary text-lg">
-                  <KeyRound className="h-4 w-4" /> ACESSO DO APP
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <CollapsibleCard title="ACESSO DO APP" icon={<KeyRound className="h-4 w-4" />} className="mb-4" contentClassName="space-y-3">
                 <p className="text-xs text-muted-foreground font-sans">
                   Envie o login do aluno no WhatsApp ou copie pra colar no chat. Ao gerar, uma senha nova é definida.
                 </p>
@@ -1010,8 +1005,7 @@ export default function StudentDetail() {
                     {loadingLogin ? "Gerando..." : "Copiar login"}
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+            </CollapsibleCard>
             {id && <StudentCycleFeedbackCard studentId={id} />}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Left: Active enrollment + cycles + notes */}
@@ -1066,19 +1060,13 @@ export default function StudentDetail() {
                 })()}
 
                 {/* Personal details */}
-                <Card className="bg-card border-border">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-primary text-lg">
-                      DADOS PESSOAIS
-                      <BnitoContextButton
-                        label="dados pessoais do aluno"
-                        context="Dados de contato, idade, CPF, endereco e observacoes que impactam cobranca, acesso e rotina."
-                        question="Quais dados deste cadastro podem impactar cobranca, acesso ou acompanhamento?"
-                        className="ml-auto"
-                      />
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                <CollapsibleCard title="DADOS PESSOAIS" action={
+                  <BnitoContextButton
+                    label="dados pessoais do aluno"
+                    context="Dados de contato, idade, CPF, endereco e observacoes que impactam cobranca, acesso e rotina."
+                    question="Quais dados deste cadastro podem impactar cobranca, acesso ou acompanhamento?"
+                  />
+                }>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm font-sans">
                       {student.birth_date && <div className="flex items-center gap-2 text-muted-foreground"><Cake className="h-4 w-4" />{safeFormatDate(student.birth_date, "dd/MM/yyyy")}</div>}
                       {student.cpf && <div className="flex items-center gap-2 text-muted-foreground"><CreditCard className="h-4 w-4" />{formatCPF(student.cpf)}</div>}
@@ -1097,8 +1085,7 @@ export default function StudentDetail() {
                         <p className="text-xs text-muted-foreground font-sans whitespace-pre-wrap">{student.notes}</p>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
+                </CollapsibleCard>
               </div>
 
               {/* Right: WeeklyBar + quick summary */}
