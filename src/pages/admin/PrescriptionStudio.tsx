@@ -425,15 +425,41 @@ export default function PrescriptionStudio() {
   function assessmentFileName() {
     return `avaliacao-funcional-${(student?.name || "aluno").replace(/\s+/g, "-").toLowerCase()}.pdf`;
   }
-  function downloadAssessmentPDF() {
+  // Carrega as fotos dos frames (assessment_frames) como dataURLs, na ordem das vistas.
+  async function loadFrameImages(): Promise<string[]> {
+    if (!assessment?.id) return [];
+    try {
+      const { data } = await supabase.from("assessment_frames")
+        .select("image_url, frame_index").eq("assessment_id", assessment.id).order("frame_index");
+      const urls = ((data as any[]) || []).map((r) => r.image_url).filter(Boolean);
+      const out: string[] = [];
+      for (const u of urls) {
+        try {
+          const resp = await fetch(u);
+          const b = await resp.blob();
+          out.push(await new Promise<string>((res) => { const fr = new FileReader(); fr.onloadend = () => res(fr.result as string); fr.readAsDataURL(b); }));
+        } catch { out.push(""); }
+      }
+      return out;
+    } catch { return []; }
+  }
+  async function downloadAssessmentPDF() {
     if (!assessment) return;
-    generateAssessmentPDF(assessment, assessmentMeta()).save(assessmentFileName());
+    setSendingAssess(true);
+    try {
+      const imgs = await loadFrameImages();
+      generateAssessmentPDF(assessment, assessmentMeta(), imgs).save(assessmentFileName());
+    } catch (e: any) {
+      toast.error("Não consegui gerar o PDF: " + (e?.message || "erro"));
+    }
+    setSendingAssess(false);
   }
   async function sendAssessmentWhatsApp() {
     if (!assessment || !companyId || !studentId) return;
     setSendingAssess(true);
     try {
-      const blob = generateAssessmentPDF(assessment, assessmentMeta()).output("blob");
+      const imgs = await loadFrameImages();
+      const blob = generateAssessmentPDF(assessment, assessmentMeta(), imgs).output("blob");
       await sendPdfToStudentWhatsApp({
         companyId, studentId, blob, fileName: assessmentFileName(),
         caption: `${(student?.name || "").split(" ")[0] || "Olá"}, segue sua avaliação funcional 💪`,
@@ -611,7 +637,7 @@ export default function PrescriptionStudio() {
                 </div>
                 <p className="text-xs text-slate-400 mt-1">Gere uma nova abaixo se quiser refazer.</p>
                 <div className="flex flex-wrap gap-2 mt-3">
-                  <Button size="sm" variant="outline" onClick={downloadAssessmentPDF}>Baixar PDF</Button>
+                  <Button size="sm" variant="outline" onClick={downloadAssessmentPDF} disabled={sendingAssess}>{sendingAssess ? "Gerando..." : "Baixar PDF"}</Button>
                   <Button size="sm" onClick={sendAssessmentWhatsApp} disabled={sendingAssess} className="bg-[#25D366] text-white hover:bg-[#25D366]/90">
                     {sendingAssess ? "Enviando..." : "Enviar no WhatsApp"}
                   </Button>

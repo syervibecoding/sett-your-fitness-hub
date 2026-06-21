@@ -572,9 +572,14 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
       try {
         const { data: st } = await supabase.from("students").select("full_name").eq("id", studentId).maybeSingle();
         const name = (st as { full_name?: string } | null)?.full_name || "Aluno";
+        const imgs: string[] = [];
+        for (const fr of frames) {
+          try { imgs.push(await new Promise<string>((res) => { const r = new FileReader(); r.onloadend = () => res(r.result as string); r.readAsDataURL(fr.blob); })); } catch { imgs.push(""); }
+        }
         const pdf = generateAssessmentPDF(
           { report_text: aiReportText || fallbackReport, assessment_json: assessmentJson },
           { studentName: name, date: new Date().toLocaleDateString("pt-BR") },
+          imgs,
         );
         const blob = pdf.output("blob") as Blob;
         const safe = name.replace(/[^\w.\-]+/g, "_");

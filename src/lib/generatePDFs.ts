@@ -800,56 +800,159 @@ export function generateNutritionPDF(plan: any, meta: PDFMeta): jsPDF {
 }
 
 // ── PDF da AVALIAÇÃO FUNCIONAL (laudo entregável ao aluno) ───────────────────
-export function generateAssessmentPDF(data: any, meta: PDFMeta): jsPDF {
+// PDF da Avaliação Funcional — réplica da estética de referência (capa + stat cards +
+// cobertura do protocolo + cards de foto com miniatura, badge nº e severidade).
+// frameImages: dataURLs das fotos na ordem das vistas (opcional).
+export function generateAssessmentPDF(data: any, meta: PDFMeta, frameImages?: string[]): jsPDF {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  header(doc, "Avaliacao Funcional", "Laudo tecnico — postura e movimento", meta);
-  let y = 40;
-
+  const pageW = W(doc);
   const json = data?.assessment_json ?? data ?? {};
-  const reportText = first(data?.report_text, json?.relatorio_para_aluno, json?.report_text) || "";
+  const vistas: any[] = Array.isArray(json?.vistas) ? json.vistas : [];
+  const expected: any[] = Array.isArray(json?.expected_movements) ? json.expected_movements : [];
+  const nVistas = vistas.length;
+  const nExpected = expected.length || nVistas || 1;
+  const totalComp = json?.total_compensacoes ?? vistas.reduce((s: number, v: any) => s + (Array.isArray(v?.compensacoes) ? v.compensacoes.length : 0), 0);
+  const coverage = Math.min(100, Math.round((nVistas / nExpected) * 100));
+  const prof = meta.professional || "Matheus Loreto";
+  const cref = meta.cref || "040718-G/SC";
 
-  const ctx: [string, string][] = [];
-  if (json?.total_compensacoes != null) ctx.push([String(json.total_compensacoes), "Compensações"]);
-  if (Array.isArray(json?.vistas)) ctx.push([String(json.vistas.length), "Vistas analisadas"]);
-  if (ctx.length) y = statCards(doc, ctx, y);
+  // ── Cabeçalho da capa ──
+  let y = 18;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...GRAY);
+  doc.text("RELATÓRIO DE AVALIAÇÃO", MARGIN, y);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(...NAVY);
+  doc.text(prof, pageW - MARGIN, y, { align: "right" });
+  doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...BEGE);
+  doc.text(`CREF ${cref}`, pageW - MARGIN, y + 4.5, { align: "right" });
+  y += 8;
+  doc.setFont("helvetica", "bold"); doc.setFontSize(24); doc.setTextColor(...NAVY);
+  doc.text("Avaliação Funcional", MARGIN, y);
+  y += 4;
+  doc.setDrawColor(...LIGHT); doc.setLineWidth(0.4); doc.line(MARGIN, y, pageW - MARGIN, y);
+  y += 9;
 
+  // ── Pill "AVALIAÇÃO COMPLETA" ──
+  doc.setFont("helvetica", "bold"); doc.setFontSize(7.5);
+  const pillTxt = "AVALIAÇÃO COMPLETA";
+  const pillW = doc.getTextWidth(pillTxt) + 10;
+  doc.setFillColor(...BEGE_L); doc.roundedRect(MARGIN, y, pillW, 7, 3.5, 3.5, "F");
+  doc.setTextColor(...BEGE); doc.text(pillTxt, MARGIN + 5, y + 4.8);
+  y += 15;
+
+  // ── Nome + data ──
+  doc.setFont("helvetica", "bold"); doc.setFontSize(30); doc.setTextColor(...NAVY);
+  doc.text(sanitize(meta.studentName || "Aluno"), MARGIN, y);
+  y += 7;
+  doc.setFont("helvetica", "italic"); doc.setFontSize(10); doc.setTextColor(...GRAY);
+  doc.text(meta.date, MARGIN, y);
+  y += 9;
+
+  // ── 3 stat cards ──
+  const gap = 4;
+  const cardW = (pageW - MARGIN * 2 - gap * 2) / 3;
+  const cardH = 24;
+  const cards: [string, string, string][] = [
+    ["FOTOS", String(nVistas), "registradas"],
+    ["VISTAS", String(nVistas), `de ${nExpected}`],
+    ["COBERTURA", `${coverage}%`, "protocolo"],
+  ];
+  cards.forEach((c, i) => {
+    const x = MARGIN + i * (cardW + gap);
+    doc.setDrawColor(...LIGHT); doc.setFillColor(255, 255, 255);
+    doc.roundedRect(x, y, cardW, cardH, 2, 2, "FD");
+    doc.setFillColor(...BEGE); doc.roundedRect(x, y, 1.4, cardH, 0.7, 0.7, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...BEGE);
+    doc.text(c[0], x + 5, y + 6);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(...NAVY);
+    doc.text(c[1], x + 5, y + 16);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...GRAY);
+    doc.text(c[2], x + 5, y + 21);
+  });
+  y += cardH + 10;
+
+  // ── Cobertura do protocolo ──
+  doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...BEGE);
+  doc.text("COBERTURA DO PROTOCOLO", MARGIN, y); y += 5;
+  doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(...NAVY);
+  doc.text("Vistas registradas", MARGIN, y); y += 7;
+  const listNames = (expected.length ? expected : vistas.map((v: any) => v?.vista)).map((x: any) => sanitize(String(x || "")));
+  const colW = (pageW - MARGIN * 2) / 2;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9.5);
+  let listMaxY = y;
+  listNames.forEach((name: string, i: number) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const x = MARGIN + col * colW;
+    const yy = y + row * 6;
+    doc.setFillColor(...BEGE); doc.circle(x + 1.5, yy - 1.2, 1.1, "F");
+    doc.setTextColor(...TEXT); doc.text(name, x + 5, yy);
+    listMaxY = Math.max(listMaxY, yy);
+  });
+  y = listMaxY + 11;
+
+  // ── Registro fotográfico (título) ──
+  doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...BEGE);
+  doc.text("REGISTRO FOTOGRÁFICO", MARGIN, y); y += 5;
+  doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(...NAVY);
+  doc.text(`${nVistas} fotos  ·  ${totalComp} compensações`, MARGIN, y); y += 8;
+
+  // ── Cards de foto (um por vista) ──
+  const sevColor = (s: string): [number, number, number] => {
+    const x = (s || "").toLowerCase();
+    if (x.includes("sever") || x.includes("grave") || x.includes("alta")) return [200, 60, 60];
+    if (x.includes("moder")) return AMBER;
+    return GREEN;
+  };
+  vistas.forEach((v: any, i: number) => {
+    const comps: any[] = Array.isArray(v?.compensacoes) ? v.compensacoes : [];
+    const imgSize = 30;
+    const cardH2 = Math.max(imgSize + 8, 16 + Math.max(1, comps.length) * 6);
+    y = ensure(doc, y, cardH2 + 6);
+    doc.setDrawColor(...LIGHT); doc.setFillColor(255, 255, 255);
+    doc.roundedRect(MARGIN, y, pageW - MARGIN * 2, cardH2, 2.5, 2.5, "FD");
+    const imgX = MARGIN + 4, imgY = y + 4;
+    if (frameImages && frameImages[i]) {
+      try { doc.addImage(frameImages[i], "JPEG", imgX, imgY, imgSize, imgSize); } catch { /* ignora imagem inválida */ }
+    } else {
+      doc.setFillColor(...LIGHT); doc.roundedRect(imgX, imgY, imgSize, imgSize, 1.5, 1.5, "F");
+    }
+    doc.setFillColor(...NAVY); doc.roundedRect(imgX, imgY, 9, 6, 1, 1, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(255, 255, 255);
+    doc.text(String(i + 1).padStart(2, "0"), imgX + 4.5, imgY + 4.2, { align: "center" });
+    const tx = imgX + imgSize + 6;
+    let ty = imgY + 3;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...GRAY);
+    doc.text(`FOTO ${String(i + 1).padStart(2, "0")} DE ${nVistas}`, tx, ty); ty += 5.5;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(...NAVY);
+    doc.text(sanitize(String(v?.vista || "Vista")), tx, ty); ty += 6;
+    if (!comps.length) {
+      doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.setTextColor(...GRAY);
+      doc.text("Nenhuma compensação registrada", tx, ty);
+    } else {
+      comps.forEach((c: any) => {
+        const sev = sanitize(String(first(c?.severidade, c?.severity, c?.gravidade, "Leve")));
+        const col = sevColor(sev);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(7.5);
+        const bw = doc.getTextWidth(sev) + 6;
+        doc.setDrawColor(...col); doc.setLineWidth(0.4);
+        doc.roundedRect(tx, ty - 3.4, bw, 5, 2.5, 2.5, "D");
+        doc.setTextColor(...col); doc.text(sev, tx + 3, ty);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...TEXT);
+        const desc = sanitize(String(first(c?.descricao, c?.description, c?.nome, "")));
+        const lines = doc.splitTextToSize(desc, pageW - MARGIN - (tx + bw + 3));
+        doc.text(lines, tx + bw + 3, ty);
+        ty += Math.max(6, lines.length * 4.5 + 1.5);
+      });
+    }
+    y += cardH2 + 6;
+  });
+
+  const reportText = asText(first(data?.report_text, json?.relatorio_para_aluno, json?.report_text));
   if (reportText) {
+    y = ensure(doc, y, 16);
     y = sectionTitle(doc, "Laudo", y);
     doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...TEXT);
-    y = wrapText(doc, asText(reportText), MARGIN, y, W(doc) - MARGIN * 2, 5) + 4;
-  }
-
-  const vistas = Array.isArray(json?.vistas) ? json.vistas : [];
-  const withFindings = vistas.filter((v: any) => Array.isArray(v?.compensacoes) && v.compensacoes.length);
-  if (withFindings.length) {
-    y = sectionTitle(doc, "Compensacoes observadas", y);
-    withFindings.forEach((v: any) => {
-      y = ensure(doc, y, 10);
-      doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...NAVY);
-      y = wrapText(doc, asText(v.vista || "Vista"), MARGIN, y, W(doc) - MARGIN * 2, 4.5) + 1;
-      (v.compensacoes || []).forEach((c: any) => {
-        const desc = typeof c === "string" ? c : asText(first(c?.descricao, c?.description, c?.nome));
-        const sev = typeof c === "object" && c ? asText(first(c?.gravidade, c?.severity)) : "";
-        if (!desc) return;
-        doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...TEXT);
-        y = wrapText(doc, `•  ${desc}${sev ? ` (${sev})` : ""}`, MARGIN + 2, y, W(doc) - MARGIN * 2 - 4, 4.5) + 1;
-      });
-      y += 2;
-    });
-  }
-
-  const recs = json?.prescription_context;
-  if (recs) {
-    y = sectionTitle(doc, "Orientacoes para o treino", y);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...TEXT);
-    y = wrapText(doc, asText(recs), MARGIN, y, W(doc) - MARGIN * 2, 5) + 2;
-  }
-
-  if (Array.isArray(json?.warnings) && json.warnings.length) y = warningsBlock(doc, json.warnings, y);
-
-  if (!reportText && !withFindings.length) {
-    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...GRAY);
-    wrapText(doc, "Avaliacao registrada. O laudo detalhado estara disponivel com o seu treinador.", MARGIN, y, W(doc) - MARGIN * 2, 5);
+    wrapText(doc, reportText, MARGIN, y, pageW - MARGIN * 2, 5);
   }
 
   stampFooters(doc, meta);
