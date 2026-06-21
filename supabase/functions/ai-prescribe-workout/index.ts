@@ -800,7 +800,7 @@ function fallbackExercise(
     is_isolation: isIso,
     cues: params.cue,
     biomechanical_note: params.note,
-    notes: "Troca de estímulo: sem 1-2 técnica/base · sem 3-4 progride (+reps ou carga) · sem 5-6 consolida.",
+    notes: "semana 1 e 2: técnica e base\nsemana 3 e 4: progride (+reps ou carga)\nsemana 5 e 6: consolida",
     regression: exercise.regressions[0] || "Reduzir amplitude/carga e manter dor <= 3.",
     progression: exercise.progressions[0] || "Progredir reps antes de carga, mantendo técnica.",
   };

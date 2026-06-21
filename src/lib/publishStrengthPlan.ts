@@ -50,7 +50,7 @@ export function mapStrengthExercise(e: any): StudentWorkoutExercise {
     sets: e?.sets != null ? String(e.sets) : "",
     reps: e?.reps != null ? String(e.reps) : "",
     rest: restSeconds != null && restSeconds !== "" ? `${restSeconds}s` : (e?.rest != null ? String(e.rest) : ""),
-    notes: [e?.notes, (e?.cues && String(e.cues).trim()) || e?.biomechanical_note].filter(Boolean).join(" · "),
+    notes: [e?.notes, (e?.cues && String(e.cues).trim()) || e?.biomechanical_note].filter(Boolean).join("\n"),
     set_types: Array.isArray(e?.set_types) ? e.set_types : undefined,
     method: e?.method ?? null,
     group_id: e?.group_id ?? null,
