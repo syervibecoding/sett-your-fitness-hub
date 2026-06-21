@@ -429,7 +429,7 @@ export default function StudentAnamnese() {
               <div className="grid grid-cols-2 gap-3">
                 <F label="Nível de atividade atual" span="col-span-2">
                   <SS value={f.activity_level} onChange={(v: string) => set("activity_level", v)} placeholder="Selecione..."
-                    opts={[["sedentario","Sedentário"],["leve","Levemente ativo"],["moderado","Moderadamente ativo"],["muito_ativo","Muito ativo"],["extremo","Extremamente ativo"]]} />
+                    opts={[["sedentario","Sedentário — quase não me movimento"],["leve","Levemente ativo — 1-2x/sem ou caminho um pouco"],["moderado","Moderadamente ativo — treino 3-4x/sem"],["muito_ativo","Muito ativo — treino 5-6x/sem"],["extremo","Extremamente ativo — treino pesado todo dia / trabalho físico"]]} />
                 </F>
                 <F label="Tempo de treino (meses)"><Input type="number" value={f.experience_months} onChange={e => set("experience_months", e.target.value)} className="h-10" /></F>
                 {(f.interest_strength || f.interest_running || f.interest_swimming || f.interest_cycling) ? (
