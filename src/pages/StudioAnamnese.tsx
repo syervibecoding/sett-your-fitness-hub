@@ -154,7 +154,7 @@ export default function StudentAnamnese() {
       const APPETITE_LBL: Record<string, string> = { faminto: "com bastante fome", normal: "normal", sem_fome: "sem fome", enjoo: "enjoo/não come" };
       const nutritionContext = [
         `Refeições/dia: ${f.meals_per_day || "5"}`,
-        (f.meal_t1 || f.meal_t2 || f.meal_t3) && `Horários habituais: ${[f.meal_t1 && "1ª " + f.meal_t1, f.meal_t2 && "almoço " + f.meal_t2, f.meal_t3 && "última " + f.meal_t3].filter(Boolean).join(", ")}`,
+        (() => { const ts = Array.from({ length: 7 }, (_, i) => (f as any)[`meal_t${i + 1}`]).map((v, i) => (v ? `${i + 1}ª ${v}` : null)).filter(Boolean); return ts.length ? `Horários habituais: ${ts.join(", ")}` : ""; })(),
         f.meal_routine && `Horários ${ROUTINE_LBL[f.meal_routine] || f.meal_routine}`,
         f.train_time && `Treina no período: ${f.train_time}`,
         `Treina em jejum: ${FASTED_LBL[f.train_fasted] || f.train_fasted}`,
@@ -194,7 +194,7 @@ export default function StudentAnamnese() {
         sport: f.interest_running ? "corrida" : f.interest_swimming ? "natacao" : f.interest_cycling ? "ciclismo" : null,
         fcmax: f.fcmax ? Number(f.fcmax) : null,
         fcrep: f.fcrep ? Number(f.fcrep) : null,
-        current_volume_weekly: f.current_volume_weekly ? Number(f.current_volume_weekly) : null,
+        current_volume_weekly: f.current_volume_weekly ? (parseFloat(String(f.current_volume_weekly).replace(",", ".").replace(/[^\d.]/g, "")) || null) : null,
         cardio_goal: sanitizeShort(f.sport_goal),
         stress_score: f.stress_score ? Number(f.stress_score) : null,
         sleep_quality: f.sleep_quality ? Number(f.sleep_quality) : null,
@@ -408,7 +408,7 @@ export default function StudentAnamnese() {
                     <F label="Objetivo / prova" span="col-span-2">
                       <Input value={f.sport_goal} onChange={e => set("sport_goal", e.target.value)} className="h-10" placeholder="Ex: Maratona em outubro, 1500m sub-30..." />
                     </F>
-                    <F label="Volume atual (km ou h/sem)"><Input type="number" value={f.current_volume_weekly} onChange={e => set("current_volume_weekly", e.target.value)} className="h-10" /></F>
+                    <F label="Volume atual (km ou h/sem)"><Input value={f.current_volume_weekly} onChange={e => set("current_volume_weekly", e.target.value)} className="h-10" placeholder="ex: 6km/semana ou 2h/semana — ou 'não sei'" /></F>
                     <F label="Recuperado hoje? (0-10)"><Input type="number" min="0" max="10" value={f.perceived_recovery} onChange={e => set("perceived_recovery", e.target.value)} className="h-10" placeholder="10 = ótimo" /></F>
                     <F label="FC máxima (se souber)"><Input type="number" value={f.fcmax} onChange={e => set("fcmax", e.target.value)} className="h-10" placeholder="opcional" /></F>
                     <F label="FC repouso (se souber)"><Input type="number" value={f.fcrep} onChange={e => set("fcrep", e.target.value)} className="h-10" placeholder="opcional" /></F>
@@ -418,7 +418,7 @@ export default function StudentAnamnese() {
                     </>)}
                     {f.interest_swimming && (<>
                       <F label="Natação — acesso à piscina"><SS value={f.swim_pool} onChange={(v: string) => set("swim_pool", v)} placeholder="Selecione..." opts={[["25m","Piscina 25m"],["50m","Piscina 50m"],["nao","Sem acesso regular"]]} /></F>
-                      <F label="Natação — nível"><SS value={f.swim_level} onChange={(v: string) => set("swim_level", v)} placeholder="Selecione..." opts={[["iniciante","Iniciante"],["intermediario","Intermediário"],["avancado","Avançado"]]} /></F>
+                      <F label="Natação — seu nível"><SS value={f.swim_level} onChange={(v: string) => set("swim_level", v)} placeholder="Selecione..." opts={[["iniciante","Iniciante — nado há pouco / me viro mal"],["intermediario","Intermediário — nado bem, +6 meses"],["avancado","Avançado — boa técnica, +2 anos"],["nao_sei","Não sei dizer"]]} /></F>
                       <F label="Natação — volume (m ou min/sem)" span="col-span-2"><Input value={f.swim_volume} onChange={e => set("swim_volume", e.target.value)} className="h-10" placeholder="ex: 3000m/sem ou 2x40min" /></F>
                     </>)}
                     {f.interest_cycling && (<>
@@ -497,9 +497,15 @@ export default function StudentAnamnese() {
                 <div>
                   <Label className="text-xs font-medium text-slate-600 mb-1 block">Horários aproximados das refeições</Label>
                   <div className="grid grid-cols-3 gap-2">
-                    <div><Label className="text-[10px] text-slate-500 block mb-0.5">1ª refeição</Label><Input type="time" value={f.meal_t1} onChange={e => set("meal_t1", e.target.value)} className="h-10" /></div>
-                    <div><Label className="text-[10px] text-slate-500 block mb-0.5">Almoço</Label><Input type="time" value={f.meal_t2} onChange={e => set("meal_t2", e.target.value)} className="h-10" /></div>
-                    <div><Label className="text-[10px] text-slate-500 block mb-0.5">Última refeição</Label><Input type="time" value={f.meal_t3} onChange={e => set("meal_t3", e.target.value)} className="h-10" /></div>
+                    {Array.from({ length: Math.min(7, Math.max(1, Number(f.meals_per_day) || 3)) }).map((_, i) => {
+                      const key = `meal_t${i + 1}`;
+                      return (
+                        <div key={key}>
+                          <Label className="text-[10px] text-slate-500 block mb-0.5">{i + 1}ª refeição</Label>
+                          <Input type="time" value={(f as any)[key] || ""} onChange={e => set(key, e.target.value)} className="h-10" />
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
                 <div>

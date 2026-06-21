@@ -71,8 +71,9 @@ export const Checkbox = ({ checked, onCheckedChange, id, className = "" }: any) 
   <button
     type="button" id={id} role="checkbox" aria-checked={checked}
     onClick={() => onCheckedChange?.(!checked)}
+    style={checked ? { backgroundColor: "#8B7355", borderColor: "#8B7355" } : undefined}
     className={cx("h-4 w-4 rounded border flex items-center justify-center transition flex-shrink-0",
-      checked ? "bg-bege border-bege" : "bg-white border-slate-300", className)}>
+      checked ? "" : "bg-white border-slate-300", className)}>
     {checked && (
       <svg viewBox="0 0 12 12" className="h-3 w-3 text-white" fill="none">
         <path d="M2 6l3 3 5-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
