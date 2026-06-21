@@ -19,7 +19,8 @@ import {
   Dumbbell, Activity, Waves, Bike, Apple, FileText,
 } from "lucide-react";
 import VideoAssessment from "@/components/VideoAssessment";
-import { generateAllPDFs } from "@/lib/generatePDFs";
+import { generateAllPDFs, generateAssessmentPDF } from "@/lib/generatePDFs";
+import { sendPdfToStudentWhatsApp } from "@/lib/sendStudentMedia";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tabs, TabsContent, TabsList, TabsTrigger } from "@/lib/studioUi";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 import {
@@ -58,6 +59,7 @@ export default function PrescriptionStudio() {
   const [students, setStudents]   = useState<{ id: string; name: string; email?: string | null }[]>([]);
   const [studentId, setStudentId] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
+  const [sendingAssess, setSendingAssess] = useState(false);
   const [tab, setTab]             = useState("anamnese");
 
   // Anamnese state
@@ -410,6 +412,38 @@ export default function PrescriptionStudio() {
     setPublishing(false);
   }
 
+  // ── Avaliação funcional: baixar PDF / enviar no WhatsApp ──────────────────
+  function assessmentMeta() {
+    return {
+      studentName: student?.name || "Aluno",
+      date: new Date(assessment?.created_at || Date.now()).toLocaleDateString("pt-BR"),
+      professional: "Matheus Loreto",
+      cref: "040718-G/SC",
+    };
+  }
+  function assessmentFileName() {
+    return `avaliacao-funcional-${(student?.name || "aluno").replace(/\s+/g, "-").toLowerCase()}.pdf`;
+  }
+  function downloadAssessmentPDF() {
+    if (!assessment) return;
+    generateAssessmentPDF(assessment, assessmentMeta()).save(assessmentFileName());
+  }
+  async function sendAssessmentWhatsApp() {
+    if (!assessment || !companyId || !studentId) return;
+    setSendingAssess(true);
+    try {
+      const blob = generateAssessmentPDF(assessment, assessmentMeta()).output("blob");
+      await sendPdfToStudentWhatsApp({
+        companyId, studentId, blob, fileName: assessmentFileName(),
+        caption: `${(student?.name || "").split(" ")[0] || "Olá"}, segue sua avaliação funcional 💪`,
+      });
+      toast.success("Avaliação enviada no WhatsApp!");
+    } catch (e: any) {
+      toast.error("Não consegui enviar: " + (e?.message || "erro"));
+    }
+    setSendingAssess(false);
+  }
+
   // ── Gera os PDFs separados ──────────────────────────────────────────────
   function downloadPDFs() {
     const meta = {
@@ -575,6 +609,12 @@ export default function PrescriptionStudio() {
                   <Badge variant="outline" className="text-xs">{assessment.assessment_json?.total_compensacoes || 0} compensações</Badge>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">Gere uma nova abaixo se quiser refazer.</p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <Button size="sm" variant="outline" onClick={downloadAssessmentPDF}>Baixar PDF</Button>
+                  <Button size="sm" onClick={sendAssessmentWhatsApp} disabled={sendingAssess} className="bg-[#25D366] text-white hover:bg-[#25D366]/90">
+                    {sendingAssess ? "Enviando..." : "Enviar no WhatsApp"}
+                  </Button>
+                </div>
               </CardContent></Card>
             )}
             <VideoAssessment
