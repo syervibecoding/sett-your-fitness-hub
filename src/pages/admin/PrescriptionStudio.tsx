@@ -57,6 +57,7 @@ export default function PrescriptionStudio() {
   const [authChecked, setAuthChecked] = useState(false);
   const [students, setStudents]   = useState<{ id: string; name: string; email?: string | null }[]>([]);
   const [studentId, setStudentId] = useState("");
+  const [studentSearch, setStudentSearch] = useState("");
   const [tab, setTab]             = useState("anamnese");
 
   // Anamnese state
@@ -442,10 +443,15 @@ export default function PrescriptionStudio() {
         </CardHeader>
         <CardContent className="space-y-3">
           {students.length > 0 ? (
-            <Select value={studentId} onValueChange={setStudentId}>
-              <SelectTrigger><SelectValue placeholder="Selecione um aluno..." /></SelectTrigger>
-              <SelectContent>{students.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-            </Select>
+            <>
+              <Input value={studentSearch} onChange={e => setStudentSearch(e.target.value)} placeholder="Buscar aluno por nome..." className="mb-2" />
+              <Select value={studentId} onValueChange={setStudentId}>
+                <SelectTrigger><SelectValue placeholder="Selecione um aluno..." /></SelectTrigger>
+                <SelectContent>
+                  {students.filter(s => (s.name || "").toLowerCase().includes(studentSearch.trim().toLowerCase())).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </>
           ) : (
             <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
               Nenhum aluno encontrado para esta empresa.
