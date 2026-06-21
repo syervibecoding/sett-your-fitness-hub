@@ -122,6 +122,16 @@ export default function PrescriptionStudio() {
     (async () => {
       const { data: a } = await db.from("student_anamneses").select("*").eq("student_id", studentId).maybeSingle();
       setAnamnese(a);
+      // Pré-marca "o que o aluno vai receber" pelas flags da anamnese (já considera nutri/assessoria).
+      if (a) {
+        const next = new Set<Modality>();
+        if ((a as any).wants_strength !== false) next.add("musculacao");
+        if ((a as any).wants_running) next.add("corrida");
+        if ((a as any).wants_swimming) next.add("natacao");
+        if ((a as any).wants_cycling) next.add("ciclismo");
+        if ((a as any).wants_nutrition) next.add("nutricao");
+        if (next.size) setModalities(next);
+      }
       const { data: assess } = await db.from("functional_assessments")
         .select("id, assessment_json, report_text, created_at").eq("student_id", studentId)
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
