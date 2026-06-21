@@ -74,7 +74,14 @@ export interface NutritionPlan {
   generated_by: string;
 }
 
-function buildMeals(mealsPerDay: number, veg: boolean): any[] {
+// Extrai os horários reais informados na anamnese (campo nutrition_context: "Horários habituais: ...").
+function parseMealTimes(ctx?: string | null): string[] {
+  if (!ctx) return [];
+  const seg = /hor[aá]rios? habituais?:([^|]+)/i.exec(ctx)?.[1] || "";
+  return (seg.match(/\b([01]?\d|2[0-3]):[0-5]\d\b/g) || []).slice(0, 7);
+}
+
+function buildMeals(mealsPerDay: number, veg: boolean, times?: string[]): any[] {
   const protein = veg
     ? ["tofu", "ovos", "leguminosas (feijão, lentilha, grão-de-bico)", "iogurte/queijo"]
     : ["frango", "peixe", "carne magra", "ovos"];
@@ -86,7 +93,10 @@ function buildMeals(mealsPerDay: number, veg: boolean): any[] {
     { meal: "Jantar", time: "21:00", focus: "Proteína + vegetais (carboidrato leve)", eat: [protein[2] || protein[0], "legumes/salada", "porção menor de carbo"], go_easy: ["refeição muito pesada perto de dormir"] },
     { meal: "Ceia", time: "22:30", focus: "Algo leve com proteína", eat: [veg ? "iogurte/queijo" : "iogurte", "castanhas"], go_easy: ["doces", "cafeína"] },
   ];
-  return base.slice(0, Math.min(Math.max(mealsPerDay || 5, 3), 6));
+  const meals = base.slice(0, Math.min(Math.max(mealsPerDay || 5, 3), 6));
+  // Usa os horários reais da anamnese quando informados (em vez de fixos).
+  if (times && times.length) meals.forEach((m, i) => { if (times[i]) m.time = times[i]; });
+  return meals;
 }
 
 function buildSupplements(objective: string, endurance: boolean, stress: number): any[] {
@@ -205,7 +215,7 @@ export function buildNutritionProgram(input: NutritionInput): NutritionPlan {
       { weeks: "3-4", training_load: "progressao", nutrition_focus: "carb cycling acompanhando os dias mais pesados", carb_strategy: "mais carboidrato em torno de MMII/tiros/longo", recovery_priority: "eletrólitos no suor alto e lanches práticos" },
       { weeks: "5-6", training_load: "consolidacao", nutrition_focus: "refinar timing e evitar queda de energia", carb_strategy: "manter carboidrato nos dias-chave, reduzir no deload", recovery_priority: "digestão, hidratação e feedback para o próximo ciclo" },
     ],
-    meals: buildMeals(mealsPerDay, veg),
+    meals: buildMeals(mealsPerDay, veg, parseMealTimes(input.nutrition_context)),
     pre_race_gi_protocol: "Nas 2–4 h antes de prova/corrida intensa: priorize carboidrato de fácil digestão (banana, pão branco, arroz branco, whey/malto). Evite FODMAPs (feijão, brócolis, couve, leite) e fibra insolúvel.",
     intra_workout_protocol: endurance ? "Sessões > 75 min: 30–60 g de carboidrato/h; > 90 min: 60–90 g/h (2:1 malto:frutose). Hidratação com eletrólitos." : "Treinos de força: foque na hidratação; carboidrato intra só em sessões muito longas.",
     rest_day_adjustments: `Reduza o carboidrato para ~${carb_cycling.rest_day_carbs_g} g, mantenha a proteína (${proteinTotal} g) e a gordura pode subir um pouco para saúde hormonal.`,
