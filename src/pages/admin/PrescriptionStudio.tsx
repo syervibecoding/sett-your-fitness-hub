@@ -412,6 +412,22 @@ export default function PrescriptionStudio() {
     setEditPlan((p: any) => { if (!p) return p; const n = JSON.parse(JSON.stringify(p)); if (n.workouts?.[wi]?.exercises?.[ei]) n.workouts[wi].exercises[ei][field] = value; return n; });
   const updateWName = (wi: number, value: string) =>
     setEditPlan((p: any) => { if (!p) return p; const n = JSON.parse(JSON.stringify(p)); if (n.workouts?.[wi]) n.workouts[wi].name = value; return n; });
+  const removeExercise = (wi: number, ei: number) =>
+    setEditPlan((p: any) => { if (!p) return p; const n = JSON.parse(JSON.stringify(p)); n.workouts?.[wi]?.exercises?.splice(ei, 1); return n; });
+  const addExercise = (wi: number) =>
+    setEditPlan((p: any) => {
+      if (!p) return p; const n = JSON.parse(JSON.stringify(p));
+      if (n.workouts?.[wi]) { n.workouts[wi].exercises = n.workouts[wi].exercises || []; n.workouts[wi].exercises.push({ exercise_name: "", sets: 3, reps: "10-12", rest_seconds: 60, cues: "", exercise_order: n.workouts[wi].exercises.length + 1 }); }
+      return n;
+    });
+  const removeWorkout = (wi: number) =>
+    setEditPlan((p: any) => { if (!p) return p; const n = JSON.parse(JSON.stringify(p)); n.workouts?.splice(wi, 1); return n; });
+  const addWorkout = () =>
+    setEditPlan((p: any) => {
+      if (!p) return p; const n = JSON.parse(JSON.stringify(p)); n.workouts = n.workouts || [];
+      n.workouts.push({ name: `Treino ${String.fromCharCode(65 + n.workouts.length)}`, day_of_week: n.workouts.length + 1, exercises: [] });
+      return n;
+    });
 
   // ── Avaliação funcional: baixar PDF / enviar no WhatsApp ──────────────────
   function assessmentMeta() {
@@ -841,18 +857,27 @@ export default function PrescriptionStudio() {
                           <p className="text-xs text-slate-500">Edite séries / reps / descanso / obs. Ao publicar, vai a versão editada pro app do aluno.</p>
                           {editPlan.workouts.map((w: any, wi: number) => (
                             <div key={wi} className="border rounded-lg p-2 bg-white space-y-1.5">
-                              <Input value={w.name || ""} onChange={e => updateWName(wi, e.target.value)} className="h-8 text-sm font-medium" />
+                              <div className="flex items-center gap-2">
+                                <Input value={w.name || ""} onChange={e => updateWName(wi, e.target.value)} className="h-8 text-sm font-medium" />
+                                <button type="button" onClick={() => removeWorkout(wi)} className="text-xs text-red-500 px-2 shrink-0 whitespace-nowrap">Remover treino</button>
+                              </div>
+                              <div className="grid grid-cols-12 gap-1 text-[10px] text-slate-400 uppercase px-0.5">
+                                <span className="col-span-3">Exercício</span><span className="col-span-1">Sér</span><span className="col-span-2">Reps</span><span className="col-span-2">Desc(s)</span><span className="col-span-3">Obs</span><span className="col-span-1"></span>
+                              </div>
                               {(w.exercises || []).map((ex: any, ei: number) => (
                                 <div key={ei} className="grid grid-cols-12 gap-1 items-center">
-                                  <span className="col-span-12 sm:col-span-4 text-xs truncate">{ex.exercise_name}</span>
-                                  <Input className="col-span-4 sm:col-span-1 h-7 text-xs px-1" value={String(ex.sets ?? "")} onChange={e => updateExField(wi, ei, "sets", e.target.value)} placeholder="séries" />
-                                  <Input className="col-span-4 sm:col-span-2 h-7 text-xs px-1" value={String(ex.reps ?? "")} onChange={e => updateExField(wi, ei, "reps", e.target.value)} placeholder="reps" />
-                                  <Input className="col-span-4 sm:col-span-2 h-7 text-xs px-1" value={String(ex.rest_seconds ?? "")} onChange={e => updateExField(wi, ei, "rest_seconds", e.target.value)} placeholder="desc(s)" />
-                                  <Input className="col-span-12 sm:col-span-3 h-7 text-xs px-1" value={ex.cues || ex.notes || ""} onChange={e => updateExField(wi, ei, "cues", e.target.value)} placeholder="obs" />
+                                  <Input className="col-span-12 sm:col-span-3 h-7 text-xs px-1" value={ex.exercise_name || ""} onChange={e => updateExField(wi, ei, "exercise_name", e.target.value)} placeholder="exercício" />
+                                  <Input className="col-span-3 sm:col-span-1 h-7 text-xs px-1" value={String(ex.sets ?? "")} onChange={e => updateExField(wi, ei, "sets", e.target.value)} placeholder="séries" />
+                                  <Input className="col-span-3 sm:col-span-2 h-7 text-xs px-1" value={String(ex.reps ?? "")} onChange={e => updateExField(wi, ei, "reps", e.target.value)} placeholder="reps" />
+                                  <Input className="col-span-3 sm:col-span-2 h-7 text-xs px-1" value={String(ex.rest_seconds ?? "")} onChange={e => updateExField(wi, ei, "rest_seconds", e.target.value)} placeholder="desc(s)" />
+                                  <Input className="col-span-9 sm:col-span-3 h-7 text-xs px-1" value={ex.cues || ex.notes || ""} onChange={e => updateExField(wi, ei, "cues", e.target.value)} placeholder="obs" />
+                                  <button type="button" onClick={() => removeExercise(wi, ei)} className="col-span-3 sm:col-span-1 text-red-500 text-sm" title="Remover exercício">✕</button>
                                 </div>
                               ))}
+                              <button type="button" onClick={() => addExercise(wi)} className="text-xs text-[#1B2B4A] underline mt-1">+ Adicionar exercício</button>
                             </div>
                           ))}
+                          <button type="button" onClick={addWorkout} className="text-sm text-[#1B2B4A] underline">+ Adicionar treino</button>
                         </div>
                       )}
                     </div>

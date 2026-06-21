@@ -427,7 +427,6 @@ export default function StudentPortal() {
     // disparando em paralelo (antes isso duplicava porque `allLogs` ficava stale após cada insert).
     const rows = logsToSave.map(log => ({
       student_id: studentId,
-      company_id: companyId,
       workout_id: log.workout_id,
       exercise_index: log.exercise_index,
       set_number: log.set_number,
