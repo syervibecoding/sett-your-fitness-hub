@@ -814,6 +814,15 @@ export default function StudentPortal() {
         {activeView === "treino" && (
           <div className="space-y-6">
             {/* (seletor de ciclos removido — o ciclo atual já é mostrado abaixo) */}
+            {!selectedCycle && (
+              <div className="rounded-xl border border-border bg-card p-6 text-center space-y-2">
+                <div className="text-3xl">💪</div>
+                <p className="font-sans font-medium text-foreground">Seu treino está sendo preparado</p>
+                <p className="text-sm text-muted-foreground font-sans">
+                  Seu treinador está montando seu plano com cuidado. Assim que ficar pronto, ele aparece aqui — e você recebe um aviso no WhatsApp. Qualquer dúvida, é só chamar!
+                </p>
+              </div>
+            )}
             {selectedCycle && (
               <div className="space-y-4">
                 <Card className="bg-card border-border">
