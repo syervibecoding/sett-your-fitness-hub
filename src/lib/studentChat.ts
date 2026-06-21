@@ -17,17 +17,39 @@ export async function buildStudentChatMap(companyId?: string | null): Promise<Re
   return map;
 }
 
-// Abre o chat do aluno com a mensagem pronta. Sem conversa vinculada → onNoChat (ou copia pro clipboard).
-export function openStudentChat(opts: {
+function waDigits(phone?: string | null): string | null {
+  if (!phone) return null;
+  let d = String(phone).replace(/\D/g, "");
+  if (!d) return null;
+  if (d.length <= 11) d = "55" + d; // assume Brasil se vier sem DDI
+  return d;
+}
+
+// Abre o chat do aluno com a mensagem pronta. Ordem do fallback:
+// 1) conversa interna vinculada (chatId) → abre o WhatsAppChat com prefill;
+// 2) sem conversa → abre o WhatsApp DIRETO pelo número (igual ao cadastro);
+// 3) sem telefone → onNoChat (copia pro clipboard).
+export async function openStudentChat(opts: {
   navigate: NavigateFunction;
   routePrefix: string;
   chatId?: string | null;
+  studentId?: string | null;
+  phone?: string | null;
   message: string;
   onNoChat?: (message: string) => void;
-}): void {
-  const { navigate, routePrefix, chatId, message, onNoChat } = opts;
+}): Promise<void> {
+  const { navigate, routePrefix, chatId, studentId, phone, message, onNoChat } = opts;
   if (chatId) {
     navigate(`/${routePrefix}/whatsapp-chat`, { state: { chatId, prefillMessage: message } });
+    return;
+  }
+  let digits = waDigits(phone);
+  if (!digits && studentId) {
+    const { data } = await supabase.from("students").select("whatsapp, phone").eq("id", studentId).maybeSingle();
+    digits = waDigits((data as any)?.whatsapp || (data as any)?.phone);
+  }
+  if (digits) {
+    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(message)}`, "_blank", "noopener");
     return;
   }
   if (onNoChat) {

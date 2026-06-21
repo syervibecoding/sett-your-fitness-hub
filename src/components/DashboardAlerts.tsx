@@ -258,12 +258,13 @@ export function DashboardAlerts({ trainerId }: Props) {
     staleTime: 60_000,
   });
   const sendBirthday = (studentId: string, fullName: string) => {
-    openStudentChat({
+    void openStudentChat({
       navigate,
       routePrefix: (routePrefix as string) || "admin",
       chatId: studentChatMap?.[studentId],
+      studentId,
       message: birthdayMessage(fullName),
-      onNoChat: (m) => { void navigator.clipboard?.writeText(m); toast.success("Sem conversa no WhatsApp — mensagem de aniversário copiada."); },
+      onNoChat: (m) => { void navigator.clipboard?.writeText(m); toast.success("Aluno sem WhatsApp — mensagem de aniversário copiada."); },
     });
   };
 

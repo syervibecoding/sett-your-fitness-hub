@@ -178,12 +178,13 @@ export default function AdminDashboard() {
 
   const handleRenew = (studentId: string, fullName?: string, planName?: string, daysLeft?: number) => {
     const message = renewalMessage({ fullName, planName, daysLeft, studentId, overdue: typeof daysLeft === "number" && daysLeft <= 0 });
-    openStudentChat({
+    void openStudentChat({
       navigate,
       routePrefix: (routePrefix as string) || "admin",
       chatId: studentChatMap?.[studentId],
+      studentId,
       message,
-      onNoChat: (m) => { void navigator.clipboard?.writeText(m); toast.success("Sem conversa no WhatsApp — mensagem de renovação copiada."); },
+      onNoChat: (m) => { void navigator.clipboard?.writeText(m); toast.success("Aluno sem WhatsApp — mensagem de renovação copiada."); },
     });
   };
 

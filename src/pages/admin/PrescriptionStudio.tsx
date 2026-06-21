@@ -185,12 +185,13 @@ export default function PrescriptionStudio() {
     const nome = (student?.name || "").trim().split(/\s+/)[0] || "";
     const message = `Oi, ${nome}! Pra eu montar seu plano do jeito certo, responde essa anamnese rapidinha (leva uns minutos): ${link}`;
     const { data: chat } = await supabase.from("whatsapp_chats").select("id").eq("student_id", studentId).limit(1).maybeSingle();
-    openStudentChat({
+    void openStudentChat({
       navigate: nav,
       routePrefix: chatRoutePrefix,
       chatId: (chat as any)?.id ?? null,
+      studentId,
       message,
-      onNoChat: (m) => { void navigator.clipboard?.writeText(m); toast.success("Sem conversa no WhatsApp — link da anamnese copiado."); },
+      onNoChat: (m) => { void navigator.clipboard?.writeText(m); toast.success("Aluno sem WhatsApp cadastrado — link copiado."); },
     });
   }
   function copyLink() {
