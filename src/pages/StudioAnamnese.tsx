@@ -15,6 +15,9 @@ const TOTAL_STEPS = 7;
 
 const COMMON_FOODS = ["Frango", "Ovos", "Carne", "Peixe", "Arroz", "Batata doce", "Pão", "Tapioca", "Aveia", "Feijão", "Macarrão", "Frutas", "Salada", "Legumes", "Iogurte", "Whey", "Queijo"];
 const TRAIN_TIMES = ["Manhã cedo", "Manhã", "Almoço", "Tarde", "Fim de tarde", "Noite"];
+const WEEKDAYS: [string, string][] = [["seg", "Seg"], ["ter", "Ter"], ["qua", "Qua"], ["qui", "Qui"], ["sex", "Sex"], ["sab", "Sáb"], ["dom", "Dom"]];
+const OBJ_OPTS: [string, string][] = [["emagrecimento", "Emagrecimento"], ["hipertrofia", "Ganho de massa"], ["performance", "Performance esportiva"], ["saude", "Saúde e bem-estar"]];
+const OBJ_LABEL: Record<string, string> = { emagrecimento: "Emagrecimento", hipertrofia: "Ganho de massa", performance: "Performance", saude: "Saúde" };
 
 const F = ({ label, children, span }: any) => (
   <div className={span}>
@@ -51,6 +54,7 @@ export default function StudentAnamnese() {
     // Rotina e histórico
     activity_level: "", experience_months: "",
     days_available: "", session_duration_min: "60",
+    days_strength: "", days_running: "", days_swimming: "", days_cycling: "",
     equipment: "", training_history: "",
     // Modalidades de interesse
     interest_strength: false, interest_running: false,
@@ -171,13 +175,23 @@ export default function StudentAnamnese() {
         custom_answers[cf.id] = { label: cf.label, value: v };
       }
 
+      const objectivesList = (f.objective || "").split(",").map((s) => s.trim()).filter(Boolean);
+      const dCount = (csv: string) => (csv || "").split(",").map((s) => s.trim()).filter(Boolean).length;
+      const cardioDaysSet = new Set([f.days_running, f.days_swimming, f.days_cycling].flatMap((c) => (c || "").split(",").map((s) => s.trim()).filter(Boolean)));
+      const daysSummary = [
+        f.interest_strength && f.days_strength && `Musculação: ${f.days_strength}`,
+        f.interest_running && f.days_running && `Corrida: ${f.days_running}`,
+        f.interest_swimming && f.days_swimming && `Natação: ${f.days_swimming}`,
+        f.interest_cycling && f.days_cycling && `Ciclismo: ${f.days_cycling}`,
+      ].filter(Boolean).join("; ");
+
       const payload = {
         student_id: invite.student_id,
         company_id: invite.company_id,
         custom_answers,
         age: f.age ? Number(f.age) : null,
         body_fat_percent: f.body_fat_percent ? Number(f.body_fat_percent) : null,
-        objective: sanitizeShort(f.objective),
+        objective: sanitizeShort(objectivesList[0] || f.objective),
         activity_level: f.activity_level,
         is_endurance_athlete: f.interest_running || f.interest_swimming || f.interest_cycling,
         training_modality: [
@@ -186,8 +200,8 @@ export default function StudentAnamnese() {
           f.interest_swimming && "natação",
           f.interest_cycling && "ciclismo",
         ].filter(Boolean).join(" + "),
-        days_per_week_strength: f.interest_strength ? Number(f.days_available) || null : null,
-        days_per_week_cardio: (f.interest_running || f.interest_swimming || f.interest_cycling) ? Number(f.days_available) || null : null,
+        days_per_week_strength: f.interest_strength ? (dCount(f.days_strength) || Number(f.days_available) || null) : null,
+        days_per_week_cardio: (f.interest_running || f.interest_swimming || f.interest_cycling) ? (cardioDaysSet.size || Number(f.days_available) || null) : null,
         session_duration_min: Number(f.session_duration_min) || null,
         equipment: sanitizeShort(f.equipment),
         experience_months: f.experience_months ? Number(f.experience_months) : null,
@@ -227,6 +241,8 @@ export default function StudentAnamnese() {
           wantsNutrition && "nutricao",
         ].filter(Boolean),
         notes: [
+          objectivesList.length > 1 && `Objetivos por prioridade: ${objectivesList.map((v, i) => `${i + 1}º ${OBJ_LABEL[v] || v}`).join(", ")}`,
+          daysSummary && `Dias por modalidade: ${daysSummary}`,
           f.main_goal && `Objetivo principal: ${sanitizeText(f.main_goal)}`,
           f.training_history && `Histórico: ${sanitizeText(f.training_history)}`,
           ...cardioDetail,
@@ -341,9 +357,25 @@ export default function StudentAnamnese() {
             {/* PASSO 2 — Objetivo + modalidades */}
             {step === 2 && (
               <div className="space-y-4">
-                <F label="Objetivo principal">
-                  <SS value={f.objective} onChange={(v: string) => set("objective", v)} placeholder="Selecione..."
-                    opts={[["emagrecimento","Emagrecimento"],["hipertrofia","Ganho de massa"],["performance","Performance esportiva"],["saude","Saúde e bem-estar"]]} />
+                <F label="Objetivos — toque na ORDEM de prioridade (o 1º é o mais importante)">
+                  <div className="flex flex-wrap gap-2">
+                    {OBJ_OPTS.map(([v, l]) => {
+                      const order = (f.objective || "").split(",").map(s => s.trim()).filter(Boolean).indexOf(v);
+                      const sel = order >= 0;
+                      return (
+                        <button type="button" key={v} onClick={() => toggleCsv("objective", v)}
+                          className={`px-3 py-2 rounded-lg border text-sm flex items-center gap-1.5 transition ${sel ? "border-[#8B7355] bg-[#F5EDD8]/50 text-[#1B2B4A] font-medium" : "border-slate-200 text-slate-600"}`}>
+                          {sel && <span className="h-5 w-5 rounded-full bg-[#8B7355] text-white text-[11px] flex items-center justify-center">{order + 1}</span>}
+                          {l}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {f.objective && (
+                    <p className="text-[11px] text-slate-500 mt-1.5">
+                      Sua prioridade: {(f.objective || "").split(",").map(s => s.trim()).filter(Boolean).map((v, i) => `${i + 1}º ${OBJ_LABEL[v] || v}`).join(" · ")}
+                    </p>
+                  )}
                 </F>
                 <F label="Conte mais sobre o que você quer alcançar">
                   <Textarea value={f.main_goal} onChange={e => set("main_goal", e.target.value)} className="min-h-[70px]" placeholder="Ex: correr minha primeira meia maratona, melhorar a postura, perder 5kg..." />
@@ -397,7 +429,28 @@ export default function StudentAnamnese() {
                     opts={[["sedentario","Sedentário"],["leve","Levemente ativo"],["moderado","Moderadamente ativo"],["muito_ativo","Muito ativo"],["extremo","Extremamente ativo"]]} />
                 </F>
                 <F label="Tempo de treino (meses)"><Input type="number" value={f.experience_months} onChange={e => set("experience_months", e.target.value)} className="h-10" /></F>
-                <F label="Dias disponíveis/semana"><Input type="number" min="1" max="7" value={f.days_available} onChange={e => set("days_available", e.target.value)} className="h-10" /></F>
+                {(f.interest_strength || f.interest_running || f.interest_swimming || f.interest_cycling) ? (
+                  <div className="col-span-2 space-y-2">
+                    <Label className="text-xs font-medium text-slate-600">Dias disponíveis para CADA modalidade (toque nos dias que pode)</Label>
+                    {([["interest_strength", "days_strength", "🏋️ Musculação"], ["interest_running", "days_running", "🏃 Corrida"], ["interest_swimming", "days_swimming", "🏊 Natação"], ["interest_cycling", "days_cycling", "🚴 Ciclismo"]] as [string, string, string][])
+                      .filter(([flag]) => (f as any)[flag]).map(([, key, label]) => (
+                        <div key={key} className="rounded-lg border border-slate-200 bg-slate-50/60 p-2">
+                          <p className="text-[11px] font-medium text-slate-600 mb-1">{label}</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {WEEKDAYS.map(([dv, dl]) => {
+                              const on = ((f as any)[key] || "").split(",").map((s: string) => s.trim()).includes(dv);
+                              return (
+                                <button type="button" key={dv} onClick={() => toggleCsv(key, dv)}
+                                  className={`px-2.5 py-1 rounded-full text-xs border transition ${on ? "border-[#8B7355] bg-[#F5EDD8]/60 text-[#1B2B4A] font-medium" : "border-slate-200 text-slate-600"}`}>{dl}</button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <F label="Dias disponíveis/semana"><Input type="number" min="1" max="7" value={f.days_available} onChange={e => set("days_available", e.target.value)} className="h-10" /></F>
+                )}
                 <F label="Minutos por sessão"><Input type="number" value={f.session_duration_min} onChange={e => set("session_duration_min", e.target.value)} className="h-10" /></F>
                 <F label="Onde treina">
                   <SS value={f.equipment} onChange={(v: string) => set("equipment", v)} placeholder="Selecione..."
