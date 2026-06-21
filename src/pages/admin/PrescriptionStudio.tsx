@@ -60,6 +60,8 @@ export default function PrescriptionStudio() {
   const [studentId, setStudentId] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
   const [sendingAssess, setSendingAssess] = useState(false);
+  const [editPlan, setEditPlan] = useState<any | null>(null);
+  const [showEdit, setShowEdit] = useState(false);
   const [tab, setTab]             = useState("anamnese");
 
   // Anamnese state
@@ -370,18 +372,7 @@ export default function PrescriptionStudio() {
       });
       if (bundleErr) console.warn("prescription_bundles insert falhou (nao bloqueia):", bundleErr.message);
 
-      // Publica AUTOMATICAMENTE o treino de força no app do aluno (materializa em workouts → aba "Treino").
-      // Cardio (running_plans) e nutrição (nutrition_plans) já são persistidos pelas próprias edges e
-      // aparecem como abas condicionais no app do aluno automaticamente — não precisam de materialização.
-      if (strengthPlan && studentId && companyId) {
-        try {
-          const r = await publishStrengthPlanToStudent({ plan: strengthPlan, studentId, companyId, createdBy: user?.id ?? null });
-          setPublished({ workoutsCreated: r.workoutsCreated, createdEnrollment: r.createdEnrollment });
-        } catch (pubErr: any) {
-          // Não derruba a geração: a prescrição foi criada; só a materialização do treino falhou.
-          setError(`Prescrição gerada, mas falhou ao publicar o treino no app do aluno: ${pubErr?.message || "erro"}. Use o botão "Publicar treino no app do aluno".`);
-        }
-      }
+      // Sem auto-publicação: o professor revisa/edita o treino e clica em "Publicar treino no app do aluno".
 
     } catch (e: any) {
       setError(e.message);
@@ -395,7 +386,7 @@ export default function PrescriptionStudio() {
     setPublishing(true); setError(""); setPublished(null);
     try {
       const r = await publishStrengthPlanToStudent({
-        plan: results.musculacao, studentId, companyId, createdBy: user?.id ?? null,
+        plan: editPlan || results.musculacao, studentId, companyId, createdBy: user?.id ?? null,
       });
       setPublished({ workoutsCreated: r.workoutsCreated, createdEnrollment: r.createdEnrollment });
       // Avisa o aluno no WhatsApp que a prescrição já está no app (abre o wa.me pré-preenchido).
@@ -411,6 +402,16 @@ export default function PrescriptionStudio() {
     }
     setPublishing(false);
   }
+
+  // Espelha o plano de força gerado num rascunho editável (publicar usa esta versão).
+  useEffect(() => {
+    if (results.musculacao) { try { setEditPlan(JSON.parse(JSON.stringify(results.musculacao))); } catch { setEditPlan(results.musculacao); } }
+    else setEditPlan(null);
+  }, [results.musculacao]);
+  const updateExField = (wi: number, ei: number, field: string, value: any) =>
+    setEditPlan((p: any) => { if (!p) return p; const n = JSON.parse(JSON.stringify(p)); if (n.workouts?.[wi]?.exercises?.[ei]) n.workouts[wi].exercises[ei][field] = value; return n; });
+  const updateWName = (wi: number, value: string) =>
+    setEditPlan((p: any) => { if (!p) return p; const n = JSON.parse(JSON.stringify(p)); if (n.workouts?.[wi]) n.workouts[wi].name = value; return n; });
 
   // ── Avaliação funcional: baixar PDF / enviar no WhatsApp ──────────────────
   function assessmentMeta() {
@@ -802,6 +803,34 @@ export default function PrescriptionStudio() {
                   <Button onClick={downloadPDFs} className="w-full bg-[#8B7355] hover:bg-[#8B7355]/90 mt-2">
                     <Download className="h-4 w-4 mr-2" /> Baixar PDFs separados ({Object.keys(results).length})
                   </Button>
+
+                  {/* Revisar e editar a prescrição de força ANTES de publicar no app */}
+                  {editPlan && Array.isArray(editPlan.workouts) && (
+                    <div className="border rounded-lg p-3 mt-2 bg-slate-50/60">
+                      <button type="button" onClick={() => setShowEdit(s => !s)} className="text-sm font-medium text-[#1B2B4A] underline">
+                        {showEdit ? "Ocultar edição" : "✏️ Revisar e editar o treino antes de enviar"}
+                      </button>
+                      {showEdit && (
+                        <div className="mt-3 space-y-3">
+                          <p className="text-xs text-slate-500">Edite séries / reps / descanso / obs. Ao publicar, vai a versão editada pro app do aluno.</p>
+                          {editPlan.workouts.map((w: any, wi: number) => (
+                            <div key={wi} className="border rounded-lg p-2 bg-white space-y-1.5">
+                              <Input value={w.name || ""} onChange={e => updateWName(wi, e.target.value)} className="h-8 text-sm font-medium" />
+                              {(w.exercises || []).map((ex: any, ei: number) => (
+                                <div key={ei} className="grid grid-cols-12 gap-1 items-center">
+                                  <span className="col-span-12 sm:col-span-4 text-xs truncate">{ex.exercise_name}</span>
+                                  <Input className="col-span-4 sm:col-span-1 h-7 text-xs px-1" value={String(ex.sets ?? "")} onChange={e => updateExField(wi, ei, "sets", e.target.value)} placeholder="séries" />
+                                  <Input className="col-span-4 sm:col-span-2 h-7 text-xs px-1" value={String(ex.reps ?? "")} onChange={e => updateExField(wi, ei, "reps", e.target.value)} placeholder="reps" />
+                                  <Input className="col-span-4 sm:col-span-2 h-7 text-xs px-1" value={String(ex.rest_seconds ?? "")} onChange={e => updateExField(wi, ei, "rest_seconds", e.target.value)} placeholder="desc(s)" />
+                                  <Input className="col-span-12 sm:col-span-3 h-7 text-xs px-1" value={ex.cues || ex.notes || ""} onChange={e => updateExField(wi, ei, "cues", e.target.value)} placeholder="obs" />
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Publica o treino de força no app do aluno (o PDF/IA sozinho NÃO aparece pro aluno). */}
                   {results.musculacao && (
