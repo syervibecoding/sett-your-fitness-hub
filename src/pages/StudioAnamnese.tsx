@@ -63,6 +63,7 @@ export default function StudentAnamnese() {
     has_nutritionist: "nao", wants_nutrition_tips: "sim", has_endurance_coach: "nao",
     // Específico cardio
     sport_goal: "", current_volume_weekly: "",
+    race_name: "", race_date: "",
     fcmax: "", fcrep: "", perceived_recovery: "",
     run_where: "", run_best_time: "",
     swim_pool: "", swim_level: "", swim_volume: "",
@@ -210,6 +211,8 @@ export default function StudentAnamnese() {
         fcrep: f.fcrep ? Number(f.fcrep) : null,
         current_volume_weekly: f.current_volume_weekly ? (parseFloat(String(f.current_volume_weekly).replace(",", ".").replace(/[^\d.]/g, "")) || null) : null,
         cardio_goal: sanitizeShort(f.sport_goal),
+        _race: f.race_date ? { name: sanitizeShort(f.race_name || "Prova"), date: f.race_date } : null,
+        _pain: { tornozelo: Number(f.eva_tornozelo) || 0, joelho: Number(f.eva_joelho) || 0, quadril: Number(f.eva_quadril) || 0, lombar: Number(f.eva_lombar) || 0, ombro: Number(f.eva_ombro) || 0 },
         stress_score: f.stress_score ? Number(f.stress_score) : null,
         sleep_quality: f.sleep_quality ? Number(f.sleep_quality) : null,
         injuries: [
@@ -461,6 +464,8 @@ export default function StudentAnamnese() {
                     <F label="Objetivo / prova" span="col-span-2">
                       <Input value={f.sport_goal} onChange={e => set("sport_goal", e.target.value)} className="h-10" placeholder="Ex: Maratona em outubro, 1500m sub-30..." />
                     </F>
+                    <F label="Tem prova/competição marcada? Qual?"><Input value={f.race_name} onChange={e => set("race_name", e.target.value)} className="h-10" placeholder="ex: Maratona de SP (vazio = não tem)" /></F>
+                    <F label="Data da prova"><Input type="date" value={f.race_date} onChange={e => set("race_date", e.target.value)} className="h-10" /></F>
                     <F label="Volume atual (km ou h/sem)"><Input value={f.current_volume_weekly} onChange={e => set("current_volume_weekly", e.target.value)} className="h-10" placeholder="ex: 6km/semana ou 2h/semana — ou 'não sei'" /></F>
                     <F label="Recuperado hoje? (0-10)"><Input type="number" min="0" max="10" value={f.perceived_recovery} onChange={e => set("perceived_recovery", e.target.value)} className="h-10" placeholder="10 = ótimo" /></F>
                     <F label="FC máxima (se souber)"><Input type="number" value={f.fcmax} onChange={e => set("fcmax", e.target.value)} className="h-10" placeholder="opcional" /></F>

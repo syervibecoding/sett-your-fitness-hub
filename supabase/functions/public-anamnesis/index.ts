@@ -370,6 +370,35 @@ Deno.serve(async (req) => {
         .update({ status: "completed", completed_at: new Date().toISOString() })
         .eq("id", invite.id);
 
+      // Efeitos colaterais: prova → student_goals (calendário); dores (EVA) → boneco anatômico.
+      try {
+        const race = (incoming as any)._race;
+        if (race && race.date) {
+          await supabase.from("student_goals").delete()
+            .eq("student_id", invite.student_id).eq("kind", "prova").is("created_by", null);
+          await supabase.from("student_goals").insert({
+            company_id: invite.company_id, student_id: invite.student_id,
+            title: String(race.name || "Prova").slice(0, 120), kind: "prova",
+            target_date: race.date, status: "pending",
+            description: "Cadastrada pela anamnese", created_by: null,
+          });
+        }
+        const pain = (incoming as any)._pain || {};
+        const sev = (n: number) => (n >= 7 ? "severa" : n >= 4 ? "moderada" : "leve");
+        const painRows = Object.entries(pain)
+          .filter(([, v]) => Number(v) > 0)
+          .map(([region, v]) => ({
+            company_id: invite.company_id, student_id: invite.student_id,
+            region, type: "dor", severity: sev(Number(v)),
+            note: `Dor relatada na anamnese (EVA ${v}/10)`, source: "anamnese",
+          }));
+        await supabase.from("student_body_limitations").delete()
+          .eq("student_id", invite.student_id).eq("source", "anamnese");
+        if (painRows.length) await supabase.from("student_body_limitations").insert(painRows);
+      } catch (e) {
+        console.error("anamnese side-effects error", e);
+      }
+
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
