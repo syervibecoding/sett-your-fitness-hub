@@ -1,4 +1,4 @@
-import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import { BrainCircuit, HelpCircle, Loader2, Send, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -298,6 +298,10 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
     void askBnito(input);
   };
 
+  // BNITO arrastável: o aluno pode mover o botão pra não atrapalhar finalizar a série.
+  const dragRef = useRef({ sx: 0, sy: 0, ox: 0, oy: 0, moved: false });
+  const [bnitoDrag, setBnitoDrag] = useState({ x: 0, y: 0 });
+
   return (
     <>
       {children}
@@ -308,8 +312,11 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
               <button
                 type="button"
                 aria-label={`Abrir ${name}`}
-                onClick={() => setOpen(true)}
-                className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] right-[calc(1.25rem+env(safe-area-inset-right,0px))] z-40 flex h-16 w-16 items-center justify-center rounded-full border border-white/70 bg-navy text-primary-foreground shadow-[0_18px_45px_rgba(29,45,92,0.32)] ring-8 ring-navy/10 transition duration-200 hover:-translate-y-0.5 hover:bg-navy/95 focus:outline-none focus:ring-4 focus:ring-ring focus:ring-offset-2 md:bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] md:right-6"
+                style={{ transform: `translate(${bnitoDrag.x}px, ${bnitoDrag.y}px)`, touchAction: "none" }}
+                onPointerDown={(e) => { dragRef.current = { sx: e.clientX, sy: e.clientY, ox: bnitoDrag.x, oy: bnitoDrag.y, moved: false }; (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); }}
+                onPointerMove={(e) => { const dx = e.clientX - dragRef.current.sx; const dy = e.clientY - dragRef.current.sy; if (Math.abs(dx) > 5 || Math.abs(dy) > 5) dragRef.current.moved = true; if (dragRef.current.moved) setBnitoDrag({ x: dragRef.current.ox + dx, y: dragRef.current.oy + dy }); }}
+                onPointerUp={(e) => { (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId); if (!dragRef.current.moved) setOpen(true); }}
+                className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] right-[calc(1.25rem+env(safe-area-inset-right,0px))] z-40 flex h-16 w-16 items-center justify-center rounded-full border border-white/70 bg-navy text-primary-foreground shadow-[0_18px_45px_rgba(29,45,92,0.32)] ring-8 ring-navy/10 transition-colors duration-200 hover:bg-navy/95 focus:outline-none focus:ring-4 focus:ring-ring focus:ring-offset-2 md:bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] md:right-6 cursor-grab active:cursor-grabbing"
               >
                 <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/45 bg-white/10">
                   <BrainCircuit className="h-7 w-7" />

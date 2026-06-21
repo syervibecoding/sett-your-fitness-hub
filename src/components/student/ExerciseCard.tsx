@@ -180,7 +180,7 @@ export function ExerciseCard({
                 <span>Anterior</span>
                 <span>Kg</span>
                 <span>Reps</span>
-                <span className="text-center">PSE</span>
+                <span className="text-center">Dific.</span>
                 <span></span>
               </div>
 
@@ -208,29 +208,23 @@ export function ExerciseCard({
                   <div key={s} className="space-y-1">
                     <div className={`grid grid-cols-[36px_1fr_1fr_1fr_40px_28px] gap-1.5 items-center rounded-md px-0.5 py-0.5 ${isCompleted ? 'bg-green-500/5' : ''}`}>
                       {/* Set type badge */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className={`h-7 w-9 rounded text-xs font-bold font-sans ${config.bgColor} ${config.color} flex items-center justify-center`}>
-                            {getSetDisplayLabel(s)}
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="min-w-[180px]">
-                          {SET_TYPES.map(t => (
-                            <DropdownMenuItem key={t} onClick={() => onUpdateLog(idx, s + 1, "set_type", t)}>
-                              <span className={`font-bold mr-2 ${SET_TYPE_CONFIG[t].color}`}>{SET_TYPE_CONFIG[t].label}</span>
-                              <span className="text-sm">{SET_TYPE_CONFIG[t].name}</span>
-                            </DropdownMenuItem>
-                          ))}
-                          {numSets > 1 && (
-                            <>
-                              <DropdownMenuItem className="text-destructive" onClick={() => onRemoveSet(idx, s + 1)}>
-                                <X className="h-3.5 w-3.5 mr-2" />
-                                Remover Série
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {/* Tipo de série (definido pelo treinador) — só leitura; toque explica o que é */}
+                      <button
+                        type="button"
+                        className={`h-7 w-9 rounded text-xs font-bold font-sans ${config.bgColor} ${config.color} flex items-center justify-center`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const d: Record<string, string> = {
+                            warmup: "Aquecimento: peso leve pra preparar o músculo, sem buscar fadiga.",
+                            normal: "Série normal: execução padrão com a carga do dia.",
+                            failure: "Até a falha: repita até não conseguir mais nenhuma com boa técnica.",
+                            drop: "Drop-set: ao falhar, reduza a carga e continue sem descanso.",
+                          };
+                          toast(config.name, { description: d[setType] || "" });
+                        }}
+                      >
+                        {getSetDisplayLabel(s)}
+                      </button>
 
                       {/* Previous */}
                       <span className="text-[11px] text-muted-foreground font-sans truncate">
@@ -244,20 +238,14 @@ export function ExerciseCard({
                         className="h-7 text-xs bg-card border-border px-1.5"
                         placeholder={prevWeight > 0 ? String(prevWeight) : "0"}
                         value={log?.weight ?? ""}
-                        onChange={(e) => onUpdateLog(idx, s + 1, "weight", parseFloat(e.target.value) || 0)}
+                        onChange={(e) => onUpdateLog(idx, s + 1, "weight", e.target.value === "" ? null : (parseFloat(e.target.value) || 0))}
                         onClick={(e) => e.stopPropagation()}
                       />
 
-                      {/* Reps */}
-                      <Input
-                        type="number"
-                        inputMode="numeric"
-                        className="h-7 text-xs bg-card border-border px-1.5"
-                        placeholder={ex.reps}
-                        value={log?.reps_done ?? ""}
-                        onChange={(e) => onUpdateLog(idx, s + 1, "reps_done", parseInt(e.target.value) || 0)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
+                      {/* Reps — prescritas pelo treinador (não editável; a prescrição é nossa) */}
+                      <div className="h-7 flex items-center justify-center text-xs font-sans text-foreground bg-secondary/40 rounded border border-border px-1" title="Repetições prescritas">
+                        {ex.reps}
+                      </div>
 
                       {/* RPE/PSE */}
                       <DropdownMenu>
@@ -286,6 +274,7 @@ export function ExerciseCard({
                           e.stopPropagation();
                           const newCompleted = !isCompleted;
                           onUpdateLog(idx, s + 1, "completed", newCompleted);
+                          if (newCompleted) onUpdateLog(idx, s + 1, "reps_done", parseInt(String(ex.reps)) || 0);
                           if (newCompleted && isSessionActive) {
                             onSetComplete(idx, s + 1, ex.rest);
                           }
@@ -319,16 +308,6 @@ export function ExerciseCard({
               })}
             </div>
 
-            {/* Add set button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full text-xs text-primary font-sans gap-1.5 h-8 border border-dashed border-primary/30"
-              onClick={(e) => { e.stopPropagation(); onAddSet(idx); }}
-            >
-              <Plus className="h-3 w-3" />
-              Adicionar Série
-            </Button>
 
             {/* Mini-history */}
             {exerciseHistory.length > 0 && (

@@ -370,8 +370,8 @@ export default function StudentPortal() {
         workout_id: workoutId,
         exercise_index: exIdx,
         set_number: setNum,
-        weight: prev[key]?.weight || 0,
-        reps_done: prev[key]?.reps_done || 0,
+        weight: prev[key]?.weight ?? null,
+        reps_done: prev[key]?.reps_done ?? null,
         [field]: value,
       },
     }));
@@ -432,16 +432,23 @@ export default function StudentPortal() {
       exercise_index: log.exercise_index,
       set_number: log.set_number,
       session_date: todayStr,
-      weight: log.weight,
-      reps_done: log.reps_done,
+      weight: log.weight ?? 0,
+      reps_done: log.reps_done ?? 0,
       set_type: log.set_type || 'normal',
       rpe: log.rpe || null,
       completed: log.completed || false,
     }));
     if (rows.length > 0) {
-      const { error } = await supabase
-        .from("workout_logs" as any)
-        .upsert(rows, { onConflict: "student_id,workout_id,exercise_index,set_number,session_date" });
+      // Retry: soluços de rede/lock não devem assustar o aluno com "não foi salvo".
+      let error: any = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const res = await supabase
+          .from("workout_logs" as any)
+          .upsert(rows, { onConflict: "student_id,workout_id,exercise_index,set_number,session_date" });
+        error = res.error;
+        if (!error) break;
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+      }
       if (error) { hadError = true; console.error("Erro ao salvar carga:", error); }
       else {
         // Reflete o check-in na hora: mescla as linhas de hoje em allLogs (WeeklyBar/streak/trainedDays
@@ -806,31 +813,7 @@ export default function StudentPortal() {
         {/* TREINO VIEW */}
         {activeView === "treino" && (
           <div className="space-y-6">
-            {/* Cycle selector */}
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {cycles.map(cycle => {
-                const isActive = selectedCycle?.id === cycle.id;
-                const isCurrent = (() => {
-                  try { return isWithinInterval(new Date(), { start: parseISO(cycle.start_date), end: parseISO(cycle.end_date) }); }
-                  catch { return false; }
-                })();
-                return (
-                  <button key={cycle.id} onClick={() => {
-                    setSelectedCycle(cycle);
-                    setSelectedWorkoutId(cycle.workouts[0]?.id || null);
-                    setExpandedExercise(null);
-                  }}
-                    className={`flex-shrink-0 flex flex-col items-center gap-1 px-4 py-3 rounded-lg border transition-all font-sans ${
-                      isActive ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:border-muted-foreground/40"
-                    }`}>
-                    <span className="text-xs font-medium">Ciclo {cycle.cycle_number}</span>
-                    {cycle.workouts.length > 0 ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <Circle className="h-4 w-4 text-muted-foreground/40" />}
-                    {isCurrent && <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/50 text-primary">Atual</Badge>}
-                  </button>
-                );
-              })}
-            </div>
-
+            {/* (seletor de ciclos removido — o ciclo atual já é mostrado abaixo) */}
             {selectedCycle && (
               <div className="space-y-4">
                 <Card className="bg-card border-border">
