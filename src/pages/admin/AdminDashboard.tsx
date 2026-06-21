@@ -7,6 +7,7 @@ import { Users, TrendingUp, RefreshCw, Clock, UserX, Timer, RotateCcw, MessageCi
 import { format, addDays } from "date-fns";
 import { toast } from "sonner";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
+import { MonthlyPrescriptionsCard } from "@/components/admin/MonthlyPrescriptionsCard";
 import { AtRiskStudents } from "@/components/admin/AtRiskStudents";
 import { useMaster } from "@/contexts/MasterContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -350,6 +351,8 @@ export default function AdminDashboard() {
         </Card>
 
         <DashboardAlerts />
+
+        <MonthlyPrescriptionsCard companyId={effectiveCompanyId} />
       </div>
     </>
   );

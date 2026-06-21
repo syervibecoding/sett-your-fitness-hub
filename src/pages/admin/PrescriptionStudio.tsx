@@ -386,6 +386,14 @@ export default function PrescriptionStudio() {
         plan: results.musculacao, studentId, companyId, createdBy: user?.id ?? null,
       });
       setPublished({ workoutsCreated: r.workoutsCreated, createdEnrollment: r.createdEnrollment });
+      // Avisa o aluno no WhatsApp que a prescrição já está no app (abre o wa.me pré-preenchido).
+      const nome = (student?.name || "").trim().split(/\s+/)[0] || "";
+      void openStudentChat({
+        navigate: nav,
+        routePrefix: chatRoutePrefix,
+        studentId,
+        message: `Oi, ${nome}! Sua nova prescrição já está no seu app 💪 É só abrir e treinar. Qualquer dúvida, me chama!`,
+      });
     } catch (e: any) {
       setError(e?.message || "Falha ao publicar o treino para o aluno.");
     }
