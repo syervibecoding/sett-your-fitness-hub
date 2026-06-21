@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { assertTenantAccess, HttpError } from "../_shared/tenant-auth.ts";
+import { planAdvancedMethods } from "../_shared/prescription/advancedMethods.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -775,6 +776,13 @@ function fallbackExercise(
   const exercise = pickCatalogExercise(catalog, params.keywords, usedIds, riskText);
   if (!exercise) return null;
   usedIds.add(exercise.id);
+  const isIso = params.phase === "forca_especifica" || params.phase === "ativacao_especifica";
+  const setsN = params.sets;
+  const set_types = Array.from({ length: setsN }, (_, i) => {
+    if (!isIso && i === 0 && setsN >= 3) return "warmup";          // 1ª série dos compostos = aquecimento
+    if (isIso && setsN >= 2 && i === setsN - 1) return "failure";  // última do isolador = até a falha
+    return "normal";
+  });
   return {
     phase: params.phase,
     exercise_id: exercise.id,
@@ -788,8 +796,11 @@ function fallbackExercise(
     rest_seconds: params.rest,
     tempo: params.tempo || "3010",
     exercise_order: params.order,
+    set_types,
+    is_isolation: isIso,
     cues: params.cue,
     biomechanical_note: params.note,
+    notes: "Troca de estímulo: sem 1-2 técnica/base · sem 3-4 progride (+reps ou carga) · sem 5-6 consolida.",
     regression: exercise.regressions[0] || "Reduzir amplitude/carga e manter dor <= 3.",
     progression: exercise.progressions[0] || "Progredir reps antes de carga, mantendo técnica.",
   };
@@ -818,18 +829,27 @@ function buildEmergencyFallbackPlan(args: {
   const kneeRisk = riskText.includes("joelho") || riskText.includes("valgo");
   const backRisk = riskText.includes("lombar") || riskText.includes("butt") || riskText.includes("retrovers");
   const usedIds = new Set<string>();
+  const lvlText = normalizeText(args.fitnessLevel);
+  const level: "iniciante" | "intermediario" | "avancado" =
+    lvlText.includes("inic") ? "iniciante" : lvlText.includes("avan") ? "avancado" : "intermediario";
+  const hasPain = kneeRisk || backRisk || /dor|lesao|lesão/.test(riskText);
 
-  const makeWorkout = (name: string, day: number, focus: string, specs: FallbackExerciseSpec[]) => ({
-    name,
-    day_of_week: day,
-    duration_min: 50,
-    split_focus: focus,
-    exercises: specs
+  const makeWorkout = (name: string, day: number, focus: string, specs: FallbackExerciseSpec[]) => {
+    const exercises = specs
       .map((spec, index) => fallbackExercise(args.catalog, usedIds, riskText, { ...spec, order: index + 1 }))
-      .filter(Boolean),
-    volume_load_estimate: "Conservador; usar RIR 2-4 e dor <= 3.",
-    notes: "Plano de emergência gerado sem Anthropic: revisar antes de publicar se houver dor importante ou restrição clínica.",
-  });
+      .filter(Boolean) as any[];
+    // Metodologias avançadas conforme nível/fase (conservador — iniciante/dor → nenhuma).
+    const withMethods = planAdvancedMethods(exercises, { mesocycle: "acumulacao", level, hasPain, sessionKey: `d${day}` });
+    return {
+      name,
+      day_of_week: day,
+      duration_min: 50,
+      split_focus: focus,
+      exercises: withMethods,
+      volume_load_estimate: "Conservador; usar RIR 2-4 e dor <= 3.",
+      notes: "Motor BN: técnica antes de carga; troca de estímulo a cada 2 semanas; revisar se houver dor/restrição.",
+    };
+  };
 
   const workouts = [
     makeWorkout("Treino A - Base tecnica de membros inferiores", 1, "mobilidade, core, controle de quadril e força global leve", [

@@ -16,6 +16,10 @@ export interface StudentWorkoutExercise {
   reps: string;
   rest: string;
   notes: string;
+  set_types?: string[];
+  method?: string | null;
+  group_id?: string | null;
+  method_seconds?: number | null;
 }
 
 export interface StudentWorkoutRow {
@@ -46,7 +50,11 @@ export function mapStrengthExercise(e: any): StudentWorkoutExercise {
     sets: e?.sets != null ? String(e.sets) : "",
     reps: e?.reps != null ? String(e.reps) : "",
     rest: restSeconds != null && restSeconds !== "" ? `${restSeconds}s` : (e?.rest != null ? String(e.rest) : ""),
-    notes: (e?.cues && String(e.cues).trim()) || e?.biomechanical_note || e?.notes || "",
+    notes: [e?.notes, (e?.cues && String(e.cues).trim()) || e?.biomechanical_note].filter(Boolean).join(" · "),
+    set_types: Array.isArray(e?.set_types) ? e.set_types : undefined,
+    method: e?.method ?? null,
+    group_id: e?.group_id ?? null,
+    method_seconds: e?.method_seconds ?? null,
   };
 }
 
