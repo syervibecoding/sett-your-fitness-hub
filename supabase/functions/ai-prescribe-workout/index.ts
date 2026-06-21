@@ -767,6 +767,17 @@ type FallbackExerciseSpec = {
   tempo?: string;
 };
 
+// Troca de estímulo a cada 2 semanas — instruções ESPECÍFICAS e acionáveis por tipo de exercício.
+function blockNote(phase: string, isIso: boolean): string {
+  if (phase === "forca_global" || phase === "forca_especifica") {
+    return isIso
+      ? "semana 1 e 2: foco na execução e conexão muscular\nsemana 3 e 4: 2 drop-sets na última série\nsemana 5 e 6: progredir a carga e chegar perto da falha"
+      : "semana 1 e 2: foco na técnica e amplitude (RIR 3-4)\nsemana 3 e 4: aumentar a carga mantendo a execução\nsemana 5 e 6: progredir a carga, mais perto da falha (RIR 1-2)";
+  }
+  // mobilidade / core / ativação / controle motor (preparação)
+  return "semana 1 e 2: aprender o movimento e a amplitude\nsemana 3 e 4: aumentar o tempo de controle/sustentação\nsemana 5 e 6: mais amplitude e estabilidade";
+}
+
 function fallbackExercise(
   catalog: ExerciseCatalog,
   usedIds: Set<string>,
@@ -800,7 +811,7 @@ function fallbackExercise(
     is_isolation: isIso,
     cues: params.cue,
     biomechanical_note: params.note,
-    notes: "semana 1 e 2: técnica e base\nsemana 3 e 4: progride (+reps ou carga)\nsemana 5 e 6: consolida",
+    notes: blockNote(params.phase, isIso),
     regression: exercise.regressions[0] || "Reduzir amplitude/carga e manter dor <= 3.",
     progression: exercise.progressions[0] || "Progredir reps antes de carga, mantendo técnica.",
   };
