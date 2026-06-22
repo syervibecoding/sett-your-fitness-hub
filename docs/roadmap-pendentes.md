@@ -7,6 +7,15 @@ mais profunda, tabela nova com RLS própria, ou deploy de edge — incompatível
 > Migrations de **tabela nova** precisam de RLS escopada por `company_id` (senão a tabela fica
 > aberta via anon key). Por isso não foram aplicadas ainda.
 
+## ✅ JÁ CONCLUÍDOS (follow-up, local, sem deploy)
+- **P9 + P15** — `ai_plan_versions` (tabela + RLS espelhando `company_members`/master) criada;
+  `publishStrengthPlanToStudent` versiona o plano publicado + resume as edições do professor vs. a IA;
+  `PlanVersionsCard` na aba **Programa** do aluno.
+- **P17** — `trainer_assignments_history.deleted_at`; remoção virou **soft-delete** (recuperável),
+  excluída do cálculo de performance; validação de datas (início não-futuro, fim ≥ início).
+- **G2/T6** — RPC `cohort_feedback_summary` (security invoker, RLS aplica) + `CohortInsightsCard`
+  no dashboard (distribuição de NPS + % que pede ajuste).
+
 ## P2 — Ciclos incompletos (breakdown ✓Força ✗Cardio ?Nutrição)
 - **Por que adiado:** o link ciclo↔modalidade é fuzzy. `training_cycles` = força; cardio/natação/nutrição
   vivem em `prescription_bundles.has_*` e em outras tabelas, sem FK direta pro ciclo.

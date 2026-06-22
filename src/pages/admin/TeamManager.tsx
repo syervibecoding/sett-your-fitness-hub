@@ -281,9 +281,10 @@ export default function TeamManager() {
       supabase.from("profiles").select("user_id, full_name").in("user_id", trainerIds),
       supabase.from("students").select("id, full_name, assigned_trainer_id")
         .eq("company_id", effectiveCompanyId),
-      supabase.from("trainer_assignments_history")
+      (supabase as any).from("trainer_assignments_history")
         .select("student_id, trainer_id, assigned_at, unassigned_at")
-        .eq("company_id", effectiveCompanyId),
+        .eq("company_id", effectiveCompanyId)
+        .is("deleted_at", null), // P17 — exclui períodos removidos do cálculo de performance
     ]);
 
     const profiles = profilesRes.data || [];
@@ -448,10 +449,11 @@ export default function TeamManager() {
     setHistoryStudentId(studentId);
     if (!studentId) { setHistoryRows([]); return; }
     setHistoryLoading(true);
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from("trainer_assignments_history")
       .select("id, trainer_id, assigned_at, unassigned_at")
       .eq("student_id", studentId)
+      .is("deleted_at", null)
       .order("assigned_at", { ascending: true });
     setHistoryRows((data || []) as any);
     setHistoryLoading(false);
@@ -462,6 +464,14 @@ export default function TeamManager() {
   };
 
   const saveHistoryRow = async (row: { id: string; trainer_id: string | null; assigned_at: string; unassigned_at: string | null }) => {
+    // P17 — validação de datas: início não pode ser no futuro; fim não pode anteceder o início.
+    const today = new Date().toISOString().slice(0, 10);
+    if (row.assigned_at && row.assigned_at.slice(0, 10) > today) {
+      toast({ title: "Data inválida", description: "O início da atribuição não pode ser no futuro.", variant: "destructive" }); return;
+    }
+    if (row.unassigned_at && row.assigned_at && row.unassigned_at.slice(0, 10) < row.assigned_at.slice(0, 10)) {
+      toast({ title: "Data inválida", description: "O fim não pode ser antes do início.", variant: "destructive" }); return;
+    }
     const { error } = await supabase.from("trainer_assignments_history").update({
       trainer_id: row.trainer_id,
       assigned_at: row.assigned_at,
@@ -473,7 +483,9 @@ export default function TeamManager() {
   };
 
   const deleteHistoryRow = async (id: string) => {
-    const { error } = await supabase.from("trainer_assignments_history").delete().eq("id", id);
+    // P17 — soft-delete: não apaga (auditoria/recuperável), só some do cálculo e da lista.
+    if (!window.confirm("Remover este período? Ele deixa de contar na performance (fica recuperável no banco).")) return;
+    const { error } = await (supabase as any).from("trainer_assignments_history").update({ deleted_at: new Date().toISOString() }).eq("id", id);
     if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
     setHistoryRows((rows) => rows.filter((r) => r.id !== id));
     toast({ title: "Período removido" });

@@ -403,6 +403,7 @@ export default function PrescriptionStudio() {
     try {
       const r = await publishStrengthPlanToStudent({
         plan: editPlan || results.musculacao, studentId, companyId, createdBy: user?.id ?? null,
+        aiOriginal: results.musculacao, // P9/P15 — versiona + resume edições do professor.
       });
       setPublished({ workoutsCreated: r.workoutsCreated, createdEnrollment: r.createdEnrollment });
       // Avisa o aluno no WhatsApp que a prescrição já está no app (abre o wa.me pré-preenchido).

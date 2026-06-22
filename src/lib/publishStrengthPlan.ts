@@ -81,11 +81,27 @@ export function buildWorkoutRows(plan: any, cycleId: string, companyId: string):
 
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
 
+// P15 — resumo das edições do professor vs. plano original da IA.
+function summarizePlanEdits(orig: any, edited: any): { edited: boolean; text: string } {
+  const flat = (p: any) => ((p?.workouts || []) as any[]).flatMap((w) => ((w?.exercises || []) as any[]).map((e) => e?.exercise_name || e?.library_exercise_name || ""));
+  const a = flat(orig), b = flat(edited);
+  const setA = new Set(a.filter(Boolean)), setB = new Set(b.filter(Boolean));
+  const added = [...setB].filter((x) => !setA.has(x));
+  const removed = [...setA].filter((x) => !setB.has(x));
+  const changed = JSON.stringify(orig?.workouts || []) !== JSON.stringify(edited?.workouts || []);
+  const parts: string[] = [];
+  if (added.length) parts.push(`${added.length} adicionado(s)`);
+  if (removed.length) parts.push(`${removed.length} removido(s)`);
+  if (changed && !parts.length) parts.push("ajustes de séries/reps/obs");
+  return { edited: changed, text: changed ? parts.join(", ") || "ajustes" : "sem edições" };
+}
+
 export async function publishStrengthPlanToStudent(opts: {
   plan: any;
   studentId: string;
   companyId: string;
   createdBy?: string | null;
+  aiOriginal?: any; // P9/P15 — plano original da IA, para versionar/diff.
 }): Promise<PublishResult> {
   const { plan, studentId, companyId, createdBy } = opts;
   const db = supabase as any;
@@ -165,6 +181,20 @@ export async function publishStrengthPlanToStudent(opts: {
   );
   const { error: wErr } = await db.from("workouts").insert(rows);
   if (wErr) throw new Error(`Falha ao criar treinos: ${wErr.message}`);
+
+  // P9/P15 — versiona o plano publicado (best-effort; nunca bloqueia a publicação).
+  try {
+    const sum = opts.aiOriginal ? summarizePlanEdits(opts.aiOriginal, plan) : { edited: false, text: "sem edições" };
+    await db.from("ai_plan_versions").insert({
+      company_id: companyId,
+      student_id: studentId,
+      cycle_id: cycle.id,
+      plan,
+      edited: sum.edited,
+      edit_summary: sum.text,
+      created_by: createdBy ?? null,
+    });
+  } catch { /* versionamento opcional */ }
 
   return { enrollmentId: enrollmentId!, cycleId: cycle.id, workoutsCreated: rows.length, createdEnrollment };
 }

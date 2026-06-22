@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
 import { MonthlyPrescriptionsCard } from "@/components/admin/MonthlyPrescriptionsCard";
 import { PendingFeedbackCard } from "@/components/admin/PendingFeedbackCard";
+import { CohortInsightsCard } from "@/components/admin/CohortInsightsCard";
 import { AtRiskStudents } from "@/components/admin/AtRiskStudents";
 import { useMaster } from "@/contexts/MasterContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -355,6 +356,7 @@ export default function AdminDashboard() {
 
         <MonthlyPrescriptionsCard companyId={effectiveCompanyId} routePrefix={(routePrefix as string) || "admin"} />
         <PendingFeedbackCard companyId={effectiveCompanyId} routePrefix={(routePrefix as string) || "admin"} />
+        <CohortInsightsCard companyId={effectiveCompanyId} />
       </div>
     </>
   );

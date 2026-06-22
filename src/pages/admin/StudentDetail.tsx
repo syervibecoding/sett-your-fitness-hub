@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StudentCycleFeedbackCard } from "@/components/admin/StudentCycleFeedbackCard";
+import { PlanVersionsCard } from "@/components/admin/PlanVersionsCard";
 import { StudentCustomAnswersCard } from "@/components/admin/StudentCustomAnswersCard";
 import { CollapsibleCard } from "@/components/admin/CollapsibleCard";
 import { StudentGoalsManager } from "@/components/admin/StudentGoalsManager";
@@ -1133,6 +1134,7 @@ export default function StudentDetail() {
                 createdBy={session?.user?.id}
               />
             )}
+            {id && <PlanVersionsCard studentId={id} />}
 
             {/* Enrollments */}
             <Card className="bg-card border-border">
