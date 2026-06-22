@@ -771,11 +771,11 @@ type FallbackExerciseSpec = {
 function blockNote(phase: string, isIso: boolean): string {
   if (phase === "forca_global" || phase === "forca_especifica") {
     return isIso
-      ? "semana 1 e 2: foco na execução e conexão muscular\nsemana 3 e 4: 2 drop-sets na última série\nsemana 5 e 6: progredir a carga e chegar perto da falha"
-      : "semana 1 e 2: foco na técnica e amplitude (RIR 3-4)\nsemana 3 e 4: aumentar a carga mantendo a execução\nsemana 5 e 6: progredir a carga, mais perto da falha (RIR 1-2)";
+      ? "semana 1 e 2: foco na execução e conexão muscular\nsemana 3 e 4: 2 drop-sets na última série (veja o que é no marcador do exercício)\nsemana 5 e 6: progredir a carga e chegar perto da falha"
+      : "semana 1 e 2: foco na técnica e na amplitude completa\nsemana 3 e 4: pirâmide crescente — suba a carga e baixe as reps a cada série\nsemana 5 e 6: progredir a carga mantendo a técnica";
   }
-  // mobilidade / core / ativação / controle motor (preparação)
-  return "semana 1 e 2: aprender o movimento e a amplitude\nsemana 3 e 4: aumentar o tempo de controle/sustentação\nsemana 5 e 6: mais amplitude e estabilidade";
+  // preparação (mobilidade / core / ativação / controle motor): cadência concreta, nada subjetivo
+  return "semana 1 e 2: aprender o movimento — cadência 2-0-2\nsemana 3 e 4: cadência 3-1-3 (3s descer, 1s pausa, 3s subir)\nsemana 5 e 6: cadência 4-2-4 com amplitude total";
 }
 
 function fallbackExercise(
@@ -788,6 +788,7 @@ function fallbackExercise(
   if (!exercise) return null;
   usedIds.add(exercise.id);
   const isIso = params.phase === "forca_especifica" || params.phase === "ativacao_especifica";
+  const pain = /dor|lesa|les[aã]o/i.test(riskText || "");
   const setsN = params.sets;
   const set_types = Array.from({ length: setsN }, (_, i) => {
     if (!isIso && i === 0 && setsN >= 3) return "warmup";          // 1ª série dos compostos = aquecimento
@@ -809,6 +810,9 @@ function fallbackExercise(
     exercise_order: params.order,
     set_types,
     is_isolation: isIso,
+    method: (isIso && !pain) ? "dropset" : null,
+    group_id: null,
+    method_seconds: null,
     cues: params.cue,
     biomechanical_note: params.note,
     notes: blockNote(params.phase, isIso),
@@ -849,14 +853,12 @@ function buildEmergencyFallbackPlan(args: {
     const exercises = specs
       .map((spec, index) => fallbackExercise(args.catalog, usedIds, riskText, { ...spec, order: index + 1 }))
       .filter(Boolean) as any[];
-    // Metodologias avançadas conforme nível/fase (conservador — iniciante/dor → nenhuma).
-    const withMethods = planAdvancedMethods(exercises, { mesocycle: "acumulacao", level, hasPain, sessionKey: `d${day}` });
     return {
       name,
       day_of_week: day,
       duration_min: 50,
       split_focus: focus,
-      exercises: withMethods,
+      exercises,
       volume_load_estimate: "Conservador; usar RIR 2-4 e dor <= 3.",
       notes: "Motor BN: técnica antes de carga; troca de estímulo a cada 2 semanas; revisar se houver dor/restrição.",
     };
