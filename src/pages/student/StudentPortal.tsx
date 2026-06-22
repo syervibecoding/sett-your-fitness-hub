@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
-import { Dumbbell, Play, Clock, CheckCircle2, Circle, Loader2, LogOut, Save, CalendarDays, History, BarChart3, ArrowLeft } from "lucide-react";
+import { Dumbbell, Play, Clock, CheckCircle2, Circle, Loader2, LogOut, Save, CalendarDays, History, BarChart3, ArrowLeft, Flame } from "lucide-react";
 import { format, parseISO, differenceInDays, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +21,7 @@ import { MethodBadge } from "@/components/workout/MethodBadge";
 import { PeriodizationBanner } from "@/components/student/PeriodizationBanner";
 import { StatsCharts } from "@/components/student/StatsCharts";
 import { VolumeInsights } from "@/components/student/VolumeInsights";
+import { WarmupGuide } from "@/components/student/WarmupGuide";
 import { useRestTimer } from "@/components/student/RestTimer";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { WeeklyBar } from "@/components/student/WeeklyBar";
@@ -115,6 +116,7 @@ export default function StudentPortal() {
   const [sendingFeedback, setSendingFeedback] = useState(false);
   const [loading, setLoading] = useState(true);
   const [expandedExercise, setExpandedExercise] = useState<number | null>(null);
+  const [warmupOpen, setWarmupOpen] = useState(false);
   const [logs, setLogs] = useState<Record<string, WorkoutLog>>({});
   const [previousLogs, setPreviousLogs] = useState<Record<string, WorkoutLog>>({});
   const [savingLogs, setSavingLogs] = useState(false);
@@ -631,6 +633,30 @@ export default function StudentPortal() {
       .map(([date, sets]) => ({ date, sets: sets.sort((a, b) => a.set_number - b.set_number) }));
   };
 
+  // A2/Q5 — ponte de contexto pro BNITO: grava o treino/exercício aberto + melhor carga,
+  // pra o assistente responder com base no que o aluno está fazendo agora (não genérico).
+  useEffect(() => {
+    try {
+      if (!selectedWorkout) { sessionStorage.removeItem("sett-bnito-context"); return; }
+      const ctx: any = { workout_title: selectedWorkout.title, objetivo_ciclo: selectedCycle?.objective || null };
+      if (expandedExercise != null && selectedWorkout.exercises[expandedExercise]) {
+        const ex = selectedWorkout.exercises[expandedExercise];
+        const hist = getExerciseHistory(selectedWorkout.id, expandedExercise);
+        const best = Math.max(0, ...hist.flatMap((h: any) => h.sets.map((s: any) => s.weight || 0)));
+        ctx.exercicio_aberto = {
+          nome: ex.exercise_name,
+          grupo: ex.muscle_group,
+          prescrito: `${getTotalSets(expandedExercise)}×${ex.reps}`,
+          descanso: ex.rest,
+          metodo: ex.method || null,
+          obs: ex.notes || null,
+          melhor_carga_kg: best > 0 ? best : null,
+        };
+      }
+      sessionStorage.setItem("sett-bnito-context", JSON.stringify(ctx));
+    } catch { /* noop */ }
+  }, [selectedWorkout, expandedExercise, selectedCycle, logs]);
+
   // Computed values for Home — based on actual sessions, not day_of_week
   const trainedDays = useMemo(() => {
     const now = new Date();
@@ -898,12 +924,43 @@ export default function StudentPortal() {
                           workoutTitle={selectedWorkout.title}
                         />
 
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg text-foreground font-sans font-semibold">{selectedWorkout.title}</h3>
-                          <Button size="sm" onClick={() => saveCurrentLogs()} disabled={savingLogs}>
-                            <Save className="h-3.5 w-3.5 mr-1" />
-                            {savingLogs ? "Salvando..." : "Salvar"}
-                          </Button>
+                        <WarmupGuide muscleGroups={selectedWorkout.exercises.map((e) => e.muscle_group)} open={warmupOpen} onOpenChange={setWarmupOpen} />
+
+                        {/* A4 — resumo inline do treino em andamento (volume / séries / tempo) */}
+                        {isSessionForCurrentWorkout && (() => {
+                          const wId = selectedWorkout.id;
+                          const setLogs = Object.values(logs).filter((l: any) => l.workout_id === wId);
+                          const doneSets = setLogs.filter((l: any) => l.completed).length;
+                          const totalPlanned = selectedWorkout.exercises.reduce((s, _e, i) => s + getTotalSets(i), 0);
+                          const vol = setLogs.filter((l: any) => l.completed).reduce((s, l: any) => s + (Number(l.weight) || 0) * (Number(l.reps_done) || 0), 0);
+                          return (
+                            <div className="grid grid-cols-3 gap-2">
+                              {([
+                                ["Volume", vol >= 1000 ? `${(vol / 1000).toFixed(1)}t` : `${Math.round(vol)}kg`],
+                                ["Séries", `${doneSets}/${totalPlanned}`],
+                                ["Tempo", session.formatTime(session.elapsed)],
+                              ] as const).map(([label, value]) => (
+                                <div key={label} className="rounded-lg border border-border bg-card p-2 text-center">
+                                  <p className="text-[10px] uppercase text-muted-foreground font-sans tracking-wide">{label}</p>
+                                  <p className="text-sm font-mono-data font-semibold text-foreground">{value}</p>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="text-lg text-foreground font-sans font-semibold truncate">{selectedWorkout.title}</h3>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Button size="sm" variant="outline" onClick={() => setWarmupOpen(true)}>
+                              <Flame className="h-3.5 w-3.5 mr-1" />
+                              Aquecer
+                            </Button>
+                            <Button size="sm" onClick={() => saveCurrentLogs()} disabled={savingLogs}>
+                              <Save className="h-3.5 w-3.5 mr-1" />
+                              {savingLogs ? "Salvando..." : "Salvar"}
+                            </Button>
+                          </div>
                         </div>
 
                         {(() => {

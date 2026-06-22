@@ -1,6 +1,6 @@
 // Painel de volume: volume-load por semana (barras) + volume por grupamento (pizza).
 // Reutilizado no dashboard do aluno e na ficha do aluno no admin (mesmo shape do StatsCharts).
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { BarChart3, PieChart as PieIcon } from "lucide-react";
 import {
@@ -24,25 +24,49 @@ const PIE_COLORS = [
 ];
 
 export function VolumeInsights({ allLogs, cycles, className }: VolumeInsightsProps) {
+  const [range, setRange] = useState<"all" | "8w" | "4w">("all");
+  const filteredLogs = useMemo(() => {
+    if (range === "all") return allLogs || [];
+    const days = range === "4w" ? 28 : 56;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cut = cutoff.toISOString().slice(0, 10);
+    return (allLogs || []).filter((l: any) => (l?.session_date || "") >= cut);
+  }, [allLogs, range]);
   const meta = useMemo(() => buildExerciseMeta(cycles), [cycles]);
-  const weekly = useMemo(() => volumeLoadByWeek(allLogs || []), [allLogs]);
-  const byMuscle = useMemo(() => volumeByMuscleGroup(allLogs || [], meta), [allLogs, meta]);
+  const weekly = useMemo(() => volumeLoadByWeek(filteredLogs), [filteredLogs]);
+  const byMuscle = useMemo(() => volumeByMuscleGroup(filteredLogs, meta), [filteredLogs, meta]);
   const totalVol = useMemo(() => byMuscle.reduce((s, m) => s + m.volume, 0), [byMuscle]);
+  const rangeTabs = [["all", "Tudo"], ["8w", "8 sem"], ["4w", "4 sem"]] as const;
 
   const hasData = weekly.length > 0 || byMuscle.length > 0;
-  if (!hasData) {
-    return (
-      <Card className={`bg-card border-border border-dashed ${className ?? ""}`}>
-        <CardContent className="p-8 text-center">
-          <BarChart3 className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-muted-foreground font-sans text-sm">Registre treinos para ver o volume.</p>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <div className={`space-y-4 ${className ?? ""}`}>
+      {/* A5 — faixa de período: foca o gráfico no recorte recente ou no todo */}
+      <div className="flex items-center gap-1.5">
+        {rangeTabs.map(([k, lbl]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setRange(k)}
+            className={`px-2.5 py-1 rounded-full text-[11px] font-sans border transition-colors ${range === k ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+          >
+            {lbl}
+          </button>
+        ))}
+      </div>
+
+      {!hasData && (
+        <Card className="bg-card border-border border-dashed">
+          <CardContent className="p-8 text-center">
+            <BarChart3 className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground font-sans text-sm">Sem registros nesse período.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {hasData && (<>
       {/* Volume-load por semana */}
       <Card className="bg-card border-border">
         <CardContent className="p-4">
@@ -121,6 +145,7 @@ export function VolumeInsights({ allLogs, cycles, className }: VolumeInsightsPro
           )}
         </CardContent>
       </Card>
+      </>)}
     </div>
   );
 }

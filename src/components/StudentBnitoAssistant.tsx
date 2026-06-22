@@ -101,6 +101,16 @@ function getStudentPageLabel(pathname: string) {
   return "SettApp";
 }
 
+// A2/Q5 — contexto de treino que o StudentPortal grava (exercício aberto, carga prescrita, melhor carga).
+function readTrainingContext(): unknown {
+  try {
+    const raw = sessionStorage.getItem("sett-bnito-context");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 function buildLocalMission(pageLabel: string, name: string): ProactiveMission {
   if (pageLabel === "treino aberto") {
     return {
@@ -229,6 +239,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
             page_label: pageLabel,
             route_params: params,
             app_map: appMap,
+            training_context: readTrainingContext(),
           },
         },
       });
@@ -276,6 +287,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
           page_label: pageLabel,
           route_params: params,
           app_map: appMap,
+          training_context: readTrainingContext(),
         },
       },
     }).then(({ data, error }) => {

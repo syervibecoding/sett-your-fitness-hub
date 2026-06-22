@@ -1,38 +1,37 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Timer, Volume2, VolumeX } from "lucide-react";
 import { restDoneFeedback, isSoundMuted, setSoundMuted } from "@/lib/feedback";
 
 interface RestTimerProps {
   restSeconds: number;
+  startedAt?: number;
   onComplete?: () => void;
 }
 
-export function RestTimer({ restSeconds, onComplete }: RestTimerProps) {
-  const [remaining, setRemaining] = useState(restSeconds);
-  const [isRunning, setIsRunning] = useState(true);
+// A7 — relógio de parede: o descanso é calculado por timestamp (não por contagem de ticks),
+// então sobrevive a trocar de aba/rota e ao throttling de setInterval em segundo plano.
+export function RestTimer({ restSeconds, startedAt, onComplete }: RestTimerProps) {
+  const endAt = useMemo(() => (startedAt ?? Date.now()) + restSeconds * 1000, [startedAt, restSeconds]);
+  const calc = () => Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
+  const [remaining, setRemaining] = useState(calc);
   const [muted, setMuted] = useState(isSoundMuted());
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const firedRef = useRef(false);
 
   useEffect(() => {
-    setRemaining(restSeconds);
-    setIsRunning(true);
-  }, [restSeconds]);
-
-  useEffect(() => {
-    if (!isRunning || remaining <= 0) return;
-    intervalRef.current = setInterval(() => {
-      setRemaining(prev => {
-        if (prev <= 1) {
-          setIsRunning(false);
-          restDoneFeedback();
-          onComplete?.();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [isRunning, remaining, onComplete]);
+    firedRef.current = false;
+    const tick = () => {
+      const r = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
+      setRemaining(r);
+      if (r <= 0 && !firedRef.current) {
+        firedRef.current = true;
+        restDoneFeedback();
+        onComplete?.();
+      }
+    };
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [endAt, onComplete]);
 
   const progress = restSeconds > 0 ? ((restSeconds - remaining) / restSeconds) * 100 : 0;
 
@@ -85,15 +84,34 @@ export function parseRestSeconds(restStr: string | number | null | undefined): n
   return 60;
 }
 
+const REST_KEY = "sett-active-rest";
+type ActiveRest = { exerciseIdx: number; setNum: number; seconds: number; startedAt: number };
+
 export function useRestTimer() {
-  const [activeRest, setActiveRest] = useState<{ exerciseIdx: number; setNum: number; seconds: number } | null>(null);
+  // Restaura um descanso em andamento ao remontar (trocar de aba/rota não perde o cronômetro).
+  const [activeRest, setActiveRest] = useState<ActiveRest | null>(() => {
+    try {
+      const raw = sessionStorage.getItem(REST_KEY);
+      if (!raw) return null;
+      const v = JSON.parse(raw) as ActiveRest;
+      if (typeof v?.startedAt === "number" && typeof v?.seconds === "number"
+        && Date.now() < v.startedAt + (v.seconds + 5) * 1000) return v;
+      sessionStorage.removeItem(REST_KEY);
+    } catch { /* noop */ }
+    return null;
+  });
 
   const startRest = useCallback((exerciseIdx: number, setNum: number, restStr: string) => {
     const seconds = parseRestSeconds(restStr);
-    setActiveRest({ exerciseIdx, setNum, seconds });
+    const next: ActiveRest = { exerciseIdx, setNum, seconds, startedAt: Date.now() };
+    setActiveRest(next);
+    try { sessionStorage.setItem(REST_KEY, JSON.stringify(next)); } catch { /* noop */ }
   }, []);
 
-  const clearRest = useCallback(() => setActiveRest(null), []);
+  const clearRest = useCallback(() => {
+    setActiveRest(null);
+    try { sessionStorage.removeItem(REST_KEY); } catch { /* noop */ }
+  }, []);
 
   return { activeRest, startRest, clearRest };
 }

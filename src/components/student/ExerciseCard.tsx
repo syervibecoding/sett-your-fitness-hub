@@ -56,7 +56,7 @@ interface ExerciseCardProps {
   onUpdateLog: (exIdx: number, setNum: number, field: string, value: number | string | boolean) => void;
   exerciseHistory: { date: string; sets: { weight: number; reps_done: number; set_number: number }[] }[];
   isSessionActive: boolean;
-  activeRest: { exerciseIdx: number; setNum: number; seconds: number } | null;
+  activeRest: { exerciseIdx: number; setNum: number; seconds: number; startedAt?: number } | null;
   onSetComplete: (exIdx: number, setNum: number, restStr: string) => void;
   onRestComplete: () => void;
   totalSets: number;
@@ -226,9 +226,19 @@ export function ExerciseCard({
                         {getSetDisplayLabel(s)}
                       </button>
 
-                      {/* Previous */}
-                      <span className="text-[11px] text-muted-foreground font-sans truncate">
-                        {prevWeight > 0 ? `${prevWeight}×${prevReps}` : '-'}
+                      {/* Anterior — carga × reps + RPE; toque/hover mostra como foi da última vez */}
+                      <span
+                        className="text-[11px] text-muted-foreground font-sans truncate"
+                        title={prevWeight > 0
+                          ? `Última vez: ${prevWeight}kg × ${prevReps} reps${prev?.rpe ? ` · RPE ${prev.rpe}` : ""}${prev?.set_type && prev.set_type !== "normal" ? ` · ${prev.set_type}` : ""}${prev?.completed ? " · concluída" : ""}`
+                          : "Sem registro anterior"}
+                      >
+                        {prevWeight > 0 ? (
+                          <>
+                            {prevWeight}×{prevReps}
+                            {prev?.rpe ? <span className="text-muted-foreground/60"> ·{prev.rpe}</span> : null}
+                          </>
+                        ) : '-'}
                       </span>
 
                       {/* Weight */}
@@ -300,7 +310,7 @@ export function ExerciseCard({
 
                     {showRestTimer && (
                       <div className="ml-[calc(36px+0.375rem)]">
-                        <RestTimer restSeconds={activeRest.seconds} onComplete={onRestComplete} />
+                        <RestTimer restSeconds={activeRest.seconds} startedAt={activeRest.startedAt} onComplete={onRestComplete} />
                       </div>
                     )}
                   </div>
@@ -319,6 +329,24 @@ export function ExerciseCard({
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2 space-y-1.5">
+                  {(() => {
+                    // A8 — progressão de carga: máx por sessão (cronológico), sparkline sem dependência.
+                    const prog = [...exerciseHistory]
+                      .sort((a, b) => a.date.localeCompare(b.date))
+                      .map((h) => Math.max(0, ...h.sets.map((s) => s.weight || 0)))
+                      .filter((v) => v > 0);
+                    if (prog.length < 2) return null;
+                    const mn = Math.min(...prog), mx = Math.max(...prog);
+                    return (
+                      <div className="rounded-md border border-border bg-card/50 p-2 mb-1.5">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-sans">Progressão de carga</span>
+                          <span className="text-[10px] font-mono-data text-primary">{mn}→{mx}kg</span>
+                        </div>
+                        <Sparkline points={prog} />
+                      </div>
+                    );
+                  })()}
                   {exerciseHistory.map(({ date, sets }) => (
                     <div key={date} className="flex items-start gap-2 text-[11px] font-sans text-muted-foreground">
                       <span className="font-medium text-foreground/70 min-w-[40px]">
@@ -336,5 +364,26 @@ export function ExerciseCard({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// Sparkline puro em SVG (sem recharts) — evolução da carga máxima por sessão.
+function Sparkline({ points }: { points: number[] }) {
+  const W = 220, H = 36, pad = 3;
+  const min = Math.min(...points), max = Math.max(...points);
+  const range = max - min || 1;
+  const stepX = points.length > 1 ? (W - pad * 2) / (points.length - 1) : 0;
+  const coords = points.map((v, i) => {
+    const x = pad + i * stepX;
+    const y = H - pad - ((v - min) / range) * (H - pad * 2);
+    return [x, y] as const;
+  });
+  const path = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const last = coords[coords.length - 1];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-9" preserveAspectRatio="none" aria-hidden>
+      <path d={path} fill="none" stroke="hsl(var(--primary))" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      {last && <circle cx={last[0]} cy={last[1]} r="2.5" fill="hsl(var(--primary))" />}
+    </svg>
   );
 }
