@@ -60,8 +60,25 @@ alter table public.trainer_assignments_history add column if not exists deleted_
 -- + validação de data futura no TeamManager + botão restaurar (set deleted_at = null).
 ```
 
+## G3 — Sincronização Musculação ↔ Cardio ↔ Nutrição
+- **Por que adiado:** mexe na geração multimodal (mapa de conflito de dias + propagar kcal reais da
+  edição do treino pra nutrição). Alto esforço/risco; toca PrescriptionStudio + prescriptionIntegration + motor.
+- **Plano:** (a) detectar conflito de dias (ex.: cardio pesado véspera de MMII) e alertar; (b) substituir
+  o `700 kcal/h` fixo da nutrição pelo gasto estimado dos treinos realmente prescritos.
+
+## P16 — Sincronização contínua Asaas
+- **Por que adiado:** baixo valor vs. esforço; o ideal é webhook (backend) e não polling.
+- **Plano:** auto-refresh + "última sync há X min" no FinancialDashboard, ou webhook Asaas → tabela local.
+
+## P18 (parcial) — logo + cores no PDF
+- **Feito:** `professional`, `cref` e agora `company` são configuráveis no rodapé (`PDFMeta`).
+- **Falta (adiado):** logo (imagem inline) + paleta por empresa, e **passar** company/professional/cref reais
+  da sessão nos call-sites (hoje caem no default "Matheus Loreto / BN"). Wiring simples nos `generate*PDF`.
+
 ---
 **Já entregue (não estava claro no roadmap original):**
+- **PWA** já completo: `manifest.webmanifest` linkado, Service Worker real (`public/sw.js`,
+  network-first p/ HTML + cache-first p/ assets) registrado em `main.tsx`, ícones 192/512. Sem dívida.
 - **P11** (linha do tempo + auditoria por aluno) já existia: `useStudentTimeline` + `StudentTimeline`
   na aba "Visão 360". Enriquecido com o status de entrega (P6).
 - **P8** (rotação de estímulo por semana) entregue via `blockNote` objetivo+semana (motor) +

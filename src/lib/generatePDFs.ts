@@ -24,6 +24,7 @@ export interface PDFMeta {
   date: string;
   professional?: string;
   cref?: string;
+  company?: string; // P18 — nome da empresa no rodapé (multitenancy); default "BN Performance Training".
 }
 
 // ── Helpers genéricos ──────────────────────────────────────────────────────
@@ -86,7 +87,7 @@ function stampFooters(doc: jsPDF, meta: PDFMeta) {
     doc.setDrawColor(...LIGHT); doc.setLineWidth(0.3);
     doc.line(MARGIN, h - 14, w - MARGIN, h - 14);
     doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...GRAY);
-    doc.text(`${meta.professional || "Matheus Loreto"}  ·  ${meta.cref || "CREF 040718-G/SC"}  ·  BN Performance Training`, MARGIN, h - 9);
+    doc.text(`${meta.professional || "Matheus Loreto"}  ·  ${meta.cref || "CREF 040718-G/SC"}  ·  ${meta.company || "BN Performance Training"}`, MARGIN, h - 9);
     doc.text(`${p}/${pages}`, w - MARGIN, h - 9, { align: "right" });
   }
 }

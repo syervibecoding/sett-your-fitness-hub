@@ -33,6 +33,7 @@ export function useWorkoutSession(studentId: string | null, companyId: string | 
   const [elapsed, setElapsed] = useState(0);
   const [summary, setSummary] = useState<SessionSummary | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const finishingRef = useRef(false); // A9 — evita conceder XP em dobro (double-click / corrida com autosave).
 
   // Restore from localStorage
   useEffect(() => {
@@ -88,6 +89,7 @@ export function useWorkoutSession(studentId: string | null, companyId: string | 
     };
     setActiveSession(session);
     setElapsed(0);
+    finishingRef.current = false; // novo treino é finalizável de novo
     localStorage.setItem(STORAGE_KEY(studentId), JSON.stringify(session));
   }, [studentId, companyId]);
 
@@ -96,7 +98,8 @@ export function useWorkoutSession(studentId: string | null, companyId: string | 
     exercises: { exercise_name: string; muscle_group: string; sets: string }[],
     previousBestWeights: Record<string, number>
   ) => {
-    if (!activeSession || !studentId) return null;
+    if (!activeSession || !studentId || finishingRef.current) return null;
+    finishingRef.current = true; // A9 — trava reentrância: só um award_xp por sessão.
 
     const now = Date.now();
     const durationSeconds = Math.floor((now - activeSession.startedAt) / 1000);
@@ -176,6 +179,7 @@ export function useWorkoutSession(studentId: string | null, companyId: string | 
     setElapsed(0);
     localStorage.removeItem(STORAGE_KEY(studentId));
 
+    finishingRef.current = false;
     return result;
   }, [activeSession, studentId]);
 
