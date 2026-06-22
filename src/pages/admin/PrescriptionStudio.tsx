@@ -62,6 +62,9 @@ export default function PrescriptionStudio() {
   const [sendingAssess, setSendingAssess] = useState(false);
   const [editPlan, setEditPlan] = useState<any | null>(null);
   const [showEdit, setShowEdit] = useState(false);
+  const [library, setLibrary] = useState<{ id: string; name: string; muscle_group: string | null }[]>([]);
+  const [pickerWorkout, setPickerWorkout] = useState<number | null>(null);
+  const [pickerSearch, setPickerSearch] = useState("");
   const [tab, setTab]             = useState("anamnese");
 
   // Anamnese state
@@ -408,6 +411,13 @@ export default function PrescriptionStudio() {
     if (results.musculacao) { try { setEditPlan(JSON.parse(JSON.stringify(results.musculacao))); } catch { setEditPlan(results.musculacao); } }
     else setEditPlan(null);
   }, [results.musculacao]);
+  // Biblioteca de exercícios para o seletor ao adicionar exercício na edição.
+  useEffect(() => {
+    (async () => {
+      const { data } = await db.from("exercise_library").select("id, name, muscle_group").order("name");
+      setLibrary(((data as any[]) || []).map((r) => ({ id: r.id, name: r.name, muscle_group: r.muscle_group })));
+    })();
+  }, []);
   const updateExField = (wi: number, ei: number, field: string, value: any) =>
     setEditPlan((p: any) => { if (!p) return p; const n = JSON.parse(JSON.stringify(p)); if (n.workouts?.[wi]?.exercises?.[ei]) n.workouts[wi].exercises[ei][field] = value; return n; });
   const updateWName = (wi: number, value: string) =>
@@ -428,6 +438,18 @@ export default function PrescriptionStudio() {
       n.workouts.push({ name: `Treino ${String.fromCharCode(65 + n.workouts.length)}`, day_of_week: n.workouts.length + 1, exercises: [] });
       return n;
     });
+  // Adiciona um exercício escolhido da BIBLIOTECA (com exercise_id → vídeo etc. no app).
+  const pickExercise = (wi: number, lib: { id: string; name: string; muscle_group: string | null }) => {
+    setEditPlan((p: any) => {
+      if (!p) return p; const n = JSON.parse(JSON.stringify(p));
+      if (n.workouts?.[wi]) {
+        n.workouts[wi].exercises = n.workouts[wi].exercises || [];
+        n.workouts[wi].exercises.push({ exercise_id: lib.id, exercise_name: lib.name, library_exercise_name: lib.name, muscle_group: lib.muscle_group || "", sets: 3, reps: "10-12", rest_seconds: 60, cues: "", exercise_order: n.workouts[wi].exercises.length + 1 });
+      }
+      return n;
+    });
+    setPickerWorkout(null); setPickerSearch("");
+  };
 
   // ── Avaliação funcional: baixar PDF / enviar no WhatsApp ──────────────────
   function assessmentMeta() {
@@ -866,7 +888,7 @@ export default function PrescriptionStudio() {
                               </div>
                               {(w.exercises || []).map((ex: any, ei: number) => (
                                 <div key={ei} className="grid grid-cols-12 gap-1 items-center">
-                                  <Input className="col-span-12 sm:col-span-3 h-7 text-xs px-1" value={ex.exercise_name || ""} onChange={e => updateExField(wi, ei, "exercise_name", e.target.value)} placeholder="exercício" />
+                                  <span className="col-span-12 sm:col-span-3 text-xs font-medium truncate" title={ex.exercise_name || ""}>{ex.exercise_name || "—"}</span>
                                   <Input className="col-span-3 sm:col-span-1 h-7 text-xs px-1" value={String(ex.sets ?? "")} onChange={e => updateExField(wi, ei, "sets", e.target.value)} placeholder="séries" />
                                   <Input className="col-span-3 sm:col-span-2 h-7 text-xs px-1" value={String(ex.reps ?? "")} onChange={e => updateExField(wi, ei, "reps", e.target.value)} placeholder="reps" />
                                   <Input className="col-span-3 sm:col-span-2 h-7 text-xs px-1" value={String(ex.rest_seconds ?? "")} onChange={e => updateExField(wi, ei, "rest_seconds", e.target.value)} placeholder="desc(s)" />
@@ -874,7 +896,21 @@ export default function PrescriptionStudio() {
                                   <button type="button" onClick={() => removeExercise(wi, ei)} className="col-span-3 sm:col-span-1 text-red-500 text-sm" title="Remover exercício">✕</button>
                                 </div>
                               ))}
-                              <button type="button" onClick={() => addExercise(wi)} className="text-xs text-[#1B2B4A] underline mt-1">+ Adicionar exercício</button>
+                              <button type="button" onClick={() => { setPickerWorkout(pickerWorkout === wi ? null : wi); setPickerSearch(""); }} className="text-xs text-[#1B2B4A] underline mt-1">+ Adicionar exercício</button>
+                              {pickerWorkout === wi && (
+                                <div className="mt-2 border rounded-lg p-2 bg-slate-50">
+                                  <Input value={pickerSearch} onChange={e => setPickerSearch(e.target.value)} placeholder="Buscar na biblioteca..." className="h-8 text-xs mb-2" />
+                                  <div className="max-h-44 overflow-y-auto space-y-1">
+                                    {library.length === 0 && <p className="text-xs text-slate-400">Carregando biblioteca…</p>}
+                                    {library.filter(l => (l.name || "").toLowerCase().includes(pickerSearch.trim().toLowerCase())).slice(0, 50).map(l => (
+                                      <button type="button" key={l.id} onClick={() => pickExercise(wi, l)} className="w-full text-left text-xs px-2 py-1 rounded border border-transparent hover:bg-white hover:border-slate-200 flex justify-between gap-2">
+                                        <span className="truncate">{l.name}</span>
+                                        {l.muscle_group && <span className="text-slate-400 shrink-0">{l.muscle_group}</span>}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           ))}
                           <button type="button" onClick={addWorkout} className="text-sm text-[#1B2B4A] underline">+ Adicionar treino</button>
