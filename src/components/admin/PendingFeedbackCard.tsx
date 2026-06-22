@@ -46,6 +46,13 @@ export function PendingFeedbackCard({ companyId, routePrefix }: { companyId: str
 
   const goStudent = (sid: string) => navigate(`/${routePrefix || "admin"}/students/${sid}`);
 
+  // G1 — sugestão de ajuste do próximo ciclo a partir do feedback (mesma lógica do RPC next_cycle_recommendation).
+  const recoFor = (r: any) => {
+    if (r.nps != null && r.nps <= 6) return "Sugestão: reduzir volume/intensidade e alinhar expectativa.";
+    if (r.wants_adjustment) return "Sugestão: aplicar o ajuste pedido no próximo ciclo.";
+    return "Sugestão: pode progredir o estímulo.";
+  };
+
   return (
     <Card className="bg-card border-border">
       <CardHeader className="pb-3">
@@ -77,6 +84,7 @@ export function PendingFeedbackCard({ companyId, routePrefix }: { companyId: str
                   {r.wants_adjustment && r.adjustment_notes && (
                     <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{r.adjustment_notes}</p>
                   )}
+                  <p className="mt-1 text-[11px] text-primary">{recoFor(r)}</p>
                   <div className="mt-1.5 flex items-center gap-2">
                     <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => goStudent(r.student_id)}>Abrir aluno</Button>
                     <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => markApplied(r.id)}><Check className="mr-1 h-3.5 w-3.5" /> Revisado</Button>

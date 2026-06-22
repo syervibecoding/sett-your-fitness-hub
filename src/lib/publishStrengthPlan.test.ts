@@ -21,6 +21,10 @@ describe("mapStrengthExercise", () => {
       reps: "20s",
       rest: "30s",
       notes: "Glúteo contraído",
+      // Campos de método/sistema de treino carregados pro app do aluno (badge explicado).
+      method: null,
+      group_id: null,
+      method_seconds: null,
     });
   });
 

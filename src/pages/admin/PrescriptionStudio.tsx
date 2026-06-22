@@ -406,6 +406,20 @@ export default function PrescriptionStudio() {
         aiOriginal: results.musculacao, // P9/P15 — versiona + resume edições do professor.
       });
       setPublished({ workoutsCreated: r.workoutsCreated, createdEnrollment: r.createdEnrollment });
+      // P14 — trilha de decisão desta publicação (best-effort; não bloqueia).
+      try {
+        const readiness = (prescriptionIntegration as any)?.readiness?.status ?? null;
+        const editedFlag = JSON.stringify(results.musculacao?.workouts || []) !== JSON.stringify((editPlan || results.musculacao)?.workouts || []);
+        const decisions: string[] = [];
+        if (readiness && readiness !== "pronto") decisions.push(`prontidão: ${readiness}`);
+        if (noLib.length) decisions.push(`${noLib.length} fora da biblioteca`);
+        if (editedFlag) decisions.push("editado pelo professor");
+        await db.from("ai_decision_logs").insert({
+          student_id: studentId, company_id: companyId, source: "publish",
+          summary: decisions.length ? decisions.join(" · ") : "publicado como a IA gerou",
+          payload: { readiness, edited: editedFlag, no_library: noLib.length, workouts: (editPlan || results.musculacao)?.workouts?.length || 0 },
+        });
+      } catch { /* log opcional */ }
       // Avisa o aluno no WhatsApp que a prescrição já está no app (abre o wa.me pré-preenchido).
       const nome = (student?.name || "").trim().split(/\s+/)[0] || "";
       void openStudentChat({

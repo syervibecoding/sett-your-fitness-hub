@@ -33,6 +33,12 @@ export function useStudentTimeline(studentId: string | null) {
 
     await Promise.all([
       safe(async () => {
+        // P10 — mostra cada VERSÃO da anamnese (histórico); fallback p/ a linha única se não houver histórico.
+        const { data: hist } = await (supabase as any).from("student_anamnesis_history").select("id, version, created_at, snapshot").eq("student_id", studentId);
+        if (hist && hist.length) {
+          hist.forEach((h: any) => out.push({ id: `anamh-${h.id}`, kind: "anamnese", date: pickDate(h.created_at), title: `Anamnese (v${h.version})`, subtitle: h.snapshot?.objective || undefined }));
+          return;
+        }
         const { data } = await supabase.from("student_anamneses").select("id, created_at, objective").eq("student_id", studentId);
         (data ?? []).forEach((a: any) => out.push({ id: `anam-${a.id}`, kind: "anamnese", date: pickDate(a.created_at), title: "Anamnese preenchida", subtitle: a.objective || undefined }));
       }),

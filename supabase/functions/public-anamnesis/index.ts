@@ -365,6 +365,20 @@ Deno.serve(async (req) => {
         });
       }
 
+      // P10 — snapshot append-only (histórico de versões da anamnese). Best-effort.
+      try {
+        const { count } = await supabase
+          .from("student_anamnesis_history")
+          .select("id", { count: "exact", head: true })
+          .eq("student_id", invite.student_id);
+        await supabase.from("student_anamnesis_history").insert({
+          student_id: invite.student_id,
+          company_id: invite.company_id,
+          version: (count || 0) + 1,
+          snapshot: payload,
+        });
+      } catch (_e) { /* histórico opcional, não bloqueia o submit */ }
+
       await supabase
         .from("anamnese_invites")
         .update({ status: "completed", completed_at: new Date().toISOString() })
