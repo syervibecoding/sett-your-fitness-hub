@@ -233,7 +233,7 @@ export default function StudentPortal() {
       // que EXISTE no banco vivo (zshrcg). O cast evita o erro de tipo.
       const { data: cyclesData } = await (supabase as any)
         .from("training_cycles")
-        .select("id, cycle_number, start_date, end_date, status, objective, duration_weeks")
+        .select("id, cycle_number, start_date, end_date, status, objective, duration_weeks, delivery_status")
         .eq("student_id", student.id)
         .order("cycle_number");
 
@@ -299,6 +299,10 @@ export default function StudentPortal() {
           byNewest[0] ||
           enriched[0];
         setSelectedCycle(chosen);
+        // P6 — marca a prescrição como vista assim que o aluno abre o ciclo escolhido.
+        if (chosen?.id && (chosen as any).delivery_status !== "viewed") {
+          void (supabase as any).from("training_cycles").update({ delivery_status: "viewed" }).eq("id", chosen.id);
+        }
         const todayDow = new Date().getDay();
         const todaysWorkout = chosen.workouts.find(w => w.day_of_week === todayDow);
         if (todaysWorkout) {

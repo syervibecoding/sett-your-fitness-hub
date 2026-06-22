@@ -153,6 +153,7 @@ export async function publishStrengthPlanToStudent(opts: {
       name: plan?.cycle_name ?? "Ciclo de treino",
       objective: plan?.objective ?? null,
       duration_weeks: durationWeeks,
+      delivery_status: "sent", // P6 — entrega: vira "viewed" quando o aluno abre o ciclo.
     })
     .select("id")
     .single();
