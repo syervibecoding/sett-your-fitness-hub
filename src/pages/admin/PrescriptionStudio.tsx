@@ -30,6 +30,7 @@ import {
 } from "@/lib/prescriptionIntegration";
 import { readEdgeError } from "@/lib/edgeError";
 import { publishStrengthPlanToStudent } from "@/lib/publishStrengthPlan";
+import { PeriodizationRoadmap } from "@/components/admin/PeriodizationRoadmap";
 import { openStudentChat } from "@/lib/studentChat";
 import { toast } from "sonner";
 
@@ -387,6 +388,17 @@ export default function PrescriptionStudio() {
   // ── Publica o treino de força gerado para o app do aluno ────────────────
   async function publishToStudent() {
     if (!results.musculacao || !studentId || !companyId) return;
+    // P13 — checagem pré-publicação: avisa exercícios fora da biblioteca (sem vídeo/ligação).
+    const plan0: any = editPlan || results.musculacao;
+    const noLib: string[] = [];
+    (plan0?.workouts || []).forEach((w: any) => (w?.exercises || []).forEach((e: any) => {
+      if (!e?.exercise_id) noLib.push(e?.exercise_name || e?.library_exercise_name || "exercício");
+    }));
+    if (noLib.length) {
+      const sample = [...new Set(noLib)].slice(0, 6).join(", ");
+      const ok = window.confirm(`${noLib.length} exercício(s) fora da biblioteca (sem vídeo/ligação): ${sample}${noLib.length > 6 ? "…" : ""}.\n\nDá pra trocá-los pela biblioteca na edição (clique no nome do exercício). Publicar assim mesmo?`);
+      if (!ok) return;
+    }
     setPublishing(true); setError(""); setPublished(null);
     try {
       const r = await publishStrengthPlanToStudent({
@@ -873,6 +885,14 @@ export default function PrescriptionStudio() {
                   <Button onClick={downloadPDFs} className="w-full bg-[#8B7355] hover:bg-[#8B7355]/90 mt-2">
                     <Download className="h-4 w-4 mr-2" /> Baixar PDFs separados ({Object.keys(results).length})
                   </Button>
+
+                  {results.musculacao && (
+                    <PeriodizationRoadmap
+                      objective={results.musculacao.objective}
+                      durationWeeks={results.musculacao.duration_weeks}
+                      className="mt-2"
+                    />
+                  )}
 
                   {/* Revisar e editar a prescrição de força ANTES de publicar no app */}
                   {editPlan && Array.isArray(editPlan.workouts) && (

@@ -203,6 +203,11 @@ export default function WorkoutBuilder() {
       return { ...w, exercises: w.exercises.map((e, k) => sel.includes(k) ? { ...e, method, group_id: null, method_seconds: methodSeconds } : e) };
     }));
     clearMethodSel(wIdx);
+    // P7 — doutrina método×fase: técnicas intensas rendem mais na intensificação/choque, não na base.
+    const INTENSITY = new Set<MethodId>(["dropset", "restpause", "cluster", "giantset"]);
+    if (INTENSITY.has(method)) {
+      toast({ title: `${meta.label} aplicado`, description: "Técnica intensa: rende mais nas semanas de intensificação/choque (evite na base). O aluno verá a explicação no marcador do exercício." });
+    }
   };
 
   const ungroupBlock = (wIdx: number, idxs: number[]) =>

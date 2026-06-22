@@ -264,6 +264,27 @@ export default function FinancialDashboard() {
   };
 
   const handleIssueInvoice = async (asaasPaymentId: string) => {
+    // P3 — valida cadastro fiscal (CPF + endereço/CEP) antes de emitir. Evita NFS-e vazia/erro.
+    const pay: any = allPayments.find((p) => p.asaas_payment_id === asaasPaymentId);
+    if (pay?.student_id) {
+      let s: any = null;
+      try {
+        const { data } = await supabase.from("students").select("cpf, cep, address").eq("id", pay.student_id).maybeSingle();
+        s = data;
+      } catch { s = null; }
+      if (s) {
+        const cpf = String(s.cpf || "").replace(/\D/g, "");
+        const cep = String(s.cep || "").replace(/\D/g, "");
+        const missing: string[] = [];
+        if (cpf.length < 11) missing.push("CPF");
+        if (cep.length < 8) missing.push("CEP");
+        if (!String(s.address || "").trim()) missing.push("endereço");
+        if (missing.length) {
+          const ok = window.confirm(`Cadastro fiscal incompleto: falta ${missing.join(", ")}. A NFS-e pode sair vazia ou falhar. Emitir mesmo assim?`);
+          if (!ok) return;
+        }
+      }
+    }
     setIssuingInvoice(asaasPaymentId);
     try {
       const { data, error } = await supabase.functions.invoke("asaas-integration", {
