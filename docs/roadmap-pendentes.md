@@ -75,6 +75,39 @@ alter table public.trainer_assignments_history add column if not exists deleted_
 - **Falta (adiado):** logo (imagem inline) + paleta por empresa, e **passar** company/professional/cref reais
   da sessão nos call-sites (hoje caem no default "Matheus Loreto / BN"). Wiring simples nos `generate*PDF`.
 
+## Lote 6 — Backend de inteligência (cron/analytics) — exige DEPLOY + tabela com RLS
+> Todos abaixo só funcionam deployados (edge/cron) e com tabela nova RLS-escopada → fora da fase
+> "rodar local". Especificados aqui prontos pra implementar quando o deploy for liberado.
+
+### Q2/T1 — Reativação automática de inativos (delta)
+- **Já existe:** `AtRiskStudents` (client) já detecta dias sem treino via `studentStatus.ts`, e o dashboard
+  tem contador de inativos. **Falta (deploy):** cron diário (`detect-inactive-students`) que, para alunos com
+  ciclo ativo e 7+ dias sem `workout_logs`, gera mensagem de reativação pronta (WhatsApp) — opcionalmente
+  numa tabela `admin_alerts`.
+
+### G1/T5 — Feedback do aluno retroalimenta o motor
+- **Já existe:** `cycle_feedback` (nps/wants_adjustment/applied) + `student-workout-feedback` (feedback por
+  treino → WhatsApp do treinador) + card de pendências (novo).
+- **Falta (deploy):** `feedback-aggregator` — ao fim do ciclo, consolida nps + dor + aderência e RECOMENDA o
+  preset do próximo ciclo (ex.: "nps baixo + dor → -1 nível de volume"). Grava num campo do ciclo / `ai_decision_logs`.
+
+### G2/T6 — Coorte / churn (RPC SQL)
+```sql
+create or replace function public.cohort_adherence(_company_id uuid)
+returns table(bucket text, alunos int, completou_ciclo numeric, churn numeric)
+language sql stable security definer as $$
+  -- agrupa por dor inicial / nps / nível; cruza cycle_feedback + training_cycles + workout_logs.
+  -- (corpo a definir conforme as métricas finais desejadas)
+  select 'todos'::text, count(*)::int, 0::numeric, 0::numeric from public.students where company_id = _company_id;
+$$;
+-- expor no AICoachHub: "alunos com dor inicial = 60% churn → prescreva conservador".
+```
+
+### A10/A11 — Lembrete de fim de ciclo + check-in semanal
+- **Falta (deploy):** cron que, ao atingir `training_cycles.end_date`, dispara push/WhatsApp "como foi o ciclo?"
+  (alimenta G1); e um check-in semanal (segunda-feira) com link de feedback. Push real depende de inscrição
+  Web Push (o SW já existe; falta o fluxo de subscription + VAPID).
+
 ---
 **Já entregue (não estava claro no roadmap original):**
 - **PWA** já completo: `manifest.webmanifest` linkado, Service Worker real (`public/sw.js`,
