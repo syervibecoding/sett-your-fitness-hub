@@ -106,13 +106,21 @@ function createUserClient(req: Request) {
 
 function fallbackNutritionPlan(input: any, rawText = "") {
   const weight = Number(input.weight_kg) || 75;
-  const targetKcal = input.objective === "emagrecimento" ? 2200 : 2800;
-  return {
+  const obj = String(input.objective || "").toLowerCase();
+  // T3 — endurance: por flag explícita ou pela modalidade/objetivo.
+  const endurance = input.is_endurance_athlete === true ||
+    /endurance|corrida|run|triat|maraton|ciclis|nata[cç]/.test(`${obj} ${String(input.training_modality || "").toLowerCase()}`);
+  // T4 — kcal por OBJETIVO; endurance/performance puxam energia e carbo pra cima.
+  const targetKcal = obj.includes("emagre")
+    ? 2200
+    : (endurance || obj.includes("perform") || obj.includes("ganho") || obj.includes("hipert")) ? 3000 : 2800;
+  const carbsPerKg = endurance ? 5.5 : 3.5;
+  const plan: any = {
     plan_name: "Dicas Nutricionais BN",
     energy_summary: {
       target_kcal: targetKcal,
-      protein_total_g: Math.round(weight * 2),
-      carbs_total_g: Math.round(weight * 3.5),
+      protein_total_g: Math.round(weight * (endurance ? 1.8 : 2)),
+      carbs_total_g: Math.round(weight * carbsPerKg),
       fat_total_g: Math.round(weight * 0.9),
     },
     nutrition_tips: [
@@ -173,6 +181,22 @@ function fallbackNutritionPlan(input: any, rawText = "") {
       ? `A IA retornou resposta parcial. Use este plano base e revise. Prévia: ${clean(rawText).slice(0, 500)}`
       : "Plano base gerado para continuidade. Revisar preferências, restrições e rotina do aluno.",
   };
+  // T3 — restrições de endurance: CHO obrigatório, sem déficit agressivo nem jejum longo em volume.
+  if (endurance) {
+    plan.endurance_constraints =
+      "Carboidrato é prioridade (4-7 g/kg/dia, até 8+ em volume alto). NÃO usar déficit agressivo (>15%) nem jejum prolongado (>12h) em fase de volume — comprometem performance e recuperação. Repor CHO e eletrólitos em treinos longos/intensos.";
+    plan.nutrition_tips = [
+      {
+        title: "Durante treinos longos",
+        timing: "A cada 45 a 60 minutos",
+        goal: "Manter a glicemia e a performance em sessões acima de ~75 min.",
+        how_much: "30 a 60 g de carboidrato por hora (bebida, gel ou fruta) + água e eletrólitos.",
+        examples: ["bebida de carboidrato", "gel de carboidrato", "banana"],
+      },
+      ...plan.nutrition_tips,
+    ];
+  }
+  return plan;
 }
 
 function normalizeNutritionPlan(plan: any, input: any, rawText = "") {

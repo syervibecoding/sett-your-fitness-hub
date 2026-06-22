@@ -873,9 +873,17 @@ function buildEmergencyFallbackPlan(args: {
     lvlText.includes("inic") ? "iniciante" : lvlText.includes("avan") ? "avancado" : "intermediario";
   const hasPain = kneeRisk || backRisk || /dor|lesao|lesão/.test(riskText);
 
+  // Q3/T2 — prontidão (readiness) em "cautela" corta ~20% o volume das fases de força.
+  const readinessStatus = (args.prescriptionIntegration as any)?.readiness?.status;
+  const lowReadiness = readinessStatus === "cautela";
+  const volMult = lowReadiness ? 0.8 : 1;
+
   const makeWorkout = (name: string, day: number, focus: string, specs: FallbackExerciseSpec[]) => {
     const exercises = specs
-      .map((spec, index) => fallbackExercise(args.catalog, usedIds, riskText, { ...spec, order: index + 1 }, clean(args.objective || "")))
+      .map((spec, index) => {
+        const sets = volMult < 1 && /^forca/.test(spec.phase) ? Math.max(1, Math.round(spec.sets * volMult)) : spec.sets;
+        return fallbackExercise(args.catalog, usedIds, riskText, { ...spec, sets, order: index + 1 }, clean(args.objective || ""));
+      })
       .filter(Boolean) as any[];
     return {
       name,
@@ -884,7 +892,7 @@ function buildEmergencyFallbackPlan(args: {
       split_focus: focus,
       exercises,
       volume_load_estimate: "Conservador; usar RIR 2-4 e dor <= 3.",
-      notes: "Motor BN: técnica antes de carga; troca de estímulo a cada 2 semanas; revisar se houver dor/restrição.",
+      notes: `Motor BN: técnica antes de carga; troca de estímulo a cada 2 semanas; revisar se houver dor/restrição.${volMult < 1 ? " Volume das fases de força reduzido ~20% por prontidão em cautela (readiness)." : ""}`,
     };
   };
 
