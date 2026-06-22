@@ -302,8 +302,8 @@ export default function UnifiedPrescriber() {
       <div className="max-w-3xl mx-auto space-y-5">
         <div>
           <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">Prescrição</p>
-          <h1 className="font-display text-3xl">Prescrição Integrada com IA</h1>
-          <p className="text-sm text-muted-foreground">Anamnese única · IAs em sequência · periodização sincronizada</p>
+          <h1 className="font-display text-3xl">Prescrição Integrada</h1>
+          <p className="text-sm text-muted-foreground">Anamnese única · prescrição automática por metodologia BN · periodização sincronizada</p>
         </div>
 
         <Card>
