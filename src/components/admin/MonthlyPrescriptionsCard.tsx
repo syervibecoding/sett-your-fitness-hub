@@ -3,9 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ClipboardList } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 // Prescrições feitas no mês corrente, na ordem em que foram feitas (mais recente primeiro).
-export function MonthlyPrescriptionsCard({ companyId }: { companyId: string | null | undefined }) {
+export function MonthlyPrescriptionsCard({ companyId, routePrefix }: { companyId: string | null | undefined; routePrefix?: string }) {
+  const navigate = useNavigate();
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -54,7 +56,7 @@ export function MonthlyPrescriptionsCard({ companyId }: { companyId: string | nu
         ) : (
           <div className="space-y-2 max-h-80 overflow-y-auto">
             {rows.map((r: any) => (
-              <div key={r.id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-secondary/40 border border-border">
+              <button key={r.id} type="button" onClick={() => navigate(`/${routePrefix || "admin"}/students/${r.student_id}`)} className="w-full text-left flex items-center justify-between gap-2 p-2 rounded-lg bg-secondary/40 border border-border hover:border-primary/40 transition-colors">
                 <div className="min-w-0">
                   <p className="text-sm font-sans font-medium text-foreground truncate">{r.name}</p>
                   <p className="text-xs text-muted-foreground font-sans">
@@ -69,7 +71,7 @@ export function MonthlyPrescriptionsCard({ companyId }: { companyId: string | nu
                   {r.has_cycling && <Badge variant="outline" className="text-[10px]">Ciclismo</Badge>}
                   {r.has_nutrition && <Badge variant="outline" className="text-[10px]">Nutrição</Badge>}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}

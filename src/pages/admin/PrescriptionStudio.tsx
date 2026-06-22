@@ -63,7 +63,8 @@ export default function PrescriptionStudio() {
   const [editPlan, setEditPlan] = useState<any | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [library, setLibrary] = useState<{ id: string; name: string; muscle_group: string | null }[]>([]);
-  const [pickerWorkout, setPickerWorkout] = useState<number | null>(null);
+  const [pickerTarget, setPickerTarget] = useState<{ wi: number; ei: number | null } | null>(null);
+  const [pickerGroup, setPickerGroup] = useState("");
   const [pickerSearch, setPickerSearch] = useState("");
   const [tab, setTab]             = useState("anamnese");
 
@@ -439,16 +440,21 @@ export default function PrescriptionStudio() {
       return n;
     });
   // Adiciona um exercício escolhido da BIBLIOTECA (com exercise_id → vídeo etc. no app).
-  const pickExercise = (wi: number, lib: { id: string; name: string; muscle_group: string | null }) => {
+  const pickExercise = (lib: { id: string; name: string; muscle_group: string | null }) => {
+    if (!pickerTarget) return;
+    const { wi, ei } = pickerTarget;
     setEditPlan((p: any) => {
       if (!p) return p; const n = JSON.parse(JSON.stringify(p));
-      if (n.workouts?.[wi]) {
-        n.workouts[wi].exercises = n.workouts[wi].exercises || [];
-        n.workouts[wi].exercises.push({ exercise_id: lib.id, exercise_name: lib.name, library_exercise_name: lib.name, muscle_group: lib.muscle_group || "", sets: 3, reps: "10-12", rest_seconds: 60, cues: "", exercise_order: n.workouts[wi].exercises.length + 1 });
+      const w = n.workouts?.[wi]; if (!w) return n;
+      w.exercises = w.exercises || [];
+      if (ei == null) {
+        w.exercises.push({ exercise_id: lib.id, exercise_name: lib.name, library_exercise_name: lib.name, muscle_group: lib.muscle_group || "", sets: 3, reps: "10-12", rest_seconds: 60, cues: "", exercise_order: w.exercises.length + 1 });
+      } else if (w.exercises[ei]) {
+        w.exercises[ei] = { ...w.exercises[ei], exercise_id: lib.id, exercise_name: lib.name, library_exercise_name: lib.name, muscle_group: lib.muscle_group || "" };
       }
       return n;
     });
-    setPickerWorkout(null); setPickerSearch("");
+    setPickerTarget(null); setPickerSearch(""); setPickerGroup("");
   };
 
   // ── Avaliação funcional: baixar PDF / enviar no WhatsApp ──────────────────
@@ -888,7 +894,7 @@ export default function PrescriptionStudio() {
                               </div>
                               {(w.exercises || []).map((ex: any, ei: number) => (
                                 <div key={ei} className="grid grid-cols-12 gap-1 items-center">
-                                  <span className="col-span-12 sm:col-span-3 text-xs font-medium truncate" title={ex.exercise_name || ""}>{ex.exercise_name || "—"}</span>
+                                  <button type="button" onClick={() => { setPickerTarget({ wi, ei }); setPickerSearch(""); setPickerGroup(""); }} className="col-span-12 sm:col-span-3 text-xs font-medium truncate text-left hover:text-[#1B2B4A] hover:underline" title="Trocar exercício (biblioteca)">{ex.exercise_name || "—"} ✎</button>
                                   <Input className="col-span-3 sm:col-span-1 h-7 text-xs px-1" value={String(ex.sets ?? "")} onChange={e => updateExField(wi, ei, "sets", e.target.value)} placeholder="séries" />
                                   <Input className="col-span-3 sm:col-span-2 h-7 text-xs px-1" value={String(ex.reps ?? "")} onChange={e => updateExField(wi, ei, "reps", e.target.value)} placeholder="reps" />
                                   <Input className="col-span-3 sm:col-span-2 h-7 text-xs px-1" value={String(ex.rest_seconds ?? "")} onChange={e => updateExField(wi, ei, "rest_seconds", e.target.value)} placeholder="desc(s)" />
@@ -896,18 +902,30 @@ export default function PrescriptionStudio() {
                                   <button type="button" onClick={() => removeExercise(wi, ei)} className="col-span-3 sm:col-span-1 text-red-500 text-sm" title="Remover exercício">✕</button>
                                 </div>
                               ))}
-                              <button type="button" onClick={() => { setPickerWorkout(pickerWorkout === wi ? null : wi); setPickerSearch(""); }} className="text-xs text-[#1B2B4A] underline mt-1">+ Adicionar exercício</button>
-                              {pickerWorkout === wi && (
+                              <button type="button" onClick={() => { setPickerTarget(pickerTarget?.wi === wi && pickerTarget?.ei == null ? null : { wi, ei: null }); setPickerSearch(""); setPickerGroup(""); }} className="text-xs text-[#1B2B4A] underline mt-1">+ Adicionar exercício</button>
+                              {pickerTarget?.wi === wi && (
                                 <div className="mt-2 border rounded-lg p-2 bg-slate-50">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <p className="text-[11px] font-medium text-slate-600">{pickerTarget.ei == null ? "Adicionar da biblioteca" : "Trocar exercício"}</p>
+                                    <button type="button" onClick={() => setPickerTarget(null)} className="text-[11px] text-slate-400">fechar</button>
+                                  </div>
                                   <Input value={pickerSearch} onChange={e => setPickerSearch(e.target.value)} placeholder="Buscar na biblioteca..." className="h-8 text-xs mb-2" />
+                                  <div className="flex flex-wrap gap-1 mb-2">
+                                    {["", ...Array.from(new Set(library.map(l => l.muscle_group).filter(Boolean) as string[])).sort()].map(g => (
+                                      <button type="button" key={g || "all"} onClick={() => setPickerGroup(g)} className={`px-2 py-0.5 rounded-full text-[10px] border ${pickerGroup === g ? "border-[#8B7355] bg-[#F5EDD8]/60 text-[#1B2B4A]" : "border-slate-200 text-slate-500"}`}>{g || "Todos"}</button>
+                                    ))}
+                                  </div>
                                   <div className="max-h-44 overflow-y-auto space-y-1">
                                     {library.length === 0 && <p className="text-xs text-slate-400">Carregando biblioteca…</p>}
-                                    {library.filter(l => (l.name || "").toLowerCase().includes(pickerSearch.trim().toLowerCase())).slice(0, 50).map(l => (
-                                      <button type="button" key={l.id} onClick={() => pickExercise(wi, l)} className="w-full text-left text-xs px-2 py-1 rounded border border-transparent hover:bg-white hover:border-slate-200 flex justify-between gap-2">
-                                        <span className="truncate">{l.name}</span>
-                                        {l.muscle_group && <span className="text-slate-400 shrink-0">{l.muscle_group}</span>}
-                                      </button>
-                                    ))}
+                                    {library
+                                      .filter(l => !pickerGroup || l.muscle_group === pickerGroup)
+                                      .filter(l => (l.name || "").toLowerCase().includes(pickerSearch.trim().toLowerCase()))
+                                      .slice(0, 60).map(l => (
+                                        <button type="button" key={l.id} onClick={() => pickExercise(l)} className="w-full text-left text-xs px-2 py-1 rounded border border-transparent hover:bg-white hover:border-slate-200 flex justify-between gap-2">
+                                          <span className="truncate">{l.name}</span>
+                                          {l.muscle_group && <span className="text-slate-400 shrink-0">{l.muscle_group}</span>}
+                                        </button>
+                                      ))}
                                   </div>
                                 </div>
                               )}

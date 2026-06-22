@@ -587,6 +587,7 @@ export default function StudentPortal() {
     });
 
     await session.finishSession(logs, selectedWorkout.exercises, previousBestWeights);
+    toast({ title: "Treino concluído! 🎉", description: "Mandou bem — orgulho do seu progresso. Bora pro próximo!" });
 
     // Abre o popup "Como foi o treino?" — a resposta vai pro WhatsApp do treinador.
     setFeedbackWorkoutTitle(selectedWorkout.title);

@@ -352,7 +352,7 @@ export default function AdminDashboard() {
 
         <DashboardAlerts />
 
-        <MonthlyPrescriptionsCard companyId={effectiveCompanyId} />
+        <MonthlyPrescriptionsCard companyId={effectiveCompanyId} routePrefix={(routePrefix as string) || "admin"} />
       </div>
     </>
   );

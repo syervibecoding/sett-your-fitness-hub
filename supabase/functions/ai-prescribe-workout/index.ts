@@ -768,13 +768,35 @@ type FallbackExerciseSpec = {
 };
 
 // Troca de estímulo a cada 2 semanas — instruções ESPECÍFICAS e acionáveis por tipo de exercício.
-function blockNote(phase: string, isIso: boolean): string {
+const METHOD_LABEL: Record<string, string> = { dropset: "drop-set", restpause: "rest-pause", cluster: "cluster-set" };
+
+// Método do isolador varia por objetivo + ordem (mais variedade; tudo com badge explicado no app).
+function isoMethodFor(objective: string, order: number): string {
+  const o = (objective || "").toLowerCase();
+  if (o.includes("emagre") || o.includes("perda")) return "dropset";          // densidade/metabólico
+  if (o.includes("perfor")) return order % 2 === 0 ? "cluster" : "restpause";  // qualidade com carga
+  return ["dropset", "restpause", "cluster"][order % 3];                        // hipertrofia/saúde: varia
+}
+
+// Troca de estímulo a cada 2 semanas, específica por TIPO de exercício e por OBJETIVO.
+function blockNote(phase: string, isIso: boolean, objective: string, method: string | null): string {
+  const o = (objective || "").toLowerCase();
+  const emagre = o.includes("emagre") || o.includes("perda");
+  const perf = o.includes("perfor");
   if (phase === "forca_global" || phase === "forca_especifica") {
-    return isIso
-      ? "semana 1 e 2: foco na execução e conexão muscular\nsemana 3 e 4: 2 drop-sets na última série (veja o que é no marcador do exercício)\nsemana 5 e 6: progredir a carga e chegar perto da falha"
-      : "semana 1 e 2: foco na técnica e na amplitude completa\nsemana 3 e 4: pirâmide crescente — suba a carga e baixe as reps a cada série\nsemana 5 e 6: progredir a carga mantendo a técnica";
+    if (isIso) {
+      const lbl = method ? (METHOD_LABEL[method] || method) : "uma técnica de intensidade";
+      const wk34 = emagre
+        ? `reduza o descanso e faça 1 ${lbl} na última série`
+        : perf
+        ? `1 ${lbl} mantendo a qualidade de cada repetição`
+        : `1 ${lbl} na última série (veja o que é no marcador)`;
+      return `semana 1 e 2: foco na execução e conexão muscular\nsemana 3 e 4: ${wk34}\nsemana 5 e 6: progredir a carga e a intensidade`;
+    }
+    if (emagre) return "semana 1 e 2: foco na técnica e no ritmo constante\nsemana 3 e 4: reduza o descanso (até ~45s) mantendo a carga\nsemana 5 e 6: progredir a carga sem perder o ritmo";
+    if (perf) return "semana 1 e 2: foco na técnica e na velocidade da subida\nsemana 3 e 4: aumentar a carga e baixar as reps (força)\nsemana 5 e 6: cargas altas em baixas repetições, com técnica";
+    return "semana 1 e 2: foco na técnica e na amplitude completa\nsemana 3 e 4: pirâmide crescente — suba a carga e baixe as reps a cada série\nsemana 5 e 6: progredir a carga mantendo a técnica";
   }
-  // preparação (mobilidade / core / ativação / controle motor): cadência concreta, nada subjetivo
   return "semana 1 e 2: aprender o movimento — cadência 2-0-2\nsemana 3 e 4: cadência 3-1-3 (3s descer, 1s pausa, 3s subir)\nsemana 5 e 6: cadência 4-2-4 com amplitude total";
 }
 
@@ -783,12 +805,14 @@ function fallbackExercise(
   usedIds: Set<string>,
   riskText: string,
   params: FallbackExerciseSpec & { order: number },
+  objective: string,
 ) {
   const exercise = pickCatalogExercise(catalog, params.keywords, usedIds, riskText);
   if (!exercise) return null;
   usedIds.add(exercise.id);
   const isIso = params.phase === "forca_especifica" || params.phase === "ativacao_especifica";
   const pain = /dor|lesa|les[aã]o/i.test(riskText || "");
+  const isoMethod = (isIso && !pain) ? isoMethodFor(objective, params.order || 1) : null;
   const setsN = params.sets;
   const set_types = Array.from({ length: setsN }, (_, i) => {
     if (!isIso && i === 0 && setsN >= 3) return "warmup";          // 1ª série dos compostos = aquecimento
@@ -810,12 +834,12 @@ function fallbackExercise(
     exercise_order: params.order,
     set_types,
     is_isolation: isIso,
-    method: (isIso && !pain) ? "dropset" : null,
+    method: isoMethod,
     group_id: null,
     method_seconds: null,
     cues: params.cue,
     biomechanical_note: params.note,
-    notes: blockNote(params.phase, isIso),
+    notes: blockNote(params.phase, isIso, objective, isoMethod),
     regression: exercise.regressions[0] || "Reduzir amplitude/carga e manter dor <= 3.",
     progression: exercise.progressions[0] || "Progredir reps antes de carga, mantendo técnica.",
   };
@@ -851,7 +875,7 @@ function buildEmergencyFallbackPlan(args: {
 
   const makeWorkout = (name: string, day: number, focus: string, specs: FallbackExerciseSpec[]) => {
     const exercises = specs
-      .map((spec, index) => fallbackExercise(args.catalog, usedIds, riskText, { ...spec, order: index + 1 }))
+      .map((spec, index) => fallbackExercise(args.catalog, usedIds, riskText, { ...spec, order: index + 1 }, clean(args.objective || "")))
       .filter(Boolean) as any[];
     return {
       name,
