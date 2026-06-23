@@ -786,6 +786,11 @@ export default function WhatsAppChat() {
                 filteredChats.map((chat) => {
                   const labels = chatLabels[chat.id] || [];
                   const lastSenderName = chat.last_sender_id ? senderNames[chat.last_sender_id] : null;
+                  const meta = chat.student_id ? studentMeta[chat.id] : undefined;
+                  const trainerName = meta?.trainerId
+                    ? (trainers.find((t) => t.id === meta.trainerId)?.name || senderNames[meta.trainerId] || "Treinador")
+                    : null;
+                  const statusLabel: Record<string, string> = { ativo: "Ativo", pendente: "Pendente", renovar: "Renovar", inativo: "Inativo" };
                   return (
                     <div key={chat.id} className="relative group">
                       <button
