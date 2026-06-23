@@ -155,7 +155,7 @@ export default function WhatsAppChat() {
   const loadChats = useCallback(async () => {
     let query = supabase
       .from("whatsapp_chats")
-      .select("*, student:students(full_name, whatsapp, category_id)")
+      .select("*, student:students(full_name, whatsapp, category_id, assigned_trainer_id, status)")
       .order("last_message_at", { ascending: false, nullsFirst: false });
 
     if (effectiveCompanyId) query = query.eq("company_id", effectiveCompanyId);
