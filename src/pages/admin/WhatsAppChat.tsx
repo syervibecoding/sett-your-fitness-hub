@@ -759,7 +759,23 @@ export default function WhatsAppChat() {
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <Button variant={activeFilter === "mine" ? "default" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setActiveFilter("mine")}>Minhas</Button>
+                <Button variant={activeFilter === "my-students" ? "default" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setActiveFilter(activeFilter === "my-students" ? "all" : "my-students")}><User className="h-3 w-3 mr-1" />Meus alunos</Button>
                 <Button variant={activeFilter === "no-workout" ? "default" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setActiveFilter("no-workout")}><AlertTriangle className="h-3 w-3 mr-1" />S/ Treino</Button>
+              </div>
+              <div className="flex items-center gap-1">
+                <Select value={trainerFilter} onValueChange={setTrainerFilter}>
+                  <SelectTrigger className="h-7 text-xs">
+                    <Users className="h-3 w-3 mr-1 shrink-0" />
+                    <SelectValue placeholder="Treinador" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os treinadores</SelectItem>
+                    <SelectItem value="none">Sem treinador</SelectItem>
+                    {trainers.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
