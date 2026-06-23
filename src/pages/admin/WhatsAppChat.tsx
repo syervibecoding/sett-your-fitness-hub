@@ -822,6 +822,28 @@ export default function WhatsAppChat() {
                               })}
                             </div>
                           )}
+                          {chat.student_id && (
+                            <div className="flex gap-1 mt-1 flex-wrap items-center">
+                              {meta && (
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "text-[10px] h-4 px-1.5 border",
+                                    meta.status === "ativo" && "bg-primary/10 text-primary border-primary/20",
+                                    meta.status === "pendente" && "bg-amber-500/15 text-amber-600 border-amber-500/30",
+                                    meta.status === "renovar" && "bg-destructive/10 text-destructive border-destructive/20",
+                                    meta.status === "inativo" && "text-muted-foreground",
+                                  )}
+                                >
+                                  {statusLabel[meta.status]}
+                                </Badge>
+                              )}
+                              <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                                <User className="h-2.5 w-2.5 mr-0.5" />
+                                {trainerName || "Sem treinador"}
+                              </Badge>
+                            </div>
+                          )}
                           <div className="flex items-center justify-between mt-0.5">
                             {lastSenderName && <p className="text-[10px] text-muted-foreground truncate">Enviado por: {lastSenderName}</p>}
                             <div className="flex items-center gap-1.5 shrink-0">
