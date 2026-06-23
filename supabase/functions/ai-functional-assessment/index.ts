@@ -1,11 +1,15 @@
+// ============================================================================
+// Functional Assessment — Avaliação Postural e Funcional (motor determinístico)
+//   Sem IA / sem Anthropic. Gera laudo técnico a partir dos dados clínicos
+//   (queixa principal, histórico de lesões, modalidade, nível) usando regras
+//   da Metodologia BN. Mantém o mesmo JSON consumido pelo frontend.
+// ============================================================================
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-const MODEL = "claude-sonnet-4-5-20250929";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +17,11 @@ const corsHeaders = {
 };
 
 const clean = (s: string) => (s || "").replace(/[^\x20-\x7E\u00C0-\u017F]/g, "");
+const normalize = (s: string) =>
+  (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 
 async function requireUser(req: Request) {
   const authHeader = req.headers.get("Authorization");
@@ -26,249 +35,307 @@ async function requireUser(req: Request) {
   return data.claims;
 }
 
-function aiErrorResponse(status: number) {
-  const msg =
-    status === 429 ? "Limite de requisições da IA atingido. Tente novamente em instantes." :
-    status === 401 ? "Chave da Anthropic inválida. Verifique a ANTHROPIC_API_KEY." :
-    status === 402 ? "Créditos da Anthropic esgotados." :
-    "Erro ao chamar a IA.";
-  return new Response(JSON.stringify({ error: msg }), {
-    status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+// ─── BASE DE REGRAS (Metodologia BN) ───────────────────────────────────────────
+type Rule = {
+  id: string;
+  keywords: string[];
+  nome: string;
+  localizacao: string;
+  causa: string;
+  impacto: string;
+  encurtados: string[];
+  fracos: string[];
+  restricoes: string[];
+  contraindicados: { exercicio: string; motivo: string }[];
+  cautela: { exercicio: string; adaptacao: string }[];
+  prioridade: string;
+  score: { area: keyof ScorePostural | keyof ScoreFuncional; penalidade: number }[];
+};
+
+interface ScorePostural {
+  total: number;
+  cabeca_cervical: number;
+  coluna_toracolombar: number;
+  pelve_quadril: number;
+  membros_inferiores: number;
+  obs: string;
+}
+interface ScoreFuncional {
+  total: number;
+  mobilidade_tornozelo: number;
+  mobilidade_quadril: number;
+  estabilidade_lombar: number;
+  controle_joelho: number;
+  simetria_movimento: number;
+  obs: string;
+}
+
+const RULES: Rule[] = [
+  {
+    id: "joelho",
+    keywords: ["joelho", "patela", "patelar", "valgo", "menisco", "condromalacia", "femoropatelar"],
+    nome: "Valgo dinâmico / sobrecarga de joelho",
+    localizacao: "bilateral",
+    causa: "Fraqueza de glúteo médio e rotadores externos do quadril + possível pronação de tornozelo",
+    impacto: "Risco elevado de dor patelofemoral e síndrome do estresse tibial; exige controle de joelho em agachamentos",
+    encurtados: ["Tensor da fáscia lata (TFL)", "Adutores", "Banda iliotibial"],
+    fracos: ["Glúteo médio", "Rotadores externos do quadril", "Vasto medial oblíquo"],
+    restricoes: ["Controle de joelho no agachamento", "Estabilidade de membro inferior unipodal"],
+    contraindicados: [
+      { exercicio: "Agachamento com carga máxima sem controle de técnica", motivo: "Reforça o padrão de valgo sob carga" },
+      { exercicio: "Leg press com joelhos em colapso medial", motivo: "Sobrecarrega a articulação femoropatelar" },
+    ],
+    cautela: [
+      { exercicio: "Agachamento livre", adaptacao: "Reduzir carga, priorizar técnica e amplitude controlada" },
+      { exercicio: "Afundo / passada", adaptacao: "Foco no alinhamento joelho-pé, volume progressivo" },
+    ],
+    prioridade: "Fortalecer glúteo médio e rotadores externos para corrigir o controle de joelho",
+    score: [{ area: "controle_joelho", penalidade: 3 }, { area: "membros_inferiores", penalidade: 2 }],
+  },
+  {
+    id: "lombar",
+    keywords: ["lombar", "lombalgia", "coluna", "hiperlordose", "lordose", "hernia", "disco", "costas baixa", "sacro"],
+    nome: "Instabilidade lombar / hiperlordose",
+    localizacao: "central",
+    causa: "Encurtamento de psoas e reto femoral + fraqueza de core e glúteo máximo",
+    impacto: "Sobrecarga lombar em cargas axiais; risco de dor sacroilíaca e lombalgia",
+    encurtados: ["Psoas (flexores do quadril)", "Eretores da espinha", "Reto femoral"],
+    fracos: ["Transverso do abdômen / core", "Glúteo máximo", "Multífidos"],
+    restricoes: ["Estabilidade lombo-pélvica", "Dissociação quadril-lombar"],
+    contraindicados: [
+      { exercicio: "Levantamento terra pesado sem domínio técnico", motivo: "Risco de sobrecarga lombar em flexão" },
+      { exercicio: "Agachamento com carga axial elevada", motivo: "Compressão lombar com core instável" },
+    ],
+    cautela: [
+      { exercicio: "Stiff / good morning", adaptacao: "Amplitude parcial e carga leve até estabilizar o core" },
+      { exercicio: "Agachamento", adaptacao: "Priorizar bracing abdominal e neutralidade pélvica" },
+    ],
+    prioridade: "Estabilização de core e alongamento de flexores do quadril",
+    score: [{ area: "estabilidade_lombar", penalidade: 3 }, { area: "coluna_toracolombar", penalidade: 2 }],
+  },
+  {
+    id: "ombro",
+    keywords: ["ombro", "manguito", "impacto", "protrusao", "cifose", "torax", "supraespinhal", "escapula"],
+    nome: "Protrusão de ombros / disfunção escapular",
+    localizacao: "bilateral",
+    causa: "Encurtamento de peitoral menor + fraqueza de romboides e trapézio inferior",
+    impacto: "Limitação de mobilidade overhead e risco de impacto subacromial",
+    encurtados: ["Peitoral menor", "Peitoral maior", "Trapézio superior"],
+    fracos: ["Romboides", "Trapézio inferior", "Manguito rotador"],
+    restricoes: ["Mobilidade overhead", "Estabilidade escapular"],
+    contraindicados: [
+      { exercicio: "Desenvolvimento atrás da nuca", motivo: "Posição de risco para impacto subacromial" },
+      { exercicio: "Supino com pegada muito aberta", motivo: "Estresse anterior de ombro com escápula instável" },
+    ],
+    cautela: [
+      { exercicio: "Desenvolvimento overhead", adaptacao: "Reduzir amplitude e priorizar estabilidade escapular" },
+      { exercicio: "Crucifixo", adaptacao: "Limitar amplitude posterior para proteger a cápsula anterior" },
+    ],
+    prioridade: "Mobilidade torácica e fortalecimento de retratores escapulares",
+    score: [{ area: "coluna_toracolombar", penalidade: 2 }, { area: "cabeca_cervical", penalidade: 1 }],
+  },
+  {
+    id: "tornozelo",
+    keywords: ["tornozelo", "dorsiflexao", "entorse", "panturrilha", "aquiles", "calcaneo", "fascite"],
+    nome: "Restrição de dorsiflexão de tornozelo",
+    localizacao: "bilateral",
+    causa: "Encurtamento de gastrocnêmio/sóleo ou restrição capsular do tornozelo",
+    impacto: "Inclinação excessiva de tronco no agachamento e compensação lombar",
+    encurtados: ["Gastrocnêmio", "Sóleo"],
+    fracos: ["Tibial anterior", "Fibulares"],
+    restricoes: ["Dorsiflexão de tornozelo", "Profundidade de agachamento"],
+    contraindicados: [
+      { exercicio: "Agachamento profundo sem calço com tornozelo restrito", motivo: "Força compensação lombar e valgo" },
+    ],
+    cautela: [
+      { exercicio: "Agachamento profundo", adaptacao: "Usar calço/anilha sob o calcanhar até ganhar mobilidade" },
+    ],
+    prioridade: "Ganho de mobilidade de tornozelo (dorsiflexão)",
+    score: [{ area: "mobilidade_tornozelo", penalidade: 3 }, { area: "membros_inferiores", penalidade: 1 }],
+  },
+  {
+    id: "quadril",
+    keywords: ["quadril", "pelve", "drop", "trendelenburg", "gluteo", "piriforme", "abdutor"],
+    nome: "Drop de pelve / fraqueza de abdutores",
+    localizacao: "bilateral",
+    causa: "Fraqueza de glúteo médio e mínimo (abdutores do quadril)",
+    impacto: "Desalinhamento em agachamentos/levantamentos e sobrecarga no IT band",
+    encurtados: ["Adutores", "Tensor da fáscia lata (TFL)"],
+    fracos: ["Glúteo médio", "Glúteo mínimo"],
+    restricoes: ["Mobilidade de quadril", "Estabilidade pélvica unipodal"],
+    contraindicados: [],
+    cautela: [
+      { exercicio: "Agachamento unilateral", adaptacao: "Reduzir amplitude e garantir nível pélvico" },
+    ],
+    prioridade: "Fortalecimento de abdutores do quadril e estabilidade pélvica",
+    score: [{ area: "mobilidade_quadril", penalidade: 2 }, { area: "pelve_quadril", penalidade: 2 }],
+  },
+  {
+    id: "cervical",
+    keywords: ["cervical", "pescoco", "cabeca", "anteriorizacao", "cefaleia", "trapezio"],
+    nome: "Anteriorização da cabeça",
+    localizacao: "central",
+    causa: "Encurtamento de suboccipitais e peitoral + fraqueza de flexores profundos do pescoço",
+    impacto: "Tensão cervical e limitação de mobilidade torácica",
+    encurtados: ["Suboccipitais", "Esternocleidomastóideo", "Peitoral menor"],
+    fracos: ["Flexores profundos do pescoço", "Trapézio inferior"],
+    restricoes: ["Extensão torácica"],
+    contraindicados: [],
+    cautela: [
+      { exercicio: "Encolhimento (shrug) pesado", adaptacao: "Carga moderada e foco postural" },
+    ],
+    prioridade: "Reeducação postural cervical e mobilidade torácica",
+    score: [{ area: "cabeca_cervical", penalidade: 3 }],
+  },
+  {
+    id: "pe",
+    keywords: ["pe", "pes", "pronacao", "supinacao", "chapado", "plano", "arco"],
+    nome: "Pronação excessiva de pé",
+    localizacao: "bilateral",
+    causa: "Colapso do arco plantar e fraqueza de musculatura intrínseca do pé",
+    impacto: "Cadeia ascendente: contribui para valgo de joelho e drop de pelve",
+    encurtados: ["Fibulares"],
+    fracos: ["Tibial posterior", "Musculatura intrínseca do pé"],
+    restricoes: ["Estabilidade do pé na fase de apoio"],
+    contraindicados: [],
+    cautela: [
+      { exercicio: "Saltos / pliometria", adaptacao: "Volume progressivo com foco no alinhamento do apoio" },
+    ],
+    prioridade: "Fortalecimento de tibial posterior e controle do arco plantar",
+    score: [{ area: "membros_inferiores", penalidade: 2 }],
+  },
+];
+
+function severityFromContext(text: string): "leve" | "moderada" | "severa" {
+  const t = normalize(text);
+  if (/(cirurgia|hernia|ruptura|grave|severa|forte|cronic|nao consigo|impossivel|lesao recente)/.test(t)) return "severa";
+  if (/(dor|desconforto|limitacao|leve dor|incomodo|recorrente)/.test(t)) return "moderada";
+  return "leve";
+}
+
+function buildAssessment(input: {
+  student_name: string;
+  queixa_principal: string;
+  historico_lesoes: string;
+  modalidade: string;
+  nivel: string;
+  imagesProvided: string[];
+}) {
+  const haystack = normalize(`${input.queixa_principal} ${input.historico_lesoes} ${input.modalidade}`);
+  const matched = RULES.filter((r) => r.keywords.some((k) => haystack.includes(normalize(k))));
+
+  const sev = severityFromContext(`${input.queixa_principal} ${input.historico_lesoes}`);
+
+  // Scores base (10 = ideal), penalizados por disfunção
+  const sp: ScorePostural = {
+    total: 10, cabeca_cervical: 10, coluna_toracolombar: 10, pelve_quadril: 10,
+    membros_inferiores: 10, obs: "Escala de 0 a 10 onde 10 é ideal.",
+  };
+  const sf: ScoreFuncional = {
+    total: 10, mobilidade_tornozelo: 10, mobilidade_quadril: 10, estabilidade_lombar: 10,
+    controle_joelho: 10, simetria_movimento: 10, obs: "Escala de 0 a 10 onde 10 é ideal.",
+  };
+  const sevMult = sev === "severa" ? 1.4 : sev === "moderada" ? 1 : 0.6;
+
+  const encurtados = new Set<string>();
+  const fracos = new Set<string>();
+  const restricoes = new Set<string>();
+  const contraindicados: { exercicio: string; motivo: string }[] = [];
+  const cautela: { exercicio: string; adaptacao: string }[] = [];
+  const prioridades: string[] = [];
+  const disfuncoes = matched.map((r) => {
+    r.encurtados.forEach((x) => encurtados.add(x));
+    r.fracos.forEach((x) => fracos.add(x));
+    r.restricoes.forEach((x) => restricoes.add(x));
+    r.contraindicados.forEach((x) => contraindicados.push(x));
+    r.cautela.forEach((x) => cautela.push(x));
+    if (!prioridades.includes(r.prioridade)) prioridades.push(r.prioridade);
+    for (const s of r.score) {
+      const pen = Math.round(s.penalidade * sevMult);
+      if (s.area in sp) (sp as any)[s.area] = Math.max(0, (sp as any)[s.area] - pen);
+      if (s.area in sf) (sf as any)[s.area] = Math.max(0, (sf as any)[s.area] - pen);
+    }
+    return {
+      nome: r.nome,
+      localizacao: r.localizacao,
+      gravidade: sev,
+      causa_provavel: r.causa,
+      impacto_treino: r.impacto,
+    };
   });
+
+  // Recalcula totais
+  sp.total = Math.round((sp.cabeca_cervical + sp.coluna_toracolombar + sp.pelve_quadril + sp.membros_inferiores) / 4);
+  sf.total = Math.round(
+    (sf.mobilidade_tornozelo + sf.mobilidade_quadril + sf.estabilidade_lombar + sf.controle_joelho + sf.simetria_movimento) / 5
+  );
+
+  if (prioridades.length === 0) {
+    prioridades.push("Manutenção da boa mecânica de movimento e progressão de carga controlada");
+  }
+
+  const nome = clean(input.student_name || "O aluno");
+  const modalidade = clean(input.modalidade || "treinamento");
+  const nivel = clean(input.nivel || "intermediário");
+
+  let relatorio: string;
+  if (disfuncoes.length === 0) {
+    relatorio =
+      `${nome}, sua avaliação não apontou disfunções relevantes a partir das informações fornecidas. ` +
+      `Isso é um ótimo ponto de partida para o seu programa de ${modalidade}.\n\n` +
+      `O foco do trabalho será manter a boa mecânica de movimento e aplicar a sobrecarga progressiva de forma segura, ` +
+      `respeitando o seu nível (${nivel}). Continuamos monitorando postura e padrões de movimento a cada ciclo.`;
+  } else {
+    const listaDisf = disfuncoes.map((d) => `• ${d.nome} (${d.gravidade})`).join("\n");
+    relatorio =
+      `${nome}, com base na sua queixa e histórico, identificamos alguns pontos de atenção que vamos trabalhar ao longo do programa:\n\n` +
+      `${listaDisf}\n\n` +
+      `Esses pontos são comuns e totalmente trabalháveis. O programa de ${modalidade} vai priorizar a correção desses padrões, ` +
+      `combinando fortalecimento das estruturas mais fracas, ganho de mobilidade onde há restrição e ajuste técnico nos exercícios. ` +
+      `Tudo respeitando o seu nível atual (${nivel}) e evoluindo de forma segura.\n\n` +
+      `A prioridade inicial será: ${prioridades[0].toLowerCase()}. Vamos acompanhar a evolução a cada ciclo.`;
+  }
+
+  const resumo =
+    `Avaliação determinística (Metodologia BN) — ${nome}.\n` +
+    `Disfunções: ${disfuncoes.length ? disfuncoes.map((d) => d.nome).join("; ") : "nenhuma relevante identificada"}.\n` +
+    `Músculos a priorizar (fortalecer): ${[...fracos].join(", ") || "—"}.\n` +
+    `Músculos a alongar/liberar: ${[...encurtados].join(", ") || "—"}.\n` +
+    `Restrições: ${[...restricoes].join(", ") || "—"}.\n` +
+    `Prioridades corretivas: ${prioridades.join(" → ")}.\n` +
+    `Score postural ${sp.total}/10 · Score funcional ${sf.total}/10.`;
+
+  return {
+    fonte: "bn_deterministic_engine",
+    imagens_recebidas: input.imagesProvided,
+    postura_estatica: {
+      vista_frontal: { observacoes: "Análise baseada em dados clínicos informados (sem leitura automática de imagem)." },
+      vista_lateral: { observacoes: "Análise baseada em dados clínicos informados (sem leitura automática de imagem)." },
+      vista_posterior: { observacoes: "Análise baseada em dados clínicos informados (sem leitura automática de imagem)." },
+    },
+    overhead_squat: {
+      vista_frontal: { observacoes: "Avaliar manualmente com as fotos enviadas." },
+      vista_lateral: { observacoes: "Avaliar manualmente com as fotos enviadas." },
+      vista_posterior: { observacoes: "Avaliar manualmente com as fotos enviadas." },
+    },
+    disfuncoes_identificadas: disfuncoes,
+    musculos_encurtados: [...encurtados],
+    musculos_fracos: [...fracos],
+    restricoes_movimento: [...restricoes],
+    prioridades_corretivas: prioridades,
+    exercicios_contraindicados: contraindicados,
+    exercicios_cautela: cautela,
+    score_postural: sp,
+    score_funcional: sf,
+    relatorio_para_aluno: relatorio,
+    resumo_para_prescricao: resumo,
+  };
 }
-
-// ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `
-Você é um especialista em avaliação postural e funcional da BN Performance Training.
-Sua função é analisar imagens de avaliação postural estática e overhead squat e gerar
-um laudo técnico completo que será usado para prescrição de treino individualizado.
-
-METODOLOGIA BN PERFORMANCE:
-A BN Performance Training avalia cada aluno em dois momentos:
-1. POSTURA ESTÁTICA — fotos de frente, lado e costas com grid de alinhamento
-2. MOVIMENTO FUNCIONAL — overhead squat de frente, lado e costas
-
-O objetivo é identificar compensações, disfunções e restrições que impactam
-tanto a performance (corrida, triathlon, musculação) quanto a estética corporal.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PROTOCOLO DE ANÁLISE — POSTURA ESTÁTICA
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-VISTA FRONTAL (com grid):
-□ Alinhamento da cabeça (inclinação lateral, rotação)
-□ Nível dos ombros (ombro mais alto/baixo, protração bilateral ou unilateral)
-□ Nível das cristas ilíacas (pelve mais alta de um lado)
-□ Joelhos (valgo/varo bilateral ou unilateral)
-□ Pés (pronação, supinação, rotação externa/interna)
-□ Simetria geral direita vs esquerda
-
-VISTA LATERAL:
-□ Posição da cabeça (anteriorização, retificação cervical)
-□ Ombros (protrusão anterior, cifose torácica)
-□ Coluna torácica (hipercifose, retificação)
-□ Coluna lombar (hiperlordose, retificação)
-□ Pelve (anteversão = hiperlordose lombar / retroversão = lordose reduzida)
-□ Quadril (flexão de quadril — hip flexors encurtados)
-□ Joelhos (hiperextensão, flexão)
-□ Tornozelos (flexão plantar compensatória)
-
-VISTA POSTERIOR (com grid):
-□ Alinhamento da coluna (escoliose funcional ou estrutural)
-□ Nível de escápulas (abdução, elevação)
-□ Altura das cristas ilíacas (drop da pelve em repouso)
-□ Joelhos (valgo/varo, rotação tibial)
-□ Calcanhares (pronação = calcâneo valgum)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PROTOCOLO DE ANÁLISE — OVERHEAD SQUAT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-VISTA FRONTAL:
-□ Assimetria de braços (um lado mais baixo/rotado)
-□ Inclinação lateral do tronco
-□ Joelhos: valgo bilateral ou unilateral (indica fraqueza de glúteo médio/rotadores externos)
-□ Pés: pronação excessiva, rotação externa compensatória
-□ Drop da pelve (um lado cai — Trendelenburg funcional)
-□ Deslocamento do peso para um lado
-
-VISTA LATERAL:
-□ Inclinação excessiva do tronco à frente
-  — Ângulo do tronco vs ângulo da tíbia (devem ser aproximadamente paralelos)
-  — Inclinação desproporcional indica: encurtamento de tornozelo (ADM limitada),
-    fraqueza de glúteos ou encurtamento de hip flexors
-□ Falta de ADM (amplitude de dorsiflexão do tornozelo)
-  — Identificar se limitação é de tornozelo ou de mobilidade de quadril
-□ Retroversão pélvica ao final do movimento ("butt wink")
-  — Indica encurtamento de isquiotibiais e limitação de dorsiflexão
-□ Aumento da lordose lombar durante o movimento
-  — Indica fraqueza de core + hip flexors encurtados
-□ Profundidade do agachamento (ADM total do movimento)
-
-VISTA POSTERIOR:
-□ Drop da pelve (um lado cai durante o agachamento)
-□ Assimetria de braços overhead
-□ Desvio lateral da coluna durante o movimento
-□ Rotação de quadril assimétrica
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DISFUNÇÕES E SUAS CAUSAS PROVÁVEIS (para referenciar no laudo)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-INCLINAÇÃO EXCESSIVA DO TRONCO NO SQUAT:
-→ Causa 1: Falta de ADM de tornozelo (dorsiflexão limitada)
-→ Causa 2: Fraqueza de glúteos/quadríceps
-→ Causa 3: Encurtamento de hip flexors (psoas/reto femoral)
-→ Impacto corrida: aumento de sobrecarga posterior, risco de lesão lombar
-
-DROP DA PELVE:
-→ Causa: Fraqueza de glúteo médio e pequeno (abdutores do quadril)
-→ Impacto corrida: síndrome do estresse tibial, STIC, dor no TFL/IT band
-→ Impacto musculação: desalinhamento nos agachamentos e levantamentos
-
-RETROVERSÃO PÉLVICA (BUTT WINK):
-→ Causa 1: Encurtamento de isquiotibiais
-→ Causa 2: Falta de mobilidade de quadril
-→ Causa 3: Fraqueza de core na estabilização lombar
-→ Impacto: sobrecarga lombar em cargas axiais
-
-VALGO DE JOELHO:
-→ Causa 1: Fraqueza de glúteo médio + rotadores externos
-→ Causa 2: Pronação excessiva de tornozelo
-→ Causa 3: Fraqueza de vasto medial
-→ Impacto corrida: risco elevado de STIC e dor patelofemoral
-→ Lado afetado sempre deve ser indicado (D, E ou bilateral)
-
-ASSIMETRIA DE BRAÇOS NO OVERHEAD:
-→ Causa 1: Limitação de mobilidade de ombro (geralmente o lado mais baixo)
-→ Causa 2: Desequilíbrio de trapézio/serrátil anterior
-→ Causa 3: Restrição de mobilidade torácica
-
-PROTRUSÃO DE OMBROS (postura estática):
-→ Causa: Peitoral menor encurtado + romboides/trapézio inferior fracos
-→ Impacto: limitação de mobilidade overhead, risco de impacto subacromial
-
-HIPERLORDOSE LOMBAR (postura estática):
-→ Causa: Psoas/reto femoral encurtados + core e glúteos fracos
-→ Impacto corrida: síndrome do piriforme, dor sacroilíaca, stress lombar
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-INSTRUÇÃO DE SAÍDA — RESPONDA APENAS COM JSON VÁLIDO
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Você deve retornar EXATAMENTE este JSON, sem texto adicional, sem markdown:
-
-{
-  "postura_estatica": {
-    "vista_frontal": {
-      "cabeca": "descrição ou null",
-      "ombros": "descrição ou null",
-      "pelve": "descrição ou null",
-      "joelhos": "descrição ou null",
-      "pes": "descrição ou null",
-      "observacoes": "outras observações"
-    },
-    "vista_lateral": {
-      "cabeca_pescoco": "descrição ou null",
-      "ombros": "descrição ou null",
-      "coluna_toracica": "descrição ou null",
-      "coluna_lombar": "descrição ou null",
-      "pelve": "descrição ou null",
-      "joelhos": "descrição ou null",
-      "observacoes": "outras observações"
-    },
-    "vista_posterior": {
-      "coluna": "descrição ou null",
-      "escapulas": "descrição ou null",
-      "pelve": "descrição ou null",
-      "joelhos_calcanhares": "descrição ou null",
-      "observacoes": "outras observações"
-    }
-  },
-  "overhead_squat": {
-    "vista_frontal": {
-      "bracos": "simétrico | assimetria direita | assimetria esquerda",
-      "joelhos": "sem alteração | valgo bilateral | valgo direito | valgo esquerdo | varo",
-      "pelve": "estável | drop direito | drop esquerdo",
-      "tronco": "centralizado | desvio direito | desvio esquerdo",
-      "observacoes": "outras observações"
-    },
-    "vista_lateral": {
-      "inclinacao_tronco": "adequada | excessiva",
-      "angulo_tibiotronco": "paralelo | tronco muito a frente",
-      "adm_tornozelo": "adequada | limitada",
-      "pelve_fundo": "neutra | retroversao | anteversao",
-      "lordose_lombar": "mantida | aumentada | reduzida",
-      "profundidade_squat": "completa | parcial | limitada",
-      "observacoes": "outras observações"
-    },
-    "vista_posterior": {
-      "drop_pelve": "ausente | direito | esquerdo",
-      "assimetria_bracas": "ausente | presente direito | presente esquerdo",
-      "desvio_coluna": "ausente | presente",
-      "observacoes": "outras observações"
-    }
-  },
-  "disfuncoes_identificadas": [
-    {
-      "nome": "nome da disfunção",
-      "localizacao": "bilateral | direito | esquerdo",
-      "gravidade": "leve | moderada | severa",
-      "causa_provavel": "descrição da causa",
-      "impacto_treino": "como isso afeta o treino"
-    }
-  ],
-  "musculos_encurtados": ["lista de músculos provavelmente encurtados"],
-  "musculos_fracos": ["lista de músculos provavelmente fracos/inibidos"],
-  "restricoes_movimento": ["lista de restrições de amplitude/mobilidade"],
-  "prioridades_corretivas": [
-    "1ª prioridade de intervenção",
-    "2ª prioridade",
-    "3ª prioridade"
-  ],
-  "exercicios_contraindicados": [
-    {
-      "exercicio": "nome do exercício",
-      "motivo": "por que contraindicar"
-    }
-  ],
-  "exercicios_cautela": [
-    {
-      "exercicio": "nome do exercício",
-      "adaptacao": "como adaptar para tornar seguro"
-    }
-  ],
-  "score_postural": {
-    "total": 0,
-    "cabeca_cervical": 0,
-    "coluna_toracolombar": 0,
-    "pelve_quadril": 0,
-    "membros_inferiores": 0,
-    "obs": "escala de 0 a 10 onde 10 é ideal"
-  },
-  "score_funcional": {
-    "total": 0,
-    "mobilidade_tornozelo": 0,
-    "mobilidade_quadril": 0,
-    "estabilidade_lombar": 0,
-    "controle_joelho": 0,
-    "simetria_movimento": 0,
-    "obs": "escala de 0 a 10 onde 10 é ideal"
-  },
-  "relatorio_para_aluno": "Texto em português claro, acolhedor e motivador (3-5 parágrafos). Explica o que foi encontrado em linguagem acessível, sem termos técnicos excessivos. Fala sobre os pontos de atenção e o que o programa vai trabalhar. Tom: profissional e encorajador.",
-  "resumo_para_prescricao": "Texto técnico resumido (2-3 parágrafos) para o profissional que vai prescrever o treino. Deve incluir as principais disfunções, músculos a priorizar, restrições e orientações específicas por modalidade se a informação estiver disponível."
-}
-`.trim();
 
 // ─── SERVIDOR ─────────────────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  if (!ANTHROPIC_API_KEY) {
-    return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY não configurada. Adicione o segredo para usar a IA." }), {
-      status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
   const claims = await requireUser(req);
   if (!claims) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -276,103 +343,44 @@ serve(async (req) => {
     });
   }
 
-
   try {
     const {
       student_id,
       student_name,
       company_id,
-      assessment_id,       // ID pré-gerado no frontend
-      // Imagens em base64 (podem ser parciais — nem todas são obrigatórias)
-      image_postura_frente,  // base64
-      image_postura_lado,    // base64
-      image_postura_costas,  // base64
-      image_squat_frente,    // base64
-      image_squat_lado,      // base64
-      image_squat_costas,    // base64
-      // Anamnese complementar
+      assessment_id,
+      image_postura_frente,
+      image_postura_lado,
+      image_postura_costas,
+      image_squat_frente,
+      image_squat_lado,
+      image_squat_costas,
       queixa_principal = "",
       historico_lesoes = "",
       modalidade = "",
       nivel = "",
     } = await req.json();
 
-    // Monta array de imagens disponíveis para o Claude
-    const imageContent: any[] = [];
-    const labels = [
-      { key: image_postura_frente, label: "POSTURA ESTÁTICA — VISTA FRONTAL" },
-      { key: image_postura_lado,   label: "POSTURA ESTÁTICA — VISTA LATERAL" },
-      { key: image_postura_costas, label: "POSTURA ESTÁTICA — VISTA POSTERIOR" },
-      { key: image_squat_frente,   label: "OVERHEAD SQUAT — VISTA FRONTAL" },
-      { key: image_squat_lado,     label: "OVERHEAD SQUAT — VISTA LATERAL" },
-      { key: image_squat_costas,   label: "OVERHEAD SQUAT — VISTA POSTERIOR" },
-    ];
+    const imagesProvided: string[] = [];
+    if (image_postura_frente) imagesProvided.push("Postura — Frontal");
+    if (image_postura_lado) imagesProvided.push("Postura — Lateral");
+    if (image_postura_costas) imagesProvided.push("Postura — Posterior");
+    if (image_squat_frente) imagesProvided.push("Overhead Squat — Frontal");
+    if (image_squat_lado) imagesProvided.push("Overhead Squat — Lateral");
+    if (image_squat_costas) imagesProvided.push("Overhead Squat — Posterior");
 
-    for (const { key, label } of labels) {
-      if (key) {
-        imageContent.push({ type: "text", text: `\n--- ${label} ---` });
-        imageContent.push({
-          type: "image",
-          source: {
-            type: "base64",
-            media_type: "image/jpeg",
-            data: key.replace(/^data:image\/\w+;base64,/, ""),
-          },
-        });
-      }
-    }
-
-    // Adiciona contexto da anamnese
-    const anamneseText = `
-DADOS DO ALUNO:
-Nome: ${clean(student_name || "não informado")}
-Modalidade: ${clean(modalidade || "não informada")}
-Nível: ${clean(nivel || "não informado")}
-Queixa principal: ${clean(queixa_principal || "nenhuma")}
-Histórico de lesões: ${clean(historico_lesoes || "nenhum")}
-
-Analise todas as imagens acima e retorne o JSON conforme instruído.
-    `.trim();
-
-    imageContent.push({ type: "text", text: anamneseText });
-
-    // Chama Claude com visão
-    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 4096,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: imageContent }],
-      }),
+    const assessmentJson = buildAssessment({
+      student_name: student_name || "",
+      queixa_principal,
+      historico_lesoes,
+      modalidade,
+      nivel,
+      imagesProvided,
     });
 
-    if (!aiResponse.ok) return aiErrorResponse(aiResponse.status);
+    const reportText = assessmentJson.relatorio_para_aluno;
+    const resumoPrescricao = assessmentJson.resumo_para_prescricao;
 
-    const aiData = await aiResponse.json();
-    const rawText = aiData.content?.[0]?.text ?? "";
-
-    // Parse do JSON retornado
-    let assessmentJson = null;
-    let reportText = "";
-    let resumoPresricao = "";
-
-    try {
-      const cleaned = rawText.replace(/```json|```/g, "").trim();
-      assessmentJson = JSON.parse(cleaned);
-      reportText = assessmentJson.relatorio_para_aluno || "";
-      resumoPresricao = assessmentJson.resumo_para_prescricao || "";
-    } catch {
-      // Se não parsear, salva raw mesmo
-      reportText = "Análise concluída. Consulte o relatório técnico completo.";
-    }
-
-    // Salva no banco
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const id = assessment_id || crypto.randomUUID();
 
@@ -384,7 +392,7 @@ Analise todas as imagens acima e retorne o JSON conforme instruído.
       historico_lesoes: clean(historico_lesoes),
       modalidade: clean(modalidade),
       nivel: clean(nivel),
-      ai_raw_response: rawText,
+      ai_raw_response: JSON.stringify({ generated_by: "bn_deterministic_engine" }),
       report_text: reportText,
       assessment_json: assessmentJson,
       status: "completed",
@@ -395,14 +403,14 @@ Analise todas as imagens acima e retorne o JSON conforme instruído.
         id,
         report_text: reportText,
         assessment_json: assessmentJson,
-        resumo_prescricao: resumoPresricao,
+        resumo_prescricao: resumoPrescricao,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error(e);
     return new Response(
-      JSON.stringify({ error: e.message }),
+      JSON.stringify({ error: (e as Error).message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
