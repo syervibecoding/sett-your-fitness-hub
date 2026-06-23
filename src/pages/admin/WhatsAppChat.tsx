@@ -96,6 +96,9 @@ export default function WhatsAppChat() {
   const [studentContexts, setStudentContexts] = useState<Record<string, StudentContext>>({});
   const [chatLabels, setChatLabels] = useState<Record<string, string[]>>({});
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
+  const [trainerFilter, setTrainerFilter] = useState<string>("all");
+  const [trainers, setTrainers] = useState<TrainerOption[]>([]);
+  const [studentMeta, setStudentMeta] = useState<Record<string, StudentMeta>>({});
   const [sendingAttachment, setSendingAttachment] = useState(false);
   const [mediaFallbacks, setMediaFallbacks] = useState<Record<string, string>>({});
   const [failedMediaFetches, setFailedMediaFetches] = useState<Record<string, true>>({});
