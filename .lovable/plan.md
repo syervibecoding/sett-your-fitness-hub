@@ -1,39 +1,61 @@
-# Prescrição de força sem IA (apenas gerador determinístico)
+# Atribuição de treinadores no WhatsApp
 
 ## Objetivo
-Fazer a prescrição de musculação parar de chamar a IA (Anthropic) e passar a usar **apenas o gerador determinístico (fallback)** já existente no repositório de referência `bn-performance-app`. O treino é montado por regras (objetivo, nível, dias/semana, restrições e avaliação funcional) a partir da biblioteca de exercícios da empresa.
+Na tela de **Conversas** do WhatsApp, todos (admin, Bruna, coordenador, treinador) continuam vendo todas as conversas da empresa, mas agora cada conversa mostra:
+- **Qual treinador está atribuído** ao aluno (ou "Sem treinador").
+- **Status do aluno**: Ativo, Pendente ou Aguardando renovação.
 
-## Como funciona o gerador (do repo de referência)
-1. Carrega o catálogo de exercícios da empresa (globais + da empresa) com seus grupos musculares e alvos.
-2. Escolhe um "preset metodológico" pelo objetivo/nível/restrições (ex.: hipertrofia iniciante, força, emagrecimento, retorno de lesão, corrida+musculação).
-3. Monta 2 a 4 treinos (A/B/C) seguindo a estrutura BN (mobilidade → core → ativação → controle motor → força global → força específica), escolhendo exercícios por palavras-chave e penalizando os que tenham risco para a restrição informada (joelho, lombar, ombro etc.).
-4. Retorna o plano no **mesmo formato JSON** que a função atual já salva em `ai_strength_plans`, então o frontend e o restante do fluxo continuam funcionando sem alteração.
+Além disso, adicionamos filtros para focar em um treinador específico, e um atalho **"Meus alunos"** para o treinador ver rapidamente só os clientes dele.
 
-## Mudanças
+Nenhuma mudança de permissão/banco é necessária — a visibilidade continua igual (por empresa); apenas enriquecemos a tela e adicionamos filtros.
 
-### 1. Edge function `supabase/functions/ai-prescribe-workout/index.ts` (reescrita)
-- Remover a chamada à Anthropic, o `SYSTEM_PROMPT` e a dependência de `ANTHROPIC_API_KEY`.
-- Portar do repo de referência apenas o necessário (sem IA, sem shadow engine, sem `company_ai_config`/`ai_decision_logs`, que não existem neste projeto):
-  - helpers: `clean`, `normalizeText`, `isRecord`, `chunkArray`, `selectByExerciseIdChunks`
-  - `loadExerciseCatalog` (consulta `exercise_library`, `exercise_muscle_targets`, `muscle_groups`, `company_exercise_volumes`; `exercise_metadata` fica opcional e é ignorada se não existir)
-  - `METHODOLOGY_PRESETS` + `selectMethodologyPreset`
-  - `exerciseText`, `pickCatalogExercise`, `fallbackExercise`, `buildEmergencyFallbackPlan`
-- Fluxo do handler:
-  1. autentica o usuário (mantém `requireUser`)
-  2. carrega o catálogo da empresa
-  3. seleciona o preset
-  4. gera o plano com `buildEmergencyFallbackPlan` (campo `generated_by: "bn_deterministic_engine"`)
-  5. salva em `ai_strength_plans` e retorna `{ id, plan }` (mesma assinatura de hoje)
-- Se a empresa não tiver exercícios no catálogo, retorna erro claro pedindo para cadastrar exercícios na Biblioteca antes de prescrever.
+## O que muda na tela de Conversas
 
-### 2. Frontend `src/pages/admin/UnifiedPrescriber.tsx` (ajuste de texto)
-- Trocar o título "Prescrição Integrada com IA" e o subtítulo para refletir geração automática por metodologia (sem mencionar IA), ex.: "Prescrição Integrada" / "Anamnese única · prescrição automática por metodologia BN".
-- Nenhuma mudança de lógica: continua chamando `ai-prescribe-workout` e exibindo o plano retornado.
+```text
+┌───────────────────────────────┐
+│ 🔍 Buscar conversa...          │
+│ [Todas ▾] [Minhas] [S/ Treino] │
+│ [Meus alunos] [Treinador ▾]    │  ← novos filtros
+├───────────────────────────────┤
+│ 👤 João Silva                  │
+│    Última mensagem...          │
+│    🟢 Ativo · 🏋 Treinador: Ana │  ← novas etiquetas
+├───────────────────────────────┤
+│ 👤 Maria Souza                 │
+│    🟡 Pendente · Sem treinador │
+└───────────────────────────────┘
+```
 
-## Fora de escopo (confirmar depois)
-- `ai-running-plan` (plano de corrida) e `ai-functional-assessment` continuam usando IA. O pedido foi sobre a prescrição de treino (força). Se você quiser, num passo seguinte aplico a mesma abordagem determinística para a corrida.
-- Não removo o segredo `ANTHROPIC_API_KEY` (fica inofensivo, sem uso na prescrição de força).
+- **Etiqueta de treinador**: badge com o nome do treinador atribuído ao aluno, ou "Sem treinador" quando `assigned_trainer_id` está vazio. Aparece apenas em conversas vinculadas a um aluno.
+- **Etiqueta de status**: badge colorido com o status da matrícula/aluno (Ativo / Pendente / Aguardando renovação).
+- **Filtro por treinador** (dropdown): lista os treinadores da empresa; ao escolher um, mostra só conversas de alunos daquele treinador. Inclui opção "Sem treinador".
+- **Atalho "Meus alunos"**: filtra para conversas de alunos cujo `assigned_trainer_id` é o usuário logado. Útil principalmente para o treinador, mas disponível para todos.
+
+## Detalhes técnicos
+
+Arquivo principal: `src/pages/admin/WhatsAppChat.tsx` (a mesma tela é usada nas rotas de admin, coordenador e treinador).
+
+1. **Carregar dados de atribuição** (estender `loadStudentData` / `loadChats`):
+   - Buscar `students.assigned_trainer_id` para os alunos vinculados às conversas (já temos `student_id` em cada chat).
+   - Buscar nomes dos treinadores em `profiles` (`user_id`, `full_name`) — já existe `loadSenderNames` que carrega `profiles`; reaproveitar/estender para mapear `trainerNamesById`.
+   - Status do aluno: derivar do que já é carregado em `loadStudentData` (matrícula ativa, renovação) e/ou `students.status`. Já existem `enrollments` e pagamentos carregados ali; consolidar num campo `studentStatus` por chat.
+   - Guardar em estados novos: `chatTrainer` (`Record<chatId, {id, name} | null>`) e `chatStatus` (`Record<chatId, 'ativo'|'pendente'|'renovar'>`).
+
+2. **Renderização das etiquetas** (no bloco de cada conversa, ~linha 737-747): adicionar dois badges usando tokens do design system (sem cores hardcoded `text-white` cruas — usar variantes/`bg-primary`, `bg-muted`, `secondary`, `destructive`, e o padrão amber já presente para "Financeiro").
+
+3. **Filtros** (estado `activeFilter` e novo estado `trainerFilter`):
+   - Adicionar `"my-students"` ao tipo `FilterType` (atalho "Meus alunos").
+   - Novo estado `trainerFilter: string | "all" | "none"` com um `DropdownMenu`/`Select` populado pela lista de treinadores da empresa.
+   - Atualizar `filteredChats` (~linha 650) para aplicar:
+     - `my-students`: manter só chats cujo aluno tem `assigned_trainer_id === user.id`.
+     - `trainerFilter`: filtra por treinador escolhido (ou "Sem treinador").
+
+4. **Lista de treinadores**: buscar membros da empresa com papel treinador. Reaproveitar abordagem de `TeamManager.tsx` (consulta `company_members` + `user_roles` + `profiles`) ou simplesmente derivar a partir dos `assigned_trainer_id` presentes nas conversas + nomes de `profiles`. Para um seletor completo, buscar treinadores via `user_roles`/`company_members`.
+
+## Fora de escopo
+- Sem mudanças de RLS ou migração de banco (todos continuam vendo as mesmas conversas).
+- Sem mudanças na lógica de envio/recebimento de mensagens nem na vinculação aluno↔conversa (que já existe).
 
 ## Validação
-- Conferir build da edge function.
-- Gerar uma prescrição de teste para um aluno com exercícios na biblioteca e confirmar que o plano A/B/C aparece normalmente, sem chamada à Anthropic (checar logs da função).
+- Como admin: ver todas as conversas com badge do treinador e status; testar filtro por treinador e "Sem treinador".
+- Como treinador: usar "Meus alunos" e confirmar que aparecem só os alunos atribuídos a ele (sem deixar de ter acesso às demais conversas quando o filtro está em "Todas").

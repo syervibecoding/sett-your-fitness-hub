@@ -31,7 +31,7 @@ type Chat = {
   last_sender_id: string | null;
   contact_name: string | null;
   category: string | null;
-  student?: { full_name: string; whatsapp: string | null; category_id: string | null } | null;
+  student?: { full_name: string; whatsapp: string | null; category_id: string | null; assigned_trainer_id: string | null; status: string | null } | null;
   lastMessage?: string;
 };
 
@@ -56,7 +56,11 @@ type StudentContext = {
   studentName: string;
 };
 
-type FilterType = "all" | "unread" | "groups" | "mine" | "no-workout";
+type FilterType = "all" | "unread" | "groups" | "mine" | "no-workout" | "my-students";
+
+type TrainerOption = { id: string; name: string };
+
+type StudentMeta = { trainerId: string | null; status: "ativo" | "pendente" | "renovar" | "inativo" };
 
 type TemplateItem = {
   id: string;
@@ -92,6 +96,9 @@ export default function WhatsAppChat() {
   const [studentContexts, setStudentContexts] = useState<Record<string, StudentContext>>({});
   const [chatLabels, setChatLabels] = useState<Record<string, string[]>>({});
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
+  const [trainerFilter, setTrainerFilter] = useState<string>("all");
+  const [trainers, setTrainers] = useState<TrainerOption[]>([]);
+  const [studentMeta, setStudentMeta] = useState<Record<string, StudentMeta>>({});
   const [sendingAttachment, setSendingAttachment] = useState(false);
   const [mediaFallbacks, setMediaFallbacks] = useState<Record<string, string>>({});
   const [failedMediaFetches, setFailedMediaFetches] = useState<Record<string, true>>({});
@@ -148,7 +155,7 @@ export default function WhatsAppChat() {
   const loadChats = useCallback(async () => {
     let query = supabase
       .from("whatsapp_chats")
-      .select("*, student:students(full_name, whatsapp, category_id)")
+      .select("*, student:students(full_name, whatsapp, category_id, assigned_trainer_id, status)")
       .order("last_message_at", { ascending: false, nullsFirst: false });
 
     if (effectiveCompanyId) query = query.eq("company_id", effectiveCompanyId);
@@ -209,6 +216,7 @@ export default function WhatsAppChat() {
 
     const contexts: Record<string, StudentContext> = {};
     const labels: Record<string, string[]> = {};
+    const meta: Record<string, StudentMeta> = {};
     const workoutsByCycle = new Set((workouts || []).map((w) => w.cycle_id));
     const pendingPaymentsByStudent = new Set((payments || []).map((p) => p.student_id));
 
@@ -230,10 +238,48 @@ export default function WhatsAppChat() {
 
       if (pendingPaymentsByStudent.has(studentId)) chatLabelsArr.push("Financeiro");
       if (chatLabelsArr.length > 0) labels[chat.id] = chatLabelsArr;
+
+      // Status do aluno para a etiqueta da conversa
+      const rawStatus = chat.student?.status || "";
+      let status: StudentMeta["status"];
+      if (rawStatus === "awaiting_renewal") status = "renovar";
+      else if (rawStatus === "inactive") status = "inativo";
+      else if (rawStatus === "pending" || pendingPaymentsByStudent.has(studentId)) status = "pendente";
+      else status = "ativo";
+
+      meta[chat.id] = { trainerId: chat.student?.assigned_trainer_id || null, status };
     }
 
     setStudentContexts(contexts);
     setChatLabels(labels);
+    setStudentMeta(meta);
+  }, [effectiveCompanyId]);
+
+  const loadTrainers = useCallback(async () => {
+    if (!effectiveCompanyId) { setTrainers([]); return; }
+    const { data: members } = await supabase
+      .from("company_members")
+      .select("user_id")
+      .eq("company_id", effectiveCompanyId);
+    const memberIds = (members || []).map((m) => m.user_id).filter(Boolean) as string[];
+    if (memberIds.length === 0) { setTrainers([]); return; }
+
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("user_id, role")
+      .in("user_id", memberIds)
+      .in("role", ["trainer", "coordinator", "admin"]);
+    const trainerIds = [...new Set((roles || []).filter((r) => r.role === "trainer").map((r) => r.user_id))];
+    if (trainerIds.length === 0) { setTrainers([]); return; }
+
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("user_id, full_name")
+      .in("user_id", trainerIds);
+    const list: TrainerOption[] = (profiles || [])
+      .map((p) => ({ id: p.user_id as string, name: p.full_name || "Treinador" }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    setTrainers(list);
   }, [effectiveCompanyId]);
 
   const loadMessages = useCallback(async (chatId: string) => {
@@ -404,7 +450,7 @@ export default function WhatsAppChat() {
     }
   };
 
-  useEffect(() => { loadChats(); loadSenderNames(); loadTemplates(); loadCategories(); loadAvailableLabels(); }, [loadChats, loadSenderNames, loadTemplates, loadCategories, loadAvailableLabels]);
+  useEffect(() => { loadChats(); loadSenderNames(); loadTemplates(); loadCategories(); loadAvailableLabels(); loadTrainers(); }, [loadChats, loadSenderNames, loadTemplates, loadCategories, loadAvailableLabels, loadTrainers]);
   // Load contacts from Evolution API separately to avoid overwhelming edge function workers
   useEffect(() => { const t = setTimeout(() => loadContacts(), 2000); return () => clearTimeout(t); }, [loadContacts]);
   useEffect(() => { if (chats.length > 0) { loadStudentData(chats); loadChatLabels(chats.map(c => c.id)); } }, [chats, loadStudentData, loadChatLabels]);
@@ -657,6 +703,16 @@ export default function WhatsAppChat() {
       const labels = chatLabels[c.id] || [];
       if (!labels.includes("Aguardando Treino")) return false;
     }
+    if (activeFilter === "my-students" && studentMeta[c.id]?.trainerId !== user?.id) return false;
+    if (trainerFilter !== "all") {
+      const tId = studentMeta[c.id]?.trainerId ?? null;
+      if (trainerFilter === "none") {
+        // só conversas vinculadas a aluno sem treinador
+        if (!c.student_id || tId) return false;
+      } else if (tId !== trainerFilter) {
+        return false;
+      }
+    }
     return true;
   });
 
@@ -703,7 +759,23 @@ export default function WhatsAppChat() {
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <Button variant={activeFilter === "mine" ? "default" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setActiveFilter("mine")}>Minhas</Button>
+                <Button variant={activeFilter === "my-students" ? "default" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setActiveFilter(activeFilter === "my-students" ? "all" : "my-students")}><User className="h-3 w-3 mr-1" />Meus alunos</Button>
                 <Button variant={activeFilter === "no-workout" ? "default" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setActiveFilter("no-workout")}><AlertTriangle className="h-3 w-3 mr-1" />S/ Treino</Button>
+              </div>
+              <div className="flex items-center gap-1">
+                <Select value={trainerFilter} onValueChange={setTrainerFilter}>
+                  <SelectTrigger className="h-7 text-xs">
+                    <Users className="h-3 w-3 mr-1 shrink-0" />
+                    <SelectValue placeholder="Treinador" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os treinadores</SelectItem>
+                    <SelectItem value="none">Sem treinador</SelectItem>
+                    {trainers.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -714,6 +786,11 @@ export default function WhatsAppChat() {
                 filteredChats.map((chat) => {
                   const labels = chatLabels[chat.id] || [];
                   const lastSenderName = chat.last_sender_id ? senderNames[chat.last_sender_id] : null;
+                  const meta = chat.student_id ? studentMeta[chat.id] : undefined;
+                  const trainerName = meta?.trainerId
+                    ? (trainers.find((t) => t.id === meta.trainerId)?.name || senderNames[meta.trainerId] || "Treinador")
+                    : null;
+                  const statusLabel: Record<string, string> = { ativo: "Ativo", pendente: "Pendente", renovar: "Renovar", inativo: "Inativo" };
                   return (
                     <div key={chat.id} className="relative group">
                       <button
@@ -743,6 +820,28 @@ export default function WhatsAppChat() {
                                 if (!label) return null;
                                 return <Badge key={labelId} className="text-[10px] h-4 px-1.5 text-white" style={{ backgroundColor: label.color }}>{label.name}</Badge>;
                               })}
+                            </div>
+                          )}
+                          {chat.student_id && (
+                            <div className="flex gap-1 mt-1 flex-wrap items-center">
+                              {meta && (
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "text-[10px] h-4 px-1.5 border",
+                                    meta.status === "ativo" && "bg-primary/10 text-primary border-primary/20",
+                                    meta.status === "pendente" && "bg-amber-500/15 text-amber-600 border-amber-500/30",
+                                    meta.status === "renovar" && "bg-destructive/10 text-destructive border-destructive/20",
+                                    meta.status === "inativo" && "text-muted-foreground",
+                                  )}
+                                >
+                                  {statusLabel[meta.status]}
+                                </Badge>
+                              )}
+                              <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                                <User className="h-2.5 w-2.5 mr-0.5" />
+                                {trainerName || "Sem treinador"}
+                              </Badge>
                             </div>
                           )}
                           <div className="flex items-center justify-between mt-0.5">
