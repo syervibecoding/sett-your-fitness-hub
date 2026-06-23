@@ -703,6 +703,16 @@ export default function WhatsAppChat() {
       const labels = chatLabels[c.id] || [];
       if (!labels.includes("Aguardando Treino")) return false;
     }
+    if (activeFilter === "my-students" && studentMeta[c.id]?.trainerId !== user?.id) return false;
+    if (trainerFilter !== "all") {
+      const tId = studentMeta[c.id]?.trainerId ?? null;
+      if (trainerFilter === "none") {
+        // só conversas vinculadas a aluno sem treinador
+        if (!c.student_id || tId) return false;
+      } else if (tId !== trainerFilter) {
+        return false;
+      }
+    }
     return true;
   });
 
