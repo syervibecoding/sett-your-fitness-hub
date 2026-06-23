@@ -263,13 +263,28 @@ export default function WhatsAppChat() {
       .eq("company_id", effectiveCompanyId);
     const memberIds = (members || []).map((m) => m.user_id).filter(Boolean) as string[];
     if (memberIds.length === 0) { setTrainers([]); return; }
+    const memberSet = new Set(memberIds);
 
+    // 1) Usuários com papel "trainer"
     const { data: roles } = await supabase
       .from("user_roles")
       .select("user_id, role")
       .in("user_id", memberIds)
-      .in("role", ["trainer", "coordinator", "admin"]);
-    const trainerIds = [...new Set((roles || []).filter((r) => r.role === "trainer").map((r) => r.user_id))];
+      .eq("role", "trainer");
+    const roleTrainerIds = (roles || []).map((r) => r.user_id).filter(Boolean) as string[];
+
+    // 2) Qualquer um que efetivamente atende alunos (assigned_trainer_id),
+    //    independente do papel (coordenador/admin que monta treino também entra).
+    const { data: assigned } = await supabase
+      .from("students")
+      .select("assigned_trainer_id")
+      .eq("company_id", effectiveCompanyId)
+      .not("assigned_trainer_id", "is", null);
+    const assignedIds = (assigned || [])
+      .map((s) => s.assigned_trainer_id)
+      .filter((id): id is string => !!id && memberSet.has(id));
+
+    const trainerIds = [...new Set([...roleTrainerIds, ...assignedIds])];
     if (trainerIds.length === 0) { setTrainers([]); return; }
 
     const { data: profiles } = await supabase
