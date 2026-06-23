@@ -1,8 +1,8 @@
 // ============================================================================
-// FunctionalAssessment — Avaliação Postural e Funcional com IA
+// FunctionalAssessment — Avaliação Postural e Funcional (determinística)
 //   Envia fotos de postura estática + overhead squat e dados clínicos.
-//   A IA gera um laudo (report_text) e um JSON estruturado usado depois
-//   como contexto pelas prescrições de musculação e corrida.
+//   Um motor de regras (Metodologia BN, sem IA) gera o laudo (report_text)
+//   e um JSON estruturado usado depois como contexto pelas prescrições.
 // ============================================================================
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
