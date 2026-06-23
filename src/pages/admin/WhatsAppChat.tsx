@@ -56,7 +56,11 @@ type StudentContext = {
   studentName: string;
 };
 
-type FilterType = "all" | "unread" | "groups" | "mine" | "no-workout";
+type FilterType = "all" | "unread" | "groups" | "mine" | "no-workout" | "my-students";
+
+type TrainerOption = { id: string; name: string };
+
+type StudentMeta = { trainerId: string | null; status: "ativo" | "pendente" | "renovar" | "inativo" };
 
 type TemplateItem = {
   id: string;
