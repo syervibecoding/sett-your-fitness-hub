@@ -216,6 +216,7 @@ export default function WhatsAppChat() {
 
     const contexts: Record<string, StudentContext> = {};
     const labels: Record<string, string[]> = {};
+    const meta: Record<string, StudentMeta> = {};
     const workoutsByCycle = new Set((workouts || []).map((w) => w.cycle_id));
     const pendingPaymentsByStudent = new Set((payments || []).map((p) => p.student_id));
 
@@ -237,10 +238,48 @@ export default function WhatsAppChat() {
 
       if (pendingPaymentsByStudent.has(studentId)) chatLabelsArr.push("Financeiro");
       if (chatLabelsArr.length > 0) labels[chat.id] = chatLabelsArr;
+
+      // Status do aluno para a etiqueta da conversa
+      const rawStatus = chat.student?.status || "";
+      let status: StudentMeta["status"];
+      if (rawStatus === "awaiting_renewal") status = "renovar";
+      else if (rawStatus === "inactive") status = "inativo";
+      else if (rawStatus === "pending" || pendingPaymentsByStudent.has(studentId)) status = "pendente";
+      else status = "ativo";
+
+      meta[chat.id] = { trainerId: chat.student?.assigned_trainer_id || null, status };
     }
 
     setStudentContexts(contexts);
     setChatLabels(labels);
+    setStudentMeta(meta);
+  }, [effectiveCompanyId]);
+
+  const loadTrainers = useCallback(async () => {
+    if (!effectiveCompanyId) { setTrainers([]); return; }
+    const { data: members } = await supabase
+      .from("company_members")
+      .select("user_id")
+      .eq("company_id", effectiveCompanyId);
+    const memberIds = (members || []).map((m) => m.user_id).filter(Boolean) as string[];
+    if (memberIds.length === 0) { setTrainers([]); return; }
+
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("user_id, role")
+      .in("user_id", memberIds)
+      .in("role", ["trainer", "coordinator", "admin"]);
+    const trainerIds = [...new Set((roles || []).filter((r) => r.role === "trainer").map((r) => r.user_id))];
+    if (trainerIds.length === 0) { setTrainers([]); return; }
+
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("user_id, full_name")
+      .in("user_id", trainerIds);
+    const list: TrainerOption[] = (profiles || [])
+      .map((p) => ({ id: p.user_id as string, name: p.full_name || "Treinador" }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    setTrainers(list);
   }, [effectiveCompanyId]);
 
   const loadMessages = useCallback(async (chatId: string) => {
