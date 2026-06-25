@@ -309,7 +309,7 @@ export default function UnifiedPrescriber() {
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base">Aluno</CardTitle></CardHeader>
           <CardContent>
-            <SS value={studentId} onChange={setStudentId} opts={[["", "Selecione..."], ...students.map(s => [s.id, s.full_name])]} />
+            <SS value={studentId} onChange={setStudentId} placeholder="Selecione..." opts={students.map(s => [s.id, s.full_name])} />
             {anamneseId && <p className="text-xs text-navy mt-1">Anamnese salva carregada — edite se necessário.</p>}
             {studentId && (
               <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
