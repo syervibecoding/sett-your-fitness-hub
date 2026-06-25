@@ -284,9 +284,9 @@ export default function UnifiedPrescriber() {
     </div>
   );
   const SI = (props: any) => <Input {...props} className={inputCls} />;
-  const SS = ({ value, onChange, opts }: any) => (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
+  const SS = ({ value, onChange, opts, placeholder }: any) => (
+    <Select value={value || undefined} onValueChange={onChange}>
+      <SelectTrigger className={inputCls}><SelectValue placeholder={placeholder} /></SelectTrigger>
       <SelectContent>{opts.map(([v, l]: [string, string]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
     </Select>
   );
