@@ -2791,6 +2791,18 @@ export type Database = {
         Args: { p_enrollment_id: string; p_new_start_date: string }
         Returns: undefined
       }
+      student_self_update_allowed: {
+        Args: {
+          _asaas_customer_id: string
+          _assigned_trainer_id: string
+          _category_id: string
+          _company_id: string
+          _id: string
+          _selected_plan_id: string
+          _status: string
+        }
+        Returns: boolean
+      }
       unaccent_simple: { Args: { t: string }; Returns: string }
     }
     Enums: {
