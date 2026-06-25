@@ -309,29 +309,22 @@ export function AppSidebar() {
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            className="cursor-not-allowed opacity-60 pointer-events-none"
-                            aria-disabled
-                          >
-                            <Sparkles className="h-4 w-4" />
-                            <span>Prescrição IA</span>
-                            <span className="ml-auto rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-                              Em dev
-                            </span>
+                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/prescricao`}>
+                            <NavLink to={`${exercisePrefix}/prescricao`} end>
+                              <Sparkles className="h-4 w-4" />
+                              <span>Prescrição IA</span>
+                            </NavLink>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            className="cursor-not-allowed opacity-60 pointer-events-none"
-                            aria-disabled
-                          >
-                            <Activity className="h-4 w-4" />
-                            <span>Avaliação Funcional</span>
-                            <span className="ml-auto rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-                              Em dev
-                            </span>
+                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/avaliacao`}>
+                            <NavLink to={`${exercisePrefix}/avaliacao`} end>
+                              <Activity className="h-4 w-4" />
+                              <span>Avaliação Funcional</span>
+                            </NavLink>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
+
                       </SidebarMenuSub>
                     </CollapsibleContent>
                   </SidebarMenuItem>
