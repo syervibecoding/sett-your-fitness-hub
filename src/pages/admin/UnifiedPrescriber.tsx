@@ -315,6 +315,12 @@ export default function UnifiedPrescriber() {
           <CardHeader className="pb-3"><CardTitle className="text-base">Aluno</CardTitle></CardHeader>
           <CardContent>
             <SS value={studentId} onChange={setStudentId} placeholder="Selecione..." opts={students.map(s => [s.id, s.full_name])} />
+            {!studentId && (
+              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                Escolha um aluno para liberar a anamnese e gerar a prescrição.
+              </p>
+            )}
             {anamneseId && <p className="text-xs text-navy mt-1">Anamnese salva carregada — edite se necessário.</p>}
             {studentId && (
               <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
