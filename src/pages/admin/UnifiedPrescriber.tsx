@@ -22,6 +22,7 @@ import {
   Loader2, CheckCircle2, Circle, AlertCircle, Dumbbell, Activity,
   ChevronDown, ChevronUp, ClipboardCheck,
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface Student { id: string; full_name: string; }
 interface Anamnese {
