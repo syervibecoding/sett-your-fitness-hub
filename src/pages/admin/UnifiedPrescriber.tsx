@@ -22,6 +22,7 @@ import {
   Loader2, CheckCircle2, Circle, AlertCircle, Dumbbell, Activity,
   ChevronDown, ChevronUp, ClipboardCheck,
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface Student { id: string; full_name: string; }
 interface Anamnese {
@@ -161,8 +162,12 @@ export default function UnifiedPrescriber() {
   }
 
   async function generate() {
-    if (!studentId || !companyId) { setError("Selecione um aluno."); return; }
-    if (modalities.size === 0) { setError("Selecione ao menos uma prescrição."); return; }
+    if (!studentId) {
+      const msg = "Selecione um aluno antes de gerar a prescrição.";
+      setError(msg); toast.error(msg); return;
+    }
+    if (!companyId) { const msg = "Empresa não identificada. Recarregue a página."; setError(msg); toast.error(msg); return; }
+    if (modalities.size === 0) { const msg = "Selecione ao menos uma prescrição."; setError(msg); toast.error(msg); return; }
     setGenerating(true); setError("");
     setStatus({ musculacao: "idle", corrida: "idle" });
     setResults({ musculacao: null, corrida: null });
@@ -310,6 +315,12 @@ export default function UnifiedPrescriber() {
           <CardHeader className="pb-3"><CardTitle className="text-base">Aluno</CardTitle></CardHeader>
           <CardContent>
             <SS value={studentId} onChange={setStudentId} placeholder="Selecione..." opts={students.map(s => [s.id, s.full_name])} />
+            {!studentId && (
+              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                Escolha um aluno para liberar a anamnese e gerar a prescrição.
+              </p>
+            )}
             {anamneseId && <p className="text-xs text-navy mt-1">Anamnese salva carregada — edite se necessário.</p>}
             {studentId && (
               <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
