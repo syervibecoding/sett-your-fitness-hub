@@ -162,8 +162,12 @@ export default function UnifiedPrescriber() {
   }
 
   async function generate() {
-    if (!studentId || !companyId) { setError("Selecione um aluno."); return; }
-    if (modalities.size === 0) { setError("Selecione ao menos uma prescrição."); return; }
+    if (!studentId) {
+      const msg = "Selecione um aluno antes de gerar a prescrição.";
+      setError(msg); toast.error(msg); return;
+    }
+    if (!companyId) { const msg = "Empresa não identificada. Recarregue a página."; setError(msg); toast.error(msg); return; }
+    if (modalities.size === 0) { const msg = "Selecione ao menos uma prescrição."; setError(msg); toast.error(msg); return; }
     setGenerating(true); setError("");
     setStatus({ musculacao: "idle", corrida: "idle" });
     setResults({ musculacao: null, corrida: null });
