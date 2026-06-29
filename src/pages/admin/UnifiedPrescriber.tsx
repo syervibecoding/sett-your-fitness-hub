@@ -23,6 +23,8 @@ import {
   ChevronDown, ChevronUp, ClipboardCheck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { useMaster } from "@/contexts/MasterContext";
 
 interface Student { id: string; full_name: string; }
 interface Anamnese {
