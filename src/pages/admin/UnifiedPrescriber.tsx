@@ -316,7 +316,19 @@ export default function UnifiedPrescriber() {
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base">Aluno</CardTitle></CardHeader>
           <CardContent>
-            <SS value={studentId} onChange={setStudentId} placeholder="Selecione..." opts={students.map(s => [s.id, s.full_name])} />
+            {!companyId ? (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                Nenhuma empresa selecionada. Acesse pelo painel Master "Visualizar empresa" para liberar os alunos.
+              </p>
+            ) : students.length === 0 ? (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                Nenhum aluno cadastrado nesta empresa ainda.
+              </p>
+            ) : (
+              <SS value={studentId} onChange={setStudentId} placeholder="Selecione..." opts={students.map(s => [s.id, s.full_name])} />
+            )}
             {!studentId && (
               <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                 <AlertCircle className="h-3 w-3" />
