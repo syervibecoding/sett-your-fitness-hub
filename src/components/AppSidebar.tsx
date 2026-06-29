@@ -312,7 +312,7 @@ export function AppSidebar() {
                           <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/prescricao`}>
                             <NavLink to={`${exercisePrefix}/prescricao`} end>
                               <Sparkles className="h-4 w-4" />
-                              <span>Prescrição IA</span>
+                              <span>Prescrição BN</span>
                             </NavLink>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
