@@ -54,7 +54,12 @@ const DEFAULT_ANAMNESE: Anamnese = {
 };
 
 export default function UnifiedPrescriber() {
-  const [companyId, setCompanyId]   = useState<string | null>(null);
+  const { role, companyId: authCompanyId } = useAuth();
+  const { viewingCompany, isViewingCompany } = useMaster();
+  const companyId = role === "master"
+    ? (isViewingCompany ? viewingCompany?.id ?? null : null)
+    : authCompanyId;
+
   const [students, setStudents]     = useState<Student[]>([]);
   const [studentId, setStudentId]   = useState("");
   const [anamnese, setAnamnese]     = useState<Anamnese>(DEFAULT_ANAMNESE);
@@ -68,18 +73,13 @@ export default function UnifiedPrescriber() {
   const [error, setError]           = useState("");
 
   useEffect(() => {
+    if (!companyId) { setStudents([]); return; }
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: m } = await supabase.from("company_members")
-        .select("company_id").eq("user_id", user.id).limit(1).maybeSingle();
-      if (!m) return;
-      setCompanyId(m.company_id);
       const { data: list } = await supabase.from("students")
-        .select("id, full_name").eq("company_id", m.company_id).order("full_name");
+        .select("id, full_name").eq("company_id", companyId).order("full_name");
       setStudents(list || []);
     })();
-  }, []);
+  }, [companyId]);
 
   useEffect(() => {
     if (!studentId) return;
