@@ -23,6 +23,8 @@ import {
   ChevronDown, ChevronUp, ClipboardCheck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { useMaster } from "@/contexts/MasterContext";
 
 interface Student { id: string; full_name: string; }
 interface Anamnese {
@@ -52,7 +54,12 @@ const DEFAULT_ANAMNESE: Anamnese = {
 };
 
 export default function UnifiedPrescriber() {
-  const [companyId, setCompanyId]   = useState<string | null>(null);
+  const { role, companyId: authCompanyId } = useAuth();
+  const { viewingCompany, isViewingCompany } = useMaster();
+  const companyId = role === "master"
+    ? (isViewingCompany ? viewingCompany?.id ?? null : null)
+    : authCompanyId;
+
   const [students, setStudents]     = useState<Student[]>([]);
   const [studentId, setStudentId]   = useState("");
   const [anamnese, setAnamnese]     = useState<Anamnese>(DEFAULT_ANAMNESE);
@@ -66,18 +73,13 @@ export default function UnifiedPrescriber() {
   const [error, setError]           = useState("");
 
   useEffect(() => {
+    if (!companyId) { setStudents([]); return; }
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: m } = await supabase.from("company_members")
-        .select("company_id").eq("user_id", user.id).limit(1).maybeSingle();
-      if (!m) return;
-      setCompanyId(m.company_id);
       const { data: list } = await supabase.from("students")
-        .select("id, full_name").eq("company_id", m.company_id).order("full_name");
+        .select("id, full_name").eq("company_id", companyId).order("full_name");
       setStudents(list || []);
     })();
-  }, []);
+  }, [companyId]);
 
   useEffect(() => {
     if (!studentId) return;
@@ -314,7 +316,19 @@ export default function UnifiedPrescriber() {
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base">Aluno</CardTitle></CardHeader>
           <CardContent>
-            <SS value={studentId} onChange={setStudentId} placeholder="Selecione..." opts={students.map(s => [s.id, s.full_name])} />
+            {!companyId ? (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                Nenhuma empresa selecionada. Acesse pelo painel Master "Visualizar empresa" para liberar os alunos.
+              </p>
+            ) : students.length === 0 ? (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                Nenhum aluno cadastrado nesta empresa ainda.
+              </p>
+            ) : (
+              <SS value={studentId} onChange={setStudentId} placeholder="Selecione..." opts={students.map(s => [s.id, s.full_name])} />
+            )}
             {!studentId && (
               <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                 <AlertCircle className="h-3 w-3" />
