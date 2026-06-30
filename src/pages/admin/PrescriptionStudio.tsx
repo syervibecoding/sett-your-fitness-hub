@@ -382,6 +382,9 @@ export default function PrescriptionStudio() {
               {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {applying ? "Aplicando..." : "Aplicar ao ciclo"}
             </Button>
+            <Button variant="outline" size="lg" onClick={handleExportPdf} className="gap-2 bg-background">
+              <FileDown className="h-4 w-4" /> Exportar PDF
+            </Button>
             {cycleId && (
               <Button variant="outline" size="lg" onClick={() => navigate(`${prefix}/workout/${cycleId}`)} className="gap-2">
                 <ExternalLink className="h-4 w-4" /> Abrir no construtor
