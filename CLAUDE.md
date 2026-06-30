@@ -59,8 +59,22 @@ The Vite dev server defaults to `http://localhost:8080`.
 ## Current Local Handoff Notes
 
 - Local workspace: `/Users/macbookpro/Documents/Marquito/sett-your-fitness-hub`.
-- Branch prepared for agent work: `codex/claude-compat`.
-- This clone is based on `syervibecoding/sett-your-fitness-hub` `main`.
+- Branch for agent work (Claude ⇄ Codex): `codex/claude-compat`.
+
+### Repositório & Acesso (para o Codex)
+
+- **GitHub — nosso repo (é por aqui que sincronizamos):** remote `bn` → `https://github.com/matheusrobaloloreto-alt/bn-performance-app.git`.
+  - Branches `main` e `codex/claude-compat` estão **sincronizadas no mesmo commit** (último push: `dc8bd53`). **Trabalhamos na `codex/claude-compat`**; `main` recebe fast-forward quando alinhado.
+- **Outro remote:** `origin` → `https://github.com/syervibecoding/sett-your-fitness-hub.git` é o template original. **Não fazemos push nele.**
+- **Codex em máquina/ambiente SEPARADO** — clonar e usar a branch de colab:
+  ```bash
+  git clone https://github.com/matheusrobaloloreto-alt/bn-performance-app.git
+  cd bn-performance-app && git checkout codex/claude-compat
+  ```
+  Antes de editar: `git pull --ff-only bn codex/claude-compat`. Ao soltar: `git push bn codex/claude-compat` (commits prefixados `claude:` / `codex:`).
+- **Codex na MESMA máquina:** acessa direto em `~/Documents/Marquito/sett-your-fitness-hub` (não precisa clonar).
+- **Backend Supabase:** projeto **`zshrcgbyhzxpnlccssyz`** (Bn-app) — Postgres + Edge Functions. Deploy de edge: `supabase functions deploy <fn> --project-ref zshrcgbyhzxpnlccssyz --use-api`.
+- **Frontend (prod):** Netlify `bn-performance-webapp-matheus.netlify.app` (deploy manual `netlify deploy --prod --dir=dist`).
 - Old local GitHub token remotes found in abandoned copies were replaced with clean GitHub URLs.
 - AI refinement pack was found in `/Users/macbookpro/Downloads/app bn/sett-your-fitness-hub` and integrated as `supabase/functions/ai-coach-pack` plus the `/admin/ia`, `/coordinator/ia`, and `/trainer/ia` routes.
 - Current verified checks: `npm run build` passes, `npm run test` passes, and `npm audit --omit=dev` reports 0 vulnerabilities.
