@@ -30,7 +30,7 @@ interface StudentHomeProps {
   streak: number;
   goalEditor?: React.ReactNode;
   achievementsPanel?: React.ReactNode;
-  onNavigate: (view: "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos" | "medidas") => void;
+  onNavigate: (view: "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos" | "medidas" | "nutricao") => void;
 }
 
 
@@ -215,6 +215,19 @@ export function StudentHome({
               <div>
                 <h3 className="font-bold text-foreground font-sans text-sm">Medidas</h3>
                 <p className="text-xs text-muted-foreground font-sans mt-0.5">Circunferências e avatar</p>
+              </div>
+            </CardContent>
+          </Card>
+        </button>
+        <button onClick={() => onNavigate("nutricao")} className="text-left">
+          <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
+            <CardContent className="p-5 flex flex-col gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Apple className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-bold text-foreground font-sans text-sm">Nutrição</h3>
+                <p className="text-xs text-muted-foreground font-sans mt-0.5">Plano alimentar e macros</p>
               </div>
             </CardContent>
           </Card>
