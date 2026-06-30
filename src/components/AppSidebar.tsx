@@ -22,6 +22,7 @@ import {
   Sparkles,
   Activity,
   Cpu,
+  Apple,
 
 
 } from "lucide-react";
