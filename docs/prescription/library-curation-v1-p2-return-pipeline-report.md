@@ -6,14 +6,14 @@
 ## Status final: ✅ PASS
 
 ## Entradas
-- Label: `library-curation-v1-p1`
-- Prioridade: `P1`
+- Label: `library-curation-v1-p2`
+- Prioridade: `P2`
 - Manifesto: `docs/prescription/library-curation-v1-consolidated-manifest.csv`
-- Enviado (sent): `docs/prescription/library-curation-v1-p1-human-review.csv`
-- Devolvido (returned): `docs/prescription/library-curation-v1-p1-human-review.csv`
+- Enviado (sent): `docs/prescription/library-curation-v1-p2-human-review.csv`
+- Devolvido (returned): `docs/prescription/library-curation-v1-p2-human-review.csv`
 - Out-dir: `docs/prescription`
 - keep-going: `false`
-- Timestamp: `2026-06-30T07:23:49.955Z`
+- Timestamp: `2026-06-30T07:23:49.935Z`
 
 ## Status por passo
 | # | passo | resultado | exit |
@@ -24,11 +24,11 @@
 | 4 | SQL no-op | PASS | 0 |
 
 ## Relatórios e artefatos gerados
-- `docs/prescription/library-curation-v1-p1-return-guard-report.md`
-- `docs/prescription/library-curation-v1-p1-human-review-validation-report.md`
-- `docs/prescription/library-curation-v1-approved-manifest-p1-report.md`
-- `docs/prescription/library-curation-v1-approved-manifest-p1.csv` (approved manifest CSV)
-- `docs/prescription/library-curation-v1-approved-manifest-p1-upsert.noop.sql` (SQL no-op)
+- `docs/prescription/library-curation-v1-p2-return-guard-report.md`
+- `docs/prescription/library-curation-v1-p2-human-review-validation-report.md`
+- `docs/prescription/library-curation-v1-approved-manifest-p2-report.md`
+- `docs/prescription/library-curation-v1-approved-manifest-p2.csv` (approved manifest CSV)
+- `docs/prescription/library-curation-v1-approved-manifest-p2-upsert.noop.sql` (SQL no-op)
 
 ## Métricas do approved manifest
 | métrica | valor |

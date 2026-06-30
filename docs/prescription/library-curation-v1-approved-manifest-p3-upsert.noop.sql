@@ -2,12 +2,12 @@
 -- CURATION UPSERT SQL (GERADO POR build-curation-upsert-sql.mjs — ORDEM 036)
 -- DO NOT RUN WITHOUT BACKUP + STAGING + ATENA APPROVAL
 -- =====================================================================================
--- source:        docs/prescription/library-curation-v1-approved-manifest-p1.csv
+-- source:        docs/prescription/library-curation-v1-approved-manifest-p3.csv
 -- mode:          noop
 -- table:         public.exercise_metadata
 -- total rows:    0
 -- status:        NO_APPROVED_ROWS
--- generated_at:  2026-06-30T07:23:51.375Z
+-- generated_at:  2026-06-30T07:23:51.439Z
 -- -------------------------------------------------------------------------------------
 -- SCHEMA_GAP (campos do manifesto SEM coluna em exercise_metadata — NAO inventar coluna):
 --   * equipment (vive em exercise_library.equipment, text unico; nao em exercise_metadata)
