@@ -21,6 +21,7 @@ import {
   Megaphone,
   Sparkles,
   Activity,
+  Cpu,
 
 
 } from "lucide-react";
@@ -322,6 +323,14 @@ export function AppSidebar() {
                             <NavLink to={`${exercisePrefix}/prescricao`} end>
                               <Sparkles className="h-4 w-4" />
                               <span>Prescrição BN</span>
+                            </NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/studio`}>
+                            <NavLink to={`${exercisePrefix}/studio`} end>
+                              <Cpu className="h-4 w-4" />
+                              <span>Studio de Prescrição</span>
                             </NavLink>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
