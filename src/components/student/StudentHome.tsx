@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Dumbbell, BarChart3, CalendarDays, History, Activity, Megaphone, Ruler } from "lucide-react";
+import { Dumbbell, BarChart3, CalendarDays, History, Activity, Megaphone, Ruler, Apple } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { WeeklyBar } from "./WeeklyBar";
