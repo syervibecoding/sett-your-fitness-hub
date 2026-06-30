@@ -663,6 +663,18 @@ export default function StudentPortal() {
                         workoutDescription={selectedWorkout.description}
                       />
                     )}
+                    {selectedWorkout && selectedWorkout.exercises.length > 0 && (
+                      <>
+                        <Button variant="outline" className="w-full" onClick={() => setWarmupOpen(true)}>
+                          <Flame className="h-4 w-4 mr-2" /> Aquecimento (5 min)
+                        </Button>
+                        <WarmupGuide
+                          muscleGroups={selectedWorkout.exercises.map((e) => e.muscle_group)}
+                          open={warmupOpen}
+                          onOpenChange={setWarmupOpen}
+                        />
+                      </>
+                    )}
                     {trainedDays.size > 0 && (
                       <WeeklyBar
                         trainedDays={trainedDays}
