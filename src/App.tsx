@@ -139,6 +139,7 @@ const App = () => (
           <Route path="/admin/workout/:cycleId" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><WorkoutBuilder /></FeatureRoute>} />
           <Route path="/admin/prescricao" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><UnifiedPrescriber /></FeatureRoute>} />
           <Route path="/admin/avaliacao" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPrescription"><FunctionalAssessment /></FeatureRoute>} />
+          <Route path="/admin/ai-studio" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasAiCoach"><AICoachStudio /></FeatureRoute>} />
           <Route path="/admin/announcements" element={<ProtectedRoute allowedRoles={["admin"]}><Announcements /></ProtectedRoute>} />
           <Route path="/coordinator/announcements" element={<ProtectedRoute allowedRoles={["coordinator"]}><Announcements /></ProtectedRoute>} />
 
@@ -159,6 +160,7 @@ const App = () => (
           <Route path="/coordinator/workout/:cycleId" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><WorkoutBuilder /></FeatureRoute>} />
           <Route path="/coordinator/prescricao" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><UnifiedPrescriber /></FeatureRoute>} />
           <Route path="/coordinator/avaliacao" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPrescription" requiredModule="exercises"><FunctionalAssessment /></FeatureRoute>} />
+          <Route path="/coordinator/ai-studio" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasAiCoach"><AICoachStudio /></FeatureRoute>} />
           <Route path="/coordinator/whatsapp" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasWhatsApp"><WhatsAppSettings /></FeatureRoute>} />
           <Route path="/coordinator/whatsapp-chat" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasWhatsApp"><WhatsAppChat /></FeatureRoute>} />
           <Route path="/coordinator/whatsapp-crm" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasWhatsApp"><WhatsAppCRM /></FeatureRoute>} />
