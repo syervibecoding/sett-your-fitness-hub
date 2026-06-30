@@ -1,0 +1,39 @@
+import { useEffect, useState } from "react";
+import { Megaphone } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { AnnouncementsFeed, getUnreadAnnouncementCount } from "./AnnouncementsFeed";
+
+/**
+ * Sino de avisos no topo: ícone discreto com bolinha vermelha quando há avisos não lidos.
+ * Ao tocar, abre os avisos num menu suspenso (em vez de ocupar uma aba inteira).
+ */
+export function AnnouncementsBell({ studentId, companyId }: { studentId: string; companyId: string }) {
+  const [unread, setUnread] = useState(0);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getUnreadAnnouncementCount(studentId, companyId)
+      .then((n) => { if (alive) setUnread(n); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [studentId, companyId]);
+
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setUnread(0); }}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" className="relative" aria-label="Avisos">
+          <Megaphone className="h-4 w-4" />
+          {unread > 0 && (
+            <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500 ring-2 ring-card" />
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="max-h-[70vh] w-[min(92vw,380px)] overflow-y-auto p-3">
+        <p className="mb-2 font-mono-data text-xs font-semibold uppercase tracking-wide text-primary">Avisos</p>
+        <AnnouncementsFeed studentId={studentId} companyId={companyId} />
+      </PopoverContent>
+    </Popover>
+  );
+}

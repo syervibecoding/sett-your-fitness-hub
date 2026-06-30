@@ -31,7 +31,11 @@ import { ExternalActivitiesList } from "@/components/student/ExternalActivitiesL
 import { AnnouncementsFeed } from "@/components/student/AnnouncementsFeed";
 import { BodyMeasurements } from "@/components/student/BodyMeasurements";
 import type { Gender } from "@/components/student/BodyAvatar";
-import { Megaphone, Activity } from "lucide-react";
+import { VolumeInsights } from "@/components/student/VolumeInsights";
+import { PeriodizationBanner } from "@/components/student/PeriodizationBanner";
+import { WarmupGuide } from "@/components/student/WarmupGuide";
+import { AnnouncementsBell } from "@/components/student/AnnouncementsBell";
+import { Megaphone, Activity, Flame } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 
@@ -104,6 +108,7 @@ export default function StudentPortal() {
   const [workoutSessions, setWorkoutSessions] = useState<any[]>([]);
   const [weeklyGoal, setWeeklyGoal] = useState<number>(3);
   const [activeEnrollmentId, setActiveEnrollmentId] = useState<string | null>(null);
+  const [warmupOpen, setWarmupOpen] = useState(false);
   
 
   const selectedWorkout = selectedCycle?.workouts.find(w => w.id === selectedWorkoutId) || selectedCycle?.workouts[0] || null;
@@ -543,9 +548,12 @@ export default function StudentPortal() {
                 {viewTitles[activeView]}
               </h1>
             </div>
-            <Button variant="ghost" size="icon" onClick={signOut}>
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              {studentId && companyId && <AnnouncementsBell studentId={studentId} companyId={companyId} />}
+              <Button variant="ghost" size="icon" onClick={signOut}>
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
           {activeView === "home" && (
             <p className="text-foreground font-sans text-lg">{studentName}</p>
@@ -639,6 +647,11 @@ export default function StudentPortal() {
                   </CardContent>
                 </Card>
 
+                <PeriodizationBanner
+                  startDate={selectedCycle.start_date}
+                  endDate={selectedCycle.end_date}
+                />
+
                 {selectedCycle.workouts.length > 0 ? (
                   <div className="space-y-3">
                     {selectedWorkout && (
@@ -649,6 +662,18 @@ export default function StudentPortal() {
                         workoutTitle={selectedWorkout.title}
                         workoutDescription={selectedWorkout.description}
                       />
+                    )}
+                    {selectedWorkout && selectedWorkout.exercises.length > 0 && (
+                      <>
+                        <Button variant="outline" className="w-full" onClick={() => setWarmupOpen(true)}>
+                          <Flame className="h-4 w-4 mr-2" /> Aquecimento (5 min)
+                        </Button>
+                        <WarmupGuide
+                          muscleGroups={selectedWorkout.exercises.map((e) => e.muscle_group)}
+                          open={warmupOpen}
+                          onOpenChange={setWarmupOpen}
+                        />
+                      </>
                     )}
                     {trainedDays.size > 0 && (
                       <WeeklyBar
@@ -768,7 +793,10 @@ export default function StudentPortal() {
 
         {/* STATS VIEW */}
         {activeView === "stats" && (
-          <StatsCharts allLogs={allLogs} cycles={cycles} todayStr={todayStr} gender={gender ?? "male"} />
+          <div className="space-y-4">
+            <VolumeInsights allLogs={allLogs} cycles={cycles} />
+            <StatsCharts allLogs={allLogs} cycles={cycles} todayStr={todayStr} gender={gender ?? "male"} />
+          </div>
         )}
 
         {/* CALENDARIO VIEW */}
