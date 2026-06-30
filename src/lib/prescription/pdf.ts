@@ -84,6 +84,18 @@ export function generatePrescriptionPdf(
     }
   }
 
+  function sectionTitle(t: string) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    setColor(NAVY);
+    doc.text(t.toUpperCase(), M, y);
+    y += 2;
+    draw(NAVY);
+    doc.setLineWidth(0.4);
+    doc.line(M, y, M + 18, y);
+    y += 5;
+  }
+
   // --- cabeçalho -----------------------------------------------------------
   fill(NAVY);
   doc.rect(0, 0, W, 34, "F");
