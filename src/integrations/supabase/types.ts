@@ -1334,6 +1334,78 @@ export type Database = {
         }
         Relationships: []
       }
+      nutrition_plans: {
+        Row: {
+          carbs_g: number | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          fat_g: number | null
+          id: string
+          meals: Json
+          notes: string | null
+          objective: string
+          protein_g: number | null
+          status: string
+          student_id: string
+          title: string
+          total_calories: number | null
+          updated_at: string
+          water_ml: number | null
+        }
+        Insert: {
+          carbs_g?: number | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          fat_g?: number | null
+          id?: string
+          meals?: Json
+          notes?: string | null
+          objective?: string
+          protein_g?: number | null
+          status?: string
+          student_id: string
+          title?: string
+          total_calories?: number | null
+          updated_at?: string
+          water_ml?: number | null
+        }
+        Update: {
+          carbs_g?: number | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          fat_g?: number | null
+          id?: string
+          meals?: Json
+          notes?: string | null
+          objective?: string
+          protein_g?: number | null
+          status?: string
+          student_id?: string
+          title?: string
+          total_calories?: number | null
+          updated_at?: string
+          water_ml?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nutrition_plans_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nutrition_plans_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number

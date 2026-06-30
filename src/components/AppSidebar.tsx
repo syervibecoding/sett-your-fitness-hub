@@ -22,6 +22,7 @@ import {
   Sparkles,
   Activity,
   Cpu,
+  Apple,
 
 
 } from "lucide-react";
@@ -201,7 +202,7 @@ export function AppSidebar() {
             : [];
 
   const isWhatsAppActive = location.pathname.includes("/whatsapp");
-  const isExercisesActive = location.pathname.includes("/exercises") || location.pathname.includes("/prescriptions") || location.pathname.includes("/workout/") || location.pathname.includes("/prescricao") || location.pathname.includes("/avaliacao");
+  const isExercisesActive = location.pathname.includes("/exercises") || location.pathname.includes("/prescriptions") || location.pathname.includes("/workout/") || location.pathname.includes("/prescricao") || location.pathname.includes("/avaliacao") || location.pathname.includes("/nutricao");
   
   // Determine exercise menu prefix
   const exercisePrefix = showAdminView ? "/admin" : `/${role}`;
@@ -331,6 +332,14 @@ export function AppSidebar() {
                             <NavLink to={`${exercisePrefix}/studio`} end>
                               <Cpu className="h-4 w-4" />
                               <span>Studio de Prescrição</span>
+                            </NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/nutricao`}>
+                            <NavLink to={`${exercisePrefix}/nutricao`} end>
+                              <Apple className="h-4 w-4" />
+                              <span>Studio de Nutrição</span>
                             </NavLink>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>

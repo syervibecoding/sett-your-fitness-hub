@@ -30,6 +30,7 @@ import { calculateStreak } from "@/lib/streakCalculator";
 import { ExternalActivitiesList } from "@/components/student/ExternalActivitiesList";
 import { AnnouncementsFeed } from "@/components/student/AnnouncementsFeed";
 import { BodyMeasurements } from "@/components/student/BodyMeasurements";
+import { NutritionPlanView } from "@/components/student/NutritionPlanView";
 import type { Gender } from "@/components/student/BodyAvatar";
 import { VolumeInsights } from "@/components/student/VolumeInsights";
 import { PeriodizationBanner } from "@/components/student/PeriodizationBanner";
@@ -40,7 +41,7 @@ import { Megaphone, Activity, Flame } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 
-type ActiveView = "home" | "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos" | "medidas";
+type ActiveView = "home" | "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos" | "medidas" | "nutricao";
 
 
 interface WorkoutExercise {
@@ -529,6 +530,7 @@ export default function StudentPortal() {
     atividades: "ATIVIDADES",
     avisos: "AVISOS",
     medidas: "MEDIDAS",
+    nutricao: "NUTRIÇÃO",
   };
 
 
@@ -842,6 +844,11 @@ export default function StudentPortal() {
             gender={gender}
             onGenderChange={setGender}
           />
+        )}
+
+        {/* NUTRIÇÃO VIEW */}
+        {activeView === "nutricao" && studentId && (
+          <NutritionPlanView studentId={studentId} />
         )}
           </motion.div>
         </AnimatePresence>
