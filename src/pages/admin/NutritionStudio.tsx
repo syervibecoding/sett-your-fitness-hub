@@ -153,7 +153,7 @@ export default function NutritionStudio() {
         meals: plan.meals as unknown as object,
         notes: restrictions || null,
       };
-      const { error } = await supabase.from("nutrition_plans").insert(row);
+      const { error } = await supabase.from("nutrition_plans").insert([row] as never);
       if (error) throw new Error(error.message);
       toast.success("Plano alimentar salvo. O aluno já pode visualizá-lo.");
     } catch (err: any) {
