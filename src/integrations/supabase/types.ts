@@ -685,6 +685,62 @@ export type Database = {
         }
         Relationships: []
       }
+      company_ai_config: {
+        Row: {
+          assistant_name: string
+          company_id: string
+          created_at: string
+          doctrine: string | null
+          enabled: boolean
+          ethical_limits: string | null
+          extra: Json
+          id: string
+          methodology: string | null
+          staff_assistant_enabled: boolean
+          student_assistant_enabled: boolean
+          tone: string | null
+          updated_at: string
+        }
+        Insert: {
+          assistant_name?: string
+          company_id: string
+          created_at?: string
+          doctrine?: string | null
+          enabled?: boolean
+          ethical_limits?: string | null
+          extra?: Json
+          id?: string
+          methodology?: string | null
+          staff_assistant_enabled?: boolean
+          student_assistant_enabled?: boolean
+          tone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assistant_name?: string
+          company_id?: string
+          created_at?: string
+          doctrine?: string | null
+          enabled?: boolean
+          ethical_limits?: string | null
+          extra?: Json
+          id?: string
+          methodology?: string | null
+          staff_assistant_enabled?: boolean
+          student_assistant_enabled?: boolean
+          tone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_ai_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_billing: {
         Row: {
           company_id: string
