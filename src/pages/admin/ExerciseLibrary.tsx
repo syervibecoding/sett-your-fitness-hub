@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, Pencil, Trash2, Play, Globe, Building2, Upload, Loader2 } from "lucide-react";
 import { useMaster } from "@/contexts/MasterContext";
+import { getExerciseCover } from "@/lib/exerciseCover";
 
 interface Exercise {
   id: string;
