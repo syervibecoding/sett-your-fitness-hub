@@ -38,6 +38,7 @@ const Announcements = lazy(() => import("./pages/admin/Announcements"));
 const UnifiedPrescriber = lazy(() => import("./pages/admin/UnifiedPrescriber"));
 const FunctionalAssessment = lazy(() => import("./pages/admin/FunctionalAssessment"));
 const AICoachStudio = lazy(() => import("./pages/admin/AICoachStudio"));
+const PrescriptionStudio = lazy(() => import("./pages/admin/PrescriptionStudio"));
 
 const CoordinatorDashboard = lazy(() => import("./pages/coordinator/CoordinatorDashboard"));
 const TrainerDashboard = lazy(() => import("./pages/trainer/TrainerDashboard"));
