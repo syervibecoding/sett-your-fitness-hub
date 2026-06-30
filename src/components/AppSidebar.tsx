@@ -168,8 +168,12 @@ export function AppSidebar() {
     if (features.hasFinancial || showAdminView) {
       items.push(financialItem);
     }
+    if (features.hasAiCoach || showAdminView) {
+      items.push(adminAiCoachItem);
+    }
     return items;
   })();
+
 
   // For coordinator/trainer, filter items by permission
   const filterByPermission = (items: typeof coordinatorAllItems) => {
