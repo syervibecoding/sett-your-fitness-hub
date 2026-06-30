@@ -412,7 +412,41 @@ export default function ExerciseLibrary() {
             <h2 className="text-lg text-primary capitalize mb-3">{group}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-6">
               {exs.map((ex) => (
-                <Card key={ex.id} className="bg-card border-border group">
+                <Card key={ex.id} className="bg-card border-border group overflow-hidden">
+                  {(() => {
+                    const cover = getExerciseCover({ thumbnail_url: ex.thumbnail_url, video_url: ex.video_url });
+                    const hasVideo = !!(ex.video_path || ex.video_url);
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => hasVideo && openVideoForExercise(ex)}
+                        className="relative block w-full aspect-video bg-secondary overflow-hidden border-b border-border group/cover"
+                        aria-label={hasVideo ? `Ver vídeo de ${ex.name}` : ex.name}
+                      >
+                        {cover ? (
+                          <img
+                            src={cover}
+                            alt={ex.name}
+                            loading="lazy"
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover/cover:scale-105"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                          />
+                        ) : (
+                          <div className="h-full w-full flex flex-col items-center justify-center gap-1 text-muted-foreground">
+                            <Play className="h-6 w-6 opacity-40" />
+                            <span className="text-[10px] font-sans capitalize opacity-60">{ex.muscle_group}</span>
+                          </div>
+                        )}
+                        {hasVideo && (
+                          <span className="absolute inset-0 flex items-center justify-center bg-foreground/0 group-hover/cover:bg-foreground/20 transition-colors">
+                            <span className="h-9 w-9 rounded-full bg-background/90 flex items-center justify-center shadow opacity-0 group-hover/cover:opacity-100 transition-opacity">
+                              <Play className="h-4 w-4 text-primary fill-primary" />
+                            </span>
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })()}
                   <CardContent className="p-4 space-y-2">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
