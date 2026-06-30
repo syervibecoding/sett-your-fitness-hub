@@ -19,13 +19,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Cpu, AlertCircle, AlertTriangle, CheckCircle2, Dumbbell, Save, Loader2, ExternalLink,
+  Cpu, AlertCircle, AlertTriangle, CheckCircle2, Dumbbell, Save, Loader2, ExternalLink, FileDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 import {
-  generatePrescription, normalizePoolItem,
+  generatePrescription, normalizePoolItem, downloadPrescriptionPdf,
   type ExercisePoolItem, type Objective, type Experience, type Equipment,
   type PrescriptionPlan,
 } from "@/lib/prescription";
