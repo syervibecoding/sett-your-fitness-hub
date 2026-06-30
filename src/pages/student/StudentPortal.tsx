@@ -35,7 +35,7 @@ import { VolumeInsights } from "@/components/student/VolumeInsights";
 import { PeriodizationBanner } from "@/components/student/PeriodizationBanner";
 import { WarmupGuide } from "@/components/student/WarmupGuide";
 import { AnnouncementsBell } from "@/components/student/AnnouncementsBell";
-import { Megaphone, Activity } from "lucide-react";
+import { Megaphone, Activity, Flame } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 
