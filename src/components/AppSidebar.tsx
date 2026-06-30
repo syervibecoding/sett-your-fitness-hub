@@ -202,7 +202,7 @@ export function AppSidebar() {
             : [];
 
   const isWhatsAppActive = location.pathname.includes("/whatsapp");
-  const isExercisesActive = location.pathname.includes("/exercises") || location.pathname.includes("/prescriptions") || location.pathname.includes("/workout/") || location.pathname.includes("/prescricao") || location.pathname.includes("/avaliacao");
+  const isExercisesActive = location.pathname.includes("/exercises") || location.pathname.includes("/prescriptions") || location.pathname.includes("/workout/") || location.pathname.includes("/prescricao") || location.pathname.includes("/avaliacao") || location.pathname.includes("/nutricao");
   
   // Determine exercise menu prefix
   const exercisePrefix = showAdminView ? "/admin" : `/${role}`;
