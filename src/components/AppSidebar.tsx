@@ -191,7 +191,10 @@ export function AppSidebar() {
       : isAdmin
         ? adminItems
         : isCoordinator
-          ? filterByPermission(coordinatorAllItems)
+          ? [
+              ...filterByPermission(coordinatorAllItems),
+              ...(features.hasAiCoach ? [coordinatorAiCoachItem] : []),
+            ]
           : isTrainer
             ? filterByPermission(trainerAllItems)
             : [];
