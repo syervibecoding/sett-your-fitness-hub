@@ -21,6 +21,7 @@ import {
   Megaphone,
   Sparkles,
   Activity,
+  Cpu,
 
 
 } from "lucide-react";
