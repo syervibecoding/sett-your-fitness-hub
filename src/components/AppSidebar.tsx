@@ -90,6 +90,8 @@ const managementItems = [
 
 
 const financialItem = { title: "Financeiro", url: "/admin/financial", icon: DollarSign };
+const adminAiCoachItem = { title: "Central de IA", url: "/admin/ai-studio", icon: Sparkles };
+const coordinatorAiCoachItem = { title: "Central de IA", url: "/coordinator/ai-studio", icon: Sparkles };
 
 const whatsappSubItems = [
   { title: "Conversas", url: "/admin/whatsapp-chat", icon: MessageSquare },
@@ -166,8 +168,12 @@ export function AppSidebar() {
     if (features.hasFinancial || showAdminView) {
       items.push(financialItem);
     }
+    if (features.hasAiCoach || showAdminView) {
+      items.push(adminAiCoachItem);
+    }
     return items;
   })();
+
 
   // For coordinator/trainer, filter items by permission
   const filterByPermission = (items: typeof coordinatorAllItems) => {
@@ -185,7 +191,10 @@ export function AppSidebar() {
       : isAdmin
         ? adminItems
         : isCoordinator
-          ? filterByPermission(coordinatorAllItems)
+          ? [
+              ...filterByPermission(coordinatorAllItems),
+              ...(features.hasAiCoach ? [coordinatorAiCoachItem] : []),
+            ]
           : isTrainer
             ? filterByPermission(trainerAllItems)
             : [];

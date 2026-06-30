@@ -35,6 +35,7 @@ import { VolumeInsights } from "@/components/student/VolumeInsights";
 import { PeriodizationBanner } from "@/components/student/PeriodizationBanner";
 import { WarmupGuide } from "@/components/student/WarmupGuide";
 import { AnnouncementsBell } from "@/components/student/AnnouncementsBell";
+import { AICoachWidget } from "@/components/ai/AICoachWidget";
 import { Megaphone, Activity, Flame } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -533,6 +534,7 @@ export default function StudentPortal() {
 
   return (
     <div className="min-h-screen bg-background">
+      <AICoachWidget audience="student" />
       {/* Header */}
       <div className="bg-card border-b border-border px-4 py-5 sm:px-6">
         <div className="max-w-2xl mx-auto">

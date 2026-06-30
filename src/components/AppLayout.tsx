@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { RouteTransition } from "@/components/RouteTransition";
+import { AICoachWidget } from "@/components/ai/AICoachWidget";
 
 const ContentLoader = () => (
   <div className="flex items-center justify-center py-24">
@@ -35,6 +36,7 @@ export function AppLayout() {
             </Suspense>
           </div>
         </main>
+        <AICoachWidget audience="staff" />
       </div>
     </SidebarProvider>
   );
