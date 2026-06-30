@@ -533,6 +533,7 @@ export default function StudentPortal() {
 
   return (
     <div className="min-h-screen bg-background">
+      <AICoachWidget audience="student" />
       {/* Header */}
       <div className="bg-card border-b border-border px-4 py-5 sm:px-6">
         <div className="max-w-2xl mx-auto">
