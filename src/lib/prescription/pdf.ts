@@ -312,3 +312,4 @@ export function downloadPrescriptionPdf(
     .replace(/[^a-zA-Z0-9]+/g, "-")
     .toLowerCase();
   doc.save(`prescricao-${safe}.pdf`);
+}
