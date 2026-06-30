@@ -89,14 +89,17 @@ export default function PrescriptionStudio() {
     })();
   }, [companyId]);
 
-  // Biblioteca de exercícios da empresa (globais + da empresa)
+  // Biblioteca de exercícios da empresa (globais + da empresa) + nome da empresa
   useEffect(() => {
-    if (!companyId) { setPool([]); return; }
+    if (!companyId) { setPool([]); setCompanyName(""); return; }
     (async () => {
       const { data } = await supabase.from("exercise_library")
         .select("id, name, muscle_group, equipment, video_url, video_path")
         .or(`is_global.eq.true,company_id.eq.${companyId}`);
       setPool((data || []).map((r: any) => normalizePoolItem(r)));
+      const { data: comp } = await supabase.from("companies")
+        .select("name").eq("id", companyId).maybeSingle();
+      setCompanyName(comp?.name || "");
     })();
   }, [companyId]);
 
