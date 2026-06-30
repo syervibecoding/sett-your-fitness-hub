@@ -647,6 +647,11 @@ export default function StudentPortal() {
                   </CardContent>
                 </Card>
 
+                <PeriodizationBanner
+                  startDate={selectedCycle.start_date}
+                  endDate={selectedCycle.end_date}
+                />
+
                 {selectedCycle.workouts.length > 0 ? (
                   <div className="space-y-3">
                     {selectedWorkout && (
