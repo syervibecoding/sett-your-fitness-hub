@@ -192,6 +192,20 @@ export default function PrescriptionStudio() {
     setApplying(false);
   }
 
+  function handleExportPdf() {
+    if (!plan) return;
+    try {
+      downloadPrescriptionPdf(plan, {
+        studentName: student?.full_name || "Aluno",
+        companyName: companyName || undefined,
+        authorName: (user?.user_metadata?.full_name as string) || user?.email || undefined,
+      });
+      toast.success("PDF gerado.");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao gerar PDF.");
+    }
+  }
+
   const inputCls = "h-9 text-sm";
   const SS = ({ value, onChange, opts, placeholder }: any) => (
     <Select value={value || undefined} onValueChange={onChange}>
