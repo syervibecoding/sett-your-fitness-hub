@@ -19,13 +19,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Cpu, AlertCircle, AlertTriangle, CheckCircle2, Dumbbell, Save, Loader2, ExternalLink,
+  Cpu, AlertCircle, AlertTriangle, CheckCircle2, Dumbbell, Save, Loader2, ExternalLink, FileDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 import {
-  generatePrescription, normalizePoolItem,
+  generatePrescription, normalizePoolItem, downloadPrescriptionPdf,
   type ExercisePoolItem, type Objective, type Experience, type Equipment,
   type PrescriptionPlan,
 } from "@/lib/prescription";
@@ -66,6 +66,7 @@ export default function PrescriptionStudio() {
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [cycleId, setCycleId] = useState("");
   const [pool, setPool] = useState<ExercisePoolItem[]>([]);
+  const [companyName, setCompanyName] = useState<string>("");
 
   const [objective, setObjective] = useState<Objective>("hipertrofia");
   const [experience, setExperience] = useState<Experience>("intermediario");
@@ -88,14 +89,17 @@ export default function PrescriptionStudio() {
     })();
   }, [companyId]);
 
-  // Biblioteca de exercícios da empresa (globais + da empresa)
+  // Biblioteca de exercícios da empresa (globais + da empresa) + nome da empresa
   useEffect(() => {
-    if (!companyId) { setPool([]); return; }
+    if (!companyId) { setPool([]); setCompanyName(""); return; }
     (async () => {
       const { data } = await supabase.from("exercise_library")
         .select("id, name, muscle_group, equipment, video_url, video_path")
         .or(`is_global.eq.true,company_id.eq.${companyId}`);
       setPool((data || []).map((r: any) => normalizePoolItem(r)));
+      const { data: comp } = await supabase.from("companies")
+        .select("name").eq("id", companyId).maybeSingle();
+      setCompanyName(comp?.name || "");
     })();
   }, [companyId]);
 
@@ -186,6 +190,20 @@ export default function PrescriptionStudio() {
       toast.error(err.message || "Erro ao aplicar.");
     }
     setApplying(false);
+  }
+
+  function handleExportPdf() {
+    if (!plan) return;
+    try {
+      downloadPrescriptionPdf(plan, {
+        studentName: student?.full_name || "Aluno",
+        companyName: companyName || undefined,
+        authorName: (user?.user_metadata?.full_name as string) || user?.email || undefined,
+      });
+      toast.success("PDF gerado.");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao gerar PDF.");
+    }
   }
 
   const inputCls = "h-9 text-sm";
@@ -363,6 +381,9 @@ export default function PrescriptionStudio() {
             <Button onClick={handleApply} disabled={applying || !cycleId} size="lg" className="gap-2 shadow-lg">
               {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {applying ? "Aplicando..." : "Aplicar ao ciclo"}
+            </Button>
+            <Button variant="outline" size="lg" onClick={handleExportPdf} className="gap-2 bg-background">
+              <FileDown className="h-4 w-4" /> Exportar PDF
             </Button>
             {cycleId && (
               <Button variant="outline" size="lg" onClick={() => navigate(`${prefix}/workout/${cycleId}`)} className="gap-2">

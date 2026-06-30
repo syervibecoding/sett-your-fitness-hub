@@ -7,3 +7,5 @@ export * from "./restrictionRules";
 export * from "./progressionRules";
 export * from "./validator";
 export { generatePrescription } from "./engine";
+export { generatePrescriptionPdf, downloadPrescriptionPdf } from "./pdf";
+export type { PrescriptionPdfMeta } from "./pdf";
