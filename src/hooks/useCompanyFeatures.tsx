@@ -41,6 +41,7 @@ const TIER_FEATURES: Record<CompanyTier, Omit<CompanyFeatures, "tier" | "loading
     hasFinancial: false,
     hasWhatsApp: false,
     hasAutomation: false,
+    hasAiCoach: false,
   },
   intermediate: {
     hasPrescription: true,
@@ -55,6 +56,7 @@ const TIER_FEATURES: Record<CompanyTier, Omit<CompanyFeatures, "tier" | "loading
     hasFinancial: true,
     hasWhatsApp: false,
     hasAutomation: false,
+    hasAiCoach: true,
   },
   advanced: {
     hasPrescription: true,
@@ -69,6 +71,7 @@ const TIER_FEATURES: Record<CompanyTier, Omit<CompanyFeatures, "tier" | "loading
     hasFinancial: true,
     hasWhatsApp: true,
     hasAutomation: true,
+    hasAiCoach: true,
   },
 };
 
