@@ -66,6 +66,7 @@ export default function PrescriptionStudio() {
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [cycleId, setCycleId] = useState("");
   const [pool, setPool] = useState<ExercisePoolItem[]>([]);
+  const [companyName, setCompanyName] = useState<string>("");
 
   const [objective, setObjective] = useState<Objective>("hipertrofia");
   const [experience, setExperience] = useState<Experience>("intermediario");
