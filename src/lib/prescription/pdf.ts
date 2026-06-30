@@ -258,7 +258,7 @@ export function generatePrescriptionPdf(
 
     w.exercises.forEach((ex) => {
       const nameLines = doc.splitTextToSize(ex.exercise_name, cols[0].w - 2);
-      const rowHeight = Math.max(7, nameLines.length * 4.2 + 3);
+      const rowHeight = Math.max(8.5, nameLines.length * 4.2 + 4.5);
       ensureSpace(rowHeight + 2);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8.5);
