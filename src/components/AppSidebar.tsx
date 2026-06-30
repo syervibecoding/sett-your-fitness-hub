@@ -326,6 +326,14 @@ export function AppSidebar() {
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/studio`}>
+                            <NavLink to={`${exercisePrefix}/studio`} end>
+                              <Cpu className="h-4 w-4" />
+                              <span>Studio de Prescrição</span>
+                            </NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
                           <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/avaliacao`}>
                             <NavLink to={`${exercisePrefix}/avaliacao`} end>
                               <Activity className="h-4 w-4" />
