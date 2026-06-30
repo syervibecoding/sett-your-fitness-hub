@@ -548,9 +548,12 @@ export default function StudentPortal() {
                 {viewTitles[activeView]}
               </h1>
             </div>
-            <Button variant="ghost" size="icon" onClick={signOut}>
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              {studentId && companyId && <AnnouncementsBell studentId={studentId} companyId={companyId} />}
+              <Button variant="ghost" size="icon" onClick={signOut}>
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
           {activeView === "home" && (
             <p className="text-foreground font-sans text-lg">{studentName}</p>
