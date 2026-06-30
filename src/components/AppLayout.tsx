@@ -36,6 +36,7 @@ export function AppLayout() {
             </Suspense>
           </div>
         </main>
+        <AICoachWidget audience="staff" />
       </div>
     </SidebarProvider>
   );
