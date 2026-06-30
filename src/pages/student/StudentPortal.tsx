@@ -793,7 +793,10 @@ export default function StudentPortal() {
 
         {/* STATS VIEW */}
         {activeView === "stats" && (
-          <StatsCharts allLogs={allLogs} cycles={cycles} todayStr={todayStr} gender={gender ?? "male"} />
+          <div className="space-y-4">
+            <VolumeInsights allLogs={allLogs} cycles={cycles} />
+            <StatsCharts allLogs={allLogs} cycles={cycles} todayStr={todayStr} gender={gender ?? "male"} />
+          </div>
         )}
 
         {/* CALENDARIO VIEW */}
