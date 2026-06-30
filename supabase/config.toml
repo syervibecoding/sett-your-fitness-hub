@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.ai-functional-assessment]
 verify_jwt = false
+
+[functions.ai-coach]
+verify_jwt = false
