@@ -312,9 +312,3 @@ export function downloadPrescriptionPdf(
     .replace(/[^a-zA-Z0-9]+/g, "-")
     .toLowerCase();
   doc.save(`prescricao-${safe}.pdf`);
-}
-
-function sectionTitle(_t: string) {
-  // placeholder reatribuído dentro de generatePrescriptionPdf via closure-like;
-  // mantido aqui apenas para satisfazer a tipagem; ver implementação inline.
-}
