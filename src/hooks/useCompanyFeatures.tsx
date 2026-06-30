@@ -23,6 +23,8 @@ export interface CompanyFeatures {
   // WhatsApp CRM - advanced only
   hasWhatsApp: boolean;
   hasAutomation: boolean;
+  // AI Coach Studio - intermediate + advanced
+  hasAiCoach: boolean;
 }
 
 const TIER_FEATURES: Record<CompanyTier, Omit<CompanyFeatures, "tier" | "loading">> = {
