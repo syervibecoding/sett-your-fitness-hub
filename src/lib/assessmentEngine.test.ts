@@ -110,4 +110,88 @@ describe("BN functional assessment deterministic engine", () => {
     });
     expect(normalized.prescription_context.engine).toBe(ASSESSMENT_ENGINE_VERSION);
   });
+
+  it("detects OHS compensations from objective frame metrics", () => {
+    const normalized = normalizeAssessmentJson({
+      frame_findings: [
+        {
+          frameId: "front_ohs",
+          vista: "Vista Anterior OHS",
+          metrics: {
+            knee_valgus_angle_deg: 20,
+          },
+        },
+        {
+          frameId: "side_ohs",
+          vista: "Vista Lateral OHS",
+          pose_metrics: {
+            posterior_pelvic_tilt_delta_deg: 16,
+          },
+        },
+      ],
+    }, frameRefs);
+
+    const valgus = normalized.ohs_compensations.find((item: any) => item.key === "dynamic_valgus");
+    const buttWink = normalized.ohs_compensations.find((item: any) => item.key === "butt_wink");
+
+    expect(valgus).toMatchObject({
+      presente: true,
+      severidade: "severa",
+      frame_referencia: "front_ohs",
+      confidence: "alta",
+      rule_id: "dynamic_valgus",
+    });
+    expect(valgus.evidence_signals.some((signal: any) => signal.source === "metric")).toBe(true);
+    expect(buttWink).toMatchObject({
+      presente: true,
+      severidade: "moderada",
+      confidence: "alta",
+    });
+    expect(normalized.assessment_confidence.has_metric_evidence).toBe(true);
+    expect(normalized.prescription_context.needs_teacher_review).toBe(true);
+  });
+
+  it("builds deterministic assessment with frame metrics without calling vision AI", () => {
+    const result = buildDeterministicAssessmentJson({
+      frameRefs,
+      frame_findings: [
+        {
+          frameId: "posterior_ohs",
+          vista: "Vista Posterior OHS",
+          measurements: {
+            pelvic_drop_deg: 8,
+          },
+        },
+      ],
+      observacoes_tecnicas: "aluna sem dor no teste",
+      reason: "test_metric_fallback",
+    });
+
+    const pelvicDrop = result.ohs_compensations.find((item: any) => item.key === "pelvic_drop_trendelenburg");
+
+    expect(pelvicDrop).toMatchObject({
+      presente: true,
+      severidade: "moderada",
+      frame_referencia: "posterior_ohs",
+      confidence: "alta",
+    });
+    expect(result.frame_findings.find((item: any) => item.frameId === "posterior_ohs").measurements.pelvic_drop_deg).toBe(8);
+    expect(result.quality_gate.status).toMatch(/ready|needs_teacher_review/);
+    expect(result.score_funcional.value).toBeLessThan(10);
+    expect(result.report_sections.contexto_prescricao.assessment_confidence).toBeTruthy();
+  });
+
+  it("sets quality gate to professional clearance when red flags are present", () => {
+    const result = buildDeterministicAssessmentJson({
+      frameRefs,
+      historico_lesoes: "dor lombar com formigamento e irradiação para perna",
+      observacoes_tecnicas: "sem leitura visual automatica",
+      reason: "test_red_flag",
+    });
+
+    expect(result.red_yellow_flags.length).toBeGreaterThan(0);
+    expect(result.quality_gate.status).toBe("needs_professional_clearance");
+    expect(result.quality_gate.can_prescribe).toBe(false);
+    expect(result.prescription_context.quality_gate.can_prescribe).toBe(false);
+  });
 });

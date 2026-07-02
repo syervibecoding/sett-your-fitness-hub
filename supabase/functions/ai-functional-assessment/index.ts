@@ -893,6 +893,7 @@ serve(async (req) => {
       assessment_source = "",
       protocol_hint = "",
       expected_movements = [],
+      frame_findings = [],
     } = await req.json();
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -925,6 +926,20 @@ serve(async (req) => {
         { key: image_squat_costas,   label: "OVERHEAD SQUAT — VISTA POSTERIOR", id: "squat_costas" },
       ].forEach((s) => pushImage(s.label, s.id, s.key));
     }
+
+    const incomingFrameFindings = Array.isArray(frame_findings) ? frame_findings : [];
+    const frameMetricContext = Array.isArray(frames)
+      ? frames.map((fr: any, i: number) => ({
+        ...(incomingFrameFindings.find((item: any) => item?.frameId === (fr.frameId || `frame_${i}`)) || {}),
+        frameId: fr.frameId || `frame_${i}`,
+        vista: fr.vista || `Frame ${i + 1}`,
+        metrics: fr.metrics ?? fr.measurements ?? fr.pose_metrics ?? fr.landmark_metrics ?? fr.analysis_metrics ?? null,
+        measurements: fr.measurements ?? null,
+        pose_metrics: fr.pose_metrics ?? null,
+        findings: Array.isArray(fr.findings) ? fr.findings : [],
+        observacao: fr.observacao ?? fr.observacoes ?? null,
+      }))
+      : incomingFrameFindings;
 
     const hasTextAssessmentData = [
       peso_kg,
@@ -1009,6 +1024,7 @@ ${imageContent.length > 0
         assessment_source,
         protocol_hint,
         expected_movements,
+        frame_findings: frameMetricContext,
         reason: AI_FIRST ? (ANTHROPIC_API_KEY ? "vision_unavailable" : "anthropic_key_missing") : "deterministic_first",
       });
       rawText = JSON.stringify(assessmentJson);

@@ -20,11 +20,30 @@ export interface OhsCompensationDefinition {
   aliases: string[];
   visualSignals: string[];
   vistaKeywords: string[];
+  metricRules?: MetricRule[];
   likelyShortened: string[];
   likelyWeak: string[];
   movementRestrictions: string[];
   cautionPatterns: string[];
   trainingImplication: string;
+}
+
+export interface MetricRule {
+  field: string;
+  direction: "lt" | "lte" | "gt" | "gte" | "abs_gt" | "ratio_lt" | "ratio_gt" | "truthy";
+  mild: number;
+  moderate: number;
+  severe: number;
+  message: string;
+}
+
+export interface EvidenceSignal {
+  source: "explicit" | "frame_finding" | "teacher_note" | "metric";
+  severity: AssessmentSeverity;
+  frameId?: string | null;
+  message: string;
+  confidence: "baixa" | "media" | "alta";
+  value?: number | string | boolean | null;
 }
 
 export interface OhsCompensationResult {
@@ -36,6 +55,9 @@ export interface OhsCompensationResult {
   vista_referencia: string | null;
   evidencia: string;
   implicacao_treino: string;
+  evidence_signals?: EvidenceSignal[];
+  confidence?: "baixa" | "media" | "alta";
+  rule_id?: string;
   musculos_encurtados?: string[];
   musculos_fracos?: string[];
   restricoes_movimento?: string[];
@@ -57,6 +79,7 @@ export interface BuildAssessmentInput {
   assessment_source?: unknown;
   protocol_hint?: unknown;
   expected_movements?: unknown;
+  frame_findings?: unknown;
   reason: string;
 }
 
