@@ -491,6 +491,31 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
   function updateFrame(id: string, changes: Partial<Frame>) {
     setFrames(prev => prev.map(fr => fr.id === id ? { ...fr, ...changes } : fr));
   }
+  function swapFrameCaptureWithNext(id: string) {
+    setFrames(prev => {
+      const idx = prev.findIndex(fr => fr.id === id);
+      if (idx < 0 || idx >= prev.length - 1) return prev;
+      const next = prev[idx + 1];
+      const current = prev[idx];
+      const swapped = [...prev];
+      swapped[idx] = {
+        ...current,
+        time: next.time,
+        preview: next.preview,
+        blob: next.blob,
+        aiAnalyzed: false,
+      };
+      swapped[idx + 1] = {
+        ...next,
+        time: current.time,
+        preview: current.preview,
+        blob: current.blob,
+        aiAnalyzed: false,
+      };
+      return swapped;
+    });
+    setPreviewFrame(prev => prev?.id === id ? null : prev);
+  }
   function addFinding(id: string) {
     setFrames(prev => prev.map(fr => fr.id === id
       ? { ...fr, findings: [...fr.findings, { gravidade: "Moderada", descricao: "" }] }
@@ -703,9 +728,9 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
       {frames.length > 0 && (
         <div className="space-y-3">
           <p className="text-xs text-slate-500">
-            Revise os cortes antes da IA. Use Ver, 1s, Usar vídeo ou ampliar quando algum frame cair fora do melhor momento.
+            Revise os cortes antes da IA. Use Ver, 1s, Usar vídeo ou Trocar ↓ quando dois cortes vizinhos vierem invertidos.
           </p>
-          {frames.map((fr) => (
+          {frames.map((fr, index) => (
             <Card key={fr.id}>
               <CardContent className="pt-4">
                 <div className="flex gap-4">
@@ -753,6 +778,11 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
                       <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => recaptureFrame(fr.id, fr.time + FRAME_NUDGE_SECONDS)}>
                         1s <SkipForward className="ml-1 h-3 w-3" />
                       </Button>
+                      {index < frames.length - 1 && (
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => swapFrameCaptureWithNext(fr.id)}>
+                          <RefreshCw className="mr-1 h-3 w-3" /> Trocar ↓
+                        </Button>
+                      )}
                       <span className="text-xs text-slate-400">{fr.time.toFixed(1)}s</span>
                     </div>
 

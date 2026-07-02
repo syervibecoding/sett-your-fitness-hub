@@ -7,6 +7,16 @@ export type OhsCompensationKey =
   | "shoulder_protraction_kyphosis"
   | "overhead_arm_asymmetry";
 
+export type PosturalCompensationKey =
+  | "forward_head_posture"
+  | "rounded_shoulders_kyphosis"
+  | "scapular_asymmetry_winging"
+  | "anterior_pelvic_tilt_hyperlordosis"
+  | "pelvic_obliquity"
+  | "knee_hyperextension"
+  | "foot_pronation"
+  | "foot_supination";
+
 export type AssessmentSeverity = "ausente" | "incerta" | "leve" | "moderada" | "severa";
 
 export interface FrameRef {
@@ -15,7 +25,7 @@ export interface FrameRef {
 }
 
 export interface OhsCompensationDefinition {
-  key: OhsCompensationKey;
+  key: OhsCompensationKey | PosturalCompensationKey;
   label: string;
   aliases: string[];
   visualSignals: string[];
@@ -47,7 +57,7 @@ export interface EvidenceSignal {
 }
 
 export interface OhsCompensationResult {
-  key: OhsCompensationKey;
+  key: OhsCompensationKey | PosturalCompensationKey;
   compensacao: string;
   presente: boolean;
   severidade: AssessmentSeverity;

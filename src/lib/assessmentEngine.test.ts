@@ -4,6 +4,7 @@ import {
   buildDeterministicAssessmentJson,
   normalizeAssessmentJson,
   OHS_COMPENSATIONS,
+  POSTURAL_COMPENSATIONS,
 } from "../../supabase/functions/_shared/assessment/engine.ts";
 
 const frameRefs = [
@@ -193,5 +194,74 @@ describe("BN functional assessment deterministic engine", () => {
     expect(result.quality_gate.status).toBe("needs_professional_clearance");
     expect(result.quality_gate.can_prescribe).toBe(false);
     expect(result.prescription_context.quality_gate.can_prescribe).toBe(false);
+  });
+
+  it("returns common postural compensations in the deterministic contract", () => {
+    const result = buildDeterministicAssessmentJson({
+      frameRefs,
+      observacoes_tecnicas: [
+        "Postura lateral com cabeça anteriorizada, ombros arredondados e hiperlordose por anteversão pélvica.",
+        "Vista posterior com escápula alada leve, pelve desnivelada, pé pronado direito e joelho travado em hiperextensão.",
+      ].join(" "),
+      reason: "test_postural_compensations",
+    });
+
+    expect(result.postural_compensations.map((item: any) => item.key)).toEqual(POSTURAL_COMPENSATIONS.map((item) => item.key));
+    for (const key of [
+      "forward_head_posture",
+      "rounded_shoulders_kyphosis",
+      "scapular_asymmetry_winging",
+      "anterior_pelvic_tilt_hyperlordosis",
+      "pelvic_obliquity",
+      "knee_hyperextension",
+      "foot_pronation",
+    ]) {
+      expect(result.postural_compensations.find((item: any) => item.key === key)).toMatchObject({
+        presente: true,
+        rule_id: key,
+      });
+    }
+    expect(result.prescription_context.postural_compensations).toHaveLength(8);
+    expect(result.prescription_context.weak_muscles).toEqual(expect.arrayContaining(["gluteo medio", "serratil anterior"]));
+    expect(result.prescription_context.contraindicated_exercises.join(" ")).toMatch(/overhead|hiperextensao lombar|impacto/);
+    expect(result.score_postural.value).toBeLessThan(10);
+  });
+
+  it("detects postural compensations from objective metrics", () => {
+    const normalized = normalizeAssessmentJson({
+      frame_findings: [
+        {
+          frameId: "side_ohs",
+          vista: "Postura lateral",
+          metrics: {
+            craniovertebral_angle_deg: 41,
+            anterior_pelvic_tilt_deg: 18,
+          },
+        },
+        {
+          frameId: "posterior_ohs",
+          vista: "Postura posterior",
+          metrics: {
+            navicular_drop_mm: 14,
+            shoulder_height_diff_cm: 3.5,
+          },
+        },
+      ],
+    }, frameRefs);
+
+    expect(normalized.postural_compensations.find((item: any) => item.key === "forward_head_posture")).toMatchObject({
+      presente: true,
+      severidade: "severa",
+      confidence: "alta",
+    });
+    expect(normalized.postural_compensations.find((item: any) => item.key === "anterior_pelvic_tilt_hyperlordosis")).toMatchObject({
+      presente: true,
+      severidade: "moderada",
+    });
+    expect(normalized.postural_compensations.find((item: any) => item.key === "foot_pronation")).toMatchObject({
+      presente: true,
+      severidade: "moderada",
+    });
+    expect(normalized.assessment_confidence.signals.metric).toBeGreaterThanOrEqual(4);
   });
 });

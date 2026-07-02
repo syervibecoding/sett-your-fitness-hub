@@ -31,9 +31,159 @@ export const ASSESSMENT_METHOD_SOURCES = [
     url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC4064851/",
   },
   {
+    id: "pmc_ohsa_running_kinematics",
+    label: "Overhead squat assessment reflects ankle, knee, hip, pelvis and torso kinematics",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC10515420/",
+  },
+  {
+    id: "pmc_upper_body_photogrammetry",
+    label: "Photogrammetric assessment of head, neck, shoulder and thoracic posture",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC5446097/",
+  },
+  {
+    id: "pubmed_forward_head_assessment",
+    label: "Assessment of forward head posture in females",
+    url: "https://pubmed.ncbi.nlm.nih.gov/23963268/",
+  },
+  {
+    id: "pmc_sagittal_posture_misalignments",
+    label: "Non-structural misalignments of body posture in the sagittal plane",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC5836359/",
+  },
+  {
     id: "bn_historical_drive_dataset",
     label: "BN historical Drive folder, anonymized frame structure only",
     url: "https://drive.google.com/drive/folders/1Hj-zReZTuL7Oq7HS4LwNzIq6stTmX6xN",
+  },
+];
+
+export const POSTURAL_COMPENSATIONS: OhsCompensationDefinition[] = [
+  {
+    key: "forward_head_posture",
+    label: "Anteriorizacao da cabeca / cervical",
+    aliases: ["cabeca anteriorizada", "anteriorizacao da cabeca", "forward head", "cervical anterior", "queixo a frente", "craniovertebral"],
+    visualSignals: ["cabeca a frente", "queixo projetado", "cervical anteriorizada", "orelha a frente do ombro"],
+    vistaKeywords: ["postura", "lateral", "vista lateral"],
+    metricRules: [
+      { field: "craniovertebral_angle_deg", direction: "lt", mild: 50, moderate: 46, severe: 42, message: "angulo craniovertebral reduzido" },
+      { field: "head_forward_cm", direction: "gt", mild: 2, moderate: 4, severe: 6, message: "cabeca anteriorizada em relacao ao tronco" },
+    ],
+    likelyShortened: ["suboccipitais", "esternocleidomastoideo", "elevador da escapula"],
+    likelyWeak: ["flexores profundos cervicais", "trapezio inferior"],
+    movementRestrictions: ["controle cervical", "posicao de cabeca em empurrar/puxar"],
+    cautionPatterns: ["carga axial alta com cervical projetada", "overhead pesado sem controle cervical"],
+    trainingImplication: "Priorizar alinhamento cervical, controle de escápulas e cues de coluna neutra; evitar carga axial pesada se a cabeca projeta com fadiga.",
+  },
+  {
+    key: "rounded_shoulders_kyphosis",
+    label: "Ombros arredondados / cifose toracica",
+    aliases: ["ombros arredondados", "ombros a frente", "cifose", "hipercifose", "toracica", "protrusao de ombro", "protração de ombro"],
+    visualSignals: ["ombros projetados", "cifose aumentada", "dorso arredondado", "peitoral encurtado"],
+    vistaKeywords: ["postura", "lateral", "posterior", "shoulder flexion"],
+    metricRules: [
+      { field: "thoracic_kyphosis_deg", direction: "gt", mild: 42, moderate: 50, severe: 60, message: "cifose toracica elevada" },
+      { field: "shoulder_protraction_cm", direction: "gt", mild: 3, moderate: 5, severe: 8, message: "ombros projetados a frente" },
+    ],
+    likelyShortened: ["peitoral menor", "peitoral maior", "grande dorsal"],
+    likelyWeak: ["trapezio medio", "trapezio inferior", "romboides", "serratil anterior"],
+    movementRestrictions: ["extensao toracica", "controle escapular", "flexao de ombro"],
+    cautionPatterns: ["dips", "remada alta", "desenvolvimento atras da nuca", "press overhead pesado"],
+    trainingImplication: "Dar prioridade a mobilidade toracica, retração/depressão escapular e puxadas/remadas controladas antes de press overhead intenso.",
+  },
+  {
+    key: "scapular_asymmetry_winging",
+    label: "Assimetria escapular / escapula alada",
+    aliases: ["escapula alada", "escapular", "assimetria escapular", "escapula alta", "escapula baixa", "winging"],
+    visualSignals: ["escapula alada", "escapulas assimetricas", "borda medial aparente", "ombro desnivelado"],
+    vistaKeywords: ["postura", "posterior", "shoulder flexion"],
+    metricRules: [
+      { field: "scapular_winging_score", direction: "gt", mild: 1, moderate: 2, severe: 3, message: "alteracao escapular observada" },
+      { field: "shoulder_height_diff_cm", direction: "abs_gt", mild: 1.5, moderate: 3, severe: 5, message: "desnivel de ombros/escapulas" },
+    ],
+    likelyShortened: ["elevador da escapula", "peitoral menor"],
+    likelyWeak: ["serratil anterior", "trapezio inferior", "manguito rotador"],
+    movementRestrictions: ["ritmo escapulo-umeral", "estabilidade de ombro"],
+    cautionPatterns: ["overhead instavel", "kipping", "dips", "remada alta"],
+    trainingImplication: "Incluir serratil, trapézio inferior e controle escapular; preferir pegadas neutras e amplitude sem dor em empurrar/puxar.",
+  },
+  {
+    key: "anterior_pelvic_tilt_hyperlordosis",
+    label: "Anteversao pelvica / hiperlordose lombar",
+    aliases: ["anteversao", "anteversão", "hiperlordose", "lordose aumentada", "pelve anterior", "anterior pelvic tilt"],
+    visualSignals: ["pelve em anteversao", "lordose aumentada", "abdome projetado", "costelas abertas"],
+    vistaKeywords: ["postura", "lateral", "vista lateral"],
+    metricRules: [
+      { field: "anterior_pelvic_tilt_deg", direction: "gt", mild: 10, moderate: 15, severe: 22, message: "anteversao pelvica elevada" },
+      { field: "lumbar_lordosis_deg", direction: "gt", mild: 45, moderate: 55, severe: 65, message: "lordose lombar aumentada" },
+    ],
+    likelyShortened: ["flexores de quadril", "eretores lombares", "reto femoral"],
+    likelyWeak: ["gluteo maximo", "abdome", "isquiotibiais"],
+    movementRestrictions: ["controle lombo-pelvico", "extensao de quadril", "posicao de costelas"],
+    cautionPatterns: ["hiperextensao lombar", "carga axial alta", "ponte lombar compensada"],
+    trainingImplication: "Priorizar core anti-extensao, gluteo e controle costela-pelve; evitar progressao de carga com hiperextensao lombar.",
+  },
+  {
+    key: "pelvic_obliquity",
+    label: "Obliquidade pelvica / desnivel de pelve",
+    aliases: ["pelve desnivelada", "obliquidade pelvica", "crista iliaca", "quadril mais alto", "pelve alta", "pelve baixa"],
+    visualSignals: ["cristas iliacas desniveladas", "pelve inclinada", "quadril desnivelado"],
+    vistaKeywords: ["postura", "posterior", "frontal", "vista posterior", "vista frontal"],
+    metricRules: [
+      { field: "pelvic_obliquity_deg", direction: "abs_gt", mild: 3, moderate: 6, severe: 10, message: "obliquidade pelvica elevada" },
+      { field: "iliac_crest_height_diff_cm", direction: "abs_gt", mild: 1, moderate: 2, severe: 3.5, message: "desnivel entre cristas iliacas" },
+    ],
+    likelyShortened: ["quadrado lombar", "tfl", "adutores"],
+    likelyWeak: ["gluteo medio", "gluteo minimo", "core lateral"],
+    movementRestrictions: ["controle frontal de pelve", "apoio unilateral"],
+    cautionPatterns: ["unilateral pesado", "corrida intensa", "saltos unilaterais"],
+    trainingImplication: "Usar progressao unilateral com controle de pelve e fortalecimento de abdutores/core lateral antes de volume alto de corrida ou unilateral pesado.",
+  },
+  {
+    key: "knee_hyperextension",
+    label: "Hiperextensao de joelho / recurvatum",
+    aliases: ["hiperextensao de joelho", "hiperextensão de joelho", "recurvatum", "joelho para tras", "joelho travado"],
+    visualSignals: ["joelho hiperestendido", "joelho travado", "recurvatum em apoio"],
+    vistaKeywords: ["postura", "lateral", "vista lateral"],
+    metricRules: [
+      { field: "knee_hyperextension_deg", direction: "gt", mild: 3, moderate: 6, severe: 10, message: "hiperextensao de joelho em apoio" },
+    ],
+    likelyShortened: ["gastrocnemio", "isquiotibiais distais"],
+    likelyWeak: ["quadriceps controle terminal", "gluteo maximo", "soleo"],
+    movementRestrictions: ["controle terminal de joelho", "propriocepcao em apoio"],
+    cautionPatterns: ["travamento de joelho sob carga", "saltos sem controle", "leg press com hiperextensao"],
+    trainingImplication: "Treinar controle terminal sem travar joelho, propriocepcao e cues de joelho suave em leg press/agachamento.",
+  },
+  {
+    key: "foot_pronation",
+    label: "Pronacao excessiva / arco medial baixo",
+    aliases: ["pronacao", "pronação", "pronado", "pe pronado", "pé pronado", "pe plano", "pé plano", "arco baixo", "calcaneo valgo", "calcâneo valgo"],
+    visualSignals: ["arco medial baixo", "pe colapsa", "pe pronado", "calcaneo em valgo", "pronacao excessiva"],
+    vistaKeywords: ["postura", "posterior", "frontal", "vista posterior", "vista frontal"],
+    metricRules: [
+      { field: "rearfoot_valgus_deg", direction: "gt", mild: 5, moderate: 8, severe: 12, message: "valgo de retropé/pronacao elevada" },
+      { field: "navicular_drop_mm", direction: "gt", mild: 8, moderate: 12, severe: 16, message: "queda navicular/arco medial reduzido" },
+    ],
+    likelyShortened: ["fibulares", "gastrocnemio lateral"],
+    likelyWeak: ["tibial posterior", "intrinsecos do pe", "gluteo medio"],
+    movementRestrictions: ["controle do arco plantar", "alinhamento pe-joelho"],
+    cautionPatterns: ["saltos repetidos", "corrida intensa sem controle de pe", "agachamento com colapso medial"],
+    trainingImplication: "Integrar controle do arco, pe tripode e alinhamento joelho-pe; cautela com impacto se vier junto de valgo/dor no joelho.",
+  },
+  {
+    key: "foot_supination",
+    label: "Supinacao excessiva / apoio lateral",
+    aliases: ["supinacao", "supinação", "supinado", "pe supinado", "pé supinado", "apoio lateral", "arco alto", "pes cavos", "pé cavo", "calcaneo varo", "calcâneo varo"],
+    visualSignals: ["apoio lateral", "arco alto", "retrope em varo", "pe rigido", "pe supinado"],
+    vistaKeywords: ["postura", "posterior", "frontal", "vista posterior", "vista frontal"],
+    metricRules: [
+      { field: "rearfoot_varus_deg", direction: "gt", mild: 4, moderate: 7, severe: 11, message: "varo de retropé/supinacao elevada" },
+      { field: "lateral_foot_loading_ratio", direction: "ratio_gt", mild: 0.6, moderate: 0.7, severe: 0.8, message: "apoio lateral excessivo do pe" },
+    ],
+    likelyShortened: ["tibial posterior", "gastrocnemio medial", "fascia plantar"],
+    likelyWeak: ["fibulares", "intrinsecos do pe", "controle eversor"],
+    movementRestrictions: ["mobilidade de tornozelo/pe", "absorção de impacto"],
+    cautionPatterns: ["pliometria de alto impacto", "corrida com dor em canela/tornozelo", "mudanca de direcao"],
+    trainingImplication: "Trabalhar mobilidade e controle eversor; reduzir impacto quando houver rigidez, dor em canela ou baixa absorcao.",
   },
 ];
 
@@ -317,6 +467,8 @@ function explicitBoolean(value: unknown): boolean | undefined {
 function findExplicitCompensation(assessmentJson: any, definition: OhsCompensationDefinition) {
   const candidates = [
     ...(Array.isArray(assessmentJson?.ohs_compensations) ? assessmentJson.ohs_compensations : []),
+    ...(Array.isArray(assessmentJson?.postural_compensations) ? assessmentJson.postural_compensations : []),
+    ...(Array.isArray(assessmentJson?.compensacoes_posturais) ? assessmentJson.compensacoes_posturais : []),
     ...(Array.isArray(assessmentJson?.compensacoes_ohs) ? assessmentJson.compensacoes_ohs : []),
     ...(Array.isArray(assessmentJson?.disfuncoes_identificadas) ? assessmentJson.disfuncoes_identificadas : []),
   ];
@@ -546,13 +698,51 @@ function buildOverheadSquatFromCompensations(compensations: OhsCompensationResul
   };
 }
 
+function buildStaticPostureFromCompensations(
+  basePosture: ReturnType<typeof buildPostureStaticFromText>,
+  posturalCompensations: OhsCompensationResult[],
+) {
+  const byKey = new Map(posturalCompensations.map((item) => [item.key, item]));
+  const has = (key: string) => Boolean(byKey.get(key as any)?.presente);
+  return {
+    vista_frontal: {
+      ...basePosture.vista_frontal,
+      cabeca: has("forward_head_posture") ? "cabeca anteriorizada; confirmar por vista lateral" : basePosture.vista_frontal.cabeca,
+      ombros: has("rounded_shoulders_kyphosis") || has("scapular_asymmetry_winging")
+        ? "ombros/escapulas com assimetria ou protrusao"
+        : basePosture.vista_frontal.ombros,
+      pelve: has("pelvic_obliquity") ? "desnivel/obliquidade pelvica" : basePosture.vista_frontal.pelve,
+      joelhos: has("knee_hyperextension") ? "hiperextensao/travamento de joelho em apoio" : basePosture.vista_frontal.joelhos,
+      pes: has("foot_pronation") ? "pronacao/arco medial baixo" : has("foot_supination") ? "supinacao/apoio lateral" : basePosture.vista_frontal.pes,
+    },
+    vista_lateral: {
+      ...basePosture.vista_lateral,
+      cabeca_pescoco: has("forward_head_posture") ? "anteriorizacao de cabeca/cervical" : basePosture.vista_lateral.cabeca_pescoco,
+      ombros: has("rounded_shoulders_kyphosis") ? "ombros arredondados/protrusao" : basePosture.vista_lateral.ombros,
+      coluna_toracica: has("rounded_shoulders_kyphosis") ? "cifose toracica aumentada ou dorso arredondado" : basePosture.vista_lateral.coluna_toracica,
+      coluna_lombar: has("anterior_pelvic_tilt_hyperlordosis") ? "hiperlordose/anteversao a revisar" : basePosture.vista_lateral.coluna_lombar,
+      pelve: has("anterior_pelvic_tilt_hyperlordosis") ? "anteversao pelvica" : basePosture.vista_lateral.pelve,
+      joelhos: has("knee_hyperextension") ? "hiperextensao de joelho" : basePosture.vista_lateral.joelhos,
+    },
+    vista_posterior: {
+      ...basePosture.vista_posterior,
+      escapulas: has("scapular_asymmetry_winging") ? "assimetria escapular/escapula alada" : basePosture.vista_posterior.escapulas,
+      pelve: has("pelvic_obliquity") ? "obliquidade/desnivel pelvico" : basePosture.vista_posterior.pelve,
+      joelhos_calcanhares: has("foot_pronation") ? "pronacao/calcaneo valgo" : has("foot_supination") ? "supinacao/calcaneo varo" : basePosture.vista_posterior.joelhos_calcanhares,
+    },
+  };
+}
+
 function contraindicationsFor(painRegions: string[], compensations: OhsCompensationResult[]) {
   const present = compensations.filter((item) => item.presente);
   const out = new Set<string>();
   if (painRegions.includes("lombar")) out.add("evitar flexao lombar carregada e carga axial alta sem controle");
   if (painRegions.includes("joelho") || present.some((item) => item.key === "dynamic_valgus")) out.add("evitar agachamento profundo/afundo pesado com dor ou valgo sem controle");
-  if (painRegions.includes("ombro/cervical") || present.some((item) => ["shoulder_protraction_kyphosis", "overhead_arm_asymmetry"].includes(item.key))) out.add("evitar press overhead pesado, dips, remada alta e barra atras da nuca se houver dor/limitacao");
+  if (painRegions.includes("ombro/cervical") || present.some((item) => ["shoulder_protraction_kyphosis", "overhead_arm_asymmetry", "forward_head_posture", "rounded_shoulders_kyphosis", "scapular_asymmetry_winging"].includes(String(item.key)))) out.add("evitar press overhead pesado, dips, remada alta e barra atras da nuca se houver dor/limitacao");
   if (present.some((item) => item.key === "butt_wink")) out.add("limitar agachamento ao ponto de pelve neutra; evitar carga axial no fundo");
+  if (present.some((item) => item.key === "anterior_pelvic_tilt_hyperlordosis")) out.add("evitar hiperextensao lombar e carga axial alta sem controle costela-pelve");
+  if (present.some((item) => item.key === "knee_hyperextension")) out.add("evitar travar joelho em leg press/agachamento e impactos sem controle terminal");
+  if (present.some((item) => ["foot_pronation", "foot_supination"].includes(String(item.key)))) out.add("reduzir impacto/corrida intensa se pe-tornozelo nao controla alinhamento");
   return [...out];
 }
 
@@ -685,14 +875,13 @@ function buildFunctionalScore(compensations: OhsCompensationResult[], painRegion
 }
 
 function buildPosturalScore(assessmentJson: any, compensations: OhsCompensationResult[]) {
-  const upperPostureKeys = ["shoulder_protraction_kyphosis", "overhead_arm_asymmetry"];
-  const upperPenalty = compensations
-    .filter((item) => item.presente && upperPostureKeys.includes(item.key))
+  const posturePenalty = compensations
+    .filter((item) => item.presente)
     .reduce((total, item) => total + severityPenalty(item.severidade), 0);
   const text = normalizeText(assessmentJson?.postura_estatica);
   const staticPenalty = /(cifose|protrus|escap|pelve|coluna|assimetr)/.test(text) ? 0.8 : 0;
   return {
-    value: clampScore(10 - upperPenalty - staticPenalty),
+    value: clampScore(10 - posturePenalty - staticPenalty),
     scale: "0-10",
     interpretation: "Triagem postural para orientar mobilidade, controle escapular e escolhas de exercicios.",
   };
@@ -705,6 +894,7 @@ function buildReportSections(assessmentJson: any) {
     laudo: {
       texto_aluno: assessmentJson?.relatorio_para_aluno || "",
       disfuncoes_identificadas: assessmentJson?.disfuncoes_identificadas || [],
+      compensacoes_posturais: assessmentJson?.postural_compensations || [],
       prioridades_corretivas: assessmentJson?.prioridades_corretivas || [],
       red_yellow_flags: assessmentJson?.red_yellow_flags || [],
     },
@@ -733,6 +923,7 @@ export function normalizeAssessmentJson(assessmentJson: any, frameRefs: FrameRef
     overhead_squat: assessmentJson.overhead_squat,
     disfuncoes_identificadas: assessmentJson.disfuncoes_identificadas,
     ohs_compensations: assessmentJson.ohs_compensations,
+    postural_compensations: assessmentJson.postural_compensations,
   });
   const ohs_compensations = OHS_COMPENSATIONS.map((definition) => inferOhsCompensation({
     assessmentJson: { ...assessmentJson, frame_findings },
@@ -740,7 +931,14 @@ export function normalizeAssessmentJson(assessmentJson: any, frameRefs: FrameRef
     frameRefs,
     teacherSignalText,
   }));
-  const present = ohs_compensations.filter((item) => item.presente);
+  const postural_compensations = POSTURAL_COMPENSATIONS.map((definition) => inferOhsCompensation({
+    assessmentJson: { ...assessmentJson, frame_findings },
+    definition,
+    frameRefs,
+    teacherSignalText,
+  }));
+  const allCompensations = [...ohs_compensations, ...postural_compensations];
+  const present = allCompensations.filter((item) => item.presente);
   const painRegions = painRegionsFromText(
     assessmentJson.queixa_principal,
     assessmentJson.historico_lesoes,
@@ -749,16 +947,16 @@ export function normalizeAssessmentJson(assessmentJson: any, frameRefs: FrameRef
     assessmentJson.relatorio_para_aluno,
   );
   const redYellowFlags = Array.isArray(assessmentJson.red_yellow_flags) ? assessmentJson.red_yellow_flags : [];
-  const assessment_confidence = assessmentJson.assessment_confidence || buildAssessmentConfidence(ohs_compensations, frameRefs);
+  const assessment_confidence = assessmentJson.assessment_confidence || buildAssessmentConfidence(allCompensations, frameRefs);
   const quality_gate = assessmentJson.quality_gate || buildQualityGate({
-    compensations: ohs_compensations,
+    compensations: allCompensations,
     frameRefs,
     painRegions,
     redYellowFlags,
     assessmentJson,
   });
   const score_funcional = assessmentJson.score_funcional || buildFunctionalScore(ohs_compensations, painRegions, redYellowFlags);
-  const score_postural = assessmentJson.score_postural || buildPosturalScore(assessmentJson, ohs_compensations);
+  const score_postural = assessmentJson.score_postural || buildPosturalScore(assessmentJson, postural_compensations);
   const shortened = flattenUnique([
     assessmentJson.musculos_encurtados,
     ...present.map((item) => item.musculos_encurtados || []),
@@ -780,6 +978,7 @@ export function normalizeAssessmentJson(assessmentJson: any, frameRefs: FrameRef
     engine: ASSESSMENT_ENGINE_VERSION,
     source: "ai-functional-assessment",
     ohs_compensations,
+    postural_compensations,
     posture_static: assessmentJson.postura_estatica || null,
     overhead_squat: assessmentJson.overhead_squat || null,
     protocol_direction: assessmentJson.direcionamento_protocolo || null,
@@ -808,6 +1007,7 @@ export function normalizeAssessmentJson(assessmentJson: any, frameRefs: FrameRef
     methodology_sources: assessmentJson.methodology_sources || ASSESSMENT_METHOD_SOURCES,
     frame_findings,
     ohs_compensations,
+    postural_compensations,
     assessment_confidence,
     quality_gate,
     score_funcional,
@@ -852,8 +1052,15 @@ export function buildDeterministicAssessmentJson(args: BuildAssessmentInput) {
     frameRefs: args.frameRefs,
     teacherSignalText: text,
   }));
-  const present = preliminary.filter((item) => item.presente);
-  const contraindicated = contraindicationsFor(painRegions, preliminary);
+  const posturalPreliminary = POSTURAL_COMPENSATIONS.map((definition) => inferOhsCompensation({
+    assessmentJson: { frame_findings: incomingFrameFindings },
+    definition,
+    frameRefs: args.frameRefs,
+    teacherSignalText: text,
+  }));
+  const combinedPreliminary = [...preliminary, ...posturalPreliminary];
+  const present = combinedPreliminary.filter((item) => item.presente);
+  const contraindicated = contraindicationsFor(painRegions, combinedPreliminary);
   const red_yellow_flags = redFlagsFrom(text);
   const priorities = [
     ...present.map((item) => `${item.key}: ${item.implicacao_treino}`),
@@ -873,7 +1080,7 @@ export function buildDeterministicAssessmentJson(args: BuildAssessmentInput) {
     painRegions.includes("tornozelo/panturrilha") ? ["pliometria e tiros se houver dor"] : [],
   ]);
   const protocol = protocolFor(painRegions, text, args.protocol_hint);
-  const posture = buildPostureStaticFromText(text, visualNote);
+  const posture = buildStaticPostureFromCompensations(buildPostureStaticFromText(text, visualNote), posturalPreliminary);
   const ohs = buildOverheadSquatFromCompensations(preliminary, visualNote);
   const composition = {
     peso_kg: clean(args.peso_kg) || null,
@@ -917,6 +1124,7 @@ export function buildDeterministicAssessmentJson(args: BuildAssessmentInput) {
     postura_estatica: posture,
     overhead_squat: ohs,
     ohs_compensations: preliminary,
+    postural_compensations: posturalPreliminary,
     direcionamento_protocolo: protocol,
     red_yellow_flags,
     prioridades_corretivas: priorities,

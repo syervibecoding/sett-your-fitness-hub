@@ -21,7 +21,7 @@ import {
 import VideoAssessment from "@/components/VideoAssessment";
 import { generateAllPDFs, generateAssessmentPDF } from "@/lib/generatePDFs";
 import { sendPdfToStudentWhatsApp } from "@/lib/sendStudentMedia";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tabs, TabsContent, TabsList, TabsTrigger } from "@/lib/studioUi";
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Tabs, TabsContent, TabsList, TabsTrigger } from "@/lib/studioUi";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 import {
   buildBnitoOrchestrationPlan,
@@ -60,6 +60,7 @@ export default function PrescriptionStudio() {
   const [students, setStudents]   = useState<{ id: string; name: string; email?: string | null }[]>([]);
   const [studentId, setStudentId] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
+  const [studentPickerOpen, setStudentPickerOpen] = useState(false);
   const [sendingAssess, setSendingAssess] = useState(false);
   const [editPlan, setEditPlan] = useState<any | null>(null);
   const [showEdit, setShowEdit] = useState(false);
@@ -151,6 +152,33 @@ export default function PrescriptionStudio() {
   }, [studentId]);
 
   const student = students.find(s => s.id === studentId);
+  const filteredStudents = useMemo(() => {
+    const q = studentSearch.trim().toLowerCase();
+    const matches = q
+      ? students.filter((s) => (s.name || "").toLowerCase().includes(q))
+      : students;
+    return matches.slice(0, 8);
+  }, [studentSearch, students]);
+
+  useEffect(() => {
+    if (student && studentSearch !== student.name) setStudentSearch(student.name);
+  }, [student, studentSearch]);
+
+  const handleStudentSearchChange = (value: string) => {
+    setStudentSearch(value);
+    setStudentPickerOpen(true);
+    const normalized = value.trim().toLowerCase();
+    const exact = students.find((s) => (s.name || "").trim().toLowerCase() === normalized);
+    setStudentId(exact?.id || "");
+  };
+
+  const selectStudent = (id: string) => {
+    const selected = students.find((s) => s.id === id);
+    setStudentId(id);
+    setStudentSearch(selected?.name || "");
+    setStudentPickerOpen(false);
+  };
+
   const assessmentContext = assessment?.assessment_json
     ? { ...assessment.assessment_json, report_text: assessment.report_text, id: assessment.id, created_at: assessment.created_at }
     : null;
@@ -593,15 +621,45 @@ export default function PrescriptionStudio() {
         </CardHeader>
         <CardContent className="space-y-3">
           {students.length > 0 ? (
-            <>
-              <Input value={studentSearch} onChange={e => setStudentSearch(e.target.value)} placeholder="Buscar aluno por nome..." className="mb-2" />
-              <Select value={studentId} onValueChange={setStudentId}>
-                <SelectTrigger><SelectValue placeholder="Selecione um aluno..." /></SelectTrigger>
-                <SelectContent>
-                  {students.filter(s => (s.name || "").toLowerCase().includes(studentSearch.trim().toLowerCase())).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </>
+            <div className="relative">
+              <Input
+                value={studentSearch}
+                onChange={e => handleStudentSearchChange(e.target.value)}
+                onFocus={() => setStudentPickerOpen(true)}
+                onBlur={() => window.setTimeout(() => setStudentPickerOpen(false), 120)}
+                placeholder="Digite ou selecione um aluno..."
+                autoComplete="off"
+                role="combobox"
+                aria-expanded={studentPickerOpen}
+                aria-controls="studio-student-options"
+              />
+              {studentPickerOpen && (
+                <div
+                  id="studio-student-options"
+                  role="listbox"
+                  className="absolute z-30 mt-2 max-h-56 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg"
+                >
+                  {filteredStudents.length ? filteredStudents.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      role="option"
+                      aria-selected={s.id === studentId}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => selectStudent(s.id)}
+                      className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm transition-colors hover:bg-slate-50 ${
+                        s.id === studentId ? "bg-[#1B2B4A]/5 font-semibold text-[#1B2B4A]" : "text-slate-700"
+                      }`}
+                    >
+                      <span>{s.name}</span>
+                      {s.email && <span className="ml-3 truncate text-xs text-slate-400">{s.email}</span>}
+                    </button>
+                  )) : (
+                    <div className="px-4 py-3 text-sm text-slate-500">Nenhum aluno encontrado.</div>
+                  )}
+                </div>
+              )}
+            </div>
           ) : (
             <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
               Nenhum aluno encontrado para esta empresa.
