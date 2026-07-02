@@ -8,6 +8,10 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 // Visão postural: melhor Sonnet por padrão (env-overridable; pode trocar p/ claude-opus-4-8)
 const MODEL = Deno.env.get("ANTHROPIC_MODEL_VISION") || Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-4-5-20250929";
+// Fallback-first: por padrão NÃO chama Vision. A avaliação retorna um contrato
+// estruturado conservador (sem inventar achado visual) para a prescrição consumir.
+// Para ligar leitura visual por IA, defina FUNCTIONAL_ASSESSMENT_AI_FIRST=on.
+const AI_FIRST = (Deno.env.get("FUNCTIONAL_ASSESSMENT_AI_FIRST") ?? "off").trim().toLowerCase() === "on";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -300,6 +304,129 @@ function normalizeAssessmentJson(assessmentJson: any, frameRefs: FrameRef[]) {
     report_sections: assessmentJson.report_sections || buildReportSections(assessmentJson),
     prescription_context,
   };
+}
+
+function splitList(value: unknown): string[] {
+  return clean(value)
+    .split(/[;\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+function painRegionsFromText(...values: unknown[]): string[] {
+  const text = values.map(clean).join(" ").toLowerCase();
+  const out: string[] = [];
+  if (/joelho|patel|condrom|menisc|ligamento/.test(text)) out.push("joelho");
+  if (/lomb|coluna|ci[aá]tic|sacro|quadrad/.test(text)) out.push("lombar");
+  if (/ombro|manguito|cervic|esc[aá]pul/.test(text)) out.push("ombro/cervical");
+  if (/tornoz|aquiles|panturr|canela|tibia/.test(text)) out.push("tornozelo/panturrilha");
+  if (/quadril|gl[uú]te|piriforme|tfl|iliotibial/.test(text)) out.push("quadril");
+  return [...new Set(out)];
+}
+
+function buildDeterministicAssessmentJson(args: {
+  frameRefs: FrameRef[];
+  queixa_principal: unknown;
+  historico_lesoes: unknown;
+  modalidade: unknown;
+  nivel: unknown;
+  peso_kg: unknown;
+  altura_cm: unknown;
+  cintura_cm: unknown;
+  percentual_gordura: unknown;
+  perimetros: unknown;
+  observacoes_tecnicas: unknown;
+  assessment_source: unknown;
+  protocol_hint: unknown;
+  expected_movements: unknown;
+  reason: string;
+}) {
+  const painRegions = painRegionsFromText(args.queixa_principal, args.historico_lesoes, args.observacoes_tecnicas);
+  const restrictions = painRegions.map((region) => ({
+    regiao: region,
+    regra: "manter dor <=3/10, reduzir amplitude/carga no padrão doloroso e sinalizar professor se houver piora",
+  }));
+  const redFlags = /formig|perda de for|edema|incha|dor tor[aá]c|tont|desma|fratura|cirurg|agud/i.test(
+    [args.queixa_principal, args.historico_lesoes, args.observacoes_tecnicas].map(clean).join(" "),
+  )
+    ? ["Relato textual sugere red/yellow flag; exigir revisão do professor antes de progredir carga."]
+    : [];
+  const composition = {
+    peso_kg: clean(args.peso_kg) || null,
+    altura_cm: clean(args.altura_cm) || null,
+    cintura_cm: clean(args.cintura_cm) || null,
+    percentual_gordura_informado: clean(args.percentual_gordura) || null,
+    prioridades_de_acompanhamento: splitList(args.perimetros),
+  };
+  const protocol = painRegions.some((region) => ["joelho", "tornozelo/panturrilha", "quadril"].includes(region))
+    ? "protocolo_2_mmii"
+    : painRegions.some((region) => region === "ombro/cervical")
+      ? "protocolo_3_mmss"
+      : painRegions.some((region) => region === "lombar")
+        ? "protocolo_4_radic_investigar_se_sintomas_neurais"
+        : clean(args.protocol_hint) || "protocolo_1_padrao";
+  const visualNote = args.frameRefs.length
+    ? "Fallback determinístico: frames recebidos, mas sem leitura visual por IA nesta execução. Achados visuais ficam incertos até revisão/IA Vision."
+    : "Fallback determinístico baseado apenas em dados textuais, sem imagens.";
+
+  return normalizeAssessmentJson({
+    generated_by: "bn_functional_assessment_fallback_v1",
+    fallback_reason: args.reason,
+    confianca_visual: "baixa",
+    composicao_corporal: composition,
+    frame_findings: args.frameRefs.map((frame) => ({
+      frameId: frame.frameId,
+      vista: frame.vista,
+      findings: [],
+      observacao: visualNote,
+    })),
+    postura_estatica: {
+      observacoes: visualNote,
+    },
+    overhead_squat: {
+      observacoes: visualNote,
+    },
+    ohs_compensations: OHS_COMPENSATIONS.map((definition) => ({
+      key: definition.key,
+      compensacao: definition.label,
+      presente: false,
+      severidade: "incerta",
+      frame_referencia: findFrameReference(definition, args.frameRefs).frameId,
+      evidencia: visualNote,
+      implicacao_treino: definition.trainingImplication,
+    })),
+    direcionamento_protocolo: protocol,
+    red_yellow_flags: redFlags,
+    prioridades_corretivas: restrictions.map((item) => `${item.regiao}: ${item.regra}`),
+    restricoes_movimento: restrictions,
+    exercicios_contraindicados: painRegions.includes("lombar")
+      ? ["evitar flexão lombar carregada e carga axial alta sem controle"]
+      : [],
+    exercicios_cautela: [
+      painRegions.includes("joelho") ? "agachamento profundo/afundo pesado se houver dor" : null,
+      painRegions.includes("ombro/cervical") ? "press overhead pesado e dips se houver dor/limitação" : null,
+      painRegions.includes("tornozelo/panturrilha") ? "pliometria, tiros e impacto alto se houver dor" : null,
+    ].filter(Boolean),
+    musculos_encurtados: [],
+    musculos_fracos: painRegions.includes("joelho") || painRegions.includes("quadril") ? ["glúteo médio"] : [],
+    resumo_para_prescricao: [
+      `Avaliação fallback conservadora para ${clean(args.modalidade || "treino")}.`,
+      painRegions.length ? `Regiões de atenção relatadas: ${painRegions.join(", ")}.` : "Sem dor/região crítica relatada no texto.",
+      "Usar como triagem técnica: professor deve revisar frames antes de progressão agressiva.",
+    ].join(" "),
+    relatorio_para_aluno: [
+      "Avaliação registrada em modo conservador.",
+      painRegions.length ? `Pontos de atenção informados: ${painRegions.join(", ")}.` : "Não houve queixa relevante informada.",
+      "O treino deve começar com controle técnico, mobilidade/ativação e progressão gradual.",
+    ].join(" "),
+    criterios_progressao_bn: {
+      dor: "progredir somente se dor <=3/10 durante e após o treino",
+      tecnica: "progredir carga apenas com alinhamento e amplitude controlados",
+      revisao: "revisar visualmente os frames quando a leitura por IA Vision estiver desligada",
+    },
+    sequencia_bn_video: Array.isArray(args.expected_movements) ? args.expected_movements.map(clean).filter(Boolean) : splitList(args.expected_movements),
+  }, args.frameRefs);
 }
 
 async function loadCompanyAiConfig(supabase: any, companyId: string | null | undefined): Promise<CompanyAiConfig> {
@@ -733,12 +860,6 @@ REGRAS:
 // ─── SERVIDOR ─────────────────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-
-  if (!ANTHROPIC_API_KEY) {
-    return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY não configurada. Adicione o segredo para usar a IA." }), {
-      status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
   const claims = await requireUser(req);
   if (!claims) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -813,7 +934,7 @@ serve(async (req) => {
     ].some((value) => String(value || "").trim());
 
     if (imageContent.length === 0 && !hasTextAssessmentData) {
-      return new Response(JSON.stringify({ error: "Nenhuma imagem recebida para análise." }), {
+      return new Response(JSON.stringify({ error: "Envie frames/fotos ou preencha dados textuais para a avaliação." }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -842,30 +963,55 @@ ${imageContent.length > 0
     imageContent.push({ type: "text", text: anamneseText });
     const aiConfig = await loadCompanyAiConfig(supabaseAdmin, authorizedCompanyId);
 
-    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: MODEL, max_tokens: 8000, system: `${SYSTEM_PROMPT}\n\n${companyAiSystem(aiConfig)}`, messages: [{ role: "user", content: imageContent }] }),
-    });
-
-    if (!aiResponse.ok) return aiErrorResponse(aiResponse.status);
-
-    const aiData = await aiResponse.json();
-    const rawText = aiData.content?.[0]?.text ?? "";
-
     let assessmentJson: any = null;
     let reportText = "";
     let resumoPrescricao = "";
     let frameFindings: any[] = [];
-    try {
-      assessmentJson = extractJson(rawText);
-      assessmentJson = normalizeAssessmentJson(assessmentJson, frameRefs);
-      reportText = assessmentJson.relatorio_para_aluno || "";
-      resumoPrescricao = assessmentJson.resumo_para_prescricao || "";
-      frameFindings = assessmentJson.frame_findings || [];
-    } catch {
-      reportText = "Análise concluída. Revise os achados por frame e ajuste se necessário.";
+    let rawText = "";
+
+    if (AI_FIRST && ANTHROPIC_API_KEY) {
+      try {
+        const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({ model: MODEL, max_tokens: 8000, system: `${SYSTEM_PROMPT}\n\n${companyAiSystem(aiConfig)}`, messages: [{ role: "user", content: imageContent }] }),
+        });
+
+        if (!aiResponse.ok) {
+          console.warn("ai-functional-assessment fallback", `anthropic_${aiResponse.status}`);
+        } else {
+          const aiData = await aiResponse.json();
+          rawText = aiData.content?.[0]?.text ?? "";
+          assessmentJson = normalizeAssessmentJson(extractJson(rawText), frameRefs);
+        }
+      } catch (error) {
+        console.warn("ai-functional-assessment fallback", error instanceof Error ? error.message : String(error));
+      }
     }
+
+    if (!assessmentJson) {
+      assessmentJson = buildDeterministicAssessmentJson({
+        frameRefs,
+        queixa_principal,
+        historico_lesoes,
+        modalidade,
+        nivel,
+        peso_kg,
+        altura_cm,
+        cintura_cm,
+        percentual_gordura,
+        perimetros,
+        observacoes_tecnicas,
+        assessment_source,
+        protocol_hint,
+        expected_movements,
+        reason: AI_FIRST ? (ANTHROPIC_API_KEY ? "vision_unavailable" : "anthropic_key_missing") : "deterministic_first",
+      });
+      rawText = JSON.stringify(assessmentJson);
+    }
+    reportText = assessmentJson.relatorio_para_aluno || "";
+    resumoPrescricao = assessmentJson.resumo_para_prescricao || "";
+    frameFindings = assessmentJson.frame_findings || [];
 
     if (assessmentJson) {
       const presentCompensations = Array.isArray(assessmentJson.ohs_compensations)

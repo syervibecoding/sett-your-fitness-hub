@@ -213,7 +213,6 @@ function normalizeNutritionPlan(plan: any, input: any, rawText = "") {
       macros: m.macros,
     }));
   }
-  delete plan.meals;
   delete plan.daily_meals;
   if (!plan.energy_summary) plan.energy_summary = fallback.energy_summary;
   if (!plan.carb_cycling) plan.carb_cycling = fallback.carb_cycling;

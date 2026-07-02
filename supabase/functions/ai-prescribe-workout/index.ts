@@ -663,16 +663,19 @@ function validatePrescriptionPlan(args: {
   const weeklySets = buildVolumeSummary(args.plan, args.catalog);
   const highSetLimit = levelText.includes("inic") ? 16 : objectiveText.includes("forca") ? 14 : 20;
   const lowSetLimit = objectiveText.includes("hipertrof") ? 8 : 6;
-  const volume_review = Array.from(weeklySets.entries()).map(([muscle_group, sets]) => ({
-    muscle_group,
-    weekly_sets: Math.round(sets * 10) / 10,
-    status: sets < lowSetLimit ? "baixo" : sets > highSetLimit ? "alto" : "ok",
-    note: sets < lowSetLimit
-      ? "Volume possivelmente baixo para o objetivo, se este grupo for prioridade."
-      : sets > highSetLimit
-        ? "Volume alto; exige justificativa, recuperacao e ausencia de dor."
-        : "Volume dentro da faixa conservadora.",
-  }));
+  const volume_review = Array.from(weeklySets.entries()).map(([muscle_group, sets]) => {
+    const reviewStatus: "baixo" | "ok" | "alto" = sets < lowSetLimit ? "baixo" : sets > highSetLimit ? "alto" : "ok";
+    return {
+      muscle_group,
+      weekly_sets: Math.round(sets * 10) / 10,
+      status: reviewStatus,
+      note: reviewStatus === "baixo"
+        ? "Volume possivelmente baixo para o objetivo, se este grupo for prioridade."
+        : reviewStatus === "alto"
+          ? "Volume alto; exige justificativa, recuperacao e ausencia de dor."
+          : "Volume dentro da faixa conservadora.",
+    };
+  });
 
   for (const review of volume_review) {
     if (review.status === "alto") {
@@ -716,10 +719,17 @@ function validatePrescriptionPlan(args: {
     }
   }
 
+  const status: "ok" | "warnings" | "blocked" = blockers.length
+    ? "blocked"
+    : warnings.some((warning) => warning.severity === "warning")
+      ? "warnings"
+      : "ok";
+
   return {
-    status: blockers.length ? "blocked" : warnings.some((warning) => warning.severity === "warning") ? "warnings" : "ok",
+    status,
     blockers,
     warnings,
+    corrections: [],
     volume_review,
     checked_at: new Date().toISOString(),
   };

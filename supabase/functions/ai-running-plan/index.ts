@@ -473,7 +473,6 @@ INSTRUÇÕES:
       id: planId,
       company_id: authorizedCompanyId,
       student_id,
-      name: persistedPlanName,
       plan_name: persistedPlanName,
       sport: planJson.sport,
       goal: clean(goal),
