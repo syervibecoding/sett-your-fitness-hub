@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { assertTenantAccess, HttpError } from "../_shared/tenant-auth.ts";
+import {
+  buildDeterministicAssessmentJson as buildAssessmentEngineJson,
+  normalizeAssessmentJson as normalizeAssessmentEngineJson,
+} from "../_shared/assessment/engine.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -982,7 +986,7 @@ ${imageContent.length > 0
         } else {
           const aiData = await aiResponse.json();
           rawText = aiData.content?.[0]?.text ?? "";
-          assessmentJson = normalizeAssessmentJson(extractJson(rawText), frameRefs);
+          assessmentJson = normalizeAssessmentEngineJson(extractJson(rawText), frameRefs);
         }
       } catch (error) {
         console.warn("ai-functional-assessment fallback", error instanceof Error ? error.message : String(error));
@@ -990,7 +994,7 @@ ${imageContent.length > 0
     }
 
     if (!assessmentJson) {
-      assessmentJson = buildDeterministicAssessmentJson({
+      assessmentJson = buildAssessmentEngineJson({
         frameRefs,
         queixa_principal,
         historico_lesoes,
