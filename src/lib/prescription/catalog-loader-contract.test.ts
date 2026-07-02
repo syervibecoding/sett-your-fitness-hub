@@ -29,7 +29,9 @@ describe("ORDEM 044 — contrato do loader de catálogo (estático)", () => {
     expect(pageSize).toBeGreaterThanOrEqual(1000);
   });
 
-  it("5. buildEmergencyFallbackPlan continua presente", () => {
+  it("5. engine v1 principal e buildEmergencyFallbackPlan como reserva", () => {
+    expect(src).toMatch(/generateTrainingProgram/);
+    expect(src).toMatch(/adaptTrainingProgramForAiStrengthPlan/);
     expect(src).toMatch(/buildEmergencyFallbackPlan/);
   });
 
@@ -50,11 +52,10 @@ describe("ORDEM 044 — contrato do loader de catálogo (estático)", () => {
     expect(src).toMatch(/\?\?\s*["']off["']/);
   });
 
-  it("9/10. não há cutover para engine novo; shadow/off preservados", () => {
-    // o engine só roda em shadow/on por flag; resposta segue do caminho legado (planJson)
-    expect(src).toMatch(/engineFlag\s*===\s*["']shadow["']/);
-    // não deve existir substituição incondicional do planJson pelo engine
-    expect(src).not.toMatch(/planJson\s*=\s*enginePlan/);
+  it("9/10. cutover para engine v1 está explícito e fallback legado continua protegido", () => {
+    expect(src).toMatch(/const\s+program\s*=\s*generateTrainingProgram\(input\)/);
+    expect(src).toMatch(/planJson\s*=\s*engineOutput\.plan/);
+    expect(src).toMatch(/catch\s*\(engineError\)/);
   });
 
   it("paginação acumula páginas e para quando a página vem incompleta", () => {

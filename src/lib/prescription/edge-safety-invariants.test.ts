@@ -35,7 +35,9 @@ describe("ORDEM 045 — edge safety invariants (estático)", () => {
     expect(src).toMatch(/pickCatalogExercise\(/);
   });
 
-  it("fallback de emergência presente e catalog-driven", () => {
+  it("engine v1 é o gerador principal e fallback legado fica como reserva catalog-driven", () => {
+    expect(src).toMatch(/import\s+\{\s*generateTrainingProgram\s*\}\s+from\s+["']\.\.\/_shared\/prescription\/engine\.ts["']/);
+    expect(src).toMatch(/adaptTrainingProgramForAiStrengthPlan/);
     expect(src).toMatch(/buildEmergencyFallbackPlan/);
     expect(src).toMatch(/bn_emergency_fallback/);
   });
@@ -51,9 +53,10 @@ describe("ORDEM 045 — edge safety invariants (estático)", () => {
     expect(src).toMatch(/Deno\.env\.get\(\s*["']PRESCRIPTION_ENGINE_V1["']\s*\)\s*\?\?\s*["']off["']/);
   });
 
-  it("sem cutover: engine só roda em shadow/on por flag; plano legado preservado", () => {
-    expect(src).toMatch(/engineFlag\s*===\s*["']shadow["']/);
-    expect(src).not.toMatch(/planJson\s*=\s*enginePlan/);
+  it("cutover determinístico: planJson vem do engine v1 antes do fallback legado", () => {
+    expect(src).toMatch(/const\s+program\s*=\s*generateTrainingProgram\(input\)/);
+    expect(src).toMatch(/planJson\s*=\s*engineOutput\.plan/);
+    expect(src).toMatch(/catch\s*\(engineError\)/);
   });
 
   // ── catálogo: cobertura total via paginação, sem teto antigo ─────────────

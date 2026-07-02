@@ -2,6 +2,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { assertTenantAccess, HttpError } from "../_shared/tenant-auth.ts";
 import { planAdvancedMethods } from "../_shared/prescription/advancedMethods.ts";
+import { buildPrescriptionInputFromEdgePayload } from "../_shared/prescription/adapters/inputAdapter.ts";
+import { adaptTrainingProgramForAiStrengthPlan } from "../_shared/prescription/adapters/outputAdapter.ts";
+import { generateTrainingProgram } from "../_shared/prescription/engine.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -48,6 +51,8 @@ interface ExerciseCatalogEntry {
   name: string;
   description: string | null;
   muscle_group: string | null;
+  equipment?: string | null;
+  difficulty?: string | null;
   contraindications: string[];
   regressions: string[];
   progressions: string[];
@@ -289,7 +294,7 @@ async function loadExerciseCatalog(
   const makeExerciseLibraryQuery = (from: number, to: number) => {
     const q = supabase
       .from("exercise_library")
-      .select("id, name, description, muscle_group, is_global, company_id")
+      .select("id, name, description, muscle_group, equipment, difficulty, is_global, company_id")
       .order("muscle_group", { ascending: true })
       .order("name", { ascending: true })
       .range(from, to);
@@ -402,6 +407,8 @@ async function loadExerciseCatalog(
       name: exercise.name as string,
       description: (exercise.description as string | null) ?? null,
       muscle_group: (exercise.muscle_group as string | null) ?? null,
+      equipment: (exercise.equipment as string | null) ?? null,
+      difficulty: (exercise.difficulty as string | null) ?? null,
       contraindications: metadataByExercise.get(exercise.id as string)?.contraindications ?? [],
       regressions: metadataByExercise.get(exercise.id as string)?.regressions ?? [],
       progressions: metadataByExercise.get(exercise.id as string)?.progressions ?? [],
@@ -731,6 +738,29 @@ function validatePrescriptionPlan(args: {
     warnings,
     corrections: [],
     volume_review,
+    checked_at: new Date().toISOString(),
+  };
+}
+
+function mergePreSaveValidation(primary: any, secondary: any) {
+  const primaryWarnings = Array.isArray(primary?.warnings) ? primary.warnings : [];
+  const primaryBlockers = Array.isArray(primary?.blockers) ? primary.blockers : [];
+  const primaryCorrections = Array.isArray(primary?.corrections) ? primary.corrections : [];
+  const primaryVolume = Array.isArray(primary?.volume_review) ? primary.volume_review : [];
+  const secondaryWarnings = Array.isArray(secondary?.warnings) ? secondary.warnings : [];
+  const secondaryBlockers = Array.isArray(secondary?.blockers) ? secondary.blockers : [];
+  const secondaryCorrections = Array.isArray(secondary?.corrections) ? secondary.corrections : [];
+  const secondaryVolume = Array.isArray(secondary?.volume_review) ? secondary.volume_review : [];
+  const blockers = [...primaryBlockers, ...secondaryBlockers];
+  const warnings = [...primaryWarnings, ...secondaryWarnings];
+  return {
+    ...secondary,
+    ...primary,
+    blockers,
+    warnings,
+    corrections: [...primaryCorrections, ...secondaryCorrections],
+    volume_review: primaryVolume.length ? primaryVolume : secondaryVolume,
+    status: blockers.length ? "blocked" : warnings.some((warning: any) => warning?.severity === "warning") ? "warnings" : "ok",
     checked_at: new Date().toISOString(),
   };
 }
@@ -1323,51 +1353,43 @@ INSTRUÇÕES:
     let planJson: any = null;
     let fallbackReason: string | null = null;
 
-    if (AI_FIRST && ANTHROPIC_API_KEY) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 65000);
-        const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          signal: controller.signal,
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify({
-            model: MODEL,
-            max_tokens: 16000,
-            system: `${SYSTEM_PROMPT}\n\n${companyAiSystem(aiConfig)}`,
-            messages: [{ role: "user", content: clean(athleteContext) }],
-          }),
-        });
-        clearTimeout(timeoutId);
-
-        if (!aiResponse.ok) {
-          const details = await aiResponse.text().catch(() => "");
-          fallbackReason = `anthropic_${aiResponse.status}: ${details.slice(0, 240)}`;
-          console.warn("ai-prescribe-workout emergency fallback", fallbackReason);
-        } else {
-          const aiData = await aiResponse.json();
-          const rawText = aiData.content?.[0]?.text ?? "";
-          try {
-            planJson = JSON.parse(rawText.replace(/```json|```/g, "").trim());
-          } catch {
-            fallbackReason = `json_parse_failed: ${rawText.slice(0, 240)}`;
-            console.warn("ai-prescribe-workout emergency fallback", fallbackReason);
-          }
-        }
-      } catch (error) {
-        fallbackReason = `anthropic_error: ${error instanceof Error ? error.message : String(error)}`;
-        console.warn("ai-prescribe-workout emergency fallback", fallbackReason);
+    try {
+      const { input, warnings: adapterWarnings } = buildPrescriptionInputFromEdgePayload({
+        payload: {
+          student_name,
+          objective,
+          fitness_level,
+          days_per_week,
+          duration_weeks,
+          equipment,
+          restrictions,
+          injuries: (anamnese_context as any)?.injuries ?? restrictions,
+          block_number,
+          is_endurance_athlete,
+          assessment_context,
+          anamnese_context,
+          prescription_integration,
+          running_days_context,
+          notes,
+        },
+        catalog: exerciseCatalog.exercises as any,
+      });
+      const program = generateTrainingProgram(input);
+      if (adapterWarnings.length) {
+        program.warnings.push(...adapterWarnings);
+        program.library_policy.gaps.push(...adapterWarnings.map((warning) => `input_adapter:${warning}`));
       }
-    } else {
-      fallbackReason = AI_FIRST ? "anthropic_key_missing" : "deterministic_first";
-      if (AI_FIRST) console.warn("ai-prescribe-workout emergency fallback", fallbackReason);
-    }
-
-    if (!planJson) {
+      const engineOutput = adaptTrainingProgramForAiStrengthPlan({ program });
+      planJson = engineOutput.plan;
+      planJson.enrichment = {
+        status: AI_FIRST && ANTHROPIC_API_KEY ? "deterministic_primary_ai_text_available" : "deterministic_only",
+        generator: "bn_prescription_engine_v1",
+        ai_text_refinement: "not_applied",
+      };
+      fallbackReason = "bn_prescription_engine_v1";
+    } catch (engineError) {
+      fallbackReason = `engine_v1_error: ${engineError instanceof Error ? engineError.message : String(engineError)}`;
+      console.warn("ai-prescribe-workout legacy fallback", fallbackReason);
       planJson = buildEmergencyFallbackPlan({
         catalog: exerciseCatalog,
         presetKey,
@@ -1388,7 +1410,7 @@ INSTRUÇÕES:
       planJson,
       new Set(exerciseCatalog.exercises.map((exercise) => exercise.id)),
     );
-    const preSaveValidation = validatePrescriptionPlan({
+    const legacyPreSaveValidation = validatePrescriptionPlan({
       plan: planJson,
       libraryValidation,
       catalog: exerciseCatalog,
@@ -1400,6 +1422,10 @@ INSTRUÇÕES:
       blockNumber: block_number,
       isEnduranceAthlete: is_endurance_athlete,
     });
+    const preSaveValidation = mergePreSaveValidation(
+      isRecord(planJson.validator) ? planJson.validator.pre_save : null,
+      legacyPreSaveValidation,
+    );
 
     const existingGaps = isRecord(planJson.library_policy) && Array.isArray(planJson.library_policy.gaps)
       ? planJson.library_policy.gaps

@@ -109,9 +109,9 @@ describe("B7 — shadow hardening (lógica pura)", () => {
 });
 
 describe("B7 — contract tests estáticos da edge (Deno; não executável no Vitest)", () => {
-  it("3+20) STATIC: engine só é importado dinamicamente (off não carrega o engine)", () => {
-    expect(EDGE.includes('import("../_shared/prescription/engine.ts")')).toBe(true); // dynamic
-    expect(/import\s+[^(]*from\s+["']\.\.\/_shared\/prescription\/engine/.test(EDGE)).toBe(false); // sem static
+  it("3+20) STATIC: engine v1 é importado estaticamente como gerador principal", () => {
+    expect(/import\s+\{\s*generateTrainingProgram\s*\}\s+from\s+["']\.\.\/_shared\/prescription\/engine\.ts["']/.test(EDGE)).toBe(true);
+    expect(EDGE.includes("planJson = engineOutput.plan")).toBe(true);
   });
   it("3) STATIC: bloco shadow é guardado pela flag", () => {
     expect(EDGE.includes('(Deno.env.get("PRESCRIPTION_ENGINE_V1") ?? "off")')).toBe(true);
@@ -121,9 +121,9 @@ describe("B7 — contract tests estáticos da edge (Deno; não executável no Vi
     expect(EDGE.includes("buildShadowComparison")).toBe(true);
     expect(EDGE.includes("currentPlan: planJson")).toBe(true);
   });
-  it("5) STATIC: on reconhecido mas NÃO serve plano novo (resposta não usa o programa do engine)", () => {
-    expect(EDGE.includes("plan: program")).toBe(false);
-    expect(EDGE.includes("plan: output")).toBe(false);
+  it("5) STATIC: resposta serve o planJson preenchido pelo engine v1", () => {
+    expect(EDGE.includes("planJson = engineOutput.plan")).toBe(true);
+    expect(EDGE.includes("JSON.stringify({ id: planId, plan: planJson })")).toBe(true);
   });
   it("6) STATIC: erro no shadow é capturado (try/catch dedicado)", () => {
     expect(EDGE.includes("catch (shadowError)")).toBe(true);
