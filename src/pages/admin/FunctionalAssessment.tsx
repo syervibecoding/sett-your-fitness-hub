@@ -113,7 +113,7 @@ export default function FunctionalAssessment() {
         <div>
           <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">Avaliação</p>
           <h1 className="font-display text-3xl">Avaliação Funcional</h1>
-          <p className="text-sm text-muted-foreground">Postura estática + overhead squat · laudo determinístico por Metodologia BN · contexto para a prescrição</p>
+          <p className="text-sm text-muted-foreground">Laudo por fotos (Metodologia BN) ou avaliação manual por vídeo · contexto para a prescrição</p>
         </div>
 
         <Card>
