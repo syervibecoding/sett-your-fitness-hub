@@ -255,7 +255,18 @@ export default function FunctionalAssessment() {
                 </CardContent>
               </Card>
             )}
-          </>
+            </TabsContent>
+
+            <TabsContent value="video" className="mt-0">
+              <VideoAssessment
+                studentId={studentId}
+                companyId={companyId!}
+                studentName={student?.full_name}
+                context={form}
+                onSaved={() => setStudentId(studentId)}
+              />
+            </TabsContent>
+          </Tabs>
         )}
       </div>
     </>
