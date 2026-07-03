@@ -14,7 +14,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Upload, X, ClipboardCheck, AlertCircle } from "lucide-react";
+import VideoAssessment from "@/components/VideoAssessment";
 
 interface Student { id: string; full_name: string; }
 
@@ -111,7 +113,7 @@ export default function FunctionalAssessment() {
         <div>
           <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">Avaliação</p>
           <h1 className="font-display text-3xl">Avaliação Funcional</h1>
-          <p className="text-sm text-muted-foreground">Postura estática + overhead squat · laudo determinístico por Metodologia BN · contexto para a prescrição</p>
+          <p className="text-sm text-muted-foreground">Laudo por fotos (Metodologia BN) ou avaliação manual por vídeo · contexto para a prescrição</p>
         </div>
 
         <Card>
@@ -127,7 +129,13 @@ export default function FunctionalAssessment() {
         </Card>
 
         {studentId && (
-          <>
+          <Tabs defaultValue="fotos" className="space-y-5">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="fotos">Fotos · laudo BN</TabsTrigger>
+              <TabsTrigger value="video">Vídeo · manual</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="fotos" className="space-y-5 mt-0">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Fotos</CardTitle>
@@ -247,7 +255,18 @@ export default function FunctionalAssessment() {
                 </CardContent>
               </Card>
             )}
-          </>
+            </TabsContent>
+
+            <TabsContent value="video" className="mt-0">
+              <VideoAssessment
+                studentId={studentId}
+                companyId={companyId!}
+                studentName={student?.full_name}
+                context={form}
+                onSaved={() => setStudentId(studentId)}
+              />
+            </TabsContent>
+          </Tabs>
         )}
       </div>
     </>

@@ -425,6 +425,53 @@ export type Database = {
         }
         Relationships: []
       }
+      assessment_frames: {
+        Row: {
+          ai_findings: Json | null
+          assessment_id: string
+          company_id: string
+          created_at: string
+          edited: boolean
+          frame_index: number
+          id: string
+          image_url: string
+          trainer_findings: Json
+          vista: string
+        }
+        Insert: {
+          ai_findings?: Json | null
+          assessment_id: string
+          company_id: string
+          created_at?: string
+          edited?: boolean
+          frame_index: number
+          id?: string
+          image_url: string
+          trainer_findings?: Json
+          vista: string
+        }
+        Update: {
+          ai_findings?: Json | null
+          assessment_id?: string
+          company_id?: string
+          created_at?: string
+          edited?: boolean
+          frame_index?: number
+          id?: string
+          image_url?: string
+          trainer_findings?: Json
+          vista?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_frames_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "functional_assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_flow_edges: {
         Row: {
           created_at: string
@@ -1225,6 +1272,7 @@ export type Database = {
           nivel: string | null
           queixa_principal: string | null
           report_text: string | null
+          source: string | null
           status: string | null
           student_id: string
           updated_at: string
@@ -1240,6 +1288,7 @@ export type Database = {
           nivel?: string | null
           queixa_principal?: string | null
           report_text?: string | null
+          source?: string | null
           status?: string | null
           student_id: string
           updated_at?: string
@@ -1255,6 +1304,7 @@ export type Database = {
           nivel?: string | null
           queixa_principal?: string | null
           report_text?: string | null
+          source?: string | null
           status?: string | null
           student_id?: string
           updated_at?: string
