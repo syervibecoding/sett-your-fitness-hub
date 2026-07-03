@@ -129,7 +129,13 @@ export default function FunctionalAssessment() {
         </Card>
 
         {studentId && (
-          <>
+          <Tabs defaultValue="fotos" className="space-y-5">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="fotos">Fotos · laudo BN</TabsTrigger>
+              <TabsTrigger value="video">Vídeo · manual</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="fotos" className="space-y-5 mt-0">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Fotos</CardTitle>
