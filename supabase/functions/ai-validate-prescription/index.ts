@@ -86,18 +86,27 @@ async function requireUser(req: Request) {
 }
 
 async function loadExerciseCatalog(supabase: any, companyId: string | null) {
-  let query = supabase
-    .from("exercise_library")
-    .select("id, name, muscle_group, is_global, company_id")
-    .order("muscle_group", { ascending: true })
-    .order("name", { ascending: true })
-    .limit(700);
-
-  query = companyId ? query.or(`is_global.eq.true,company_id.eq.${companyId}`) : query.eq("is_global", true);
-  const { data: exercises, error } = await query;
-  if (error) throw new Error(`Falha ao carregar biblioteca de exercicios: ${error.message}`);
-
-  const exerciseRows = (exercises ?? []) as any[];
+  // Catálogo paginado (espelha o catalogAdapter do motor) — .limit(700) truncava a
+  // biblioteca (917+ exercícios) e deixava exercícios novos invisíveis pra validação.
+  const CATALOG_PAGE_SIZE = 1000;
+  const makeQuery = (from: number, to: number) => {
+    const q = supabase
+      .from("exercise_library")
+      .select("id, name, muscle_group, is_global, company_id")
+      .order("muscle_group", { ascending: true })
+      .order("name", { ascending: true })
+      .range(from, to);
+    return companyId ? q.or(`is_global.eq.true,company_id.eq.${companyId}`) : q.eq("is_global", true);
+  };
+  const exerciseRows: any[] = [];
+  for (let from = 0; ; from += CATALOG_PAGE_SIZE) {
+    const { data, error } = await makeQuery(from, from + CATALOG_PAGE_SIZE - 1);
+    if (error) throw new Error(`Falha ao carregar biblioteca de exercicios: ${error.message}`);
+    const page = (data ?? []) as any[];
+    if (page.length === 0) break;
+    exerciseRows.push(...page);
+    if (page.length < CATALOG_PAGE_SIZE) break;
+  }
   const exerciseIds = exerciseRows.map((exercise) => exercise.id as string).filter(Boolean);
   const [targetsResult, groupsResult, metadataResult] = await Promise.all([
     exerciseIds.length

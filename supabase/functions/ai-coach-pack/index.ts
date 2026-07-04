@@ -224,18 +224,25 @@ async function loadStrengthCatalog(auth: AuthContext): Promise<StrengthCatalog> 
 
   const companyId = (member?.company_id as string | undefined) ?? null;
 
-  const { data: exercises, error: exerciseError } = await supabase
-    .from("exercise_library")
-    .select("id, name, description, muscle_group, is_global, company_id")
-    .order("muscle_group", { ascending: true })
-    .order("name", { ascending: true })
-    .limit(700);
-
-  if (exerciseError) {
-    throw new Error(`Falha ao carregar biblioteca de exercicios: ${exerciseError.message}`);
+  // Catálogo paginado (espelha o catalogAdapter do motor) — .limit(700) truncava a
+  // biblioteca (917+ exercícios) e deixava exercícios novos fora do coach pack.
+  const CATALOG_PAGE_SIZE = 1000;
+  const exerciseRows: any[] = [];
+  for (let from = 0; ; from += CATALOG_PAGE_SIZE) {
+    const { data: page, error: exerciseError } = await supabase
+      .from("exercise_library")
+      .select("id, name, description, muscle_group, is_global, company_id")
+      .order("muscle_group", { ascending: true })
+      .order("name", { ascending: true })
+      .range(from, from + CATALOG_PAGE_SIZE - 1);
+    if (exerciseError) {
+      throw new Error(`Falha ao carregar biblioteca de exercicios: ${exerciseError.message}`);
+    }
+    const rows = (page ?? []) as any[];
+    if (rows.length === 0) break;
+    exerciseRows.push(...rows);
+    if (rows.length < CATALOG_PAGE_SIZE) break;
   }
-
-  const exerciseRows = exercises ?? [];
   const exerciseIds = exerciseRows.map((exercise) => exercise.id as string).filter(Boolean);
 
   const [targetsResult, groupsResult, overridesResult] = await Promise.all([
