@@ -109,11 +109,11 @@ Rodada no ambiente local (Claude Code) por cima do HEAD atual (inclui os 6 commi
 
 **🚨 ACHADO NOVO (fora do motor):** `ai-validate-prescription/index.ts:94` e
 `ai-coach-pack/index.ts:232` ainda usam `.limit(700)` no catálogo. Com **917 exercícios** hoje,
-essas duas edges enxergam só 700 — **217 exercícios invisíveis** para a validação de prescrição e
+essas duas edges enxergavam só 700 — **217 exercícios invisíveis** para a validação de prescrição e
 para o coach pack. O motor (`ai-prescribe-workout`/catalogAdapter) está limpo (paginado; contratos
-PASS). Recomendação: paginar como o catalogAdapter ou subir o limit — é mudança de EDGE, então fica
-**documentada e NÃO aplicada** nesta ordem (mesma disciplina do fix revertido no whatsapp-manager).
-Dono natural: engine_chat/Codex.
+PASS). **RESOLVIDO (04/07/2026, autorização "total liberdade" do Matheus):** commit `05a1a9c` —
+paginação `range()` espelhando o catalogAdapter (CATALOG_PAGE_SIZE=1000) nas duas edges; `deno check`
+OK; **deployadas** em produção (smoke 401 OK). Motor intocado.
 
 ## 12. Riscos
 
