@@ -19,6 +19,7 @@ import { ExerciseCard } from "@/components/student/ExerciseCard";
 import { groupWorkoutExercises, WORKOUT_METHODS, type MethodId } from "@/lib/workoutMethods";
 import { MethodBadge } from "@/components/workout/MethodBadge";
 import { PeriodizationBanner } from "@/components/student/PeriodizationBanner";
+import { WhySafetyCard } from "@/components/student/WhySafetyCard";
 import { StatsCharts } from "@/components/student/StatsCharts";
 import { VolumeInsights } from "@/components/student/VolumeInsights";
 import { WarmupGuide } from "@/components/student/WarmupGuide";
@@ -874,6 +875,13 @@ export default function StudentPortal() {
                   durationWeeks={selectedCycle.duration_weeks}
                   startDate={selectedCycle.start_date}
                   endDate={selectedCycle.end_date}
+                />
+
+                <WhySafetyCard
+                  objective={selectedCycle.objective}
+                  startDate={selectedCycle.start_date}
+                  whatsappUrl={companyWhatsapp ? `https://wa.me/${companyWhatsapp}` : null}
+                  studentName={studentName}
                 />
 
                 {selectedCycle.workouts.length > 0 ? (

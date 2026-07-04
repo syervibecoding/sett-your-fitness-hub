@@ -1,18 +1,48 @@
-// Dashboard de evasão ("quem sumiu"): unifica os sinais de risco por aluno usando a máquina
-// de status única (studentStatus). Componente novo e standalone (não edita DashboardAlerts).
+// Central de Atenção ("semáforo BNITO"): unifica os sinais de atenção por aluno usando a máquina
+// de status única (studentStatus) + dor relatada na anamnese, com PRÓXIMA MELHOR AÇÃO:
+// mensagem pronta copiável por situação + atalho pra conversa. Componente standalone do dashboard.
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, AlertTriangle, MessageSquare } from "lucide-react";
+import { Loader2, AlertTriangle, MessageSquare, Copy, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 import { deriveStudentStatus, riskReasons, STUDENT_STATUS_LABELS, STUDENT_STATUS_COLORS, type StudentStatus } from "@/lib/studentStatus";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
-interface RiskRow { id: string; name: string; status: StudentStatus; reasons: string[]; chatId?: string | null; }
+interface RiskRow {
+  id: string;
+  name: string;
+  status: StudentStatus;
+  reasons: string[];
+  chatId?: string | null;
+  pain?: string | null;      // "joelho (moderada)" — dor relatada na anamnese
+  message: string;           // próxima melhor ação: mensagem pronta pro aluno
+  tone: "red" | "amber";     // semáforo
+}
 const PAID = ["CONFIRMED", "RECEIVED", "RECEIVED_IN_CASH"];
+
+// Mensagem pronta por situação (tom humano, 1 clique → copiar → colar no WhatsApp).
+function buildMessage(name: string, status: StudentStatus, reasons: string[], pain?: string | null): string {
+  const first = (name || "").split(" ")[0] || "tudo bem";
+  if (pain) {
+    return `Oi ${first}! Vi que você relatou dor (${pain}). Como está se sentindo hoje? Quero ajustar seu treino pra treinar sem dor — me conta como foi essa semana. 💪`;
+  }
+  if (status === "renovacao") {
+    return `Oi ${first}! Seu ciclo de treino está chegando ao fim — bora planejar o próximo? Já tenho ideias pra sua evolução. Me chama aqui! 🚀`;
+  }
+  const semTreinar = reasons.find((r) => r.startsWith("Sem treinar"));
+  if (semTreinar) {
+    return `Oi ${first}! Senti sua falta nos treinos (${semTreinar.toLowerCase()}). Aconteceu algo? Se a rotina apertou, eu adapto o plano pra encaixar — me conta. 💪`;
+  }
+  if (reasons.includes("Pagamento em atraso")) {
+    return `Oi ${first}! Passando pra avisar que consta uma pendência no seu plano. Qualquer dificuldade me chama que a gente resolve junto. 🙂`;
+  }
+  return `Oi ${first}! Passando pra saber como estão os treinos. Precisa de algum ajuste? Estou aqui. 💪`;
+}
 
 export function AtRiskStudents() {
   const navigate = useNavigate();
@@ -21,6 +51,7 @@ export function AtRiskStudents() {
   const effectiveCompanyId = role === "master" ? (isViewingCompany ? viewingCompany?.id : null) : companyId;
   const [rows, setRows] = useState<RiskRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     // Sem empresa efetiva (master fora do company-view), não lista global de todas as empresas.
@@ -33,21 +64,25 @@ export function AtRiskStudents() {
       const ids = (students ?? []).map((s: any) => s.id);
       if (ids.length === 0) { setRows([]); setLoading(false); return; }
 
-      const [{ data: pays }, { data: sessions }, { data: chats }, { data: cycles }] = await Promise.all([
+      const [{ data: pays }, { data: sessions }, { data: chats }, { data: cycles }, { data: pains }] = await Promise.all([
         supabase.from("payments").select("student_id, status").in("student_id", ids).not("status", "in", `(${PAID.map((s) => `"${s}"`).join(",")})`),
         supabase.from("workout_sessions").select("student_id, completed_at").in("student_id", ids).eq("status", "completed"),
         supabase.from("whatsapp_chats").select("id, student_id").in("student_id", ids),
         supabase.from("training_cycles" as any).select("student_id, end_date, status").in("student_id", ids).eq("status", "active"),
+        // Dor relatada na anamnese (moderada/severa entra no semáforo do professor).
+        (supabase as any).from("student_body_limitations").select("student_id, region, severity").in("student_id", ids).in("severity", ["moderada", "severa"]),
       ]);
 
       const overdue = new Set((pays ?? []).map((p: any) => p.student_id));
       const lastSession: Record<string, string> = {};
-      (sessions ?? []).forEach((s: any) => { if (s.completed_at && (!lastSession[s.student_id] || s.completed_at > lastSession[s.student_id])) lastSession[s.student_id] = s.completed_at; });
+      (sessions ?? []).forEach((s: any) => { if (s.completed_at && (!lastSession[s.student_id] || s.completed_at > lastSession[s.student_id]) ) lastSession[s.student_id] = s.completed_at; });
       const chatByStudent: Record<string, string> = {};
       (chats ?? []).forEach((c: any) => { chatByStudent[c.student_id] = c.id; });
       const cycleEnd: Record<string, string> = {};
       const activeCycle = new Set<string>();
       (cycles ?? []).forEach((c: any) => { activeCycle.add(c.student_id); if (c.end_date) cycleEnd[c.student_id] = c.end_date; });
+      const painByStudent: Record<string, string> = {};
+      (pains ?? []).forEach((p: any) => { if (!painByStudent[p.student_id]) painByStudent[p.student_id] = `${p.region} (${p.severity})`; });
 
       const now = Date.now();
       const out: RiskRow[] = [];
@@ -61,11 +96,20 @@ export function AtRiskStudents() {
           daysSinceLastTraining: daysSince, paymentOverdue: overdue.has(s.id), cycleEndsInDays,
         };
         const status = deriveStudentStatus(signals);
-        if (status === "risco" || status === "renovacao") {
-          out.push({ id: s.id, name: s.full_name, status, reasons: riskReasons(signals), chatId: chatByStudent[s.id] });
+        const pain = painByStudent[s.id] ?? null;
+        // Entra no painel: risco/renovação (como antes) OU dor moderada/severa relatada (mesmo "ativo").
+        if (status === "risco" || status === "renovacao" || (pain && status === "ativo")) {
+          const reasons = riskReasons(signals);
+          if (pain) reasons.unshift(`Dor: ${pain}`);
+          out.push({
+            id: s.id, name: s.full_name, status, reasons, chatId: chatByStudent[s.id], pain,
+            message: buildMessage(s.full_name, status, reasons, pain),
+            tone: pain || status === "risco" ? "red" : "amber",
+          });
         }
       }
-      out.sort((a, b) => (a.status === "risco" ? -1 : 1) - (b.status === "risco" ? -1 : 1));
+      // Semáforo: vermelho (dor/risco) primeiro, depois âmbar (renovação).
+      out.sort((a, b) => (a.tone === "red" ? -1 : 1) - (b.tone === "red" ? -1 : 1));
       setRows(out);
     } finally {
       setLoading(false);
@@ -74,31 +118,51 @@ export function AtRiskStudents() {
 
   useEffect(() => { load(); }, [load]);
 
+  const copyMessage = async (r: RiskRow) => {
+    try {
+      await navigator.clipboard.writeText(r.message);
+      setCopiedId(r.id);
+      toast.success("Mensagem copiada — cole no WhatsApp do aluno");
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      toast.error("Não consegui copiar — selecione manualmente");
+    }
+  };
+
   return (
     <Card className="bg-card border-border">
       <CardContent className="p-4">
-        <p className="text-eyebrow mb-3 flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-destructive" /> Alunos em risco / renovação</p>
+        <p className="text-eyebrow mb-3 flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-destructive" /> Central de atenção</p>
         {loading ? (
           <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-6 text-center">Nenhum aluno em risco no momento. 👏</p>
+          <p className="text-sm text-muted-foreground py-6 text-center">Ninguém precisando de atenção agora. 👏</p>
         ) : (
           <div className="divide-y divide-border">
             {rows.map((r) => (
-              <div key={r.id} className="flex items-center gap-3 py-2.5">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground truncate">{r.name}</p>
-                    <Badge className={cn("text-[10px]", STUDENT_STATUS_COLORS[r.status])}>{STUDENT_STATUS_LABELS[r.status]}</Badge>
+              <div key={r.id} className="py-2.5">
+                <div className="flex items-center gap-3">
+                  <span className={cn("h-2 w-2 rounded-full shrink-0", r.tone === "red" ? "bg-destructive" : "bg-amber-500")} />
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/admin/students/${r.id}`)}>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground truncate">{r.name}</p>
+                      <Badge className={cn("text-[10px]", r.pain && r.status === "ativo" ? "bg-destructive/15 text-destructive" : STUDENT_STATUS_COLORS[r.status])}>
+                        {r.pain && r.status === "ativo" ? "Dor relatada" : STUDENT_STATUS_LABELS[r.status]}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{r.reasons.join(" · ")}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">{r.reasons.join(" · ")}</p>
-                </div>
-                {r.chatId && (
-                  <button onClick={() => navigate("/admin/whatsapp-chat", { state: { chatId: r.chatId } })}
-                    className="text-primary hover:bg-muted/60 rounded p-1.5 transition-colors" title="Abrir conversa">
-                    <MessageSquare className="h-4 w-4" />
+                  <button onClick={() => copyMessage(r)}
+                    className="text-muted-foreground hover:text-primary hover:bg-muted/60 rounded p-1.5 transition-colors" title="Copiar mensagem pronta">
+                    {copiedId === r.id ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                   </button>
-                )}
+                  {r.chatId && (
+                    <button onClick={() => navigate("/admin/whatsapp-chat", { state: { chatId: r.chatId } })}
+                      className="text-primary hover:bg-muted/60 rounded p-1.5 transition-colors" title="Abrir conversa">
+                      <MessageSquare className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
