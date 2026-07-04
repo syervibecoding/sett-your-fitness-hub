@@ -108,6 +108,23 @@ type OhsCompensationDefinition = {
   aliases: string[];
   vistaKeywords: string[];
   trainingImplication: string;
+  // Enriquecimento determinístico (mapa muscular + corretivos + linguagem de aluno).
+  // Fundamentação (PubMed): OHS observacional detecta valgo/MKD de forma confiável (Post 2016,
+  // 10.1123/jsr.2015-0178); vídeo > tempo real (Rogers 2019, 10.1519/JSC.0000000000002175).
+  view?: string;         // rótulo da vista p/ agrupar no laudo (vistas[])
+  plainLabel?: string;   // linguagem de aluno
+  studentMeaning?: string;
+  overactive?: string[]; // encurtados/hiperativos → alongar
+  underactive?: string[]; // alongados/inibidos → ativar
+  corrective?: { alongar: string[]; ativar: string[] };
+  redFlag?: boolean;     // se houver dor nesse padrão → handoff
+};
+
+const VIEW_LABELS: Record<string, string> = {
+  ohs_anterior: "Overhead Squat — vista frontal",
+  ohs_lateral: "Overhead Squat — vista lateral",
+  ohs_posterior: "Overhead Squat — vista posterior",
+  postura_lateral: "Postura estática — vista lateral",
 };
 
 const OHS_COMPENSATIONS: OhsCompensationDefinition[] = [
@@ -117,6 +134,12 @@ const OHS_COMPENSATIONS: OhsCompensationDefinition[] = [
     aliases: ["dorsiflex", "tornozelo", "adm_tornozelo", "mobilidade_tornozelo", "calcanhar", "ankle"],
     vistaKeywords: ["lateral ohs", "air squat", "squat", "vista lateral"],
     trainingImplication: "Priorizar mobilidade de tornozelo e variações de agachamento com menor exigência de dorsiflexão; considerar elevação provisória de calcanhar e evitar progressão agressiva de carga axial.",
+    view: "ohs_lateral",
+    plainLabel: "Tornozelo travado (calcanhar tende a subir)",
+    studentMeaning: "Seu tornozelo tem pouca mobilidade, o que joga o tronco à frente e dificulta agachar fundo. É um dos pontos que melhora mais rápido com mobilidade específica.",
+    overactive: ["Sóleo", "Gastrocnêmio"],
+    underactive: ["Tibial anterior"],
+    corrective: { alongar: ["Along. Panturrilha Unilateral"], ativar: ["Fisio Tornozelo: dorsiflexão com banda"] },
   },
   {
     key: "dynamic_valgus",
@@ -124,6 +147,16 @@ const OHS_COMPENSATIONS: OhsCompensationDefinition[] = [
     aliases: ["valgo", "joelho", "colapso medial", "valgus"],
     vistaKeywords: ["anterior ohs", "vista anterior", "air squat", "lunge"],
     trainingImplication: "Adicionar ativação/fortalecimento de glúteo médio e rotadores externos, controle motor com cue de joelhos para fora e cautela com agachamentos/afundos pesados.",
+    view: "ohs_anterior",
+    plainLabel: "Joelhos caindo para dentro",
+    studentMeaning: "Seus joelhos tendem a ceder para dentro quando você agacha — geralmente quadril (glúteos) pouco ativo e parte interna da coxa dominante. Com o tempo sobrecarrega o joelho; é totalmente treinável.",
+    overactive: ["Adutores", "Tensor da fáscia lata (TFL)", "Bíceps femoral"],
+    underactive: ["Glúteo médio", "Glúteo máximo", "Vasto medial (VMO)"],
+    corrective: {
+      alongar: ["Along. Adutores Bilateral", "Along. Tensor da Fascia Lata Solo"],
+      ativar: ["Ponte de glúteo com mini band", "Caminhada lateral com mini band", "Concha (clamshell) com banda"],
+    },
+    redFlag: true,
   },
   {
     key: "trunk_forward_lean",
@@ -131,6 +164,15 @@ const OHS_COMPENSATIONS: OhsCompensationDefinition[] = [
     aliases: ["inclinação", "inclinacao", "tronco", "tibiotronco", "à frente", "a frente"],
     vistaKeywords: ["lateral ohs", "air squat", "vista lateral"],
     trainingImplication: "Reduzir braço de momento lombar, priorizar core lombo-pélvico e variações mais verticalizadas/estáveis antes de carga livre pesada.",
+    view: "ohs_lateral",
+    plainLabel: "Tronco caindo muito para frente",
+    studentMeaning: "Seu tronco inclina bastante à frente ao agachar — normalmente tornozelo/panturrilha travados e glúteo pouco ativo. Mobilidade de tornozelo + ativação de glúteo deixam o agachamento mais ereto.",
+    overactive: ["Sóleo", "Gastrocnêmio", "Flexores do quadril"],
+    underactive: ["Glúteo máximo", "Eretores da espinha"],
+    corrective: {
+      alongar: ["Along. Panturrilha Unilateral", "Along. Iliopsoas"],
+      ativar: ["Ponte de glúteo com mini band", "Fisio Tornozelo: dorsiflexão com banda"],
+    },
   },
   {
     key: "butt_wink",
@@ -138,6 +180,16 @@ const OHS_COMPENSATIONS: OhsCompensationDefinition[] = [
     aliases: ["butt wink", "retrovers", "pelve_fundo", "isquiotibiais", "pélvica", "pelvica"],
     vistaKeywords: ["lateral ohs", "vista lateral", "air squat"],
     trainingImplication: "Limitar amplitude ao ponto de controle pélvico, trabalhar mobilidade de quadril/isquiotibiais e evitar sobrecarga axial com perda de coluna neutra.",
+    view: "ohs_lateral",
+    plainLabel: "Lombar arredondando no fim da descida",
+    studentMeaning: "No fundo do agachamento sua lombar arredonda ('butt wink'). Costuma ser isquiotibiais/mobilidade de quadril e controle do core. Ajustamos amplitude e mobilidade para proteger a coluna.",
+    overactive: ["Isquiotibiais", "Adutor magno"],
+    underactive: ["Flexores do quadril", "Eretores da espinha"],
+    corrective: {
+      alongar: ["Along. Posterior Unilateral Solo", "Along. Adutores Flexionado (Frog)"],
+      ativar: ["Bird dog", "Perdigueiro Alternado"],
+    },
+    redFlag: true,
   },
   {
     key: "pelvic_drop_trendelenburg",
@@ -145,6 +197,16 @@ const OHS_COMPENSATIONS: OhsCompensationDefinition[] = [
     aliases: ["drop", "trendelenburg", "pelve", "quadril cai", "queda da pelve"],
     vistaKeywords: ["posterior ohs", "vista posterior", "lunge", "equilibrio", "unipodal"],
     trainingImplication: "Priorizar abdutores de quadril e exercícios unilaterais progressivos, com regressão quando houver perda de alinhamento pélvico.",
+    view: "ohs_posterior",
+    plainLabel: "Quadril cai de um lado",
+    studentMeaning: "Sua pelve inclina para um lado — normalmente glúteo médio pouco ativo. Fortalecer o quadril de forma unilateral estabiliza e protege joelho e lombar, importante para corrida também.",
+    overactive: ["Quadrado lombar", "Adutores"],
+    underactive: ["Glúteo médio"],
+    corrective: {
+      alongar: ["Along. Dorsal e Quadrado Lombar Unilateral Espaldar"],
+      ativar: ["Caminhada lateral com mini band", "Prancha Lateral"],
+    },
+    redFlag: true,
   },
   {
     key: "shoulder_protraction_kyphosis",
@@ -152,6 +214,15 @@ const OHS_COMPENSATIONS: OhsCompensationDefinition[] = [
     aliases: ["protrusão", "protrusao", "cifose", "torácica", "toracica", "escap", "ombros"],
     vistaKeywords: ["postura", "lateral", "shoulder flexion", "posterior"],
     trainingImplication: "Adicionar trabalho escapular, mobilidade torácica e fortalecimento de trapézio inferior/romboides/serrátil; cautela com pressões intensas se houver limitação overhead.",
+    view: "postura_lateral",
+    plainLabel: "Ombros arredondados / postura curvada",
+    studentMeaning: "Seus ombros rolam para frente e a parte de cima das costas arredonda — muito comum por celular/computador. Abrir o peito e fortalecer as costas melhora postura, respiração e desempenho em puxadas.",
+    overactive: ["Peitoral maior", "Peitoral menor", "Latíssimo do dorso"],
+    underactive: ["Trapézio médio e inferior", "Rombóides", "Serrátil anterior"],
+    corrective: {
+      alongar: ["Along. Peitoral Bilateral Espaldar", "Along. Peitoral Menor"],
+      ativar: ["Face pull com banda", "Band pull-apart", "Extensão Y-T", "Wall slides (deslizar na parede)"],
+    },
   },
   {
     key: "overhead_arm_asymmetry",
@@ -159,8 +230,30 @@ const OHS_COMPENSATIONS: OhsCompensationDefinition[] = [
     aliases: ["assimetria de braço", "assimetria de braco", "bracos", "braços", "overhead", "ombro mais baixo", "assimetria_bracas"],
     vistaKeywords: ["anterior ohs", "posterior ohs", "shoulder flexion", "overhead"],
     trainingImplication: "Avaliar mobilidade unilateral de ombro/torácica, incluir mobilidade do lado limitado e exercícios unilaterais para equalizar o padrão.",
+    view: "ohs_anterior",
+    plainLabel: "Um braço não sobe igual ao outro",
+    studentMeaning: "Um braço fica mais baixo que o outro acima da cabeça — assimetria de mobilidade de ombro/torácica. Trabalho unilateral do lado limitado equaliza o padrão.",
+    overactive: ["Latíssimo do dorso", "Peitoral maior"],
+    underactive: ["Trapézio médio e inferior", "Manguito rotador"],
+    corrective: {
+      alongar: ["Along. Dorsal Unilateral Espaldar", "Along. Peitoral Unilateral Espaldar"],
+      ativar: ["Face pull com banda", "Serrote em pé"],
+    },
   },
 ];
+
+// Infere compensações OHS a partir do TEXTO do professor/queixa (fallback determinístico "vê"
+// o que o professor escreveu, mesmo sem IA de visão). Severidade por palavra-chave, senão moderada.
+function inferCompensationsFromText(...values: unknown[]): Array<{ def: OhsCompensationDefinition; severidade: string }> {
+  const text = values.map(clean).join(" ").toLowerCase();
+  if (!text.trim()) return [];
+  const sevWord = /sever|acentuad|grave|important|marcad/.test(text) ? "severa" : /leve|discret|sutil|pequen/.test(text) ? "leve" : "moderada";
+  const out: Array<{ def: OhsCompensationDefinition; severidade: string }> = [];
+  for (const def of OHS_COMPENSATIONS) {
+    if (def.aliases.some((a) => text.includes(a.toLowerCase()))) out.push({ def, severidade: sevWord });
+  }
+  return out;
+}
 
 function isRecord(value: unknown): value is Record<string, any> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -374,35 +467,89 @@ function buildDeterministicAssessmentJson(args: {
     ? "Fallback determinístico: frames recebidos, mas sem leitura visual por IA nesta execução. Achados visuais ficam incertos até revisão/IA Vision."
     : "Fallback determinístico baseado apenas em dados textuais, sem imagens.";
 
+  // Inferência determinística: "lê" as observações técnicas do professor + queixa e mapeia
+  // para compensações OHS/postura → músculos → plano corretivo (biblioteca-only) → laudo do aluno.
+  const inferred = inferCompensationsFromText(args.observacoes_tecnicas, args.queixa_principal, args.historico_lesoes);
+  const anyInferred = inferred.length > 0;
+
+  const byView = new Map<string, Array<{ severidade: string; descricao: string }>>();
+  for (const { def, severidade } of inferred) {
+    const view = def.view || "ohs_lateral";
+    const arr = byView.get(view) || [];
+    arr.push({ severidade, descricao: `${def.plainLabel || def.label} — ${def.studentMeaning || def.trainingImplication}` });
+    byView.set(view, arr);
+  }
+  const vistas = [...byView.entries()].map(([view, comps]) => ({ vista: VIEW_LABELS[view] || view, compensacoes: comps }));
+
+  const encurtados = [...new Set(inferred.flatMap(({ def }) => def.overactive || []))];
+  const fracos = [...new Set(inferred.flatMap(({ def }) => def.underactive || []))];
+  const alongar = [...new Set(inferred.flatMap(({ def }) => def.corrective?.alongar || []))].slice(0, 6);
+  const ativar = [...new Set(inferred.flatMap(({ def }) => def.corrective?.ativar || []))].slice(0, 6);
+
+  const relatorioAluno = anyInferred
+    ? [
+        "Fizemos sua avaliação de movimento (agachamento overhead + postura). Veja o que observamos e o plano para você evoluir:",
+        ...inferred.slice(0, 4).map(({ def }) => `• ${def.plainLabel || def.label}: ${def.studentMeaning || ""}`),
+        alongar.length ? `Mobilidade/alongamento sugeridos: ${alongar.slice(0, 4).join(", ")}.` : "",
+        ativar.length ? `Ativação/fortalecimento sugeridos: ${ativar.slice(0, 4).join(", ")}.` : "",
+        "Nada aqui é motivo de preocupação — são pontos totalmente treináveis. Sentiu dor forte (acima de 5/10)? Pare o exercício e avise seu treinador.",
+      ].filter(Boolean).join("\n")
+    : [
+        "Sua avaliação de movimento foi registrada. Não identificamos compensações marcantes a partir das informações desta análise.",
+        painRegions.length ? `Pontos de atenção informados: ${painRegions.join(", ")}.` : "",
+        "Seu treino começa com controle técnico, mobilidade/ativação e progressão gradual. Sentiu dor forte? Pare e avise seu treinador.",
+      ].filter(Boolean).join("\n");
+
+  const checklistProfessor = [
+    "Vista frontal (OHS): joelhos em valgo? pés abrindo? peso simétrico? braços iguais?",
+    "Vista lateral (OHS): calcanhar sobe (tornozelo travado)? tronco muito à frente? lombar arqueia ou arredonda? braços caem à frente?",
+    "Vista posterior (OHS): quadril cai de um lado? desvio lateral?",
+    "Postura estática (lateral): cabeça à frente? ombros arredondados/cifose? quadril empinado (anteversão)?",
+  ];
+
+  const prioridades = anyInferred
+    ? inferred.map(({ def, severidade }) => `${def.plainLabel || def.label} (${severidade}) → alongar: ${(def.corrective?.alongar || []).join(", ") || "—"}; ativar: ${(def.corrective?.ativar || []).join(", ") || "—"}`)
+    : restrictions.map((item) => `${item.regiao}: ${item.regra}`);
+
+  const visualNoteFinal = anyInferred
+    ? "Avaliação determinística a partir das observações técnicas do professor (sem IA de visão nesta execução). Compensações inferidas do relato — confirme nos frames."
+    : visualNote;
+
   return normalizeAssessmentJson({
-    generated_by: "bn_functional_assessment_fallback_v1",
+    generated_by: "bn_functional_assessment_fallback_v2",
     fallback_reason: args.reason,
-    confianca_visual: "baixa",
+    confianca_visual: anyInferred ? "media" : "baixa",
     composicao_corporal: composition,
+    vistas,
+    total_compensacoes: inferred.length,
+    checklist_professor: checklistProfessor,
     frame_findings: args.frameRefs.map((frame) => ({
       frameId: frame.frameId,
       vista: frame.vista,
-      findings: [],
-      observacao: visualNote,
+      findings: inferred
+        .filter(({ def }) => (def.vistaKeywords || []).some((k) => (frame.vista || "").toLowerCase().includes(k)))
+        .map(({ def, severidade }) => ({ compensacao: def.label, severidade })),
+      observacao: visualNoteFinal,
     })),
-    postura_estatica: {
-      observacoes: visualNote,
-    },
-    overhead_squat: {
-      observacoes: visualNote,
-    },
-    ohs_compensations: OHS_COMPENSATIONS.map((definition) => ({
-      key: definition.key,
-      compensacao: definition.label,
-      presente: false,
-      severidade: "incerta",
-      frame_referencia: findFrameReference(definition, args.frameRefs).frameId,
-      evidencia: visualNote,
-      implicacao_treino: definition.trainingImplication,
-    })),
+    postura_estatica: { observacoes: visualNoteFinal },
+    overhead_squat: { observacoes: visualNoteFinal },
+    disfuncoes_identificadas: inferred.map(({ def, severidade }) => ({ key: def.key, label: def.label, severidade })),
+    ohs_compensations: OHS_COMPENSATIONS.map((definition) => {
+      const hit = inferred.find((i) => i.def.key === definition.key);
+      return {
+        key: definition.key,
+        compensacao: definition.label,
+        presente: !!hit,
+        severidade: hit ? hit.severidade : "ausente",
+        frame_referencia: findFrameReference(definition, args.frameRefs).frameId,
+        evidencia: hit ? `Inferido do relato técnico; ${definition.studentMeaning || definition.trainingImplication}` : visualNoteFinal,
+        implicacao_treino: definition.trainingImplication,
+      };
+    }),
+    plano_corretivo: { alongar, ativar },
     direcionamento_protocolo: protocol,
     red_yellow_flags: redFlags,
-    prioridades_corretivas: restrictions.map((item) => `${item.regiao}: ${item.regra}`),
+    prioridades_corretivas: prioridades,
     restricoes_movimento: restrictions,
     exercicios_contraindicados: painRegions.includes("lombar")
       ? ["evitar flexão lombar carregada e carga axial alta sem controle"]
@@ -412,18 +559,15 @@ function buildDeterministicAssessmentJson(args: {
       painRegions.includes("ombro/cervical") ? "press overhead pesado e dips se houver dor/limitação" : null,
       painRegions.includes("tornozelo/panturrilha") ? "pliometria, tiros e impacto alto se houver dor" : null,
     ].filter(Boolean),
-    musculos_encurtados: [],
-    musculos_fracos: painRegions.includes("joelho") || painRegions.includes("quadril") ? ["glúteo médio"] : [],
+    musculos_encurtados: encurtados,
+    musculos_fracos: fracos.length ? fracos : (painRegions.includes("joelho") || painRegions.includes("quadril") ? ["glúteo médio"] : []),
     resumo_para_prescricao: [
-      `Avaliação fallback conservadora para ${clean(args.modalidade || "treino")}.`,
-      painRegions.length ? `Regiões de atenção relatadas: ${painRegions.join(", ")}.` : "Sem dor/região crítica relatada no texto.",
-      "Usar como triagem técnica: professor deve revisar frames antes de progressão agressiva.",
-    ].join(" "),
-    relatorio_para_aluno: [
-      "Avaliação registrada em modo conservador.",
-      painRegions.length ? `Pontos de atenção informados: ${painRegions.join(", ")}.` : "Não houve queixa relevante informada.",
-      "O treino deve começar com controle técnico, mobilidade/ativação e progressão gradual.",
-    ].join(" "),
+      `Avaliação fallback para ${clean(args.modalidade || "treino")}.`,
+      anyInferred ? `Compensações inferidas: ${inferred.map((i) => i.def.label).join(", ")}.` : (painRegions.length ? `Regiões de atenção: ${painRegions.join(", ")}.` : "Sem compensação/dor crítica relatada."),
+      fracos.length ? `Priorizar ativação: ${fracos.join(", ")}.` : "",
+      "Professor deve confirmar os achados nos frames antes de progressão agressiva.",
+    ].filter(Boolean).join(" "),
+    relatorio_para_aluno: relatorioAluno,
     criterios_progressao_bn: {
       dor: "progredir somente se dor <=3/10 durante e após o treino",
       tecnica: "progredir carga apenas com alinhamento e amplitude controlados",

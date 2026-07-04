@@ -948,6 +948,34 @@ export function generateAssessmentPDF(data: any, meta: PDFMeta, frameImages?: st
     y += cardH2 + 6;
   });
 
+  // ── Plano corretivo (mobilizar + ativar) — entregável acionável para o aluno ──
+  const plano = json?.plano_corretivo || {};
+  const alongarList: string[] = Array.isArray(plano?.alongar) ? plano.alongar : [];
+  const ativarList: string[] = Array.isArray(plano?.ativar) ? plano.ativar : [];
+  if (alongarList.length || ativarList.length) {
+    y = ensure(doc, y, 30);
+    y = sectionTitle(doc, "Seu plano corretivo", y);
+    const colW = (pageW - MARGIN * 2 - 6) / 2;
+    const startY = y;
+    const renderCol = (x: number, title: string, items: string[]) => {
+      let cy = startY;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...NAVY);
+      doc.text(title, x, cy); cy += 5;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...TEXT);
+      (items.length ? items : ["—"]).forEach((it) => {
+        const lines = doc.splitTextToSize(`•  ${sanitize(String(it))}`, colW);
+        doc.text(lines, x, cy); cy += lines.length * 4.4 + 1.5;
+      });
+      return cy;
+    };
+    const y1 = renderCol(MARGIN, "MOBILIZAR / ALONGAR", alongarList);
+    const y2 = renderCol(MARGIN + colW + 6, "ATIVAR / FORTALECER", ativarList);
+    y = Math.max(y1, y2) + 3;
+    doc.setFont("helvetica", "italic"); doc.setFontSize(7.5); doc.setTextColor(...GRAY);
+    doc.text("Exercícios da sua biblioteca — seu treinador integra ao plano e progride quando você evoluir.", MARGIN, y);
+    y += 7;
+  }
+
   const reportText = asText(first(data?.report_text, json?.relatorio_para_aluno, json?.report_text));
   if (reportText) {
     y = ensure(doc, y, 16);
