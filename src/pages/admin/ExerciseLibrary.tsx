@@ -42,6 +42,18 @@ interface MuscleTarget {
   volume_percentage: number;
 }
 
+type MfitImportExercise = {
+  name: string;
+  description: string | null;
+  muscle_group: string;
+  category: string | null;
+  equipment: string | null;
+  difficulty: string | null;
+  video_url: string | null;
+  thumbnail_url: string | null;
+  source_id: string | null;
+};
+
 const useMuscleGroups = (effectiveCompanyId: string | null | undefined) => {
   const [groups, setGroups] = useState<MuscleGroup[]>([]);
   useEffect(() => {
@@ -79,6 +91,10 @@ export default function ExerciseLibrary() {
   });
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importingMfit, setImportingMfit] = useState(false);
+  const [mfitImportFileName, setMfitImportFileName] = useState("");
+  const [mfitImportPreview, setMfitImportPreview] = useState<MfitImportExercise[]>([]);
   // Upload rápido/inline de vídeo por exercício (sem abrir o formulário de edição).
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const quickInputRef = useRef<HTMLInputElement>(null);
@@ -402,6 +418,243 @@ export default function ExerciseLibrary() {
     setList(list.filter((_, i) => i !== index));
   };
 
+  const normalizeText = (value: unknown) => String(value ?? "").trim();
+
+  const normalizeMfitGroup = (value: unknown) => {
+    const raw = normalizeText(value).toLowerCase();
+    const map: Record<string, string> = {
+      abd: "Abdominais",
+      abdomen: "Abdominais",
+      abdominal: "Abdominais",
+      abs: "Abdominais",
+      biceps: "Bíceps",
+      bíceps: "Bíceps",
+      triceps: "Tríceps",
+      tríceps: "Tríceps",
+      chest: "Peitoral",
+      peito: "Peitoral",
+      dorsal: "Dorsal",
+      back: "Dorsal",
+      costas: "Dorsal",
+      shoulder: "Ombros",
+      ombro: "Ombros",
+      ombros: "Ombros",
+      inferiores: "Quadríceps",
+      inf: "Quadríceps",
+      quadriceps: "Quadríceps",
+      quadríceps: "Quadríceps",
+      gluteo: "Glúteo",
+      glúteo: "Glúteo",
+      posterior: "Posterior de Coxa",
+      hamstrings: "Posterior de Coxa",
+      panturrilha: "Panturrilha",
+      calf: "Panturrilha",
+      calves: "Panturrilha",
+      mobilidade: "Mobilidade",
+      mobility: "Mobilidade",
+      alongamento: "Alongamento",
+      stretching: "Alongamento",
+      funcional: "Funcional",
+      functional: "Funcional",
+      elastico: "Elástico",
+      elástico: "Elástico",
+      resistance_band: "Elástico",
+      outros: "geral",
+      other: "geral",
+    };
+    return map[raw] || normalizeText(value) || "geral";
+  };
+
+  const parseCsvRows = (text: string) => {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let field = "";
+    let quoted = false;
+    for (let i = 0; i < text.length; i += 1) {
+      const char = text[i];
+      const next = text[i + 1];
+      if (char === '"' && quoted && next === '"') {
+        field += '"';
+        i += 1;
+      } else if (char === '"') {
+        quoted = !quoted;
+      } else if (char === "," && !quoted) {
+        row.push(field);
+        field = "";
+      } else if ((char === "\n" || char === "\r") && !quoted) {
+        if (field || row.length) rows.push([...row, field]);
+        row = [];
+        field = "";
+        if (char === "\r" && next === "\n") i += 1;
+      } else {
+        field += char;
+      }
+    }
+    if (field || row.length) rows.push([...row, field]);
+    if (rows.length < 2) return [];
+    const headers = rows[0].map((h) => h.trim());
+    return rows.slice(1).map((values) => headers.reduce<Record<string, string>>((acc, header, index) => {
+      acc[header] = values[index] ?? "";
+      return acc;
+    }, {}));
+  };
+
+  const mfitMediaToUrl = (row: any) => {
+    const url = normalizeText(row.urlMedia ?? row.url_media ?? row.video_url ?? row.videoUrl ?? row.media ?? row.url);
+    const mediaType = Number(row.mediaType ?? row.media_type ?? row.tipoMidia ?? -1);
+    if (!url) return null;
+    if (/^https?:\/\//i.test(url)) return url;
+    if (mediaType === 0 || /^[a-zA-Z0-9_-]{8,}$/.test(url)) return `https://www.youtube.com/watch?v=${url}`;
+    return url;
+  };
+
+  const normalizeMfitRow = (row: any): MfitImportExercise | null => {
+    const name = normalizeText(row.name ?? row.nome ?? row.exercise ?? row.exercicio ?? row.exercise_name);
+    if (!name) return null;
+    const rawGroup = row.group ?? row.grupo ?? row.exerciseGroup?.nome ?? row.exerciseGroup?.id ?? row.muscle_group ?? row.category;
+    const poster = normalizeText(row.urlPoster ?? row.url_poster ?? row.thumbnail_url ?? row.poster);
+    return {
+      name,
+      description: normalizeText(row.description ?? row.descricao ?? row.obs ?? row.instructions) || null,
+      muscle_group: normalizeMfitGroup(rawGroup),
+      category: normalizeText(row.category ?? row.categoria ?? row.exerciseCategory?.name ?? row.exerciseCategory?.id) || null,
+      equipment: normalizeText(row.equipment ?? row.equipamento) || null,
+      difficulty: normalizeText(row.difficulty ?? row.nivel) || null,
+      video_url: mfitMediaToUrl(row),
+      thumbnail_url: poster || null,
+      source_id: normalizeText(row.id ?? row.objectID ?? row.exercise_id) || null,
+    };
+  };
+
+  const collectMfitRows = (payload: any): any[] => {
+    if (Array.isArray(payload)) return payload;
+    if (!payload || typeof payload !== "object") return [];
+    const candidates = [
+      payload.exercises,
+      payload.exercicios,
+      payload.items,
+      payload.data,
+      payload.results,
+      payload.payload,
+    ];
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) return candidate;
+      if (candidate && typeof candidate === "object") {
+        const nested = collectMfitRows(candidate);
+        if (nested.length) return nested;
+      }
+    }
+    return [];
+  };
+
+  const parseMfitFile = async (file: File) => {
+    const text = await file.text();
+    const rawRows = file.name.toLowerCase().endsWith(".csv")
+      ? parseCsvRows(text)
+      : collectMfitRows(JSON.parse(text));
+    const normalized = rawRows
+      .map(normalizeMfitRow)
+      .filter((row): row is MfitImportExercise => Boolean(row));
+    const unique = Array.from(new Map(normalized.map((row) => [row.name.toLowerCase(), row])).values());
+    setMfitImportFileName(file.name);
+    setMfitImportPreview(unique);
+  };
+
+  const buildMfitDescription = (ex: MfitImportExercise, currentDescription = "") => {
+    const base = currentDescription
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("Categoria MFIT:") && !line.startsWith("ID MFIT:"))
+      .join("\n");
+    const hasCategory = base.includes("Categoria MFIT:");
+    const hasSourceId = base.includes("ID MFIT:");
+    return [
+      base || ex.description || "Importado do MFIT.",
+      ex.category && !hasCategory ? `Categoria MFIT: ${ex.category}` : null,
+      ex.source_id && !hasSourceId ? `ID MFIT: ${ex.source_id}` : null,
+    ].filter(Boolean).join("\n");
+  };
+
+  const handleMfitFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      await parseMfitFile(file);
+      setImportOpen(true);
+    } catch (err: any) {
+      toast({
+        title: "Arquivo MFIT inválido",
+        description: err?.message || "Use um JSON ou CSV exportado da biblioteca do MFIT.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const importMfitExercises = async () => {
+    if (mfitImportPreview.length === 0) return;
+    setImportingMfit(true);
+    try {
+      const existingByName = new Map(exercises.map((ex) => [ex.name.trim().toLowerCase(), ex]));
+      const rows = mfitImportPreview.filter((ex) => !existingByName.has(ex.name.trim().toLowerCase()));
+      const duplicates = mfitImportPreview
+        .map((ex) => ({ importRow: ex, existing: existingByName.get(ex.name.trim().toLowerCase()) }))
+        .filter((item): item is { importRow: MfitImportExercise; existing: Exercise } => Boolean(item.existing));
+
+      const payload = rows.map((ex) => ({
+        name: ex.name,
+        description: buildMfitDescription(ex),
+        muscle_group: ex.muscle_group,
+        equipment: ex.equipment,
+        difficulty: ex.difficulty || "intermediate",
+        video_url: ex.video_url,
+        thumbnail_url: ex.thumbnail_url,
+        is_global: isMaster && !effectiveCompanyId,
+        company_id: (isMaster && !effectiveCompanyId) ? null : (effectiveCompanyId || companyId),
+        created_by: user!.id,
+      }));
+
+      if (payload.length > 0) {
+        const { error } = await (supabase as any).from("exercise_library").insert(payload);
+        if (error) throw error;
+      }
+
+      let updated = 0;
+      for (const { importRow, existing } of duplicates) {
+        const update: Record<string, string | null> = {
+          description: buildMfitDescription(importRow, existing.description || ""),
+        };
+        if (importRow.video_url && !existing.video_url && !existing.video_path) update.video_url = importRow.video_url;
+        if (importRow.thumbnail_url && !existing.thumbnail_url) update.thumbnail_url = importRow.thumbnail_url;
+        if (importRow.muscle_group && ["", "geral", "outros"].includes((existing.muscle_group || "").toLowerCase())) {
+          update.muscle_group = importRow.muscle_group;
+        }
+        if (Object.keys(update).length > 1 || update.description !== (existing.description || "")) {
+          const { error } = await (supabase as any).from("exercise_library").update(update).eq("id", existing.id);
+          if (error) throw error;
+          updated += 1;
+        }
+      }
+
+      if (rows.length === 0 && updated === 0) {
+        toast({ title: "Nada novo para importar", description: "Todos os exercícios desse arquivo já estão sincronizados." });
+        return;
+      }
+      toast({
+        title: "Exercícios importados",
+        description: `${rows.length} novo(s) e ${updated} exercício(s) sincronizado(s) com vídeos do MFIT.`,
+      });
+      setImportOpen(false);
+      setMfitImportPreview([]);
+      setMfitImportFileName("");
+      loadExercises();
+    } catch (err: any) {
+      toast({ title: "Erro ao importar MFIT", description: err?.message || "Tente novamente.", variant: "destructive" });
+    } finally {
+      setImportingMfit(false);
+    }
+  };
+
   return (
     <>
       <div className="space-y-6">
@@ -419,9 +672,14 @@ export default function ExerciseLibrary() {
               {isMaster ? "Gerencie a biblioteca global e de empresas" : "Gerencie os exercícios da sua empresa"}
             </p>
           </div>
-          <Button onClick={() => setOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />Novo Exercício
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" />Importar MFIT
+            </Button>
+            <Button onClick={() => setOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />Novo Exercício
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -554,6 +812,55 @@ export default function ExerciseLibrary() {
 
       {/* Input escondido do upload rápido/inline de vídeo por exercício */}
       <input ref={quickInputRef} type="file" accept="video/*" className="hidden" onChange={onQuickUploadChange} />
+
+      {/* MFIT Import Dialog */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Importar exercícios do MFIT</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-md border border-dashed border-border p-4">
+              <Label htmlFor="mfit-import-file" className="font-sans font-medium">Arquivo JSON ou CSV exportado do MFIT</Label>
+              <Input
+                id="mfit-import-file"
+                type="file"
+                accept=".json,.csv,application/json,text/csv"
+                onChange={handleMfitFileChange}
+                className="mt-2 bg-secondary border-border"
+              />
+              <p className="mt-2 text-xs text-muted-foreground font-sans">
+                Campos aceitos: name/nome, urlMedia/url_media/video_url, urlPoster/url_poster, group/grupo, category/categoria e description/descricao.
+              </p>
+            </div>
+            {mfitImportPreview.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-sans text-muted-foreground">
+                    {mfitImportPreview.length} exercício(s) lido(s) de {mfitImportFileName || "arquivo MFIT"}.
+                  </p>
+                  <Button onClick={importMfitExercises} disabled={importingMfit}>
+                    {importingMfit ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Importando...</> : "Adicionar à biblioteca"}
+                  </Button>
+                </div>
+                <div className="max-h-72 overflow-y-auto rounded-md border border-border">
+                  {mfitImportPreview.slice(0, 80).map((ex) => (
+                    <div key={`${ex.name}-${ex.source_id || ""}`} className="flex items-center justify-between gap-3 border-b border-border last:border-b-0 p-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-sans font-medium text-sm">{ex.name}</p>
+                        <p className="text-xs text-muted-foreground font-sans">{ex.muscle_group}{ex.category ? ` · ${ex.category}` : ""}</p>
+                      </div>
+                      <Badge variant={ex.video_url ? "default" : "outline"} className="shrink-0 text-xs">
+                        {ex.video_url ? "com vídeo" : "sem vídeo"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Create/Edit Dialog */}
       <Dialog open={open} onOpenChange={(o) => { if (!o) resetForm(); else setOpen(true); }}>

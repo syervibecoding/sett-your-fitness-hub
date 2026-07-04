@@ -121,6 +121,7 @@ const PROTOCOL_PRESETS = {
   },
 } as const;
 type AutoProtocol = keyof typeof PROTOCOL_PRESETS;
+type AnnotationTool = "line" | "circle";
 const VISTAS = Array.from(new Set([
   ...POSTURE_OHS_VISTAS,
   ...BN_SEQUENCE_VISTAS,
@@ -204,6 +205,12 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
   const [aiFrameFindings, setAiFrameFindings] = useState<AiFrameFinding[]>([]);
   const [autoProtocol, setAutoProtocol] = useState<AutoProtocol>("posture_ohs");
   const [previewFrame, setPreviewFrame] = useState<Frame | null>(null);
+  const [annotationTool, setAnnotationTool] = useState<AnnotationTool>("line");
+  const annotationCanvasRef = useRef<HTMLCanvasElement>(null);
+  const annotationHistoryRef = useRef<string[]>([]);
+  const annotationBaseRef = useRef<ImageData | null>(null);
+  const annotationDrawingRef = useRef(false);
+  const annotationStartRef = useRef<{ x: number; y: number } | null>(null);
   const activeProtocol = PROTOCOL_PRESETS[autoProtocol];
   // Entrega do laudo: popup "enviar para o aluno" após salvar a avaliação.
   const [deliverOpen, setDeliverOpen] = useState(false);
@@ -263,6 +270,155 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
       if (!shot.mostlyBlack) return lastShot;
     }
     return lastShot!;
+  }
+
+  function renderAnnotationCanvas(frame: Frame) {
+    const canvas = annotationCanvasRef.current;
+    if (!canvas) return;
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 900;
+      const scale = Math.min(1, maxW / img.naturalWidth);
+      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      annotationHistoryRef.current = [canvas.toDataURL("image/jpeg", 0.92)];
+    };
+    img.src = frame.preview;
+  }
+
+  useEffect(() => {
+    if (previewFrame) renderAnnotationCanvas(previewFrame);
+  }, [previewFrame]);
+
+  function canvasPoint(event: React.MouseEvent<HTMLCanvasElement>) {
+    const canvas = annotationCanvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((event.clientX - rect.left) / rect.width) * canvas.width,
+      y: ((event.clientY - rect.top) / rect.height) * canvas.height,
+    };
+  }
+
+  function pushAnnotationHistory() {
+    const canvas = annotationCanvasRef.current;
+    if (!canvas) return;
+    annotationHistoryRef.current = [...annotationHistoryRef.current.slice(-12), canvas.toDataURL("image/jpeg", 0.92)];
+  }
+
+  function drawLine(ctx: CanvasRenderingContext2D, from: { x: number; y: number }, to: { x: number; y: number }) {
+    ctx.save();
+    ctx.strokeStyle = "#F59E0B";
+    ctx.lineWidth = Math.max(3, Math.round(ctx.canvas.width * 0.006));
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawCircle(ctx: CanvasRenderingContext2D, from: { x: number; y: number }, to: { x: number; y: number }) {
+    ctx.save();
+    ctx.strokeStyle = "#EF4444";
+    ctx.lineWidth = Math.max(3, Math.round(ctx.canvas.width * 0.006));
+    ctx.beginPath();
+    ctx.ellipse(
+      (from.x + to.x) / 2,
+      (from.y + to.y) / 2,
+      Math.max(8, Math.abs(to.x - from.x) / 2),
+      Math.max(8, Math.abs(to.y - from.y) / 2),
+      0,
+      0,
+      Math.PI * 2,
+    );
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function applyGridAnnotation() {
+    const canvas = annotationCanvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    pushAnnotationHistory();
+    ctx.save();
+    ctx.strokeStyle = "rgba(37, 99, 235, 0.55)";
+    ctx.lineWidth = Math.max(1, Math.round(canvas.width * 0.002));
+    const thirdsX = [canvas.width / 3, (canvas.width * 2) / 3];
+    const thirdsY = [canvas.height / 3, (canvas.height * 2) / 3];
+    const mids = [canvas.width / 2, canvas.height / 2];
+    for (const x of thirdsX) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+    for (const y of thirdsY) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+    ctx.strokeStyle = "rgba(245, 158, 11, 0.75)";
+    ctx.lineWidth = Math.max(2, Math.round(canvas.width * 0.003));
+    ctx.beginPath(); ctx.moveTo(mids[0], 0); ctx.lineTo(mids[0], canvas.height); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, mids[1]); ctx.lineTo(canvas.width, mids[1]); ctx.stroke();
+    ctx.restore();
+  }
+
+  function startAnnotation(event: React.MouseEvent<HTMLCanvasElement>) {
+    const canvas = annotationCanvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    pushAnnotationHistory();
+    annotationDrawingRef.current = true;
+    annotationStartRef.current = canvasPoint(event);
+    annotationBaseRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  }
+
+  function moveAnnotation(event: React.MouseEvent<HTMLCanvasElement>) {
+    if (!annotationDrawingRef.current || !annotationStartRef.current) return;
+    const canvas = annotationCanvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx || !annotationBaseRef.current) return;
+    ctx.putImageData(annotationBaseRef.current, 0, 0);
+    const point = canvasPoint(event);
+    if (annotationTool === "line") drawLine(ctx, annotationStartRef.current, point);
+    else drawCircle(ctx, annotationStartRef.current, point);
+  }
+
+  function endAnnotation(event: React.MouseEvent<HTMLCanvasElement>) {
+    if (!annotationDrawingRef.current) return;
+    moveAnnotation(event);
+    annotationDrawingRef.current = false;
+    annotationStartRef.current = null;
+    annotationBaseRef.current = null;
+  }
+
+  function undoAnnotation() {
+    const canvas = annotationCanvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    const history = annotationHistoryRef.current;
+    if (!canvas || !ctx || history.length <= 1) return;
+    const previous = history[history.length - 2];
+    annotationHistoryRef.current = history.slice(0, -1);
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    };
+    img.src = previous;
+  }
+
+  async function saveAnnotatedFrame() {
+    const canvas = annotationCanvasRef.current;
+    if (!canvas || !previewFrame) return;
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.88));
+    if (!blob) return;
+    const preview = canvas.toDataURL("image/jpeg", 0.88);
+    setFrames(prev => prev.map(fr => fr.id === previewFrame.id
+      ? { ...fr, preview, blob, aiAnalyzed: false }
+      : fr));
+    setPreviewFrame(prev => prev ? { ...prev, preview, blob, aiAnalyzed: false } : prev);
+    toast.success("Marcações salvas no frame.");
   }
 
   function isMostlyBlack(ctx: CanvasRenderingContext2D, width: number, height: number) {
@@ -766,7 +922,7 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
                     </div>
 
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => jumpToFrame(fr.time)}>
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => setPreviewFrame(fr)}>
                         <Eye className="mr-1 h-3 w-3" /> Ver
                       </Button>
                       <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => recaptureFrame(fr.id, fr.time - FRAME_NUDGE_SECONDS)}>
@@ -827,7 +983,7 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4"
           onClick={() => setPreviewFrame(null)}
         >
-          <div className="relative flex max-h-[92vh] w-full max-w-3xl flex-col gap-3" onClick={(event) => event.stopPropagation()}>
+          <div className="relative flex max-h-[94vh] w-full max-w-5xl flex-col gap-3" onClick={(event) => event.stopPropagation()}>
             <button
               type="button"
               onClick={() => setPreviewFrame(null)}
@@ -836,8 +992,48 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
             >
               <X className="h-4 w-4" />
             </button>
-            <div className="rounded-2xl bg-black p-2">
-              <img src={previewFrame.preview} alt={previewFrame.vista} className="max-h-[82vh] w-full object-contain" />
+            <div className="rounded-2xl bg-white p-3 shadow-2xl">
+              <div className="mb-3 flex flex-wrap items-center gap-2 pr-10">
+                <Button size="sm" variant="outline" onClick={applyGridAnnotation}>
+                  Grade
+                </Button>
+                <Button
+                  size="sm"
+                  variant={annotationTool === "line" ? "default" : "outline"}
+                  onClick={() => setAnnotationTool("line")}
+                  className={annotationTool === "line" ? "bg-[#1B2B4A] text-white hover:bg-[#1B2B4A]/90" : ""}
+                >
+                  Linha reta
+                </Button>
+                <Button
+                  size="sm"
+                  variant={annotationTool === "circle" ? "default" : "outline"}
+                  onClick={() => setAnnotationTool("circle")}
+                  className={annotationTool === "circle" ? "bg-[#1B2B4A] text-white hover:bg-[#1B2B4A]/90" : ""}
+                >
+                  Círculo
+                </Button>
+                <Button size="sm" variant="outline" onClick={undoAnnotation}>
+                  Desfazer
+                </Button>
+                <Button size="sm" onClick={saveAnnotatedFrame} className="bg-[#8B7355] hover:bg-[#8B7355]/90">
+                  Salvar marcações
+                </Button>
+                <span className="text-xs text-slate-500">
+                  Arraste sobre a imagem para desenhar. A imagem salva entra no laudo.
+                </span>
+              </div>
+              <div className="flex max-h-[76vh] justify-center overflow-auto rounded-xl bg-black p-2">
+                <canvas
+                  ref={annotationCanvasRef}
+                  className="max-h-[74vh] max-w-full cursor-crosshair object-contain"
+                  onMouseDown={startAnnotation}
+                  onMouseMove={moveAnnotation}
+                  onMouseUp={endAnnotation}
+                  onMouseLeave={endAnnotation}
+                  aria-label={`Editor de marcações para ${previewFrame.vista}`}
+                />
+              </div>
             </div>
             <div className="self-center rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow">
               {previewFrame.vista} · {previewFrame.time.toFixed(1)}s

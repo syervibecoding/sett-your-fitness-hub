@@ -16,7 +16,7 @@ import { useMaster } from "@/contexts/MasterContext";
 import { useCompanyAiConfig } from "@/lib/companyAiConfig";
 import {
   Loader2, Copy, CheckCircle2, Circle, AlertCircle, Send, Download, Wand2,
-  Dumbbell, Activity, Waves, Bike, Apple, FileText,
+  Dumbbell, Activity, Waves, Bike, Apple, FileText, GripVertical,
 } from "lucide-react";
 import VideoAssessment from "@/components/VideoAssessment";
 import { generateAllPDFs, generateAssessmentPDF } from "@/lib/generatePDFs";
@@ -68,6 +68,7 @@ export default function PrescriptionStudio() {
   const [pickerTarget, setPickerTarget] = useState<{ wi: number; ei: number | null } | null>(null);
   const [pickerGroup, setPickerGroup] = useState("");
   const [pickerSearch, setPickerSearch] = useState("");
+  const [dragExercise, setDragExercise] = useState<{ wi: number; ei: number } | null>(null);
   const [tab, setTab]             = useState("anamnese");
 
   // Anamnese state
@@ -478,12 +479,34 @@ export default function PrescriptionStudio() {
     setEditPlan((p: any) => { if (!p) return p; const n = JSON.parse(JSON.stringify(p)); if (n.workouts?.[wi]?.exercises?.[ei]) n.workouts[wi].exercises[ei][field] = value; return n; });
   const updateWName = (wi: number, value: string) =>
     setEditPlan((p: any) => { if (!p) return p; const n = JSON.parse(JSON.stringify(p)); if (n.workouts?.[wi]) n.workouts[wi].name = value; return n; });
+  const renumberExercises = (exercises: any[] = []) =>
+    exercises.map((exercise, index) => ({ ...exercise, exercise_order: index + 1 }));
   const removeExercise = (wi: number, ei: number) =>
-    setEditPlan((p: any) => { if (!p) return p; const n = JSON.parse(JSON.stringify(p)); n.workouts?.[wi]?.exercises?.splice(ei, 1); return n; });
+    setEditPlan((p: any) => {
+      if (!p) return p;
+      const n = JSON.parse(JSON.stringify(p));
+      if (n.workouts?.[wi]?.exercises) {
+        n.workouts[wi].exercises.splice(ei, 1);
+        n.workouts[wi].exercises = renumberExercises(n.workouts[wi].exercises);
+      }
+      return n;
+    });
+  const moveExerciseTo = (wi: number, fromIndex: number, toIndex: number) =>
+    setEditPlan((p: any) => {
+      if (!p) return p;
+      const n = JSON.parse(JSON.stringify(p));
+      const exercises = n.workouts?.[wi]?.exercises;
+      if (!Array.isArray(exercises)) return n;
+      if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= exercises.length || toIndex >= exercises.length) return n;
+      const [moved] = exercises.splice(fromIndex, 1);
+      exercises.splice(toIndex, 0, moved);
+      n.workouts[wi].exercises = renumberExercises(exercises);
+      return n;
+    });
   const addExercise = (wi: number) =>
     setEditPlan((p: any) => {
       if (!p) return p; const n = JSON.parse(JSON.stringify(p));
-      if (n.workouts?.[wi]) { n.workouts[wi].exercises = n.workouts[wi].exercises || []; n.workouts[wi].exercises.push({ exercise_name: "", sets: 3, reps: "10-12", rest_seconds: 60, cues: "", exercise_order: n.workouts[wi].exercises.length + 1 }); }
+      if (n.workouts?.[wi]) { n.workouts[wi].exercises = n.workouts[wi].exercises || []; n.workouts[wi].exercises.push({ exercise_name: "", sets: 3, reps: "10-12", rest_seconds: 60, cues: "", exercise_order: n.workouts[wi].exercises.length + 1 }); n.workouts[wi].exercises = renumberExercises(n.workouts[wi].exercises); }
       return n;
     });
   const removeWorkout = (wi: number) =>
@@ -507,6 +530,7 @@ export default function PrescriptionStudio() {
       } else if (w.exercises[ei]) {
         w.exercises[ei] = { ...w.exercises[ei], exercise_id: lib.id, exercise_name: lib.name, library_exercise_name: lib.name, muscle_group: lib.muscle_group || "" };
       }
+      w.exercises = renumberExercises(w.exercises);
       return n;
     });
     setPickerTarget(null); setPickerSearch(""); setPickerGroup("");
@@ -925,7 +949,7 @@ export default function PrescriptionStudio() {
                 <Button className="w-full mt-4 bg-[#1B2B4A] hover:bg-[#1B2B4A]/90"
                   onClick={generate} disabled={generating || modalities.size === 0}>
                   {generating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando…</>
-                    : `Gerar ${modalities.size} prescrição${modalities.size > 1 ? "ões" : ""} integrada${modalities.size > 1 ? "s" : ""}`}
+                    : `Gerar ${modalities.size} ${modalities.size > 1 ? "prescrições integradas" : "prescrição integrada"}`}
                 </Button>
               </CardContent>
             </Card>
@@ -983,11 +1007,46 @@ export default function PrescriptionStudio() {
                                 <button type="button" onClick={() => removeWorkout(wi)} className="text-xs text-red-500 px-2 shrink-0 whitespace-nowrap">Remover treino</button>
                               </div>
                               <div className="grid grid-cols-12 gap-1 text-[10px] text-slate-400 uppercase px-0.5">
-                                <span className="col-span-3">Exercício</span><span className="col-span-1">Sér</span><span className="col-span-2">Reps</span><span className="col-span-2">Desc(s)</span><span className="col-span-3">Obs</span><span className="col-span-1"></span>
+                                <span className="col-span-1">Arrastar</span><span className="col-span-2">Exercício</span><span className="col-span-1">Sér</span><span className="col-span-2">Reps</span><span className="col-span-2">Desc(s)</span><span className="col-span-3">Obs</span><span className="col-span-1"></span>
                               </div>
                               {(w.exercises || []).map((ex: any, ei: number) => (
-                                <div key={ei} className="grid grid-cols-12 gap-1 items-center">
-                                  <button type="button" onClick={() => { setPickerTarget({ wi, ei }); setPickerSearch(""); setPickerGroup(""); }} className="col-span-12 sm:col-span-3 text-xs font-medium truncate text-left hover:text-[#1B2B4A] hover:underline" title="Trocar exercício (biblioteca)">{ex.exercise_name || "—"} ✎</button>
+                                <div
+                                  key={`${ex.exercise_id || ex.exercise_name || "exercise"}-${ei}`}
+                                  draggable
+                                  onDragStart={(event) => {
+                                    setDragExercise({ wi, ei });
+                                    event.dataTransfer.effectAllowed = "move";
+                                    event.dataTransfer.setData("text/plain", `${wi}:${ei}`);
+                                  }}
+                                  onDragOver={(event) => {
+                                    if (dragExercise?.wi === wi) {
+                                      event.preventDefault();
+                                      event.dataTransfer.dropEffect = "move";
+                                    }
+                                  }}
+                                  onDrop={(event) => {
+                                    event.preventDefault();
+                                    const source = dragExercise;
+                                    setDragExercise(null);
+                                    if (!source || source.wi !== wi) return;
+                                    moveExerciseTo(wi, source.ei, ei);
+                                  }}
+                                  onDragEnd={() => setDragExercise(null)}
+                                  className={`grid grid-cols-12 gap-1 items-center rounded-md transition-colors ${
+                                    dragExercise?.wi === wi && dragExercise?.ei === ei ? "bg-[#F5EDD8]/70 opacity-70" : "hover:bg-slate-50"
+                                  }`}
+                                >
+                                  <div className="col-span-3 sm:col-span-1 flex items-center">
+                                    <button
+                                      type="button"
+                                      className="h-7 w-8 inline-flex items-center justify-center rounded border border-slate-200 text-slate-500 cursor-grab active:cursor-grabbing hover:bg-white"
+                                      title="Arraste para mudar a ordem"
+                                      aria-label="Arraste para mudar a ordem do exercício"
+                                    >
+                                      <GripVertical className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                  <button type="button" onClick={() => { setPickerTarget({ wi, ei }); setPickerSearch(""); setPickerGroup(""); }} className="col-span-9 sm:col-span-2 text-xs font-medium truncate text-left hover:text-[#1B2B4A] hover:underline" title="Trocar exercício (biblioteca)">{ex.exercise_name || "—"} ✎</button>
                                   <Input className="col-span-3 sm:col-span-1 h-7 text-xs px-1" value={String(ex.sets ?? "")} onChange={e => updateExField(wi, ei, "sets", e.target.value)} placeholder="séries" />
                                   <Input className="col-span-3 sm:col-span-2 h-7 text-xs px-1" value={String(ex.reps ?? "")} onChange={e => updateExField(wi, ei, "reps", e.target.value)} placeholder="reps" />
                                   <Input className="col-span-3 sm:col-span-2 h-7 text-xs px-1" value={String(ex.rest_seconds ?? "")} onChange={e => updateExField(wi, ei, "rest_seconds", e.target.value)} placeholder="desc(s)" />
