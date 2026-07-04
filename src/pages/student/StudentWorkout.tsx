@@ -120,7 +120,7 @@ export default function StudentWorkout() {
         });
 
         // Fetch video data from exercise library
-        let videoMap: Record<string, { video_url: string | null; video_path: string | null }> = {};
+        const videoMap: Record<string, { video_url: string | null; video_path: string | null }> = {};
         if (exerciseIds.size > 0) {
           const { data: libraryData } = await supabase
             .from("exercise_library")

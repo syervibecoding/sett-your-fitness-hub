@@ -148,7 +148,7 @@ async function fetchDashboardData(effectiveCompanyId: string | null | undefined)
   const allTrainerIds = new Set<string>();
   expiringContracts.forEach((e: any) => { if (e.trainer_id) allTrainerIds.add(e.trainer_id); });
   countdowns.forEach((m: any) => { if (m.trainer_id) allTrainerIds.add(m.trainer_id); });
-  let trainerMap: Record<string, string> = {};
+  const trainerMap: Record<string, string> = {};
   if (allTrainerIds.size > 0) {
     const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").in("user_id", Array.from(allTrainerIds));
     (profiles || []).forEach((p: any) => { trainerMap[p.user_id] = p.full_name || ""; });

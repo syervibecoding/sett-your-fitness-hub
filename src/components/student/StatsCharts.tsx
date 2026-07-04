@@ -178,7 +178,7 @@ export function StatsCharts({ allLogs, cycles, todayStr }: StatsChartsProps) {
     const cutoffB = subDays(today, days * 2);
 
     let tonnageA = 0, tonnageB = 0;
-    let sessionsA = new Set<string>(), sessionsB = new Set<string>();
+    const sessionsA = new Set<string>(), sessionsB = new Set<string>();
     let prsA = 0, prsB = 0;
     const bestBefore: Record<string, number> = {};
     const sortedAll = [...allLogs].filter((l: any) => l.session_date).sort((a, b) => a.session_date.localeCompare(b.session_date));

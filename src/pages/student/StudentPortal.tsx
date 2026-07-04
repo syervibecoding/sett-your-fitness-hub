@@ -249,7 +249,7 @@ export default function StudentPortal() {
           exs.forEach(ex => { if (ex.exercise_id) exerciseIds.add(ex.exercise_id); });
         });
 
-        let videoMap: Record<string, { video_url: string | null; video_path: string | null; youtube_video_id: string | null }> = {};
+        const videoMap: Record<string, { video_url: string | null; video_path: string | null; youtube_video_id: string | null }> = {};
         if (exerciseIds.size > 0) {
           const { data: libraryData } = await (supabase as any)
             .from("exercise_library")

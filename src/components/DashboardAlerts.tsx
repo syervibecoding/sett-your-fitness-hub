@@ -69,7 +69,7 @@ async function fetchAlerts(
   if (!trainerId) collectTrainerIds(results[2]?.data || []);
   collectTrainerIds(results[trainerId ? 1 : 5]?.data || []);
 
-  let trainerMap: Record<string, string> = {};
+  const trainerMap: Record<string, string> = {};
   if (allTrainerIds.size > 0) {
     const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").in("user_id", Array.from(allTrainerIds));
     (profiles || []).forEach((p: any) => { trainerMap[p.user_id] = p.full_name || "—"; });

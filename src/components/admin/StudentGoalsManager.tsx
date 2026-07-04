@@ -42,7 +42,7 @@ export function StudentGoalsManager({
     setGoals(data || []);
     setLoading(false);
   };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [studentId]);
+  useEffect(() => { load();   }, [studentId]);
 
   const add = async () => {
     if (!form.title.trim() || !form.target_date) {
