@@ -90,6 +90,31 @@ Já entregue: hero "Treino de hoje", histórico rico (RPE/tipo), sparkline por e
 
 **Precisa backend/migration/deploy (NÃO executado):** nenhum novo identificado além do já documentado no Lote 6 (cron/analytics).
 
+## 11b. Verificação LOCAL (Mac, 04/07/2026, HEAD `8500904` — fecha as pendências do sandbox)
+
+Rodada no ambiente local (Claude Code) por cima do HEAD atual (inclui os 6 commits do Codex
+`e883587..5f92adf` — promote engine v1, functional assessment engine, hardening):
+
+| Item (pendência do sandbox) | Resultado local |
+|---|---|
+| `deno check` das 6 edges de prescrição (index, engine, shadow, 3 adapters) | ✅ **6/6 sem erros** (Deno 2.9.1 via npx, efêmero) |
+| `npm run test` no HEAD atual | ✅ **170/170** (Codex adicionou 10) |
+| `npm run test -- src/lib/prescription` | ✅ **120/120** |
+| `npx tsc --noEmit` | ✅ 0 erros |
+| `npm run build` | ✅ |
+| Curadoria (pipeline + return-guard) | ✅ 15/15 + 12/12 |
+| `npm run lint` | ⚠️ 901 erros (era 842; delta vem do trabalho em andamento não-commitado) |
+| Flags no HEAD atual | ✅ `PRESCRIPTION_AI_FIRST ?? "off"` e `PRESCRIPTION_ENGINE_V1 ?? "off"` — defaults preservados após o "promote engine v1" do Codex |
+| e2e Playwright | ⏸️ ainda pendente (requer browsers instalados + servidor) |
+
+**🚨 ACHADO NOVO (fora do motor):** `ai-validate-prescription/index.ts:94` e
+`ai-coach-pack/index.ts:232` ainda usam `.limit(700)` no catálogo. Com **917 exercícios** hoje,
+essas duas edges enxergam só 700 — **217 exercícios invisíveis** para a validação de prescrição e
+para o coach pack. O motor (`ai-prescribe-workout`/catalogAdapter) está limpo (paginado; contratos
+PASS). Recomendação: paginar como o catalogAdapter ou subir o limit — é mudança de EDGE, então fica
+**documentada e NÃO aplicada** nesta ordem (mesma disciplina do fix revertido no whatsapp-manager).
+Dono natural: engine_chat/Codex.
+
 ## 12. Riscos
 
 - Ambiente de auditoria ≠ Mac local: versões de Node/npm podem diferir; recomenda-se rodar `npm run build && npm run test` localmente após aplicar o patch.
