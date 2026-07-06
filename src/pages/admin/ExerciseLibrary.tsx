@@ -580,6 +580,21 @@ export default function ExerciseLibrary() {
               </Select>
             </div>
 
+            <div className="space-y-2">
+              <Label className="font-sans">Categoria</Label>
+              <Select value={form.category || "none"} onValueChange={(v) => setForm({ ...form, category: v === "none" ? "" : v })}>
+                <SelectTrigger className="bg-secondary border-border">
+                  <SelectValue placeholder="Sem categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem categoria</SelectItem>
+                  {Array.from(new Set([...Object.keys(CATEGORY_LABELS), ...categories])).sort().map((c) => (
+                    <SelectItem key={c} value={c}>{categoryLabel(c)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Muscle Target Configuration */}
             {muscleGroups.length > 0 && (
               <div className="space-y-3 p-3 rounded-lg bg-secondary/50 border border-border">
