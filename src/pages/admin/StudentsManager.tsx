@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { UserPlus, Search, Pencil, Trash2, Phone, Mail, Eye, Play, Copy } from "lucide-react";
+import { UserPlus, Search, Pencil, Trash2, Phone, Mail, Eye, Play, Copy, MessageCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMaster } from "@/contexts/MasterContext";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
@@ -62,6 +63,8 @@ const emptyForm = { full_name: "", email: "", phone: "", status: "pending", note
 
 export default function StudentsManager() {
   const [students, setStudents] = useState<Student[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sendingBatch, setSendingBatch] = useState(false);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [searchParams] = useSearchParams();
@@ -270,6 +273,40 @@ export default function StudentsManager() {
     loadData();
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSendAnamnesisBatch = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setSendingBatch(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-manager", {
+        body: { action: "send-anamnesis-invite", studentIds: ids, baseUrl: window.location.origin },
+      });
+      if (error) throw error;
+      const sent = data?.sent || 0;
+      const failed = data?.failed?.length || 0;
+      toast({
+        title: `Convites enviados: ${sent}`,
+        description: failed > 0 ? `${failed} não enviado(s) (ex.: sem WhatsApp).` : undefined,
+        variant: sent === 0 ? "destructive" : undefined,
+      });
+      if (sent > 0) setSelectedIds(new Set());
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar", description: e?.message || "Verifique se o WhatsApp está conectado", variant: "destructive" });
+    } finally {
+      setSendingBatch(false);
+    }
+  };
+
+
+
   return (
     <>
       <div className="space-y-6">
@@ -320,11 +357,31 @@ export default function StudentsManager() {
           </Select>
         </div>
 
+        {selectedIds.size > 0 && (
+          <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-4 py-2">
+            <span className="text-sm text-muted-foreground font-sans">{selectedIds.size} selecionado(s)</span>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Limpar</Button>
+              <Button size="sm" onClick={handleSendAnamnesisBatch} disabled={sendingBatch}>
+                <MessageCircle className="h-4 w-4 mr-2" />
+                {sendingBatch ? "Enviando..." : "Enviar anamnese (WhatsApp)"}
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-3">
+
           {filtered.map(s => (
             <Card key={s.id} className="bg-card border-border">
               <CardContent className="pt-6 space-y-3">
                 <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Checkbox
+                      checked={selectedIds.has(s.id)}
+                      onCheckedChange={() => toggleSelect(s.id)}
+                      aria-label={`Selecionar ${s.full_name}`}
+                    />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-foreground font-sans font-medium truncate">{s.full_name}</p>
@@ -336,6 +393,7 @@ export default function StudentsManager() {
                       {(s.phone || s.whatsapp) && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{s.whatsapp || s.phone}</span>}
                       <span>Cadastro: {format(new Date(s.created_at), "dd/MM/yyyy", { locale: ptBR })}</span>
                     </div>
+                  </div>
                   </div>
                   <div className="flex items-center gap-1 ml-4">
                     <Button variant="ghost" size="icon" onClick={() => navigate(`${rolePrefix}/students/${s.id}`)}><Eye className="h-4 w-4" /></Button>

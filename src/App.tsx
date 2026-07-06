@@ -21,8 +21,7 @@ const PlansManager = lazy(() => import("./pages/admin/PlansManager"));
 const TeamManager = lazy(() => import("./pages/admin/TeamManager"));
 const StudentsManager = lazy(() => import("./pages/admin/StudentsManager"));
 const StudentDetail = lazy(() => import("./pages/admin/StudentDetail"));
-const RegistrationManager = lazy(() => import("./pages/admin/RegistrationManager"));
-const AnamnesisManager = lazy(() => import("./pages/admin/AnamnesisManager"));
+const FormsManager = lazy(() => import("./pages/admin/FormsManager"));
 const AdminAgenda = lazy(() => import("./pages/admin/AdminAgenda"));
 const FinancialDashboard = lazy(() => import("./pages/admin/FinancialDashboard"));
 const WhatsAppSettings = lazy(() => import("./pages/admin/WhatsAppSettings"));
@@ -122,8 +121,9 @@ const App = () => (
 
           {/* Admin Routes */}
           <Route path="/admin" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasDashboard"><AdminDashboard /></FeatureRoute>} />
-          <Route path="/admin/registration" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasRegistration"><RegistrationManager /></FeatureRoute>} />
-          <Route path="/admin/anamnesis" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasAnamnesis"><AnamnesisManager /></FeatureRoute>} />
+          <Route path="/admin/forms" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasRegistration"><FormsManager /></FeatureRoute>} />
+          <Route path="/admin/registration" element={<Navigate to="/admin/forms" replace />} />
+          <Route path="/admin/anamnesis" element={<Navigate to="/admin/forms" replace />} />
           <Route path="/admin/plans" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasPlans"><PlansManager /></FeatureRoute>} />
           <Route path="/admin/team" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasTeam"><TeamManager /></FeatureRoute>} />
           <Route path="/admin/students" element={<FeatureRoute allowedRoles={["admin"]} requiredFeature="hasStudents"><StudentsManager /></FeatureRoute>} />
@@ -150,8 +150,9 @@ const App = () => (
 
           {/* Coordinator Routes */}
           <Route path="/coordinator" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasDashboard"><CoordinatorDashboard /></FeatureRoute>} />
-          <Route path="/coordinator/registration" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasRegistration" requiredModule="registration"><RegistrationManager /></FeatureRoute>} />
-          <Route path="/coordinator/anamnesis" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasAnamnesis" requiredModule="anamnesis"><AnamnesisManager /></FeatureRoute>} />
+          <Route path="/coordinator/forms" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasRegistration" requiredModule="registration"><FormsManager /></FeatureRoute>} />
+          <Route path="/coordinator/registration" element={<Navigate to="/coordinator/forms" replace />} />
+          <Route path="/coordinator/anamnesis" element={<Navigate to="/coordinator/forms" replace />} />
           <Route path="/coordinator/plans" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasPlans" requiredModule="plans"><PlansManager /></FeatureRoute>} />
           <Route path="/coordinator/team" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasTeam" requiredModule="team"><TeamManager /></FeatureRoute>} />
           <Route path="/coordinator/students" element={<FeatureRoute allowedRoles={["coordinator"]} requiredFeature="hasStudents" requiredModule="students"><StudentsManager /></FeatureRoute>} />
@@ -175,8 +176,9 @@ const App = () => (
 
           {/* Trainer Routes */}
           <Route path="/trainer" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasDashboard"><TrainerDashboard /></FeatureRoute>} />
-          <Route path="/trainer/registration" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasRegistration" requiredModule="registration"><RegistrationManager /></FeatureRoute>} />
-          <Route path="/trainer/anamnesis" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasAnamnesis" requiredModule="anamnesis"><AnamnesisManager /></FeatureRoute>} />
+          <Route path="/trainer/forms" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasRegistration" requiredModule="registration"><FormsManager /></FeatureRoute>} />
+          <Route path="/trainer/registration" element={<Navigate to="/trainer/forms" replace />} />
+          <Route path="/trainer/anamnesis" element={<Navigate to="/trainer/forms" replace />} />
           <Route path="/trainer/plans" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPlans" requiredModule="plans"><PlansManager /></FeatureRoute>} />
           <Route path="/trainer/team" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasTeam" requiredModule="team"><TeamManager /></FeatureRoute>} />
           <Route path="/trainer/students" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasStudents" requiredModule="students"><StudentsManager /></FeatureRoute>} />
