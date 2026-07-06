@@ -349,10 +349,15 @@ export default function ExerciseLibrary() {
     }
   };
 
+  const categories = Array.from(
+    new Set(exercises.map((e) => e.category).filter((c): c is string => !!c))
+  ).sort();
+
   const filtered = exercises.filter((ex) => {
     const matchSearch = ex.name.toLowerCase().includes(search.toLowerCase());
     const matchGroup = filterGroup === "all" || ex.muscle_group === filterGroup;
-    return matchSearch && matchGroup;
+    const matchCategory = filterCategory === "all" || ex.category === filterCategory;
+    return matchSearch && matchGroup && matchCategory;
   });
 
   const grouped = filtered.reduce<Record<string, Exercise[]>>((acc, ex) => {
