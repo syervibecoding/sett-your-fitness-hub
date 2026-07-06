@@ -502,6 +502,11 @@ export default function ExerciseLibrary() {
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline" className="capitalize text-xs">{ex.muscle_group}</Badge>
+                      {ex.category && (
+                        <Badge variant="outline" className="text-xs border-primary/40 text-primary">
+                          {categoryLabel(ex.category)}
+                        </Badge>
+                      )}
                       {ex.is_global && (
                         <Badge variant="secondary" className="text-xs">
                           <Globe className="h-3 w-3 mr-1" />Global
