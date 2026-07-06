@@ -1314,6 +1314,40 @@ export default function StudentDetail() {
                     {anamnesis.extra_comments && <div><span className="font-medium text-foreground">Comentários extras:</span> <span className="text-muted-foreground">{anamnesis.extra_comments}</span></div>}
                     {anamnesis.authorizes_plan != null && <div><span className="font-medium text-foreground">Autoriza criação do plano:</span> <span className="text-muted-foreground">{anamnesis.authorizes_plan ? "SIM" : "NÃO"}</span></div>}
                     {anamnesis.commits_communication != null && <div><span className="font-medium text-foreground">Compromete-se a comunicar:</span> <span className="text-muted-foreground">{anamnesis.commits_communication ? "SIM" : "NÃO"}</span></div>}
+                    {(() => {
+                      const data = (anamnesis as any).data as Record<string, any> | null;
+                      if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+                      const LABELS: Record<string, string> = {
+                        idade: "Idade", sexo: "Sexo", peso: "Peso (kg)", altura: "Altura (cm)", percentual_gordura: "% de gordura",
+                        objetivos: "Objetivos", objetivo_principal: "Objetivo principal", objetivo_descricao: "Descrição do objetivo",
+                        interesses: "Interesses", tem_nutricionista: "Já tem nutricionista", quer_dicas_nutricao: "Quer dicas de nutrição", tem_assessoria: "Já tem assessoria",
+                        nivel_atividade: "Nível de atividade", tempo_treino_meses: "Tempo de treino (meses)", dias_por_semana: "Dias por semana", dias_por_modalidade: "Dias por modalidade",
+                        minutos_sessao: "Minutos por sessão", onde_treina: "Onde treina", historico_treino: "Histórico de treino",
+                        endurance_objetivo: "Endurance — objetivo/prova", endurance_prova: "Prova marcada", endurance_data_prova: "Data da prova", endurance_volume: "Volume atual",
+                        endurance_recuperacao: "Recuperação (0-10)", fc_maxima: "FC máxima", fc_repouso: "FC de repouso",
+                        corrida_onde: "Corrida — onde", corrida_tempo: "Corrida — melhor tempo", natacao_piscina: "Natação — piscina", natacao_nivel: "Natação — nível", natacao_volume: "Natação — volume",
+                        ciclismo_tipo: "Ciclismo — tipo", ciclismo_volume: "Ciclismo — volume", ciclismo_potencia: "Ciclismo — medidor de potência",
+                        lesoes: "Lesões", condicoes_medicas: "Condições médicas", medicamentos: "Medicamentos", estresse: "Estresse (0-10)", qualidade_sono: "Qualidade do sono (0-10)", horas_sono: "Horas de sono",
+                        cardiaco: "Problema cardíaco/pressão", dor_peito: "Dor no peito/tontura", cirurgia_recente: "Cirurgia recente", cirurgia_qual: "Cirurgia — qual/quando",
+                        gestacao: "Gestação/pós-parto", gestacao_detalhe: "Gestação — detalhe", fuma: "Fuma", doente_agora: "Doente/febre agora",
+                        dor_tornozelo: "Dor tornozelo (0-10)", dor_joelho: "Dor joelho (0-10)", dor_quadril: "Dor quadril (0-10)", dor_lombar: "Dor lombar (0-10)", dor_ombro: "Dor ombro (0-10)", outra_condicao: "Outra condição de saúde",
+                        refeicoes_dia: "Refeições por dia", horarios_tipo: "Horários", horarios_refeicoes: "Horários das refeições", horario_treino: "Horário de treino", treina_jejum: "Treina em jejum", fome_acordar: "Fome ao acordar",
+                        alimentos_curte: "Alimentos que curte", alimentos_nao_gosta: "Alimentos que não gosta", restricoes_alimentares: "Restrições/alergias", orcamento: "Orçamento alimentar", suplementos: "Suplementos", acesso_cozinha: "Acesso a cozinha", observacoes: "Observações",
+                      };
+                      const fmt = (v: any) => Array.isArray(v) ? v.join(", ") : String(v);
+                      const entries = Object.keys(LABELS)
+                        .filter((k) => { const v = data[k]; return v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0); })
+                        .map((k) => [LABELS[k], fmt(data[k])] as [string, string]);
+                      if (entries.length === 0) return null;
+                      return (
+                        <div className="pt-3 mt-3 border-t border-border space-y-2">
+                          <p className="text-xs uppercase tracking-wide text-primary font-sans font-semibold">Anamnese detalhada (BN)</p>
+                          {entries.map(([label, value]) => (
+                            <div key={label}><span className="font-medium text-foreground">{label}:</span> <span className="text-muted-foreground">{value}</span></div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </>
                 )}
               </CardContent>

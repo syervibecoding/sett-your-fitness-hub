@@ -12,30 +12,162 @@ import { useToast } from "@/hooks/use-toast";
 import { CheckCircle } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { applyTheme } from "@/contexts/ThemeContext";
+import { cn } from "@/lib/utils";
 
-const MODALITY_OPTIONS = [
-  "Nenhum", "Musculação / Funcional", "Corrida", "Natação", "Bike", "Triathlon", "Tênis"
+const COMMON_FOODS = [
+  "Frango", "Ovos", "Carne", "Peixe", "Arroz", "Batata doce", "Pão", "Tapioca",
+  "Aveia", "Feijão", "Macarrão", "Frutas", "Salada", "Legumes", "Iogurte", "Whey", "Queijo",
 ];
 
-const EQUIPMENT_OPTIONS = [
-  "Mini Bands (elástico curto fechado)", "Thera Bands (elástico grande aberto)",
-  "Super Bands (elástico grande fechado)", "Medball - Wallball", "Barra Olímpica",
-  "Polia alta/baixa", "Anilhas até 10kg", "Anilhas até 20kg",
-  "Hack de Agachamento Livre", "Hack de Agachamento Guiado",
-  "Halteres até 10kg", "Halteres até 20kg", "Halteres até 30kg ou +",
-  "Banco Inclinação Ajustável", "Kettlebell até 10kg", "Kettlebell até 20kg",
-  "Máquinas", "Caixote", "Step"
-];
+type FieldType = "text" | "textarea" | "number" | "date" | "radio" | "checkbox" | "scale";
 
-const SESSION_DURATION_OPTIONS = [
-  "até 30 minutos", "de 30 a 45 minutos", "de 45 a 60 minutos", "60 minutos ou +"
-];
+interface Field {
+  key: string;
+  label: string;
+  type: FieldType;
+  options?: string[];
+  help?: string;
+  required?: boolean;
+  other?: boolean; // allow free text for checkbox
+  min?: number;
+  max?: number;
+  minLabel?: string;
+  maxLabel?: string;
+}
 
-const TRAINING_LOCATION_OPTIONS = [
-  "Academia de Rede", "Academia do Prédio", "Em casa", "Box de Crossfit/Studio"
-];
+interface Section {
+  title: string;
+  help?: string;
+  fields: Field[];
+  showIfEndurance?: boolean;
+}
 
-const SLEEP_OPTIONS = ["4h", "4h - 6h", "6h - 8h", "8h +"];
+const ENDURANCE_INTERESTS = ["Corrida", "Natação", "Ciclismo"];
+
+const SECTIONS: Section[] = [
+  {
+    title: "Seus dados",
+    fields: [
+      { key: "idade", label: "Idade", type: "text", required: true },
+      { key: "sexo", label: "Sexo", type: "radio", options: ["Masculino", "Feminino"], required: true },
+      { key: "peso", label: "Peso (kg)", type: "text", required: true },
+      { key: "altura", label: "Altura (cm)", type: "text", required: true },
+      { key: "percentual_gordura", label: "% de gordura (se souber)", type: "text", help: "Opcional" },
+    ],
+  },
+  {
+    title: "Seu objetivo",
+    fields: [
+      { key: "objetivos", label: "Objetivos (marque todos que quiser)", type: "checkbox", options: ["Emagrecimento", "Ganho de massa", "Performance esportiva", "Saúde e bem-estar"] },
+      { key: "objetivo_principal", label: "Qual é o seu objetivo PRINCIPAL (o mais importante)?", type: "radio", options: ["Emagrecimento", "Ganho de massa", "Performance esportiva", "Saúde e bem-estar"] },
+      { key: "objetivo_descricao", label: "Conte mais sobre o que você quer alcançar", type: "textarea", help: "Ex: correr minha primeira meia maratona, melhorar a postura, perder 5kg..." },
+      { key: "interesses", label: "Tenho interesse em (marque todas que quiser)", type: "checkbox", options: ["Musculação", "Corrida", "Natação", "Ciclismo", "Nutrição"] },
+      { key: "tem_nutricionista", label: "Já tem nutricionista?", type: "radio", options: ["Não", "Sim"] },
+      { key: "quer_dicas_nutricao", label: "Quer dicas de nutrição?", type: "radio", options: ["Sim", "Não"] },
+      { key: "tem_assessoria", label: "Já tem assessoria/treinador para corrida, natação ou ciclismo?", type: "radio", options: ["Não — quero o plano aqui", "Sim, já tenho"] },
+    ],
+  },
+  {
+    title: "Sua rotina de treino",
+    fields: [
+      { key: "nivel_atividade", label: "Nível de atividade atual", type: "radio", options: [
+        "Sedentário — quase não me movimento",
+        "Levemente ativo — 1-2x/sem ou caminho um pouco",
+        "Moderadamente ativo — treino 3-4x/sem",
+        "Muito ativo — treino 5-6x/sem",
+        "Extremamente ativo — treino pesado todo dia / trabalho físico",
+      ] },
+      { key: "tempo_treino_meses", label: "Há quanto tempo treina (em meses)", type: "text" },
+      { key: "dias_por_semana", label: "Quantos dias por semana você pode treinar", type: "text" },
+      { key: "dias_por_modalidade", label: "Quais dias da semana para cada modalidade?", type: "textarea", help: "Ex: Musculação seg/qua/sex · Corrida ter/qui" },
+      { key: "minutos_sessao", label: "Minutos por sessão", type: "text" },
+      { key: "onde_treina", label: "Onde treina", type: "radio", options: ["Academia completa", "Casa (halteres)", "Casa (sem equipamento)", "Ar livre"] },
+      { key: "historico_treino", label: "Histórico de treino", type: "textarea", help: "O que você já praticou, há quanto tempo..." },
+    ],
+  },
+  {
+    title: "Corrida / Natação / Ciclismo",
+    help: "Aparece porque você marcou uma dessas modalidades. Preencha o que fizer sentido.",
+    showIfEndurance: true,
+    fields: [
+      { key: "endurance_objetivo", label: "Objetivo / prova (endurance)", type: "text", help: "Ex: Maratona em outubro, 1500m sub-30..." },
+      { key: "endurance_prova", label: "Tem prova/competição marcada? Qual?", type: "text" },
+      { key: "endurance_data_prova", label: "Data da prova", type: "date" },
+      { key: "endurance_volume", label: "Volume atual (km ou h por semana)", type: "text", help: "Ex: 6km/semana ou 2h/semana — ou 'não sei'" },
+      { key: "endurance_recuperacao", label: "Quão recuperado você está hoje?", type: "scale", min: 0, max: 10, minLabel: "Nada", maxLabel: "Ótimo" },
+      { key: "fc_maxima", label: "FC máxima (se souber)", type: "text" },
+      { key: "fc_repouso", label: "FC de repouso (se souber)", type: "text" },
+      { key: "corrida_onde", label: "Corrida — onde corre", type: "radio", options: ["Rua/asfalto", "Esteira", "Trilha", "Pista"] },
+      { key: "corrida_tempo", label: "Corrida — melhor tempo recente", type: "text", help: "Ex: 10k em 52min" },
+      { key: "natacao_piscina", label: "Natação — acesso à piscina", type: "radio", options: ["Piscina 25m", "Piscina 50m", "Sem acesso regular"] },
+      { key: "natacao_nivel", label: "Natação — seu nível", type: "radio", options: [
+        "Iniciante — nado há pouco / me viro mal",
+        "Intermediário — nado bem, +6 meses",
+        "Avançado — boa técnica, +2 anos",
+        "Não sei dizer",
+      ] },
+      { key: "natacao_volume", label: "Natação — volume (m ou min por semana)", type: "text" },
+      { key: "ciclismo_tipo", label: "Ciclismo — tipo", type: "radio", options: ["Speed/estrada", "MTB", "Indoor/rolo"] },
+      { key: "ciclismo_volume", label: "Ciclismo — volume (km ou h por semana)", type: "text" },
+      { key: "ciclismo_potencia", label: "Ciclismo — tem medidor de potência?", type: "radio", options: ["Não", "Sim"] },
+    ],
+  },
+  {
+    title: "Sua saúde",
+    fields: [
+      { key: "lesoes", label: "Lesões atuais ou passadas", type: "textarea", help: "Ex: dor no joelho direito, hérnia de disco..." },
+      { key: "condicoes_medicas", label: "Condições médicas", type: "textarea", help: "Ex: hipertensão, diabetes... (deixe vazio se nenhuma)" },
+      { key: "medicamentos", label: "Medicamentos", type: "text", help: "Opcional" },
+      { key: "estresse", label: "Nível de estresse", type: "scale", min: 0, max: 10, minLabel: "Baixo", maxLabel: "Alto" },
+      { key: "qualidade_sono", label: "Qualidade do sono", type: "scale", min: 0, max: 10, minLabel: "Ruim", maxLabel: "Ótima" },
+      { key: "horas_sono", label: "Horas de sono por noite", type: "text" },
+    ],
+  },
+  {
+    title: "Triagem clínica (segurança)",
+    help: 'Usado só para deixar a prescrição segura. Na dúvida, responda "Sim".',
+    fields: [
+      { key: "cardiaco", label: "Tem problema cardíaco / pressão alta?", type: "radio", options: ["Não", "Sim"], required: true },
+      { key: "dor_peito", label: "Sente dor no peito / tontura ao se esforçar?", type: "radio", options: ["Não", "Sim"], required: true },
+      { key: "cirurgia_recente", label: "Fez cirurgia nos últimos 6 meses?", type: "radio", options: ["Não", "Sim"] },
+      { key: "cirurgia_qual", label: "Se fez cirurgia: qual e quando?", type: "text" },
+      { key: "gestacao", label: "Gestação / pós-parto? (se aplicável)", type: "radio", options: ["Não se aplica", "Gestante", "Pós-parto recente"] },
+      { key: "gestacao_detalhe", label: "Se gestante/pós-parto: semanas de gestação ou meses pós-parto", type: "text" },
+      { key: "fuma", label: "Fuma?", type: "radio", options: ["Não", "Sim"] },
+      { key: "doente_agora", label: "Está doente / com febre agora?", type: "radio", options: ["Não", "Sim"] },
+      { key: "dor_tornozelo", label: "Dor no tornozelo AGORA", type: "scale", min: 0, max: 10, minLabel: "Sem dor", maxLabel: "Dor máxima" },
+      { key: "dor_joelho", label: "Dor no joelho AGORA", type: "scale", min: 0, max: 10, minLabel: "Sem dor", maxLabel: "Dor máxima" },
+      { key: "dor_quadril", label: "Dor no quadril AGORA", type: "scale", min: 0, max: 10, minLabel: "Sem dor", maxLabel: "Dor máxima" },
+      { key: "dor_lombar", label: "Dor na lombar AGORA", type: "scale", min: 0, max: 10, minLabel: "Sem dor", maxLabel: "Dor máxima" },
+      { key: "dor_ombro", label: "Dor no ombro AGORA", type: "scale", min: 0, max: 10, minLabel: "Sem dor", maxLabel: "Dor máxima" },
+      { key: "outra_condicao", label: "Outra condição de saúde relevante?", type: "textarea", help: "Opcional — asma, diabetes, etc." },
+    ],
+  },
+  {
+    title: "Rotina alimentar e treino",
+    help: "Ajuda a programar o que comer perto do treino — orientações práticas, sem cardápio fechado.",
+    fields: [
+      { key: "refeicoes_dia", label: "Refeições por dia", type: "radio", options: ["2", "3", "4", "5", "6", "7+"] },
+      { key: "horarios_tipo", label: "Seus horários são...", type: "radio", options: ["Fixos no dia a dia", "Variam um pouco", "Mudam bastante"] },
+      { key: "horarios_refeicoes", label: "Horários aproximados das refeições", type: "textarea", help: "Ex: 07h café · 12h almoço · 16h lanche · 20h jantar" },
+      { key: "horario_treino", label: "Que horas você costuma treinar?", type: "checkbox", options: ["Manhã cedo", "Manhã", "Almoço", "Tarde", "Fim de tarde", "Noite"] },
+      { key: "treina_jejum", label: "Treina em jejum?", type: "radio", options: ["Nunca", "Às vezes", "Sempre"] },
+      { key: "fome_acordar", label: "Fome ao acordar?", type: "radio", options: ["Com bastante fome", "Normal", "Sem fome", "Enjoo / não como"] },
+    ],
+  },
+  {
+    title: "Preferências & substituições",
+    fields: [
+      { key: "alimentos_curte", label: "Alimentos que você CURTE", type: "checkbox", options: COMMON_FOODS, other: true },
+      { key: "alimentos_nao_gosta", label: "Alimentos que NÃO gosta / não come", type: "checkbox", options: COMMON_FOODS, other: true },
+      { key: "restricoes_alimentares", label: "Restrições / alergias / dieta", type: "textarea", help: "Ex: intolerância à lactose, vegetariano, alergia a amendoim..." },
+      { key: "orcamento", label: "Orçamento alimentar", type: "radio", options: ["Econômico", "Moderado", "Premium"] },
+      { key: "suplementos", label: "Suplementos que usa", type: "text", help: "Opcional" },
+      { key: "acesso_cozinha", label: "Tem acesso a cozinha / micro-ondas?", type: "radio", options: ["Sim", "Não"] },
+      { key: "observacoes", label: "Algo mais que queira contar?", type: "textarea", help: "Opcional" },
+    ],
+  },
+];
 
 export default function PublicAnamnesis() {
   const { studentId } = useParams<{ studentId: string }>();
@@ -43,34 +175,12 @@ export default function PublicAnamnesis() {
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
   const [studentName, setStudentName] = useState("");
-  const [companyId, setCompanyId] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [logoSrc, setLogoSrc] = useState<string | null>(null);
   const [titleText, setTitleText] = useState("ANAMNESE");
 
-  // Fields
-  const [modalities, setModalities] = useState<string[]>([]);
-  const [modalityOther, setModalityOther] = useState("");
-  const [trainingDays, setTrainingDays] = useState("");
-  const [availableDays, setAvailableDays] = useState("");
-  const [sessionDuration, setSessionDuration] = useState("");
-  const [trainingLocation, setTrainingLocation] = useState("");
-  const [equipment, setEquipment] = useState<string[]>([]);
-  const [equipmentOther, setEquipmentOther] = useState("");
-  const [goals, setGoals] = useState("");
-  const [diseases, setDiseases] = useState("");
-  const [injuries, setInjuries] = useState("");
-  const [currentPain, setCurrentPain] = useState("");
-  const [nutrition, setNutrition] = useState("");
-  const [profession, setProfession] = useState("");
-  const [sleepHours, setSleepHours] = useState("");
-  const [restorativeSleep, setRestorativeSleep] = useState("");
-  const [awareOfTrilogy, setAwareOfTrilogy] = useState("");
-  const [feelIn3Months, setFeelIn3Months] = useState("");
-  const [biggestObstacle, setBiggestObstacle] = useState("");
-  const [extraComments, setExtraComments] = useState("");
-  const [authorizesPlan, setAuthorizesPlan] = useState("");
-  const [commitsCommunication, setCommitsCommunication] = useState("");
+  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [otherText, setOtherText] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!studentId) { setNotFound(true); return; }
@@ -80,7 +190,6 @@ export default function PublicAnamnesis() {
       });
       if (error || !data?.student) { setNotFound(true); return; }
       setStudentName(data.student.full_name);
-      setCompanyId(null); // backend handles company scoping
       if (data.branding) {
         if (data.branding.logo_url) setLogoSrc(data.branding.logo_url);
         setTitleText(data.branding.platform_title || "ANAMNESE");
@@ -90,55 +199,80 @@ export default function PublicAnamnesis() {
     init();
   }, [studentId]);
 
-  const toggleArrayItem = (arr: string[], item: string, setter: (v: string[]) => void) => {
-    setter(arr.includes(item) ? arr.filter(i => i !== item) : [...arr, item]);
+  const set = (key: string, value: any) => setAnswers(prev => ({ ...prev, [key]: value }));
+
+  const toggleCheckbox = (key: string, item: string) => {
+    setAnswers(prev => {
+      const arr: string[] = Array.isArray(prev[key]) ? prev[key] : [];
+      return { ...prev, [key]: arr.includes(item) ? arr.filter(i => i !== item) : [...arr, item] };
+    });
   };
 
+  const interests: string[] = Array.isArray(answers.interesses) ? answers.interesses : [];
+  const showEndurance = interests.some(i => ENDURANCE_INTERESTS.includes(i));
+
+  const visibleSections = SECTIONS.filter(s => !s.showIfEndurance || showEndurance);
+
   const handleSubmit = async () => {
-    if (!goals || !diseases || !injuries || !currentPain || !nutrition || !profession || !sleepHours ||
-      !restorativeSleep || !awareOfTrilogy || !feelIn3Months || !biggestObstacle ||
-      !authorizesPlan || !commitsCommunication || !sessionDuration || !trainingLocation) {
-      toast({ title: "Preencha todos os campos obrigatórios", variant: "destructive" });
-      return;
+    // Validate required fields in visible sections
+    for (const section of visibleSections) {
+      for (const f of section.fields) {
+        if (f.required) {
+          const v = answers[f.key];
+          const empty = v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
+          if (empty) {
+            toast({ title: "Preencha todos os campos obrigatórios", description: f.label, variant: "destructive" });
+            return;
+          }
+        }
+      }
     }
+
     setSaving(true);
 
-    const allModalities = [...modalities, ...(modalityOther ? [modalityOther] : [])];
-    const allEquipment = [...equipment, ...(equipmentOther ? [equipmentOther] : [])];
-
-    const { data, error } = await supabase.functions.invoke("public-anamnesis", {
-      body: {
-        action: "submit",
-        studentId: studentId!,
-        modalities: allModalities,
-        training_days: trainingDays,
-        available_days: availableDays ? parseInt(availableDays) : null,
-        session_duration: sessionDuration,
-        training_location: trainingLocation,
-        available_equipment: allEquipment,
-        goals,
-        diseases,
-        injuries,
-        current_pain: currentPain,
-        nutrition,
-        profession,
-        sleep_hours: sleepHours,
-        restorative_sleep: restorativeSleep === "sim",
-        aware_of_trilogy: awareOfTrilogy === "sim",
-        feel_in_3_months: feelIn3Months,
-        biggest_obstacle: biggestObstacle,
-        extra_comments: extraComments || null,
-        authorizes_plan: authorizesPlan === "sim",
-        commits_communication: commitsCommunication === "sim",
-      },
-    });
-
-    setSaving(false);
-    if (error || data?.error) {
-      toast({ title: "Erro ao salvar anamnese", description: error?.message || data?.error, variant: "destructive" });
-      return;
+    // Full answers snapshot goes into JSONB data; append "other" text to checkbox arrays.
+    const data: Record<string, any> = { ...answers };
+    for (const [key, txt] of Object.entries(otherText)) {
+      if (txt && Array.isArray(data[key])) data[key] = [...data[key], txt];
     }
 
+    const str = (v: any) => (v === undefined || v === null || v === "" ? null : String(v));
+    const joinFilled = (...vals: any[]) => {
+      const parts = vals.map(str).filter(Boolean);
+      return parts.length ? parts.join(" · ") : null;
+    };
+
+    const payload: Record<string, any> = {
+      action: "submit",
+      studentId: studentId!,
+      data,
+      // Best-effort mapping to existing columns for legacy views
+      modalities: interests,
+      goals: str(answers.objetivo_descricao),
+      injuries: str(answers.lesoes),
+      diseases: joinFilled(answers.condicoes_medicas, answers.medicamentos ? `Medicamentos: ${answers.medicamentos}` : null),
+      medications: str(answers.medicamentos),
+      current_pain: str(answers.outra_condicao),
+      nutrition: str(answers.restricoes_alimentares),
+      restrictions: str(answers.restricoes_alimentares),
+      physical_activity_level: str(answers.nivel_atividade),
+      training_location: str(answers.onde_treina),
+      session_duration: str(answers.minutos_sessao),
+      training_days: str(answers.dias_por_modalidade),
+      sleep_hours: str(answers.horas_sono),
+      stress_level: str(answers.estresse),
+      sleep_quality: str(answers.qualidade_sono),
+      smoking: str(answers.fuma),
+      extra_comments: str(answers.observacoes),
+    };
+
+    const { data: res, error } = await supabase.functions.invoke("public-anamnesis", { body: payload });
+
+    setSaving(false);
+    if (error || res?.error) {
+      toast({ title: "Erro ao salvar anamnese", description: error?.message || res?.error, variant: "destructive" });
+      return;
+    }
     setDone(true);
   };
 
@@ -171,6 +305,88 @@ export default function PublicAnamnesis() {
     );
   }
 
+  const renderField = (f: Field) => {
+    const value = answers[f.key];
+    return (
+      <div key={f.key} className="space-y-2">
+        <Label className="font-sans font-medium">
+          {f.label}{f.required && " *"}
+        </Label>
+        {f.help && <p className="text-xs text-muted-foreground font-sans">{f.help}</p>}
+
+        {f.type === "text" && (
+          <Input value={value || ""} onChange={e => set(f.key, e.target.value)} className="bg-secondary border-border" />
+        )}
+        {f.type === "number" && (
+          <Input type="number" value={value ?? ""} onChange={e => set(f.key, e.target.value)} className="bg-secondary border-border" />
+        )}
+        {f.type === "date" && (
+          <Input type="date" value={value || ""} onChange={e => set(f.key, e.target.value)} className="bg-secondary border-border" />
+        )}
+        {f.type === "textarea" && (
+          <Textarea value={value || ""} onChange={e => set(f.key, e.target.value)} className="bg-secondary border-border" />
+        )}
+        {f.type === "radio" && (
+          <RadioGroup value={value || ""} onValueChange={v => set(f.key, v)}>
+            {f.options!.map(o => (
+              <div key={o} className="flex items-center gap-2">
+                <RadioGroupItem value={o} id={`${f.key}-${o}`} />
+                <Label htmlFor={`${f.key}-${o}`} className="font-sans font-normal cursor-pointer">{o}</Label>
+              </div>
+            ))}
+          </RadioGroup>
+        )}
+        {f.type === "checkbox" && (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {f.options!.map(o => (
+                <label key={o} className="flex items-center gap-2 text-sm font-sans cursor-pointer">
+                  <Checkbox
+                    checked={Array.isArray(value) && value.includes(o)}
+                    onCheckedChange={() => toggleCheckbox(f.key, o)}
+                  />
+                  {o}
+                </label>
+              ))}
+            </div>
+            {f.other && (
+              <Input
+                placeholder="Outro..."
+                value={otherText[f.key] || ""}
+                onChange={e => setOtherText(prev => ({ ...prev, [f.key]: e.target.value }))}
+                className="mt-1 bg-secondary border-border"
+              />
+            )}
+          </>
+        )}
+        {f.type === "scale" && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {Array.from({ length: (f.max! - f.min!) + 1 }, (_, i) => f.min! + i).map(n => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => set(f.key, n)}
+                className={cn(
+                  "h-9 w-9 rounded-md border text-sm font-sans transition-colors",
+                  value === n
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-secondary border-border hover:border-primary/50"
+                )}
+              >
+                {n}
+              </button>
+            ))}
+            {(f.minLabel || f.maxLabel) && (
+              <span className="w-full text-[11px] text-muted-foreground font-sans flex justify-between">
+                <span>{f.minLabel}</span><span>{f.maxLabel}</span>
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
@@ -184,166 +400,21 @@ export default function PublicAnamnesis() {
           {studentName && <p className="text-muted-foreground font-sans">Aluno: <strong className="text-foreground">{studentName}</strong></p>}
         </div>
 
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-primary text-xl">ANAMNESE</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Modalities */}
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Quais modalidades você pratica atualmente? *</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {MODALITY_OPTIONS.map(m => (
-                  <label key={m} className="flex items-center gap-2 text-sm font-sans cursor-pointer">
-                    <Checkbox checked={modalities.includes(m)} onCheckedChange={() => toggleArrayItem(modalities, m, setModalities)} />
-                    {m}
-                  </label>
-                ))}
-              </div>
-              <Input placeholder="Outro..." value={modalityOther} onChange={e => setModalityOther(e.target.value)} className="mt-1" />
-            </div>
+        {visibleSections.map(section => (
+          <Card key={section.title} className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="text-primary text-xl">{section.title}</CardTitle>
+              {section.help && <p className="text-sm text-muted-foreground font-sans">{section.help}</p>}
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {section.fields.map(renderField)}
+            </CardContent>
+          </Card>
+        ))}
 
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Quais dias da semana você pratica cada uma delas? *</Label>
-              <Textarea value={trainingDays} onChange={e => setTrainingDays(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Quantos dias na semana você tem para treinar com a BN? *</Label>
-              <Input type="number" min={0} max={7} value={availableDays} onChange={e => setAvailableDays(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Quanto tempo livre para as sessões? *</Label>
-              <RadioGroup value={sessionDuration} onValueChange={setSessionDuration}>
-                {SESSION_DURATION_OPTIONS.map(o => (
-                  <div key={o} className="flex items-center gap-2">
-                    <RadioGroupItem value={o} id={`sd-${o}`} />
-                    <Label htmlFor={`sd-${o}`} className="font-sans font-normal cursor-pointer">{o}</Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Onde você treina? *</Label>
-              <RadioGroup value={trainingLocation} onValueChange={setTrainingLocation}>
-                {TRAINING_LOCATION_OPTIONS.map(o => (
-                  <div key={o} className="flex items-center gap-2">
-                    <RadioGroupItem value={o} id={`tl-${o}`} />
-                    <Label htmlFor={`tl-${o}`} className="font-sans font-normal cursor-pointer">{o}</Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Materiais disponíveis (se casa/prédio):</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                {EQUIPMENT_OPTIONS.map(e => (
-                  <label key={e} className="flex items-center gap-2 text-sm font-sans cursor-pointer">
-                    <Checkbox checked={equipment.includes(e)} onCheckedChange={() => toggleArrayItem(equipment, e, setEquipment)} />
-                    {e}
-                  </label>
-                ))}
-              </div>
-              <Input placeholder="Outro..." value={equipmentOther} onChange={e => setEquipmentOther(e.target.value)} className="mt-1" />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Quais as suas metas com o Performance Training? *</Label>
-              <Textarea value={goals} onChange={e => setGoals(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Possui alguma doença e/ou toma algum remédio contínuo? *</Label>
-              <Textarea value={diseases} onChange={e => setDiseases(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Histórico de lesões (se tiver): *</Label>
-              <Textarea value={injuries} onChange={e => setInjuries(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Possui alguma dor atualmente? *</Label>
-              <Textarea value={currentPain} onChange={e => setCurrentPain(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Como é a sua alimentação? Faz acompanhamento com Nutricionista? *</Label>
-              <Textarea value={nutrition} onChange={e => setNutrition(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Qual a sua profissão e rotina de trabalho? *</Label>
-              <Textarea value={profession} onChange={e => setProfession(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Quantas horas você costuma dormir por noite? *</Label>
-              <RadioGroup value={sleepHours} onValueChange={setSleepHours}>
-                {SLEEP_OPTIONS.map(o => (
-                  <div key={o} className="flex items-center gap-2">
-                    <RadioGroupItem value={o} id={`sl-${o}`} />
-                    <Label htmlFor={`sl-${o}`} className="font-sans font-normal cursor-pointer">{o}</Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Seu sono é reparador? *</Label>
-              <RadioGroup value={restorativeSleep} onValueChange={setRestorativeSleep}>
-                <div className="flex items-center gap-2"><RadioGroupItem value="sim" id="rs-sim" /><Label htmlFor="rs-sim" className="font-sans font-normal cursor-pointer">Sim</Label></div>
-                <div className="flex items-center gap-2"><RadioGroupItem value="nao" id="rs-nao" /><Label htmlFor="rs-nao" className="font-sans font-normal cursor-pointer">Não</Label></div>
-              </RadioGroup>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Você tem consciência de que precisa ter alimentação + treino + sono alinhados para atingir os resultados? *</Label>
-              <RadioGroup value={awareOfTrilogy} onValueChange={setAwareOfTrilogy}>
-                <div className="flex items-center gap-2"><RadioGroupItem value="sim" id="at-sim" /><Label htmlFor="at-sim" className="font-sans font-normal cursor-pointer">Sim</Label></div>
-                <div className="flex items-center gap-2"><RadioGroupItem value="nao" id="at-nao" /><Label htmlFor="at-nao" className="font-sans font-normal cursor-pointer">Não</Label></div>
-              </RadioGroup>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Como você quer se sentir em 3 meses? *</Label>
-              <Textarea value={feelIn3Months} onChange={e => setFeelIn3Months(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">O que mais atrapalha a sua rotina de treino? *</Label>
-              <Textarea value={biggestObstacle} onChange={e => setBiggestObstacle(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Comentários extras</Label>
-              <Textarea value={extraComments} onChange={e => setExtraComments(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Você autoriza a criação do seu plano de treino com base nas informações fornecidas? *</Label>
-              <RadioGroup value={authorizesPlan} onValueChange={setAuthorizesPlan}>
-                <div className="flex items-center gap-2"><RadioGroupItem value="sim" id="ap-sim" /><Label htmlFor="ap-sim" className="font-sans font-normal cursor-pointer">Sim</Label></div>
-                <div className="flex items-center gap-2"><RadioGroupItem value="nao" id="ap-nao" /><Label htmlFor="ap-nao" className="font-sans font-normal cursor-pointer">Não</Label></div>
-              </RadioGroup>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-sans font-medium">Você se compromete a comunicar qualquer alteração na sua saúde, rotina ou treino? *</Label>
-              <RadioGroup value={commitsCommunication} onValueChange={setCommitsCommunication}>
-                <div className="flex items-center gap-2"><RadioGroupItem value="sim" id="cc-sim" /><Label htmlFor="cc-sim" className="font-sans font-normal cursor-pointer">Sim</Label></div>
-                <div className="flex items-center gap-2"><RadioGroupItem value="nao" id="cc-nao" /><Label htmlFor="cc-nao" className="font-sans font-normal cursor-pointer">Não</Label></div>
-              </RadioGroup>
-            </div>
-
-            <Button className="w-full" onClick={handleSubmit} disabled={saving}>
-              {saving ? "Salvando..." : "Finalizar Anamnese"}
-            </Button>
-          </CardContent>
-        </Card>
+        <Button className="w-full" onClick={handleSubmit} disabled={saving}>
+          {saving ? "Salvando..." : "Finalizar Anamnese"}
+        </Button>
       </div>
     </div>
   );

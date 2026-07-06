@@ -18,6 +18,8 @@ const ALLOWED_FIELDS = [
   "available_equipment","goals","diseases","injuries","current_pain","nutrition",
   "profession","sleep_hours","restorative_sleep","aware_of_trilogy","feel_in_3_months",
   "biggest_obstacle","extra_comments","authorizes_plan","commits_communication",
+  "physical_activity_level","stress_level","sleep_quality","smoking","restrictions",
+  "experience_level","medications","diet_type",
 ];
 
 Deno.serve(async (req) => {
@@ -61,6 +63,10 @@ Deno.serve(async (req) => {
         company_id: student.company_id,
       };
       for (const k of ALLOWED_FIELDS) if (body[k] !== undefined) payload[k] = body[k];
+      // Extended BN anamnesis answers are stored in the JSONB `data` column.
+      if (body.data && typeof body.data === "object" && !Array.isArray(body.data)) {
+        payload.data = body.data;
+      }
 
       const { data: existing } = await supabase
         .from("anamnesis").select("id, version").eq("student_id", student.id)

@@ -20,6 +20,7 @@ interface Exercise {
   name: string;
   description: string | null;
   muscle_group: string;
+  category: string | null;
   video_url: string | null;
   video_path: string | null;
   thumbnail_url: string | null;
@@ -27,6 +28,21 @@ interface Exercise {
   company_id: string | null;
   created_by: string;
 }
+
+const CATEGORY_LABELS: Record<string, string> = {
+  base: "Base",
+  maquinas: "Máquinas",
+  pesos_livres: "Pesos livres",
+  peso_corporal: "Peso corporal",
+  core: "Core",
+  mobilidade: "Mobilidade",
+  fisioterapia: "Fisioterapia",
+  performance: "Performance",
+  pliometria: "Pliometria",
+  ativacao: "Ativação",
+  controle_motor: "Controle motor",
+};
+const categoryLabel = (c: string) => CATEGORY_LABELS[c] ?? c;
 
 interface MuscleGroup {
   id: string;
@@ -67,11 +83,12 @@ export default function ExerciseLibrary() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [search, setSearch] = useState("");
   const [filterGroup, setFilterGroup] = useState("all");
+  const [filterCategory, setFilterCategory] = useState("all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Exercise | null>(null);
   const [videoModal, setVideoModal] = useState<{ type: "path" | "url"; value: string } | null>(null);
   const [form, setForm] = useState({
-    name: "", description: "", muscle_group: "geral",
+    name: "", description: "", muscle_group: "geral", category: "",
     video_url: "", is_global: false,
   });
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -211,6 +228,7 @@ export default function ExerciseLibrary() {
       name: form.name,
       description: form.description || null,
       muscle_group: form.muscle_group,
+      category: form.category || null,
       video_url: form.video_url || null,
       video_path: videoPath,
       is_global: isMaster ? form.is_global : false,
@@ -288,7 +306,7 @@ export default function ExerciseLibrary() {
     setEditing(ex);
     setForm({
       name: ex.name, description: ex.description || "",
-      muscle_group: ex.muscle_group, video_url: ex.video_url || "",
+      muscle_group: ex.muscle_group, category: ex.category || "", video_url: ex.video_url || "",
       is_global: ex.is_global,
     });
     setVideoFile(null);
@@ -304,7 +322,7 @@ export default function ExerciseLibrary() {
     setPrimaryMuscleIds([]);
     setSecondaryMuscleIds([]);
     setCompanyVolumes({});
-    setForm({ name: "", description: "", muscle_group: "geral", video_url: "", is_global: false });
+    setForm({ name: "", description: "", muscle_group: "geral", category: "", video_url: "", is_global: false });
   };
 
   const getEmbedUrl = (url: string) => {
@@ -331,10 +349,15 @@ export default function ExerciseLibrary() {
     }
   };
 
+  const categories = Array.from(
+    new Set(exercises.map((e) => e.category).filter((c): c is string => !!c))
+  ).sort();
+
   const filtered = exercises.filter((ex) => {
     const matchSearch = ex.name.toLowerCase().includes(search.toLowerCase());
     const matchGroup = filterGroup === "all" || ex.muscle_group === filterGroup;
-    return matchSearch && matchGroup;
+    const matchCategory = filterCategory === "all" || ex.category === filterCategory;
+    return matchSearch && matchGroup && matchCategory;
   });
 
   const grouped = filtered.reduce<Record<string, Exercise[]>>((acc, ex) => {
@@ -401,6 +424,19 @@ export default function ExerciseLibrary() {
               ))}
             </SelectContent>
           </Select>
+          {categories.length > 0 && (
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger className="w-48 bg-secondary border-border">
+                <SelectValue placeholder="Categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as categorias</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c} value={c}>{categoryLabel(c)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         {/* Exercise grid grouped by muscle group */}
@@ -466,6 +502,11 @@ export default function ExerciseLibrary() {
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline" className="capitalize text-xs">{ex.muscle_group}</Badge>
+                      {ex.category && (
+                        <Badge variant="outline" className="text-xs border-primary/40 text-primary">
+                          {categoryLabel(ex.category)}
+                        </Badge>
+                      )}
                       {ex.is_global && (
                         <Badge variant="secondary" className="text-xs">
                           <Globe className="h-3 w-3 mr-1" />Global
@@ -534,6 +575,21 @@ export default function ExerciseLibrary() {
                 <SelectContent>
                   {MUSCLE_GROUPS.map((g) => (
                     <SelectItem key={g} value={g} className="capitalize">{g}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="font-sans">Categoria</Label>
+              <Select value={form.category || "none"} onValueChange={(v) => setForm({ ...form, category: v === "none" ? "" : v })}>
+                <SelectTrigger className="bg-secondary border-border">
+                  <SelectValue placeholder="Sem categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem categoria</SelectItem>
+                  {Array.from(new Set([...Object.keys(CATEGORY_LABELS), ...categories])).sort().map((c) => (
+                    <SelectItem key={c} value={c}>{categoryLabel(c)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
