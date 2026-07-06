@@ -424,6 +424,19 @@ export default function ExerciseLibrary() {
               ))}
             </SelectContent>
           </Select>
+          {categories.length > 0 && (
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger className="w-48 bg-secondary border-border">
+                <SelectValue placeholder="Categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as categorias</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c} value={c}>{categoryLabel(c)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         {/* Exercise grid grouped by muscle group */}
