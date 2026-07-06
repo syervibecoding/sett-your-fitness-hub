@@ -357,7 +357,21 @@ export default function StudentsManager() {
           </Select>
         </div>
 
+        {selectedIds.size > 0 && (
+          <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-4 py-2">
+            <span className="text-sm text-muted-foreground font-sans">{selectedIds.size} selecionado(s)</span>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Limpar</Button>
+              <Button size="sm" onClick={handleSendAnamnesisBatch} disabled={sendingBatch}>
+                <MessageCircle className="h-4 w-4 mr-2" />
+                {sendingBatch ? "Enviando..." : "Enviar anamnese (WhatsApp)"}
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-3">
+
           {filtered.map(s => (
             <Card key={s.id} className="bg-card border-border">
               <CardContent className="pt-6 space-y-3">
