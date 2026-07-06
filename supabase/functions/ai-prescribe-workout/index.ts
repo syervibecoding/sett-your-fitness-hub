@@ -780,19 +780,56 @@ function pickCatalogExercise(
   keywords: string[],
   usedIds: Set<string>,
   riskText: string,
+  level: "iniciante" | "intermediario" | "avancado" = "intermediario",
 ): ExerciseCatalogEntry | null {
   const normalizedKeywords = keywords.map(normalizeText).filter(Boolean);
   const riskTerms = ["joelho", "lombar", "ombro", "tornozelo", "quadril"].filter((term) => riskText.includes(term));
   const scored = catalog.exercises.map((exercise) => {
     const text = exerciseText(exercise);
+    const nameText = normalizeText(exercise.name);
+    const targetText = normalizeText(exercise.targets.map((t) => t.muscle_group).join(" "));
     const metadataText = normalizeText([exercise.contraindications, exercise.pain_limitation_tags]);
     const riskPenalty = riskTerms.some((term) => metadataText.includes(term)) ? 8 : 0;
     const usedPenalty = usedIds.has(exercise.id) ? 4 : 0;
-    const score = normalizedKeywords.reduce((sum, keyword) => sum + (text.includes(keyword) ? 3 : 0), 0) - riskPenalty - usedPenalty;
+    // Dificuldade do catálogo: iniciante evita exercício avançado; avançado despriorizado levemente p/ iniciante.
+    const diff = normalizeText(exercise.difficulty || "");
+    const difficultyPenalty = level === "iniciante" && /avanc|advanced|dificil/.test(diff) ? 6
+      : level === "avancado" && /inic|beginner|facil/.test(diff) ? 1 : 0;
+    const score = normalizedKeywords.reduce((sum, keyword) => {
+      if (!text.includes(keyword)) return sum;
+      // Match no NOME ou no músculo-alvo (targets) vale mais que match em descrição solta.
+      return sum + 3 + (nameText.includes(keyword) ? 2 : 0) + (targetText.includes(keyword) ? 1 : 0);
+    }, 0) - riskPenalty - usedPenalty - difficultyPenalty;
     return { exercise, score };
   }).sort((a, b) => b.score - a.score);
 
-  return scored.find((item) => item.score > -4)?.exercise || catalog.exercises.find((exercise) => !usedIds.has(exercise.id)) || catalog.exercises[0] || null;
+  const top = scored.find((item) => item.score > -4);
+  // Se o melhor match tem metadado sensível pro risco, tenta um substituto equivalente do catálogo.
+  if (top && riskTerms.length) {
+    const meta = normalizeText([top.exercise.contraindications, top.exercise.pain_limitation_tags]);
+    if (riskTerms.some((term) => meta.includes(term)) && top.exercise.equivalent_substitutes?.length) {
+      for (const subName of top.exercise.equivalent_substitutes) {
+        const sub = catalog.exercises.find((e) => !usedIds.has(e.id) && normalizeText(e.name) === normalizeText(subName));
+        if (sub && !riskTerms.some((term) => normalizeText([sub.contraindications, sub.pain_limitation_tags]).includes(term))) return sub;
+      }
+    }
+  }
+  return top?.exercise || catalog.exercises.find((exercise) => !usedIds.has(exercise.id)) || catalog.exercises[0] || null;
+}
+
+// Avaliação funcional → foco corretivo: injeta o corretivo certo na fase de ativação/mobilidade.
+function correctiveFocusFromAssessment(riskText: string): { keywords: string[]; cue: string; why: string } | null {
+  if (riskText.includes("valgo") || riskText.includes("colapso medial"))
+    return { keywords: ["gluteo medio", "abducao", "mini band", "concha"], cue: "Joelhos apontando para fora, alinhados com os pés.", why: "Avaliação indicou valgo dinâmico — prioridade: glúteo médio." };
+  if (riskText.includes("dorsiflex") || riskText.includes("calcanhar"))
+    return { keywords: ["tornozelo", "dorsiflexao", "panturrilha", "mobilidade"], cue: "Ganhe tornozelo antes de carregar o agachamento.", why: "Avaliação indicou dorsiflexão limitada — prioridade: mobilidade de tornozelo." };
+  if (riskText.includes("butt") || riskText.includes("retrovers"))
+    return { keywords: ["posterior", "isquiotibiais", "alongamento", "quadril"], cue: "Amplitude só até onde a pelve fica estável.", why: "Avaliação indicou butt wink — prioridade: mobilidade posterior/quadril." };
+  if (riskText.includes("trendelenburg") || riskText.includes("queda da pelve") || riskText.includes("drop de pelve"))
+    return { keywords: ["gluteo medio", "unilateral", "prancha lateral", "abducao"], cue: "Pelve nivelada durante todo o movimento.", why: "Avaliação indicou drop de pelve — prioridade: abdutores unilaterais." };
+  if (riskText.includes("cifose") || riskText.includes("protrus") || riskText.includes("escap"))
+    return { keywords: ["face pull", "escapula", "trapezio", "banda"], cue: "Escápulas para trás e para baixo.", why: "Avaliação indicou protrusão/cifose — prioridade: controle escapular." };
+  return null;
 }
 
 type FallbackExerciseSpec = {
@@ -818,12 +855,47 @@ function isoMethodFor(objective: string, order: number): string {
   return ["dropset", "restpause", "cluster"][order % 3];                        // hipertrofia/saúde: varia
 }
 
+// Progressão inter-blocos POR OBJETIVO (usada nos periodization_blocks do fallback).
+function progressionBlocksFor(objective: string) {
+  const o = (objective || "").toLowerCase();
+  if (o.includes("emagre") || o.includes("perda")) {
+    return [
+      { weeks: "1-2", stimulus: "base tecnica e ritmo constante", methods: ["sem metodos avancados"], progression_rule: "Aprender os movimentos mantendo RIR 3-4, dor <= 3 e descanso completo." },
+      { weeks: "3-4", stimulus: "densidade metabolica", methods: ["reducao de descanso", "drop-set em isoladores"], progression_rule: "Manter cargas e REDUZIR descanso gradualmente (ate ~45s nas fases de forca)." },
+      { weeks: "5-6", stimulus: "densidade consolidada", methods: ["drop-set em isoladores"], progression_rule: "Progredir carga leve SEM alongar o descanso; preparar reavaliacao." },
+    ];
+  }
+  if (o.includes("perfor") || o.includes("forca") || o.includes("força")) {
+    return [
+      { weeks: "1-2", stimulus: "base tecnica com intencao de velocidade", methods: ["sem metodos avancados"], progression_rule: "Tecnica limpa e subida rapida controlada, RIR 3-4." },
+      { weeks: "3-4", stimulus: "forca — carga sobe, reps caem", methods: ["cluster/rest-pause em estaveis"], progression_rule: "Aumentar carga e reduzir reps (ex.: 8-10 -> 5-6) mantendo RIR 2-3." },
+      { weeks: "5-6", stimulus: "forca consolidada", methods: ["cluster em compostos estaveis (avancado)"], progression_rule: "Cargas altas em baixas repeticoes, sem falha; preparar reavaliacao." },
+    ];
+  }
+  if (o.includes("hipertrofia") || o.includes("massa")) {
+    return [
+      { weeks: "1-2", stimulus: "base tecnica e conexao muscular", methods: ["sem metodos avancados"], progression_rule: "Amplitude completa e controle exc, RIR 3-4, dor <= 3." },
+      { weeks: "3-4", stimulus: "acumulo de volume", methods: ["progressao dupla", "metodos de intensidade em isoladores"], progression_rule: "Progressao DUPLA: primeiro reps ate o teto da faixa, depois carga." },
+      { weeks: "5-6", stimulus: "intensificacao controlada", methods: ["piramide em compostos", "drop/rest-pause/cluster em isoladores"], progression_rule: "Piramide crescente nos compostos; consolidar e preparar reavaliacao." },
+    ];
+  }
+  return [
+    { weeks: "1-2", stimulus: "base tecnica e tolerancia", methods: ["sem metodos avancados"], progression_rule: "Aumentar reps dentro da faixa mantendo RIR 3-4 e dor <= 3." },
+    { weeks: "3-4", stimulus: "progressao conservadora", methods: ["progressao dupla"], progression_rule: "Aumentar 1 serie em exercicios estaveis ou carga leve se tecnica estiver limpa." },
+    { weeks: "5-6", stimulus: "consolidacao", methods: ["piramide leve apenas se tecnica estavel"], progression_rule: "Consolidar cargas, sem falha, e preparar reavaliacao." },
+  ];
+}
+
 // Troca de estímulo a cada 2 semanas, específica por TIPO de exercício e por OBJETIVO.
 function blockNote(phase: string, isIso: boolean, objective: string, method: string | null): string {
   const o = (objective || "").toLowerCase();
   const emagre = o.includes("emagre") || o.includes("perda");
   const perf = o.includes("perfor");
   if (phase === "forca_global" || phase === "forca_especifica") {
+    if (!isIso && method) {
+      // Composto estável com cluster (avançado): instrução explícita e segura.
+      return `semana 1 e 2: foco na técnica e na amplitude completa\nsemana 3 e 4: cluster-set — divida a série em mini-blocos com 15-20s de pausa (veja o marcador)\nsemana 5 e 6: progredir a carga mantendo a técnica, sem falha`;
+    }
     if (isIso) {
       const lbl = method ? (METHOD_LABEL[method] || method) : "uma técnica de intensidade";
       const wk34 = emagre
@@ -846,13 +918,20 @@ function fallbackExercise(
   riskText: string,
   params: FallbackExerciseSpec & { order: number },
   objective: string,
+  level: "iniciante" | "intermediario" | "avancado" = "intermediario",
 ) {
-  const exercise = pickCatalogExercise(catalog, params.keywords, usedIds, riskText);
+  const exercise = pickCatalogExercise(catalog, params.keywords, usedIds, riskText, level);
   if (!exercise) return null;
   usedIds.add(exercise.id);
   const isIso = params.phase === "forca_especifica" || params.phase === "ativacao_especifica";
   const pain = /dor|lesa|les[aã]o/i.test(riskText || "");
-  const isoMethod = (isIso && !pain) ? isoMethodFor(objective, params.order || 1) : null;
+  // Isolador: método varia por objetivo (todos os níveis, sem dor).
+  // Composto ESTÁVEL: cluster só para AVANÇADO sem dor, no 2º composto em diante (nunca no 1º pesado)
+  // — doutrina: método avançado só em exercício estável, sem dor e nível permitido; entra na semana 3+ (blockNote).
+  const isCompound = params.phase === "forca_global";
+  const isoMethod = (isIso && !pain) ? isoMethodFor(objective, params.order || 1)
+    : (isCompound && !pain && level === "avancado" && params.order >= 4) ? "cluster"
+    : null;
   const setsN = params.sets;
   const set_types = Array.from({ length: setsN }, (_, i) => {
     if (!isIso && i === 0 && setsN >= 3) return "warmup";          // 1ª série dos compostos = aquecimento
@@ -918,21 +997,60 @@ function buildEmergencyFallbackPlan(args: {
   const lowReadiness = readinessStatus === "cautela";
   const volMult = lowReadiness ? 0.8 : 1;
 
-  const makeWorkout = (name: string, day: number, focus: string, specs: FallbackExerciseSpec[]) => {
+  const objectiveText = normalizeText(args.objective);
+  const isEmagrecimento = /emagre|perda/.test(objectiveText);
+  const isPerformance = /perfor|forca|força/.test(objectiveText);
+  const isHipertrofia = /hipertrofia|massa/.test(objectiveText);
+
+  // Avaliação funcional → corretivo prioritário injetado na ativação específica.
+  const corrective = correctiveFocusFromAssessment(riskText);
+
+  // Ajusta as specs por NÍVEL e OBJETIVO (o fallback deixa de ser one-size-fits-all):
+  //  - iniciante: 1 exercício a menos (remove o último acessório de força) → 5/sessão
+  //  - avançado: +1 acessório de força específica → 7/sessão
+  //  - emagrecimento: descanso menor nas fases de força (densidade)
+  //  - hipertrofia: isoladores com 3 séries (volume)
+  //  - performance: 1º composto vira 4x5-6 com 120s (força)
+  const tuneSpecs = (specs: FallbackExerciseSpec[], extraAccessory: FallbackExerciseSpec): FallbackExerciseSpec[] => {
+    let out = specs.map((s) => ({ ...s }));
+    if (level === "iniciante" || hasPain) {
+      const lastIdx = out.map((s) => s.phase).lastIndexOf("forca_especifica");
+      if (lastIdx > 0 && out.length > 5) out.splice(lastIdx, 1);
+    } else if (level === "avancado") {
+      out.push({ ...extraAccessory });
+    }
+    if (isEmagrecimento) {
+      out = out.map((s) => (/^forca/.test(s.phase) ? { ...s, rest: Math.max(45, s.rest - 30), note: `${s.note} Densidade: descanso curto a partir da semana 3.` } : s));
+    } else if (isHipertrofia) {
+      out = out.map((s) => (s.phase === "forca_especifica" ? { ...s, sets: Math.max(s.sets, 3) } : s));
+    } else if (isPerformance && level !== "iniciante") {
+      const firstCompound = out.findIndex((s) => s.phase === "forca_global");
+      if (firstCompound >= 0) out[firstCompound] = { ...out[firstCompound], sets: 4, reps: "5-6", rest: 120, rir: "2-3", note: `${out[firstCompound].note} Ênfase de força: carga alta, reps baixas, subida com intenção de velocidade.` };
+    }
+    // Corretivo da avaliação substitui o foco da ativação específica (quando houver achado).
+    if (corrective) {
+      const ativIdx = out.findIndex((s) => s.phase === "ativacao_especifica");
+      if (ativIdx >= 0) out[ativIdx] = { ...out[ativIdx], keywords: corrective.keywords, cue: corrective.cue, note: corrective.why };
+    }
+    return out;
+  };
+
+  const makeWorkout = (name: string, day: number, focus: string, rawSpecs: FallbackExerciseSpec[], extraAccessory: FallbackExerciseSpec) => {
+    const specs = tuneSpecs(rawSpecs, extraAccessory);
     const exercises = specs
       .map((spec, index) => {
         const sets = volMult < 1 && /^forca/.test(spec.phase) ? Math.max(1, Math.round(spec.sets * volMult)) : spec.sets;
-        return fallbackExercise(args.catalog, usedIds, riskText, { ...spec, sets, order: index + 1 }, clean(args.objective || ""));
+        return fallbackExercise(args.catalog, usedIds, riskText, { ...spec, sets, order: index + 1 }, clean(args.objective || ""), level);
       })
       .filter(Boolean) as any[];
     return {
       name,
       day_of_week: day,
-      duration_min: 50,
+      duration_min: level === "avancado" ? 60 : 50,
       split_focus: focus,
       exercises,
       volume_load_estimate: "Conservador; usar RIR 2-4 e dor <= 3.",
-      notes: `Motor BN: técnica antes de carga; troca de estímulo a cada 2 semanas; revisar se houver dor/restrição.${volMult < 1 ? " Volume das fases de força reduzido ~20% por prontidão em cautela (readiness)." : ""}`,
+      notes: `Motor BN: técnica antes de carga; troca de estímulo a cada 2 semanas; revisar se houver dor/restrição.${volMult < 1 ? " Volume das fases de força reduzido ~20% por prontidão em cautela (readiness)." : ""}${corrective ? ` ${corrective.why}` : ""}`,
     };
   };
 
@@ -944,7 +1062,7 @@ function buildEmergencyFallbackPlan(args: {
       { phase: "controle_motor", keywords: ["agachamento", "goblet", "squat", "caixa"], sets: 2, reps: "8-10", rest: 60, rir: "3-4", cue: "Desça até onde mantém pelve e joelho alinhados.", note: backRisk ? "Limitar amplitude para manter coluna neutra." : "Reforça padrão técnico antes de carga." },
       { phase: "forca_global", keywords: backRisk ? ["leg press", "hack", "maquina", "agachamento"] : ["agachamento", "leg press", "goblet", "squat"], sets: 3, reps: "8-10", rest: 90, rir: "2-3", cue: "Empurre o chão sem perder alinhamento.", note: "Força global com margem de segurança." },
       { phase: "forca_especifica", keywords: ["posterior", "mesa flexora", "isquiotibiais", "gluteo"], sets: 2, reps: "10-12", rest: 75, rir: "2-3", cue: "Controle a volta e evite compensar lombar.", note: "Equilibra cadeia posterior para proteger joelho/quadril." },
-    ]),
+    ], { phase: "forca_especifica", keywords: ["cadeira extensora", "extensora", "quadriceps"], sets: 2, reps: "12-15", rest: 60, rir: "2-3", cue: "Extensão completa sem impulso.", note: "Acessório de quadríceps (nível avançado)." }),
     makeWorkout("Treino B - Postura, puxar e empurrar", 3, "mobilidade torácica, escápula, puxar e empurrar técnico", [
       { phase: "mobilidade", keywords: ["mobilidade toracica", "ombro", "shoulder", "toracica"], sets: 2, reps: "8-10", rest: 30, rir: "4", cue: "Movimento suave, sem forçar amplitude.", note: "Prepara ombro e coluna torácica para membros superiores." },
       { phase: "ativacao_core", keywords: ["pallof", "prancha", "core", "dead bug"], sets: 2, reps: "20-30s", rest: 45, rir: "3-4", cue: "Mantenha tronco estável.", note: "Estabilidade para puxadas e empurradas." },
@@ -952,7 +1070,7 @@ function buildEmergencyFallbackPlan(args: {
       { phase: "controle_motor", keywords: ["remada", "row", "puxada"], sets: 2, reps: "10", rest: 60, rir: "3", cue: "Puxe com cotovelos, sem jogar tronco.", note: "Ensina trajetória e controle escapular." },
       { phase: "forca_global", keywords: ["supino", "press", "empurrar", "chest"], sets: 3, reps: "8-10", rest: 90, rir: "2-3", cue: "Escápulas firmes e punho neutro.", note: "Empurrar global com controle." },
       { phase: "forca_especifica", keywords: ["remada", "puxada", "costas", "dorsal"], sets: 3, reps: "8-12", rest: 90, rir: "2-3", cue: "Controle a volta sem perder postura.", note: "Equilibra ombro e postura." },
-    ]),
+    ], { phase: "forca_especifica", keywords: ["rosca", "biceps", "triceps", "polia"], sets: 2, reps: "10-12", rest: 60, rir: "2-3", cue: "Cotovelo fixo, controle na volta.", note: "Acessório de braço (nível avançado)." }),
     makeWorkout("Treino C - Corpo inteiro e unilateral leve", 5, "integração full body, unilateral e acessórios", [
       { phase: "mobilidade", keywords: ["mobilidade quadril", "tornozelo", "alongamento"], sets: 2, reps: "8-10", rest: 30, rir: "4", cue: "Busque amplitude confortável.", note: "Abre movimento antes do unilateral." },
       { phase: "ativacao_core", keywords: ["bird dog", "perdigueiro", "core", "prancha"], sets: 2, reps: "8-10 por lado", rest: 45, rir: "3-4", cue: "Quadril parado e coluna neutra.", note: "Controle anti-rotação." },
@@ -960,7 +1078,16 @@ function buildEmergencyFallbackPlan(args: {
       { phase: "forca_global", keywords: backRisk ? ["hip thrust", "gluteo", "ponte"] : ["terra romeno", "rdl", "levantamento", "hip hinge"], sets: 3, reps: "8-10", rest: 90, rir: "2-3", cue: "Dobre quadril sem arredondar lombar.", note: "Fortalece cadeia posterior com controle." },
       { phase: "forca_global", keywords: ["remada", "puxada", "costas"], sets: 3, reps: "10-12", rest: 75, rir: "2-3", cue: "Postura alta e controle de escápulas.", note: "Complementa postura e tronco." },
       { phase: "forca_especifica", keywords: ["panturrilha", "calf", "abdomen", "core"], sets: 2, reps: "12-15", rest: 60, rir: "2-3", cue: "Controle total da fase excêntrica.", note: "Acessório leve para suporte do ciclo." },
-    ]),
+    ], { phase: "forca_especifica", keywords: ["elevacao lateral", "ombro", "lateral"], sets: 2, reps: "12-15", rest: 60, rir: "2-3", cue: "Suba até a linha do ombro, sem balanço.", note: "Acessório de ombro (nível avançado)." }),
+    // Treino D — só quando o aluno tem 4 dias: ênfase glúteo/posterior + core (antes o 4º dia era ignorado).
+    makeWorkout("Treino D - Posterior, glúteo e core", 6, "cadeia posterior, glúteo e estabilidade", [
+      { phase: "mobilidade", keywords: ["mobilidade quadril", "alongamento posterior", "quadril"], sets: 2, reps: "8-10", rest: 30, rir: "4", cue: "Amplitude confortável e progressiva.", note: "Prepara quadril para dominantes de quadril." },
+      { phase: "ativacao_core", keywords: ["prancha lateral", "pallof", "core"], sets: 2, reps: "20-30s", rest: 45, rir: "3-4", cue: "Quadril alinhado, sem girar.", note: "Anti-flexão lateral e anti-rotação." },
+      { phase: "ativacao_especifica", keywords: ["gluteo", "ponte", "abducao", "mini band"], sets: 2, reps: "12-15", rest: 45, rir: "3", cue: "Aperte o glúteo no topo.", note: "Prioriza glúteo antes das dominantes de quadril." },
+      { phase: "forca_global", keywords: backRisk ? ["hip thrust", "ponte", "gluteo"] : ["stiff", "terra romeno", "rdl", "posterior"], sets: 3, reps: "8-10", rest: 90, rir: "2-3", cue: "Quadril para trás, coluna neutra.", note: "Dominante de quadril com segurança." },
+      { phase: "forca_global", keywords: ["elevacao pelvica", "hip thrust", "gluteo", "ponte"], sets: 3, reps: "10-12", rest: 90, rir: "2-3", cue: "Extensão completa de quadril sem hiperextender lombar.", note: "Glúteo como motor principal." },
+      { phase: "forca_especifica", keywords: ["mesa flexora", "flexora", "isquiotibiais"], sets: 2, reps: "10-12", rest: 75, rir: "2-3", cue: "Controle a volta em 3 segundos.", note: "Isquiotibiais com ênfase excêntrica." },
+    ], { phase: "forca_especifica", keywords: ["panturrilha", "calf"], sets: 2, reps: "12-15", rest: 60, rir: "2-3", cue: "Pausa de 1s no topo.", note: "Acessório de panturrilha (nível avançado)." }),
   ].slice(0, days);
 
   return {
@@ -982,11 +1109,7 @@ function buildEmergencyFallbackPlan(args: {
       catalog_count: args.catalog.total,
       gaps: [],
     },
-    periodization_blocks: [
-      { weeks: "1-2", stimulus: "base tecnica e tolerancia", methods: ["sem metodos avancados"], progression_rule: "Aumentar reps dentro da faixa mantendo RIR 3-4 e dor <= 3." },
-      { weeks: "3-4", stimulus: "progressao conservadora", methods: ["progressao dupla"], progression_rule: "Aumentar 1 serie em exercicios estaveis ou carga leve se tecnica estiver limpa." },
-      { weeks: "5-6", stimulus: "consolidacao", methods: ["piramide leve apenas se tecnica estavel"], progression_rule: "Consolidar cargas, sem falha, e preparar reavaliacao." },
-    ],
+    periodization_blocks: progressionBlocksFor(clean(args.objective || "")),
     weekly_structure: `${workouts.length} sessões/semana alternadas, evitando dias consecutivos de MMII pesado.`,
     progression_protocol: "Progredir reps antes de carga; regredir amplitude/carga se dor > 3 ou perda técnica.",
     warnings: [

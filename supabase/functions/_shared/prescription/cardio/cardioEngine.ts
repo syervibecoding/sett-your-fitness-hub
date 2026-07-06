@@ -67,6 +67,17 @@ const ZONE_LABEL: Record<ZoneKey, string> = { z1: "Z1", z2: "Z2", z3: "Z3", z4: 
 // pace corrida (min/km) e velocidade ciclismo (km/h) por zona
 const RUN_PACE: Record<ZoneKey, number> = { z1: 7.2, z2: 6.3, z3: 5.6, z4: 5.0, z5: 4.5 };
 const BIKE_KMH: Record<ZoneKey, number> = { z1: 20, z2: 26, z3: 31, z4: 35, z5: 40 };
+// natação: metros/min por zona (≈3:00 → 1:55 por 100m) — sessões de piscina saem em METROS
+const SWIM_M_MIN: Record<ZoneKey, number> = { z1: 33, z2: 38, z3: 43, z4: 48, z5: 52 };
+// ciclismo: cadência sugerida e faixa aproximada de %FTP por zona (se tiver medidor de potência)
+const BIKE_CADENCE: Record<ZoneKey, string> = { z1: "85–95 rpm", z2: "85–95 rpm", z3: "85–95 rpm", z4: "90–100 rpm", z5: "95–105 rpm" };
+const BIKE_FTP: Record<ZoneKey, string> = { z1: "<55%", z2: "56–75%", z3: "76–90%", z4: "91–105%", z5: ">106%" };
+// intervalados ESPECÍFICOS por esporte (antes eram os mesmos p/ corrida, pedal e piscina)
+const INTERVALS: Record<"corrida" | "ciclismo" | "natacao", Record<"z3" | "z4" | "z5", string>> = {
+  corrida: { z3: "6x4 min Z3 c/ 90s Z1", z4: "5x6 min Z4 c/ 2 min Z1", z5: "8x400 m (ou 8x90s) Z5 c/ 90s Z1" },
+  ciclismo: { z3: "3x12 min Z3 c/ 4 min leve (85–95 rpm)", z4: "3x10 min Z4 c/ 5 min leve (90–100 rpm)", z5: "6x2 min Z5 c/ 3 min leve (95–105 rpm)" },
+  natacao: { z3: "4x200 m Z3 c/ 30s de parede", z4: "6x100 m Z4 c/ 20s de parede", z5: "10x50 m forte c/ 30s de parede" },
+};
 
 function normSport(s?: string): "corrida" | "ciclismo" | "natacao" {
   const x = (s || "corrida").toLowerCase();
@@ -208,14 +219,32 @@ function buildSession(spec: SessionSpec, day: string, sport: string, sessionMin:
   else if (spec.kind === "regeneracao") notes = "Carga muito baixa, só para circular sangue e recuperar. Sem ir à falha.";
   else notes = "Dia de descanso ativo: mobilidade, alongamento leve e respiração.";
 
-  const swimNote = sport === "natacao" && spec.kind !== "descanso"
-    ? " Volume em metros conforme o pace das séries (sem distância em km)." : "";
+  // ── Especificidade por esporte (antes o texto era o mesmo p/ os 3) ──
+  if (spec.kind !== "descanso") {
+    if (sport === "natacao") {
+      const meters = Math.round((main * SWIM_M_MIN[zk]) / 50) * 50;
+      notes += ` Volume da sessão: ≈${meters} m.`;
+      if (spec.kind === "facil" || spec.kind === "longo") notes += " Termine com 4x50 m de educativo (técnica/respiração bilateral).";
+      if (spec.kind === "regeneracao") notes += " Nado solto + pernada com prancha, sem cronômetro.";
+    } else if (sport === "ciclismo") {
+      notes += ` Cadência: ${BIKE_CADENCE[zk]}.`;
+      if (zk === "z3" || zk === "z4" || zk === "z5") notes += ` Com medidor de potência: ${ZONE_LABEL[zk]} ≈ ${BIKE_FTP[zk]} do FTP.`;
+    } else if (sport === "corrida" && spec.kind === "facil") {
+      notes += " Se estiver bem: 4–6x100 m de strides (acelerações leves) no fim, sem dor.";
+    }
+    // Fueling por duração — orientação prática, sem prescrição clínica.
+    if (spec.kind === "longo" && main >= 75) {
+      notes += sport === "natacao"
+        ? " Hidrate na borda a cada ~20 min."
+        : " Acima de 75 min: 30–60 g de carboidrato/hora + eletrólitos.";
+    }
+  }
 
   return {
     day, type: types[spec.kind], title: titles[spec.kind], sport: spec.kind === "descanso" ? "descanso" : sport,
     warmup_min: warmup, main_min: main, cooldown_min: cooldown, total_min: total,
     distance_km: dist, zone: ZONE_LABEL[zk], fc_target: spec.kind === "descanso" ? "—" : fcTarget(zones, zk),
-    intervals: spec.intervals ?? null, notes: notes + swimNote,
+    intervals: spec.intervals ?? null, notes,
   };
 }
 
@@ -236,8 +265,22 @@ function complementaryStrength(sport: string): string[] {
 export function buildCardioProgram(input: CardioInput): CardioPlan {
   const sport = normSport(input.sport);
   const N = clamp(Math.round(num(input.duration_weeks)) || 6, 1, 16);
-  const sessionMin = clamp(Math.round(num(input.session_duration)) || 60, 20, 180);
+  let sessionMin = clamp(Math.round(num(input.session_duration)) || 60, 20, 180);
   const { level, assumed } = resolveLevel(input);
+
+  // ── Calibração pelo volume ATUAL da anamnese (regra dos ~10%: semana 1 nunca muito acima do que já faz) ──
+  // current_volume: km/semana (corrida/pedal). Estima a semana 1 e escala a duração-base das sessões.
+  const currentVol = num(input.current_volume);
+  let volCalibrated = false;
+  if (!isNaN(currentVol) && currentVol > 0 && sport !== "natacao") {
+    const d0 = clamp(Math.round(num(input.days_per_week)) || 3, 1, 6);
+    const paceKmMin = sport === "corrida" ? 1 / RUN_PACE.z2 : BIKE_KMH.z2 / 60; // km por minuto em Z2
+    const estWeek1Km = ((d0 - 1) * Math.max(15, sessionMin - 18) + Math.max(15, Math.round(sessionMin * 1.25) - 18)) * paceKmMin;
+    if (estWeek1Km > 0) {
+      const scale = clamp(currentVol * 1.1 / estWeek1Km, 0.6, 1.15); // parte de ~volume atual +10%, nunca corta >40%
+      if (Math.abs(scale - 1) > 0.07) { sessionMin = clamp(Math.round(sessionMin * scale), 20, 180); volCalibrated = true; }
+    }
+  }
   const zones = computeFcZones(input);
   const tsbNum = num(input.tsb);
   const safety = resolveSafety(input, level);
@@ -255,7 +298,8 @@ export function buildCardioProgram(input: CardioInput): CardioPlan {
 
   for (const ph of phases) {
     let factor: number;
-    if (ph.type === "deload") factor = 0.6;
+    if (perf && ph.week === N) factor = 0.5; // TAPER: última semana antes da prova — chegar fresco
+    else if (ph.type === "deload") factor = 0.6;
     else if (ph.micro === "choque") { factor = round1(Math.min(prevFactor * 1.05, 1.6)); prevFactor = factor; }
     else { factor = ph.week === 1 ? 1.0 : round1(Math.min(prevFactor * 1.08, 1.6)); prevFactor = factor; }
 
@@ -283,7 +327,7 @@ export function buildCardioProgram(input: CardioInput): CardioPlan {
       if (hardCount > 0) {
         hardCount--;
         const hz: ZoneKey = clamp(safety.maxZone, 3, 5) >= 4 && ph.type === "qualidade" ? (safety.maxZone >= 5 && model === "piramidal" ? "z5" : "z4") : "z3";
-        const intervals = hz === "z5" ? "8x400 m (ou 8x90s) Z5 c/ 90s Z1" : hz === "z4" ? "5x6 min Z4 c/ 2 min Z1" : "6x4 min Z3 c/ 90s Z1";
+        const intervals = INTERVALS[sport][hz as "z3" | "z4" | "z5"]; // específico por esporte
         specs.push({ kind: hz === "z3" ? "limiar" : "qualidade", zone: hz, intervals });
       } else {
         specs.push({ kind: "facil", zone: "z2" });
@@ -301,7 +345,9 @@ export function buildCardioProgram(input: CardioInput): CardioPlan {
     };
     weeks.push({
       week_number: ph.week, type: ph.type, microcycle: ph.micro,
-      volume_km, volume_hours, focus: focusMap[ph.type], sessions,
+      volume_km, volume_hours,
+      focus: perf && ph.week === N ? "Taper: volume bem reduzido para chegar descansado e afiado na prova." : focusMap[ph.type],
+      sessions,
     });
   }
 
@@ -315,6 +361,8 @@ export function buildCardioProgram(input: CardioInput): CardioPlan {
   if (zones.estimated) coach_notes.push("Zonas de FC estimadas (FCmax/FCrep aproximados). Recomende teste de esforço para maior precisão.");
   if (assumed) coach_notes.push("Nível de experiência não informado — assumido conservador (iniciante). Ajuste se o atleta tiver mais base.");
   if (input.strength_plan_context) coach_notes.push("Sincronizado com a musculação: evite Z4/Z5 no dia e na véspera de MMII pesado; corrida fácil só após a força, ≥6h de intervalo.");
+  if (volCalibrated) coach_notes.push(`Volume inicial calibrado pelo volume atual da anamnese (~${round1(currentVol)} km/sem): semana 1 parte de perto do que o atleta já faz (+~10%).`);
+  if (perf) coach_notes.push("Última semana em taper (fator 0,5) para chegar descansado na prova.");
   coach_notes.push("Plano base gerado pela metodologia BN (determinístico). Revise antes de prescrever ao aluno.");
 
   let tips = "Aqueça progressivamente e desaqueça em toda sessão. Hidrate-se antes, durante e depois — principalmente nos longos. Priorize 7–9h de sono: é onde a adaptação acontece. Respeite as zonas: correr fácil de verdade é o que sustenta a evolução. Dor articular acima de leve → reduza o impacto e avise o treinador.";
@@ -333,7 +381,7 @@ export function buildCardioProgram(input: CardioInput): CardioPlan {
     general_tips: tips,
     warnings,
     coach_notes,
-    generated_by: "bn_cardio_engine_v1",
+    generated_by: "bn_cardio_engine_v2",
   };
 }
 
