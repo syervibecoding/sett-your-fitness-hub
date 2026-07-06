@@ -31,6 +31,7 @@ import { ExternalActivitiesList } from "@/components/student/ExternalActivitiesL
 import { AnnouncementsFeed } from "@/components/student/AnnouncementsFeed";
 import { BodyMeasurements } from "@/components/student/BodyMeasurements";
 import { NutritionPlanView } from "@/components/student/NutritionPlanView";
+import { CardioPlanView } from "@/components/student/CardioPlanView";
 import type { Gender } from "@/components/student/BodyAvatar";
 import { VolumeInsights } from "@/components/student/VolumeInsights";
 import { PeriodizationBanner } from "@/components/student/PeriodizationBanner";
@@ -41,7 +42,7 @@ import { Megaphone, Activity, Flame } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 
-type ActiveView = "home" | "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos" | "medidas" | "nutricao";
+type ActiveView = "home" | "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos" | "medidas" | "nutricao" | "cardio";
 
 
 interface WorkoutExercise {
@@ -531,6 +532,7 @@ export default function StudentPortal() {
     avisos: "AVISOS",
     medidas: "MEDIDAS",
     nutricao: "NUTRIÇÃO",
+    cardio: "CARDIO",
   };
 
 
@@ -849,6 +851,11 @@ export default function StudentPortal() {
         {/* NUTRIÇÃO VIEW */}
         {activeView === "nutricao" && studentId && (
           <NutritionPlanView studentId={studentId} />
+        )}
+
+        {/* CARDIO VIEW */}
+        {activeView === "cardio" && studentId && (
+          <CardioPlanView studentId={studentId} />
         )}
           </motion.div>
         </AnimatePresence>
