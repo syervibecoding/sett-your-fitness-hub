@@ -306,7 +306,7 @@ export default function ExerciseLibrary() {
     setEditing(ex);
     setForm({
       name: ex.name, description: ex.description || "",
-      muscle_group: ex.muscle_group, video_url: ex.video_url || "",
+      muscle_group: ex.muscle_group, category: ex.category || "", video_url: ex.video_url || "",
       is_global: ex.is_global,
     });
     setVideoFile(null);
