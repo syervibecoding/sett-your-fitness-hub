@@ -1,46 +1,44 @@
-# CardioPlanView — Planos de cardio no app do aluno
+# Convite de anamnese via WhatsApp + aba "Formulário"
 
-Exibir os `running_plans` (corrida, natação, ciclismo, triathlon) já existentes no banco dentro do portal do aluno, com progresso do plano e destaque dos próximos treinos. Segue o mesmo padrão visual/navegação do `NutritionPlanView`.
+## Objetivo
+Permitir enviar o link de anamnese do aluno direto pelo WhatsApp já integrado (Evolution API), tanto na ficha individual quanto em lote. Sem tabela nova de rastreamento e mantendo o link atual por ID (`/anamnese/{studentId}`). Também unir as páginas "Cadastro" e "Anamnese" numa única aba "Formulário" com sub-abas.
 
-## O que será criado
+O envio de resposta ao banco já funciona hoje (edge `public-anamnesis`, ação `submit`) — nada muda nisso.
 
-**Novo componente `src/components/student/CardioPlanView.tsx`**
+## Parte 1 — Envio pelo WhatsApp
 
-Carrega o plano de cardio ativo mais recente do aluno (RLS já garante acesso só ao próprio) e renderiza:
+### Backend (edge `whatsapp-manager`)
+Adicionar uma nova ação `send-anamnesis-invite` que reaproveita toda a infra já existente (autenticação por papel, resolução de company/instância, envio via `message/sendText`).
 
-1. **Cabeçalho do plano** — nome do plano, esporte (badge com ícone por modalidade: corrida/natação/ciclismo/triathlon), objetivo (`goal`) e modelo (`model`: polarizado/piramidal).
+- Entrada: `{ studentIds: string[], baseUrl: string, message?: string }`.
+- Para cada `studentId`: busca `full_name`, `whatsapp`, `company_id`; valida que pertence à empresa do usuário; se sem WhatsApp, marca como falha.
+- Monta o link `${baseUrl}/anamnese/${studentId}` e um texto padrão (editável):
+  > Olá {nome}! Para começarmos, preencha sua anamnese neste link: {link}
+- Envia via Evolution para cada número.
+- Retorna resumo `{ sent: number, failed: [{ id, name, reason }] }`.
+- Restrições de papel: liberada para admin/coordinator/trainer (mesmo `canChat` já usado), não entra em `adminOnlyActions`.
 
-2. **Barra de progresso do plano** — calcula a semana atual a partir de `created_at` + número de dias decorridos (`semana_atual = floor(dias/7)+1`, limitada a `duration_weeks`). Mostra "Semana X de Y" com `Progress`.
+### Frontend
+- **`StudentDetail.tsx`**: ao lado do botão "Anamnese" (copiar link), adicionar botão "Enviar no WhatsApp" que chama a ação com `[id]` e `baseUrl = window.location.origin`. Desabilitado se o aluno não tiver WhatsApp. Toast de sucesso/erro.
+- **`StudentsManager.tsx`**: adicionar seleção por checkbox nos cards da lista + botão de ação em lote "Enviar anamnese (WhatsApp)" para os selecionados; mostra toast com quantos foram enviados e quantos falharam (ex.: sem WhatsApp).
 
-3. **Próximos treinos** — a partir da semana atual em `weeks[].sessions[]`, lista as sessões da semana ordenadas por dia (Seg→Dom), destacando o próximo treino (dia ≥ hoje). Cada sessão mostra: dia, título, esporte, tipo/zona, duração total (`total_min`), distância (`distance_km`), FC alvo (`fc_target`), intervalos e notas.
+## Parte 2 — Aba única "Formulário"
 
-4. **Zonas de FC** — card com as 5 zonas de `fc_zones` (z1–z5 min/max, fcmax, fcrep). Exibe aviso quando `fc_zones.estimated = true`.
+Hoje existem dois itens de menu e duas rotas por papel: "Cadastro" (`RegistrationManager`) e "Anamnese" (`AnamnesisManager`), cada um só renderiza um `FormFieldEditor`.
 
-5. **Alertas e dicas** — `warnings[]` (linhas vermelhas de segurança), `nutrition_alert`, `general_tips` e `complementary_strength[]` (exercícios preventivos), cada um em seu bloco.
-
-6. **Estado vazio** — quando não há plano, card com ícone e "Nenhum plano de cardio disponível ainda." (igual ao padrão de nutrição).
-
-## Integração no portal
-
-**`src/pages/student/StudentPortal.tsx`**
-- Adicionar `"cardio"` ao tipo `ActiveView`.
-- Adicionar `cardio: "CARDIO"` em `viewTitles`.
-- Renderizar `{activeView === "cardio" && studentId && <CardioPlanView studentId={studentId} />}` junto das demais views.
-- Importar o novo componente.
-
-**`src/components/student/StudentHome.tsx`**
-- Adicionar `"cardio"` à assinatura de `onNavigate`.
-- Novo botão-card "Cardio / Corrida" (ícone de corrida, ex.: `Footprints` ou `HeartPulse` do lucide) com legenda "Corrida, natação e ciclismo", no mesmo grid dos demais atalhos.
-- O `handleNavigate` do portal já repassa o valor para `setActiveView`, então não precisa mudar a lógica.
+- Criar `src/pages/admin/FormsManager.tsx` com um componente `Tabs` (shadcn) contendo duas sub-abas:
+  - **Cadastro** → `FormFieldEditor formType="registration"` (conteúdo atual do RegistrationManager)
+  - **Anamnese** → `FormFieldEditor formType="anamnesis"` (conteúdo atual do AnamnesisManager)
+- **Rotas (`App.tsx`)**: adicionar `/admin/forms`, `/coordinator/forms`, `/trainer/forms` apontando para `FormsManager`, mantendo os `FeatureRoute`/módulos apropriados. As rotas antigas `/registration` e `/anamnesis` passam a redirecionar para `/forms` (evita links quebrados).
+- **Sidebar (`AppSidebar.tsx`)**: substituir os dois itens ("Cadastro" e "Anamnese") por um único "Formulário" (ícone `FileText`) nos três blocos de papel; atualizar o mapa `routeToTitle` (linhas 62-63).
+- `RegistrationManager.tsx` e `AnamnesisManager.tsx` podem ser removidos (ou mantidos e reaproveitados dentro do FormsManager). O plano é migrar o conteúdo para `FormsManager` e remover os dois arquivos antigos.
 
 ## Detalhes técnicos
-
-- Consulta: `supabase.from("running_plans").select(...).eq("student_id", studentId).order("created_at", {ascending:false}).limit(1).maybeSingle()`. Não há coluna `status` na tabela, então usamos o mais recente (mesmo critério de fallback do padrão existente).
-- Tipagem local para as estruturas jsonb (`weeks`, `fc_zones`, `safety_check`, `complementary_strength`) via interfaces no próprio arquivo, com casts `as unknown as` (mesmo padrão do `NutritionPlanView`).
-- Ordenação de dias por mapa `{Segunda:1,...,Domingo:7}`; sessões `descanso` exibidas de forma discreta.
-- Somente leitura/apresentação — nenhuma mudança de banco, RLS ou edge function. As policies de `running_plans` já permitem o aluno ler o próprio plano.
-- Componentes de UI reaproveitados: `Card`, `Badge`, `Progress`, ícones lucide, tokens semânticos de tema (sem cores hardcoded).
+- Nenhuma migração de banco necessária (sem `anamnesis_invites`).
+- O envio usa `supabase.functions.invoke("whatsapp-manager", { body: { action: "send-anamnesis-invite", ... } })`.
+- Empresa exige uma instância de WhatsApp conectada; se não houver, a edge retorna erro e o frontend mostra toast orientando conectar o WhatsApp.
+- Verificação: testar a edge com `curl_edge_functions` (ação nova) e validar a UI (botão individual + lote + aba Formulário) via preview.
 
 ## Fora de escopo
-- Não altero a geração do plano (`ai-running-plan`) nem a prescrição pelo treinador.
-- Não crio registro/seed de dados — a view lida com o estado vazio até existir um plano prescrito.
+- Tabela de rastreamento de convites (status enviado/aberto/respondido).
+- Link com token único/expiração.
