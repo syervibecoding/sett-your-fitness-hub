@@ -13,6 +13,43 @@ function json(body: unknown, status = 200) {
   });
 }
 
+/**
+ * Normaliza um número brasileiro para o formato E.164 sem "+" exigido pela Evolution API:
+ * 55 + DDD (2) + celular (9). Corrige números incompletos:
+ * - prefixa "55" quando falta o código do país;
+ * - insere o "9" do celular quando o número vier com 8 dígitos.
+ * Números já internacionais (não-BR) são mantidos apenas com dígitos.
+ */
+function normalizeBrazilPhone(raw: string): string {
+  let d = (raw || "").replace(/\D/g, "");
+  if (!d) return "";
+
+  // Remove zeros à esquerda (ex.: 0DDD)
+  d = d.replace(/^0+/, "");
+
+  // Já tem código do país BR
+  if (d.startsWith("55") && (d.length === 12 || d.length === 13)) {
+    let national = d.slice(2);
+    if (national.length === 10) {
+      // DDD + 8 dígitos → insere o 9
+      national = national.slice(0, 2) + "9" + national.slice(2);
+    }
+    return "55" + national;
+  }
+
+  // Número nacional (DDD + assinante)
+  if (d.length === 10 || d.length === 11) {
+    let national = d;
+    if (national.length === 10) {
+      national = national.slice(0, 2) + "9" + national.slice(2);
+    }
+    return "55" + national;
+  }
+
+  // Formatos não reconhecidos (ex.: internacional) — mantém apenas dígitos
+  return d;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
