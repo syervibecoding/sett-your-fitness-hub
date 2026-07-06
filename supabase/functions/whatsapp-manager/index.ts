@@ -386,6 +386,73 @@ Deno.serve(async (req) => {
       return json({ success: true, messageId: sendData?.key?.id || null });
     }
 
+    // ─── SEND ANAMNESIS INVITE (individual or batch) ───
+    if (action === "send-anamnesis-invite") {
+      const { studentIds, baseUrl, message } = body as {
+        studentIds?: string[];
+        baseUrl?: string;
+        message?: string;
+      };
+
+      if (!Array.isArray(studentIds) || studentIds.length === 0) {
+        return json({ error: "studentIds required" }, 400);
+      }
+      if (!baseUrl || typeof baseUrl !== "string") {
+        return json({ error: "baseUrl required" }, 400);
+      }
+
+      const cleanBase = baseUrl.replace(/\/+$/, "");
+
+      const { data: rows } = await adminClient
+        .from("students")
+        .select("id, full_name, whatsapp, company_id")
+        .in("id", studentIds)
+        .eq("company_id", resolvedCompanyId);
+
+      const found = new Map((rows || []).map((r) => [r.id, r]));
+
+      let sent = 0;
+      const failed: { id: string; name: string | null; reason: string }[] = [];
+
+      for (const sid of studentIds) {
+        const student = found.get(sid);
+        if (!student) {
+          failed.push({ id: sid, name: null, reason: "Aluno não encontrado" });
+          continue;
+        }
+        const phone = (student.whatsapp || "").replace(/\D/g, "");
+        if (!phone) {
+          failed.push({ id: sid, name: student.full_name, reason: "Sem WhatsApp cadastrado" });
+          continue;
+        }
+
+        const firstName = (student.full_name || "").split(" ")[0] || "";
+        const link = `${cleanBase}/anamnese/${student.id}`;
+        const text = (message && message.trim())
+          ? message.replace(/\{nome\}/g, firstName).replace(/\{link\}/g, link)
+          : `Olá ${firstName}! Para começarmos, preencha sua anamnese neste link: ${link}`;
+
+        try {
+          const sendRes = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+            method: "POST",
+            headers: evoHeaders,
+            body: JSON.stringify({ number: phone, text }),
+          });
+          if (!sendRes.ok) {
+            const errText = await sendRes.text();
+            failed.push({ id: sid, name: student.full_name, reason: `Falha no envio: ${errText.slice(0, 120)}` });
+            continue;
+          }
+          sent++;
+        } catch (e) {
+          failed.push({ id: sid, name: student.full_name, reason: `Erro: ${String(e).slice(0, 120)}` });
+        }
+      }
+
+      return json({ success: true, sent, failed });
+    }
+
+
     // ─── SEND MEDIA ───
     if (action === "send-media") {
       const { remoteJid, mediaUrl, caption, chatId, fileName, mediatype: clientMediaType, mimeType } = body;
