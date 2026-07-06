@@ -445,11 +445,32 @@ export default function VideoAssessment({ studentId, companyId, studentName, con
             ))}
           </div>
 
-          <Button className="w-full" onClick={save} disabled={saving}>
-            {saving
-              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando…</>
-              : <><Save className="mr-2 h-4 w-4" /> Salvar avaliação funcional</>}
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              className="sm:flex-1"
+              onClick={() =>
+                downloadAssessmentPdf(
+                  {
+                    frames: frames.map(f => ({
+                      vista: f.vista,
+                      time: f.time,
+                      dataUrl: f.dataUrl,
+                      findings: f.findings,
+                    })),
+                  },
+                  { studentName: studentName || "aluno", source: "video" },
+                )
+              }
+            >
+              <FileDown className="mr-2 h-4 w-4" /> Baixar laudo (PDF)
+            </Button>
+            <Button className="sm:flex-1" onClick={save} disabled={saving}>
+              {saving
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando…</>
+                : <><Save className="mr-2 h-4 w-4" /> Salvar avaliação funcional</>}
+            </Button>
+          </div>
         </>
       )}
 
