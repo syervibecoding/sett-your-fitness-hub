@@ -394,6 +394,7 @@ export default function StudentsManager() {
                       <span>Cadastro: {format(new Date(s.created_at), "dd/MM/yyyy", { locale: ptBR })}</span>
                     </div>
                   </div>
+                  </div>
                   <div className="flex items-center gap-1 ml-4">
                     <Button variant="ghost" size="icon" onClick={() => navigate(`${rolePrefix}/students/${s.id}`)}><Eye className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
