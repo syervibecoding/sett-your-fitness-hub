@@ -277,6 +277,33 @@ export default function StudentDetail() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [activatingAccess, setActivatingAccess] = useState(false);
+  const [sendingAnamnesis, setSendingAnamnesis] = useState(false);
+
+  const handleSendAnamnesisWhatsApp = async () => {
+    if (!id) return;
+    setSendingAnamnesis(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-manager", {
+        body: {
+          action: "send-anamnesis-invite",
+          studentIds: [id],
+          baseUrl: window.location.origin,
+        },
+      });
+      if (error) throw error;
+      if (data?.sent > 0) {
+        toast({ title: "Convite de anamnese enviado no WhatsApp!" });
+      } else {
+        const reason = data?.failed?.[0]?.reason || "Não foi possível enviar";
+        toast({ title: "Não enviado", description: reason, variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar", description: e?.message || "Verifique se o WhatsApp está conectado", variant: "destructive" });
+    } finally {
+      setSendingAnamnesis(false);
+    }
+  };
+
 
   const handleActivateStudentAccess = async () => {
     if (!student?.email) {
