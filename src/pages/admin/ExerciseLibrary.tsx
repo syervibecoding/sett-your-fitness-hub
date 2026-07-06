@@ -20,6 +20,7 @@ interface Exercise {
   name: string;
   description: string | null;
   muscle_group: string;
+  category: string | null;
   video_url: string | null;
   video_path: string | null;
   thumbnail_url: string | null;
@@ -27,6 +28,21 @@ interface Exercise {
   company_id: string | null;
   created_by: string;
 }
+
+const CATEGORY_LABELS: Record<string, string> = {
+  base: "Base",
+  maquinas: "Máquinas",
+  pesos_livres: "Pesos livres",
+  peso_corporal: "Peso corporal",
+  core: "Core",
+  mobilidade: "Mobilidade",
+  fisioterapia: "Fisioterapia",
+  performance: "Performance",
+  pliometria: "Pliometria",
+  ativacao: "Ativação",
+  controle_motor: "Controle motor",
+};
+const categoryLabel = (c: string) => CATEGORY_LABELS[c] ?? c;
 
 interface MuscleGroup {
   id: string;
