@@ -1,55 +1,46 @@
-# Plano — Biblioteca de exercícios + nova anamnese BN
+# CardioPlanView — Planos de cardio no app do aluno
 
-## Parte 1 — Biblioteca de exercícios (CSV → global)
+Exibir os `running_plans` (corrida, natação, ciclismo, triathlon) já existentes no banco dentro do portal do aluno, com progresso do plano e destaque dos próximos treinos. Segue o mesmo padrão visual/navegação do `NutritionPlanView`.
 
-O CSV tem **910 exercícios únicos** com Nome, Grupo muscular, Categoria, Equipamento e vídeo do YouTube. Importar como **globais** (compartilhados entre empresas), inserindo os novos e atualizando os já existentes (dedup por nome).
+## O que será criado
 
-### 1.1 Migração de schema
-- Adicionar coluna `category text` em `public.exercise_library` (hoje não existe). Sem novos GRANTs — a tabela já está liberada.
+**Novo componente `src/components/student/CardioPlanView.tsx`**
 
-### 1.2 Importação dos dados (operação de dados, não migração)
-Gerar o SQL a partir do CSV e rodar via ferramenta de inserção:
-- **Inserir** exercícios cujo nome (case-insensitive) ainda não existe entre os globais: `is_global = true`, `company_id = null`, `difficulty = 'intermediate'`, `muscle_group` = Grupo muscular, `category` = Categoria, `equipment` = Equipamento, `video_url` = link, `thumbnail_url` = `https://img.youtube.com/vi/{YouTubeID}/hqdefault.jpg`.
-- **Atualizar** os globais já existentes com o mesmo nome: refrescar `video_url`, `muscle_group`, `category`, `equipment` e `thumbnail_url` a partir do CSV.
+Carrega o plano de cardio ativo mais recente do aluno (RLS já garante acesso só ao próprio) e renderiza:
 
-### 1.3 UI — `src/pages/admin/ExerciseLibrary.tsx`
-- Adicionar estado `filterCategory` e um `Select` de categorias (musculação, core, fisioterapia, performance, mobilidade, etc., derivadas dos dados) ao lado do filtro de grupo muscular já existente.
-- Aplicar `filterCategory` na lista `filtered` (junto de `filterGroup` e busca).
-- Exibir a categoria como badge/legenda no card do exercício.
-- Incluir `category` no formulário de criação/edição de exercício.
+1. **Cabeçalho do plano** — nome do plano, esporte (badge com ícone por modalidade: corrida/natação/ciclismo/triathlon), objetivo (`goal`) e modelo (`model`: polarizado/piramidal).
 
-## Parte 2 — Nova anamnese BN (substituição completa)
+2. **Barra de progresso do plano** — calcula a semana atual a partir de `created_at` + número de dias decorridos (`semana_atual = floor(dias/7)+1`, limitada a `duration_weeks`). Mostra "Semana X de Y" com `Progress`.
 
-O Google Form BN tem **~60 perguntas em 7 seções**. Hoje a anamnese pública é **fixa no código** (`PublicAnamnesis.tsx`) com ~22 campos. Vou substituir pelo formulário completo. Os campos que já existem como colunas serão reaproveitados; os **novos campos vão para a coluna `data` (JSONB)** que já existe em `anamnesis` — evitando dezenas de colunas novas.
+3. **Próximos treinos** — a partir da semana atual em `weeks[].sessions[]`, lista as sessões da semana ordenadas por dia (Seg→Dom), destacando o próximo treino (dia ≥ hoje). Cada sessão mostra: dia, título, esporte, tipo/zona, duração total (`total_min`), distância (`distance_km`), FC alvo (`fc_target`), intervalos e notas.
 
-### Seções do novo formulário
-1. **Seus dados** — nome (já vem do contexto), idade, sexo, peso, altura, % gordura
-2. **Objetivo** — objetivos (múltipla), objetivo principal, descrição livre, interesses (musculação/corrida/natação/ciclismo/nutrição), tem nutricionista, quer dicas de nutrição, já tem assessoria
-3. **Rotina de treino** — nível de atividade, tempo de treino (meses), dias/semana, dias por modalidade, minutos/sessão, onde treina, histórico + **subseção endurance** (objetivo/prova, data da prova, volume, recuperação, FC máx/repouso, corrida, natação, ciclismo)
-4. **Saúde** — lesões, condições médicas, medicamentos, estresse (0–10), qualidade do sono (0–10), horas de sono
-5. **Triagem clínica** — cardíaco/pressão, dor no peito/tontura, cirurgia recente, gestação/pós-parto, fuma, doente agora, **escalas de dor articular** (tornozelo, joelho, quadril, lombar, ombro), outras condições
-6. **Rotina alimentar e treino** — refeições/dia, horários, treina em jejum, fome ao acordar
-7. **Preferências & substituições** — alimentos que gosta/não gosta, restrições/alergias, orçamento, suplementos, acesso a cozinha, observações
+4. **Zonas de FC** — card com as 5 zonas de `fc_zones` (z1–z5 min/max, fcmax, fcrep). Exibe aviso quando `fc_zones.estimated = true`.
 
-### 2.1 `src/pages/PublicAnamnesis.tsx`
-- Reescrever o formulário com as 7 seções acima (mantendo o visual/tema atual: Card, RadioGroup, Checkbox, escalas 0–10 via Slider/radios).
-- Campos existentes continuam mapeados às colunas atuais; todos os novos são agrupados num objeto `data` enviado ao edge.
-- Seções de endurance/natação/ciclismo ficam visíveis condicionalmente conforme os interesses marcados.
+5. **Alertas e dicas** — `warnings[]` (linhas vermelhas de segurança), `nutrition_alert`, `general_tips` e `complementary_strength[]` (exercícios preventivos), cada um em seu bloco.
 
-### 2.2 Edge `supabase/functions/public-anamnesis/index.ts`
-- Manter `ALLOWED_FIELDS` para as colunas existentes e **aceitar `data` (objeto)**, gravando/mesclando em `anamnesis.data`.
+6. **Estado vazio** — quando não há plano, card com ícone e "Nenhum plano de cardio disponível ainda." (igual ao padrão de nutrição).
 
-### 2.3 `src/pages/admin/StudentDetail.tsx`
-- Exibir os novos campos (lendo de `anamnesis.data`) numa aba/seção de anamnese, organizados pelas 7 seções, para treinador/admin consultarem.
-- Ajustar o diálogo de edição para os principais campos novos (os demais em modo leitura, para não inchar a UI).
+## Integração no portal
+
+**`src/pages/student/StudentPortal.tsx`**
+- Adicionar `"cardio"` ao tipo `ActiveView`.
+- Adicionar `cardio: "CARDIO"` em `viewTitles`.
+- Renderizar `{activeView === "cardio" && studentId && <CardioPlanView studentId={studentId} />}` junto das demais views.
+- Importar o novo componente.
+
+**`src/components/student/StudentHome.tsx`**
+- Adicionar `"cardio"` à assinatura de `onNavigate`.
+- Novo botão-card "Cardio / Corrida" (ícone de corrida, ex.: `Footprints` ou `HeartPulse` do lucide) com legenda "Corrida, natação e ciclismo", no mesmo grid dos demais atalhos.
+- O `handleNavigate` do portal já repassa o valor para `setActiveView`, então não precisa mudar a lógica.
 
 ## Detalhes técnicos
-- Sem alteração em RLS. `exercise_library` e `anamnesis` já possuem policies e grants.
-- `anamnesis.data` já é `jsonb default '{}'` — nenhuma migração necessária para os campos novos da anamnese.
-- Única migração de schema: `ALTER TABLE public.exercise_library ADD COLUMN category text;`
-- Import de exercícios roda como operação de dados (INSERT/UPDATE com dedup por `lower(name)` entre globais), gerado a partir do CSV.
-- `thumbnail_url` derivada do YouTube ID para pré-visualização rápida no mobile.
+
+- Consulta: `supabase.from("running_plans").select(...).eq("student_id", studentId).order("created_at", {ascending:false}).limit(1).maybeSingle()`. Não há coluna `status` na tabela, então usamos o mais recente (mesmo critério de fallback do padrão existente).
+- Tipagem local para as estruturas jsonb (`weeks`, `fc_zones`, `safety_check`, `complementary_strength`) via interfaces no próprio arquivo, com casts `as unknown as` (mesmo padrão do `NutritionPlanView`).
+- Ordenação de dias por mapa `{Segunda:1,...,Domingo:7}`; sessões `descanso` exibidas de forma discreta.
+- Somente leitura/apresentação — nenhuma mudança de banco, RLS ou edge function. As policies de `running_plans` já permitem o aluno ler o próprio plano.
+- Componentes de UI reaproveitados: `Card`, `Badge`, `Progress`, ícones lucide, tokens semânticos de tema (sem cores hardcoded).
 
 ## Fora de escopo
-- Não altero o gerenciador dinâmico `form_fields` (a anamnese pública é hardcoded; a fonte da verdade continua o `PublicAnamnesis.tsx`).
-- Não removo os 447 exercícios globais atuais — apenas insiro novos e atualizo os coincidentes.
+- Não altero a geração do plano (`ai-running-plan`) nem a prescrição pelo treinador.
+- Não crio registro/seed de dados — a view lida com o estado vazio até existir um plano prescrito.
