@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { UserPlus, Search, Pencil, Trash2, Phone, Mail, Eye, Play, Copy } from "lucide-react";
+import { UserPlus, Search, Pencil, Trash2, Phone, Mail, Eye, Play, Copy, MessageCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMaster } from "@/contexts/MasterContext";
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
