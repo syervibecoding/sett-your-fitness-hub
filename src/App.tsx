@@ -176,8 +176,9 @@ const App = () => (
 
           {/* Trainer Routes */}
           <Route path="/trainer" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasDashboard"><TrainerDashboard /></FeatureRoute>} />
-          <Route path="/trainer/registration" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasRegistration" requiredModule="registration"><RegistrationManager /></FeatureRoute>} />
-          <Route path="/trainer/anamnesis" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasAnamnesis" requiredModule="anamnesis"><AnamnesisManager /></FeatureRoute>} />
+          <Route path="/trainer/forms" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasRegistration" requiredModule="registration"><FormsManager /></FeatureRoute>} />
+          <Route path="/trainer/registration" element={<Navigate to="/trainer/forms" replace />} />
+          <Route path="/trainer/anamnesis" element={<Navigate to="/trainer/forms" replace />} />
           <Route path="/trainer/plans" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasPlans" requiredModule="plans"><PlansManager /></FeatureRoute>} />
           <Route path="/trainer/team" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasTeam" requiredModule="team"><TeamManager /></FeatureRoute>} />
           <Route path="/trainer/students" element={<FeatureRoute allowedRoles={["trainer"]} requiredFeature="hasStudents" requiredModule="students"><StudentsManager /></FeatureRoute>} />
