@@ -63,6 +63,8 @@ const emptyForm = { full_name: "", email: "", phone: "", status: "pending", note
 
 export default function StudentsManager() {
   const [students, setStudents] = useState<Student[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sendingBatch, setSendingBatch] = useState(false);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [searchParams] = useSearchParams();
