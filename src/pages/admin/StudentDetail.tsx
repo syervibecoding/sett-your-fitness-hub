@@ -843,6 +843,17 @@ export default function StudentDetail() {
               <span className="hidden sm:inline">Anamnese</span>
             </Button>
             <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs"
+              onClick={handleSendAnamnesisWhatsApp}
+              disabled={sendingAnamnesis || !student.whatsapp}
+              title={!student.whatsapp ? "Aluno sem WhatsApp cadastrado" : undefined}
+            >
+              <MessageCircle className="h-3.5 w-3.5 mr-1" />
+              <span className="hidden sm:inline">{sendingAnamnesis ? "Enviando..." : "Enviar anamnese"}</span>
+            </Button>
+            <Button
               variant="outline"
               size="sm"
               className="text-xs"
