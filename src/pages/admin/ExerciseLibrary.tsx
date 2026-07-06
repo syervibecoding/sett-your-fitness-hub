@@ -83,11 +83,12 @@ export default function ExerciseLibrary() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [search, setSearch] = useState("");
   const [filterGroup, setFilterGroup] = useState("all");
+  const [filterCategory, setFilterCategory] = useState("all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Exercise | null>(null);
   const [videoModal, setVideoModal] = useState<{ type: "path" | "url"; value: string } | null>(null);
   const [form, setForm] = useState({
-    name: "", description: "", muscle_group: "geral",
+    name: "", description: "", muscle_group: "geral", category: "",
     video_url: "", is_global: false,
   });
   const [videoFile, setVideoFile] = useState<File | null>(null);
