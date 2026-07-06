@@ -20,9 +20,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Loader2, Upload, Film, Save, Plus, X, Play, Camera, Maximize2, AlertCircle,
+  Loader2, Upload, Film, Save, Plus, X, Play, Camera, Maximize2, AlertCircle, FileDown,
 } from "lucide-react";
 import { toast } from "sonner";
+import { downloadAssessmentPdf } from "@/lib/assessment/pdf";
 
 type Gravidade = "Leve" | "Moderada" | "Severa";
 interface Finding { gravidade: Gravidade; descricao: string; }
