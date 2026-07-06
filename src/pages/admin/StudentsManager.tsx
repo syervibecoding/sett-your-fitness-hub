@@ -273,6 +273,40 @@ export default function StudentsManager() {
     loadData();
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSendAnamnesisBatch = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setSendingBatch(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-manager", {
+        body: { action: "send-anamnesis-invite", studentIds: ids, baseUrl: window.location.origin },
+      });
+      if (error) throw error;
+      const sent = data?.sent || 0;
+      const failed = data?.failed?.length || 0;
+      toast({
+        title: `Convites enviados: ${sent}`,
+        description: failed > 0 ? `${failed} não enviado(s) (ex.: sem WhatsApp).` : undefined,
+        variant: sent === 0 ? "destructive" : undefined,
+      });
+      if (sent > 0) setSelectedIds(new Set());
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar", description: e?.message || "Verifique se o WhatsApp está conectado", variant: "destructive" });
+    } finally {
+      setSendingBatch(false);
+    }
+  };
+
+
+
   return (
     <>
       <div className="space-y-6">
