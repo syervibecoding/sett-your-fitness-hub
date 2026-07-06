@@ -15,8 +15,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Upload, X, ClipboardCheck, AlertCircle } from "lucide-react";
+import { Loader2, Upload, X, ClipboardCheck, AlertCircle, FileDown } from "lucide-react";
 import VideoAssessment from "@/components/VideoAssessment";
+import { downloadAssessmentPdf } from "@/lib/assessment/pdf";
 
 interface Student { id: string; full_name: string; }
 
@@ -220,7 +221,22 @@ export default function FunctionalAssessment() {
 
             {result && (
               <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-base">Laudo</CardTitle></CardHeader>
+                <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
+                  <CardTitle className="text-base">Laudo</CardTitle>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    onClick={() =>
+                      downloadAssessmentPdf(
+                        { reportText: result.report_text, json },
+                        { studentName: student?.full_name || "aluno", source: "photos" },
+                      )
+                    }
+                  >
+                    <FileDown className="h-3.5 w-3.5 mr-1" /> Baixar PDF
+                  </Button>
+                </CardHeader>
                 <CardContent className="space-y-3 text-sm">
                   {(json?.score_postural?.total != null || json?.score_funcional?.total != null) && (
                     <div className="grid grid-cols-2 gap-2">
