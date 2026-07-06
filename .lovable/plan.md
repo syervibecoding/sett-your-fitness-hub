@@ -1,61 +1,55 @@
-# Relatório de Viabilidade — Importar melhorias do `bn-performance-app`
+# Plano — Biblioteca de exercícios + nova anamnese BN
 
-Comparei o repositório com o projeto atual. O repo está ~16 migrations e dezenas de arquivos à frente. Abaixo, cada bloco com **o que é**, **o que falta no banco**, **edge functions**, **dependências**, **esforço** e **risco**. Nada será alterado até você aprovar uma fase.
+## Parte 1 — Biblioteca de exercícios (CSV → global)
 
-## Visão geral de dependências novas
-- **Dependência npm:** apenas `jspdf` (para PDFs da prescrição).
-- **Tabelas que NÃO existem aqui:** `company_ai_config`, `nutrition_plans`, `assessment_frames`, `anamnese_invites`, `ai_decision_logs`, `student_files` (e possivelmente `ai_plan_versions`).
-- **Edge functions novas:** `ai-bnito-coach`, `ai-coach-pack`, `ai-student-bnito`, `ai-nutrition-plan`, `ai-nutrition-meals`, `ai-validate-prescription`, `youtube-exercise-video`, `student-workout-feedback`, `student-login-credentials`.
-- **Secrets:** todas as edges de IA usam `LOVABLE_API_KEY` (já existe). `youtube-exercise-video` pode exigir chave do YouTube (a confirmar na implementação).
+O CSV tem **910 exercícios únicos** com Nome, Grupo muscular, Categoria, Equipamento e vídeo do YouTube. Importar como **globais** (compartilhados entre empresas), inserindo os novos e atualizando os já existentes (dedup por nome).
 
----
+### 1.1 Migração de schema
+- Adicionar coluna `category text` em `public.exercise_library` (hoje não existe). Sem novos GRANTs — a tabela já está liberada.
 
-## Bloco 1 — Área do aluno
-**O que entra:** `NutritionPlanView` (plano por refeição + macros + hidratação), `CardioPlanView` (corrida/natação/ciclismo só se prescrito), `MonthlyLeaderboard` (ranking mensal anônimo via `xp_events` + RPC `get_student_rank` — já existe), `VolumeInsights`, `WarmupGuide`, `PeriodizationBanner`, `AnnouncementsBell`, e popup "Como foi o treino?" → WhatsApp.
+### 1.2 Importação dos dados (operação de dados, não migração)
+Gerar o SQL a partir do CSV e rodar via ferramenta de inserção:
+- **Inserir** exercícios cujo nome (case-insensitive) ainda não existe entre os globais: `is_global = true`, `company_id = null`, `difficulty = 'intermediate'`, `muscle_group` = Grupo muscular, `category` = Categoria, `equipment` = Equipamento, `video_url` = link, `thumbnail_url` = `https://img.youtube.com/vi/{YouTubeID}/hqdefault.jpg`.
+- **Atualizar** os globais já existentes com o mesmo nome: refrescar `video_url`, `muscle_group`, `category`, `equipment` e `thumbnail_url` a partir do CSV.
 
-- **Banco:** precisa de `nutrition_plans` (nova). Ranking/volume reutilizam `xp_events`, `workout_logs`, `prescription_bundles` (já existem).
-- **Edge:** `student-workout-feedback` (feedback pós-treino → WhatsApp).
-- **Esforço:** médio. **Risco:** baixo (componentes de UI; só o feedback toca WhatsApp/Evolution, já configurado).
-- **Dica:** `MonthlyLeaderboard`, `VolumeInsights`, `WarmupGuide`, `PeriodizationBanner`, `AnnouncementsBell` podem entrar isolados sem migration. Nutrição/Cardio dependem de prescrição (Bloco 4) para terem dados.
+### 1.3 UI — `src/pages/admin/ExerciseLibrary.tsx`
+- Adicionar estado `filterCategory` e um `Select` de categorias (musculação, core, fisioterapia, performance, mobilidade, etc., derivadas dos dados) ao lado do filtro de grupo muscular já existente.
+- Aplicar `filterCategory` na lista `filtered` (junto de `filterGroup` e busca).
+- Exibir a categoria como badge/legenda no card do exercício.
+- Incluir `category` no formulário de criação/edição de exercício.
 
-## Bloco 2 — Biblioteca de exercícios
-**O que entra:** `Biblioteca.tsx` + `WorkoutLibrary.tsx` (catálogo ~447 exercícios curados), vídeo por exercício via `youtube-exercise-video` + `exerciseCover.ts`, upload próprio (bucket `exercises-videos` já existe).
+## Parte 2 — Nova anamnese BN (substituição completa)
 
-- **Banco:** usa `exercise_library` existente; pode exigir colunas extras (cover/metadata) — a validar contra a migration do repo.
-- **Edge:** `youtube-exercise-video`.
-- **Conteúdo:** os 447 exercícios + curadoria vivem em migrations/seeds + ~100 docs de curadoria (não precisam vir; só os dados).
-- **Esforço:** médio. **Risco:** baixo-médio (volume de dados de seed e possível chave do YouTube).
+O Google Form BN tem **~60 perguntas em 7 seções**. Hoje a anamnese pública é **fixa no código** (`PublicAnamnesis.tsx`) com ~22 campos. Vou substituir pelo formulário completo. Os campos que já existem como colunas serão reaproveitados; os **novos campos vão para a coluna `data` (JSONB)** que já existe em `anamnesis` — evitando dezenas de colunas novas.
 
-## Bloco 3 — Studio de IA por empresa (white-label)
-**O que entra:** `AICoachHub.tsx` ("Central de IA") + `companyAiConfig.ts` + `useAssistantName` + `BnitoFloatingAssistant` (assistente flutuante). Cada empresa define nome do assistente (padrão "Setty"; BN = "BNITO"), metodologia, tom, doutrina, limites éticos. `Questionarios.tsx` unifica Cadastro + Anamnese.
+### Seções do novo formulário
+1. **Seus dados** — nome (já vem do contexto), idade, sexo, peso, altura, % gordura
+2. **Objetivo** — objetivos (múltipla), objetivo principal, descrição livre, interesses (musculação/corrida/natação/ciclismo/nutrição), tem nutricionista, quer dicas de nutrição, já tem assessoria
+3. **Rotina de treino** — nível de atividade, tempo de treino (meses), dias/semana, dias por modalidade, minutos/sessão, onde treina, histórico + **subseção endurance** (objetivo/prova, data da prova, volume, recuperação, FC máx/repouso, corrida, natação, ciclismo)
+4. **Saúde** — lesões, condições médicas, medicamentos, estresse (0–10), qualidade do sono (0–10), horas de sono
+5. **Triagem clínica** — cardíaco/pressão, dor no peito/tontura, cirurgia recente, gestação/pós-parto, fuma, doente agora, **escalas de dor articular** (tornozelo, joelho, quadril, lombar, ombro), outras condições
+6. **Rotina alimentar e treino** — refeições/dia, horários, treina em jejum, fome ao acordar
+7. **Preferências & substituições** — alimentos que gosta/não gosta, restrições/alergias, orçamento, suplementos, acesso a cozinha, observações
 
-- **Banco:** nova tabela `company_ai_config` (DDL pronta no repo, com RLS por `company_id` + master). Persona detalhada vai em `extra jsonb`.
-- **Edge:** `ai-bnito-coach`, `ai-coach-pack`, `ai-student-bnito` (todas `verify_jwt = true`, usam `LOVABLE_API_KEY`).
-- **Esforço:** médio-alto. **Risco:** médio (toca IA Gateway, custo por requisição, e persona por empresa precisa de UI de onboarding).
+### 2.1 `src/pages/PublicAnamnesis.tsx`
+- Reescrever o formulário com as 7 seções acima (mantendo o visual/tema atual: Card, RadioGroup, Checkbox, escalas 0–10 via Slider/radios).
+- Campos existentes continuam mapeados às colunas atuais; todos os novos são agrupados num objeto `data` enviado ao edge.
+- Seções de endurance/natação/ciclismo ficam visíveis condicionalmente conforme os interesses marcados.
 
-## Bloco 4 — Prescrição (motor determinístico v1 + Studio)
-**O que entra:** `PrescriptionStudio.tsx` (`/admin/studio`): anamnese → avaliação por vídeo → prescrição → PDFs. `lib/prescription/` (engine, presets, methodology, volumeRules, progressionRules, restrictionRules, explanations, validator + testes). `generatePDFs.ts`, `prescriptionIntegration.ts`, `periodization.ts`. Avaliação funcional por vídeo (`assessment_frames`), laudo em PDF e prescrição que cai direto no app do aluno.
+### 2.2 Edge `supabase/functions/public-anamnesis/index.ts`
+- Manter `ALLOWED_FIELDS` para as colunas existentes e **aceitar `data` (objeto)**, gravando/mesclando em `anamnesis.data`.
 
-- **Banco:** novas `nutrition_plans`, `assessment_frames`, `anamnese_invites`, `ai_decision_logs` (opcional), possivelmente `ai_plan_versions`, `student_files`. Todas precisam de RLS escopada por `company_id`.
-- **Edge:** `ai-validate-prescription`, `ai-nutrition-plan`, `ai-nutrition-meals` (+ ajustes em `ai-prescribe-workout`/`ai-running-plan`/`ai-functional-assessment`).
-- **Dependência npm:** `jspdf`.
-- **Esforço:** ALTO (bloco mais profundo). **Risco:** alto (maior superfície: migrations múltiplas, deploy de edges, motor com testes, integração multimodal aluno↔treino↔nutrição).
+### 2.3 `src/pages/admin/StudentDetail.tsx`
+- Exibir os novos campos (lendo de `anamnesis.data`) numa aba/seção de anamnese, organizados pelas 7 seções, para treinador/admin consultarem.
+- Ajustar o diálogo de edição para os principais campos novos (os demais em modo leitura, para não inchar a UI).
 
----
+## Detalhes técnicos
+- Sem alteração em RLS. `exercise_library` e `anamnesis` já possuem policies e grants.
+- `anamnesis.data` já é `jsonb default '{}'` — nenhuma migração necessária para os campos novos da anamnese.
+- Única migração de schema: `ALTER TABLE public.exercise_library ADD COLUMN category text;`
+- Import de exercícios roda como operação de dados (INSERT/UPDATE com dedup por `lower(name)` entre globais), gerado a partir do CSV.
+- `thumbnail_url` derivada do YouTube ID para pré-visualização rápida no mobile.
 
-## Ordem recomendada (cada fase é incremental e testável)
-```text
-Fase A  Bloco 1 (parte sem banco): Leaderboard, VolumeInsights, Warmup,
-        PeriodizationBanner, AnnouncementsBell  → ganho rápido, risco baixo
-Fase B  Bloco 2: Biblioteca + vídeo YouTube por exercício
-Fase C  Bloco 3: company_ai_config + Central de IA + assistente por empresa
-Fase D  Bloco 4: motor de prescrição + Studio + PDFs (+ nutrição/cardio do Bloco 1)
-```
-
-## Observações importantes
-- Cada tabela nova exige migration com **GRANT + RLS por `company_id`** (padrão do projeto). Eu trago a DDL do repo adaptada.
-- Edge functions deployam automaticamente aqui; não há a restrição "rodar local sem deploy" que o repo tinha.
-- Vou validar colunas extras em `exercise_library` e o schema real de `nutrition_plans`/`assessment_frames` direto nas migrations do repo antes de cada fase.
-- O custo de IA (Gateway) só aparece nos Blocos 3 e 4.
-
-**Próximo passo:** me diga se aprova este faseamento (A→B→C→D) ou se quer reordenar/cortar algo. Ao aprovar uma fase, eu detalho a migration e os arquivos exatos antes de implementar.
+## Fora de escopo
+- Não altero o gerenciador dinâmico `form_fields` (a anamnese pública é hardcoded; a fonte da verdade continua o `PublicAnamnesis.tsx`).
+- Não removo os 447 exercícios globais atuais — apenas insiro novos e atualizo os coincidentes.
