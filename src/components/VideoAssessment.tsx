@@ -251,7 +251,7 @@ export default function VideoAssessment({ studentId, companyId, studentName, con
           modalidade: context?.modalidade || null,
           nivel: context?.nivel || null,
           report_text,
-          assessment_json,
+          assessment_json: assessment_json as unknown as Json,
         })
         .select("id")
         .single();
