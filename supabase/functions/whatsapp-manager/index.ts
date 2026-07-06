@@ -457,7 +457,7 @@ Deno.serve(async (req) => {
           failed.push({ id: sid, name: null, reason: "Aluno não encontrado" });
           continue;
         }
-        const phone = (student.whatsapp || "").replace(/\D/g, "");
+        const phone = normalizeBrazilPhone(student.whatsapp || "");
         if (!phone) {
           failed.push({ id: sid, name: student.full_name, reason: "Sem WhatsApp cadastrado" });
           continue;
