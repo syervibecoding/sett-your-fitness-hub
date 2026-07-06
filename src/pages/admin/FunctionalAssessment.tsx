@@ -15,8 +15,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Upload, X, ClipboardCheck, AlertCircle } from "lucide-react";
+import { Loader2, Upload, X, ClipboardCheck, AlertCircle, FileDown } from "lucide-react";
 import VideoAssessment from "@/components/VideoAssessment";
+import { downloadAssessmentPdf } from "@/lib/assessment/pdf";
 
 interface Student { id: string; full_name: string; }
 
