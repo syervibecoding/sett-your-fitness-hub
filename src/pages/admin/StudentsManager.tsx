@@ -376,6 +376,12 @@ export default function StudentsManager() {
             <Card key={s.id} className="bg-card border-border">
               <CardContent className="pt-6 space-y-3">
                 <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Checkbox
+                      checked={selectedIds.has(s.id)}
+                      onCheckedChange={() => toggleSelect(s.id)}
+                      aria-label={`Selecionar ${s.full_name}`}
+                    />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-foreground font-sans font-medium truncate">{s.full_name}</p>
