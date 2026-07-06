@@ -221,7 +221,22 @@ export default function FunctionalAssessment() {
 
             {result && (
               <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-base">Laudo</CardTitle></CardHeader>
+                <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
+                  <CardTitle className="text-base">Laudo</CardTitle>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    onClick={() =>
+                      downloadAssessmentPdf(
+                        { reportText: result.report_text, json },
+                        { studentName: student?.full_name || "aluno", source: "photos" },
+                      )
+                    }
+                  >
+                    <FileDown className="h-3.5 w-3.5 mr-1" /> Baixar PDF
+                  </Button>
+                </CardHeader>
                 <CardContent className="space-y-3 text-sm">
                   {(json?.score_postural?.total != null || json?.score_funcional?.total != null) && (
                     <div className="grid grid-cols-2 gap-2">
