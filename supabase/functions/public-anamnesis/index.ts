@@ -18,6 +18,8 @@ const ALLOWED_FIELDS = [
   "available_equipment","goals","diseases","injuries","current_pain","nutrition",
   "profession","sleep_hours","restorative_sleep","aware_of_trilogy","feel_in_3_months",
   "biggest_obstacle","extra_comments","authorizes_plan","commits_communication",
+  "physical_activity_level","stress_level","sleep_quality","smoking","restrictions",
+  "experience_level","medications","diet_type",
 ];
 
 Deno.serve(async (req) => {
