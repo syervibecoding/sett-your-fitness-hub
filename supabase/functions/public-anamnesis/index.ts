@@ -63,6 +63,10 @@ Deno.serve(async (req) => {
         company_id: student.company_id,
       };
       for (const k of ALLOWED_FIELDS) if (body[k] !== undefined) payload[k] = body[k];
+      // Extended BN anamnesis answers are stored in the JSONB `data` column.
+      if (body.data && typeof body.data === "object" && !Array.isArray(body.data)) {
+        payload.data = body.data;
+      }
 
       const { data: existing } = await supabase
         .from("anamnesis").select("id, version").eq("student_id", student.id)
