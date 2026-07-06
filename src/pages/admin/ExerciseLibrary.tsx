@@ -228,6 +228,7 @@ export default function ExerciseLibrary() {
       name: form.name,
       description: form.description || null,
       muscle_group: form.muscle_group,
+      category: form.category || null,
       video_url: form.video_url || null,
       video_path: videoPath,
       is_global: isMaster ? form.is_global : false,
