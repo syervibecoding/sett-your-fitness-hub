@@ -81,7 +81,7 @@ const baseAdminItems: typeof managementItems = [];
 
 const managementItems = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
-  { title: "Formulário", url: "/admin/forms", icon: FileText },
+  { title: "Questionários", url: "/admin/forms", icon: FileText },
   { title: "Planos", url: "/admin/plans", icon: ClipboardList },
   { title: "Alunos", url: "/admin/students", icon: Users },
   { title: "Equipe", url: "/admin/team", icon: Users },
@@ -105,7 +105,7 @@ const whatsappSubItems = [
 
 const coordinatorAllItems = [
   { title: "Dashboard", url: "/coordinator", icon: LayoutDashboard },
-  { title: "Formulário", url: "/coordinator/forms", icon: FileText },
+  { title: "Questionários", url: "/coordinator/forms", icon: FileText },
   { title: "Planos", url: "/coordinator/plans", icon: ClipboardList },
   { title: "Alunos", url: "/coordinator/students", icon: Users },
   { title: "Equipe", url: "/coordinator/team", icon: Users },
@@ -132,7 +132,7 @@ const trainerWhatsappSubItems = [
 
 const trainerAllItems = [
   { title: "Dashboard", url: "/trainer", icon: LayoutDashboard },
-  { title: "Formulário", url: "/trainer/forms", icon: FileText },
+  { title: "Questionários", url: "/trainer/forms", icon: FileText },
   { title: "Planos", url: "/trainer/plans", icon: ClipboardList },
   { title: "Alunos", url: "/trainer/students", icon: Users },
   { title: "Equipe", url: "/trainer/team", icon: Users },
