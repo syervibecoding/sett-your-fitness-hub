@@ -61,7 +61,7 @@ const moduleMap: Record<string, PermissionModule> = {
   "Dashboard": "dashboard",
   "Cadastro": "registration",
   "Anamnese": "anamnesis",
-  "Formulário": "registration",
+  "Questionários": "registration",
   "Alunos": "students",
   "Agenda": "agenda",
   "Exercícios": "exercises",
