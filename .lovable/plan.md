@@ -1,44 +1,79 @@
-# Convite de anamnese via WhatsApp + aba "Formulário"
-
 ## Objetivo
-Permitir enviar o link de anamnese do aluno direto pelo WhatsApp já integrado (Evolution API), tanto na ficha individual quanto em lote. Sem tabela nova de rastreamento e mantendo o link atual por ID (`/anamnese/{studentId}`). Também unir as páginas "Cadastro" e "Anamnese" numa única aba "Formulário" com sub-abas.
 
-O envio de resposta ao banco já funciona hoje (edge `public-anamnesis`, ação `submit`) — nada muda nisso.
+Transformar a tela **Prescrição Integrada** (`/prescricao`, componente `UnifiedPrescriber`) no **Studio de Prescrição** em etapas, seguindo a imagem de referência:
 
-## Parte 1 — Envio pelo WhatsApp
+```text
+Studio de Prescrição
+Anamnese → Avaliação → Prescrições integradas → PDFs
 
-### Backend (edge `whatsapp-manager`)
-Adicionar uma nova ação `send-anamnesis-invite` que reaproveita toda a infra já existente (autenticação por papel, resolução de company/instância, envio via `message/sendText`).
+┌─ Aluno ──────────────────────────────────────┐
+│ [buscar aluno...............]                 │
+│ [ selecione o aluno            ▼ ]            │
+│ [   ✈ Enviar anamnese no WhatsApp   ]         │
+│ [ ✈ Gerar link de anamnese ] [ ✦ Fazer presc]│
+└───────────────────────────────────────────────┘
 
-- Entrada: `{ studentIds: string[], baseUrl: string, message?: string }`.
-- Para cada `studentId`: busca `full_name`, `whatsapp`, `company_id`; valida que pertence à empresa do usuário; se sem WhatsApp, marca como falha.
-- Monta o link `${baseUrl}/anamnese/${studentId}` e um texto padrão (editável):
-  > Olá {nome}! Para começarmos, preencha sua anamnese neste link: {link}
-- Envia via Evolution para cada número.
-- Retorna resumo `{ sent: number, failed: [{ id, name, reason }] }`.
-- Restrições de papel: liberada para admin/coordinator/trainer (mesmo `canChat` já usado), não entra em `adminOnlyActions`.
+[ 1. Anamnese ] [ 2. Avaliação ] [ 3. Prescrição ]
+┌───────────────────────────────────────────────┐
+│  (conteúdo da etapa ativa)                     │
+└───────────────────────────────────────────────┘
+```
 
-### Frontend
-- **`StudentDetail.tsx`**: ao lado do botão "Anamnese" (copiar link), adicionar botão "Enviar no WhatsApp" que chama a ação com `[id]` e `baseUrl = window.location.origin`. Desabilitado se o aluno não tiver WhatsApp. Toast de sucesso/erro.
-- **`StudentsManager.tsx`**: adicionar seleção por checkbox nos cards da lista + botão de ação em lote "Enviar anamnese (WhatsApp)" para os selecionados; mostra toast com quantos foram enviados e quantos falharam (ex.: sem WhatsApp).
+## Etapas do fluxo
 
-## Parte 2 — Aba única "Formulário"
+**Topo — seleção de aluno (sempre visível)**
+- Campo de busca que filtra a lista de alunos por nome.
+- Select do aluno (mantém o comportamento atual de carregar dados).
+- Botão largura total **"Enviar anamnese no WhatsApp"** → reaproveita `whatsapp-manager` ação `send-anamnesis-invite` (mesma chamada usada no cadastro do aluno), passando `studentIds: [id]` e `baseUrl: window.location.origin`.
+- **"Gerar link de anamnese"** → copia `${origin}/anamnese/${studentId}` para a área de transferência (mesmo link que o WhatsApp envia) com toast de confirmação.
+- **"Fazer prescrição"** → atalho que pula para a etapa 3.
 
-Hoje existem dois itens de menu e duas rotas por papel: "Cadastro" (`RegistrationManager`) e "Anamnese" (`AnamnesisManager`), cada um só renderiza um `FormFieldEditor`.
+**Etapa 1 · Anamnese**
+- Ao selecionar o aluno, carregar a anamnese respondida pelo aluno (tabela `anamnesis`, a que o link público preenche) e exibir um cartão **"Anamnese respondida pelo aluno"** com resumo: Objetivo, Nível, Modalidade, Dias força/sem, Lesões — ou um estado vazio ("Aguardando resposta do aluno / preencha manualmente").
+- Mapear os campos da `anamnesis` para a estrutura usada pela prescrição (`student_anamneses`) — ver seção técnica. Os campos continuam editáveis pelo treinador (as seções de acordeão atuais: Dados pessoais, Treino, Corrida, Saúde).
+- Botão "Avançar para Avaliação".
 
-- Criar `src/pages/admin/FormsManager.tsx` com um componente `Tabs` (shadcn) contendo duas sub-abas:
-  - **Cadastro** → `FormFieldEditor formType="registration"` (conteúdo atual do RegistrationManager)
-  - **Anamnese** → `FormFieldEditor formType="anamnesis"` (conteúdo atual do AnamnesisManager)
-- **Rotas (`App.tsx`)**: adicionar `/admin/forms`, `/coordinator/forms`, `/trainer/forms` apontando para `FormsManager`, mantendo os `FeatureRoute`/módulos apropriados. As rotas antigas `/registration` e `/anamnesis` passam a redirecionar para `/forms` (evita links quebrados).
-- **Sidebar (`AppSidebar.tsx`)**: substituir os dois itens ("Cadastro" e "Anamnese") por um único "Formulário" (ícone `FileText`) nos três blocos de papel; atualizar o mapa `routeToTitle` (linhas 62-63).
-- `RegistrationManager.tsx` e `AnamnesisManager.tsx` podem ser removidos (ou mantidos e reaproveitados dentro do FormsManager). O plano é migrar o conteúdo para `FormsManager` e remover os dois arquivos antigos.
+**Etapa 2 · Avaliação (embutida)**
+- Extrair o miolo da página `FunctionalAssessment` para um componente reutilizável `FunctionalAssessmentPanel` que recebe `studentId` e `companyId` por prop (hoje ele gerencia a própria seleção de aluno).
+- Renderizar esse painel dentro da etapa 2, já amarrado ao aluno selecionado no topo — o treinador faz a avaliação sem sair da tela.
+- A página standalone `/avaliacao` passa a usar o mesmo painel com seu próprio seletor (sem regressão).
+- Botão "Avançar para Prescrição".
+
+**Etapa 3 · Prescrição**
+- Bloco atual "Quais prescrições gerar?" (musculação / corrida) + progresso + resultados + PDFs.
+- Mantém a geração via `ai-prescribe-workout` / `ai-running-plan` já existente e usa a avaliação da etapa 2 como contexto.
+
+## Unificação da anamnese (aluno → prescrição)
+
+Hoje há duas tabelas:
+- `anamnesis` — preenchida pelo aluno via `/anamnese/:studentId`.
+- `student_anamneses` — lida pelas IAs de prescrição.
+
+No carregamento do aluno, buscar a `anamnesis` mais recente e **pré-preencher** os campos de `student_anamneses` a partir dela, mapeando:
+
+| student_anamneses | origem em anamnesis |
+|---|---|
+| objective | `goals` / `data.objetivo_descricao` |
+| activity_level | `physical_activity_level` |
+| training_modality | `modalities` (join) |
+| session_duration_min | `session_duration` |
+| days_per_week_strength / cardio | `training_days` / `available_days` |
+| injuries | `injuries` |
+| sleep_quality | `sleep_quality` |
+| stress_score | `stress_level` |
+| sport / cardio_goal | `data` (interesses de endurance) |
+
+Se já existir um registro em `student_anamneses`, ele tem prioridade (não sobrescreve edições do treinador); a anamnese do aluno só preenche o que estiver vazio. Ao gerar, continua salvando em `student_anamneses` como hoje.
 
 ## Detalhes técnicos
-- Nenhuma migração de banco necessária (sem `anamnesis_invites`).
-- O envio usa `supabase.functions.invoke("whatsapp-manager", { body: { action: "send-anamnesis-invite", ... } })`.
-- Empresa exige uma instância de WhatsApp conectada; se não houver, a edge retorna erro e o frontend mostra toast orientando conectar o WhatsApp.
-- Verificação: testar a edge com `curl_edge_functions` (ação nova) e validar a UI (botão individual + lote + aba Formulário) via preview.
+
+- **Arquivos alterados**: `src/pages/admin/UnifiedPrescriber.tsx` (reestruturação em wizard com `Tabs`), `src/pages/admin/FunctionalAssessment.tsx` (extrair painel).
+- **Arquivo novo**: `src/components/admin/FunctionalAssessmentPanel.tsx` — recebe `studentId`/`companyId`, contém a lógica de upload/laudo/PDF hoje na página.
+- **Sem mudanças de banco**: reaproveita tabelas, edge functions (`whatsapp-manager`, `ai-prescribe-workout`, `ai-running-plan`, `public-anamnesis`) e o link público existentes.
+- Navegação por etapas com o componente `Tabs` do shadcn; estado da etapa ativa local. Busca de aluno com filtro em memória sobre a lista já carregada.
+- Cabeçalho com o nome do assistente/branding da empresa (como o "BN" da imagem) usando o hook `useAssistantName` já existente.
 
 ## Fora de escopo
-- Tabela de rastreamento de convites (status enviado/aberto/respondido).
-- Link com token único/expiração.
+
+- Não altero a publicação de musculação no portal do aluno (tema anterior sobre `ai_strength_plans` → `training_cycles`) — fica para uma decisão separada.
+- Sem novos modelos de IA ou tabelas.
