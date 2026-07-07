@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StudentCycleFeedbackCard } from "@/components/admin/StudentCycleFeedbackCard";
 import { PlanVersionsCard } from "@/components/admin/PlanVersionsCard";
+import { AssessmentCompareCard } from "@/components/admin/AssessmentCompareCard";
 import { StudentCustomAnswersCard } from "@/components/admin/StudentCustomAnswersCard";
 import { CollapsibleCard } from "@/components/admin/CollapsibleCard";
 import { StudentGoalsManager } from "@/components/admin/StudentGoalsManager";
@@ -1134,6 +1135,7 @@ export default function StudentDetail() {
                 createdBy={session?.user?.id}
               />
             )}
+            {id && <AssessmentCompareCard studentId={id} />}
             {id && <PlanVersionsCard studentId={id} />}
 
             {/* Enrollments */}

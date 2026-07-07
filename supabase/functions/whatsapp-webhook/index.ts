@@ -59,6 +59,69 @@ async function sendText(
   } catch (err) { console.error("[flow] Send error:", err); }
 }
 
+// ─── BNITO NO WHATSAPP (opt-in por empresa) ───
+// Responde aluno conhecido com contexto do treino. Barato (Haiku), curto, com guardrails:
+// dor forte → orientar a falar com o professor; nunca diagnóstico; só temas de treino/app.
+async function maybeBnitoReply(
+  adminClient: any, companyId: string, chatId: string, question: string,
+  remoteJid: string, instanceName: string, evoUrl: string, evoHeaders: Record<string, string>,
+): Promise<void> {
+  const { data: cfg } = await adminClient.from("company_ai_config")
+    .select("bnito_whatsapp_enabled, assistant_name").eq("company_id", companyId).maybeSingle();
+  if (!cfg?.bnito_whatsapp_enabled) return; // default OFF — nada muda sem opt-in
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) return;
+
+  // Anti-loop / rate-limit: no máx. 1 resposta por minuto e 30/dia por chat.
+  const minuteAgo = new Date(Date.now() - 60_000).toISOString();
+  const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
+  const { count: recent } = await adminClient.from("whatsapp_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("chat_id", chatId).eq("is_from_me", true).gte("timestamp", minuteAgo);
+  if ((recent || 0) > 0) return;
+  const { count: daily } = await adminClient.from("whatsapp_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("chat_id", chatId).eq("is_from_me", true).gte("timestamp", dayAgo);
+  if ((daily || 0) >= 30) return;
+
+  // Contexto do aluno: nome + treino ativo (nomes dos treinos) + último check-in.
+  const { data: chatRow } = await adminClient.from("whatsapp_chats").select("student_id").eq("id", chatId).maybeSingle();
+  const studentId = chatRow?.student_id;
+  if (!studentId) return;
+  const [{ data: student }, { data: cycle }] = await Promise.all([
+    adminClient.from("students").select("full_name").eq("id", studentId).maybeSingle(),
+    adminClient.from("training_cycles").select("id, objective, start_date, end_date").eq("student_id", studentId).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  let workoutsTxt = "sem ciclo ativo no app";
+  if (cycle?.id) {
+    const { data: ws } = await adminClient.from("workouts").select("name, day_of_week").eq("cycle_id", cycle.id).order("sort_order");
+    workoutsTxt = (ws || []).map((w: any) => w.name).join("; ") || "ciclo ativo sem treinos";
+  }
+  const assistantName = cfg.assistant_name || "Setty";
+  const firstName = (student?.full_name || "").split(" ")[0] || "atleta";
+
+  const system = `Você é ${assistantName}, assistente de treino no WhatsApp da equipe. Responda em PT-BR, tom humano e curto (máx. 500 caracteres), SEM markdown.
+Contexto do aluno ${firstName}: objetivo do ciclo: ${cycle?.objective || "não informado"}; treinos do ciclo: ${workoutsTxt}.
+REGRAS DURAS: só temas de treino/execução/app. Dor forte, lesão, tontura ou sintoma → mande falar com o professor e não prescreva nada. Nunca diagnóstico/medicação. Não invente exercícios fora do plano. Se não souber, diga que o professor responde.`;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 300,
+        system,
+        messages: [{ role: "user", content: question.slice(0, 500) }],
+      }),
+    });
+    if (!res.ok) { console.error("[bnito-wa] anthropic", res.status); return; }
+    const data = await res.json();
+    const answer = (data?.content?.[0]?.text || "").trim().slice(0, 700);
+    if (answer) await sendText(evoUrl, instanceName, evoHeaders, remoteJid, answer, adminClient, chatId);
+  } catch (err) { console.error("[bnito-wa] error:", err); }
+}
+
 // ─── APPLY LABEL ───
 async function applyLabel(adminClient: any, companyId: string, chatId: string, labelName: string, color = "#10b981") {
   let { data: label } = await adminClient.from("whatsapp_labels").select("id")
@@ -471,6 +534,16 @@ Deno.serve(async (req) => {
               continue; // Don't trigger welcome flow if resuming
             }
           }
+        }
+
+        // ─── BNITO NO WHATSAPP (opt-in por empresa; default OFF) ───
+        // Aluno conhecido manda TEXTO → assistente responde com contexto do treino.
+        if (!isFromMe && isDirectContact && isStudent && instance.company_id &&
+            (msgType === "conversation" || msgType === "extendedTextMessage" || msgType === "text") &&
+            content && !content.startsWith("[") && content.length <= 500) {
+          try {
+            await maybeBnitoReply(adminClient, instance.company_id, chat.id, content, remoteJid, instanceName, evoUrl, evoHeaders);
+          } catch (err) { console.error("[webhook] bnito reply error:", err); }
         }
 
         // ─── TRIGGER WELCOME FLOW for first contact non-students ───

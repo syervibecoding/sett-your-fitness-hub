@@ -64,13 +64,14 @@ export function AtRiskStudents() {
       const ids = (students ?? []).map((s: any) => s.id);
       if (ids.length === 0) { setRows([]); setLoading(false); return; }
 
-      const [{ data: pays }, { data: sessions }, { data: chats }, { data: cycles }, { data: pains }] = await Promise.all([
+      const [{ data: pays }, { data: sessions }, { data: chats }, { data: cycles }, { data: pains }, { data: assessments }] = await Promise.all([
         supabase.from("payments").select("student_id, status").in("student_id", ids).not("status", "in", `(${PAID.map((s) => `"${s}"`).join(",")})`),
         supabase.from("workout_sessions").select("student_id, completed_at").in("student_id", ids).eq("status", "completed"),
         supabase.from("whatsapp_chats").select("id, student_id").in("student_id", ids),
         supabase.from("training_cycles" as any).select("student_id, end_date, status").in("student_id", ids).eq("status", "active"),
         // Dor relatada na anamnese (moderada/severa entra no semáforo do professor).
         (supabase as any).from("student_body_limitations").select("student_id, region, severity").in("student_id", ids).in("severity", ["moderada", "severa"]),
+        (supabase as any).from("functional_assessments").select("student_id, created_at").in("student_id", ids).order("created_at", { ascending: false }),
       ]);
 
       const overdue = new Set((pays ?? []).map((p: any) => p.student_id));
@@ -83,6 +84,9 @@ export function AtRiskStudents() {
       (cycles ?? []).forEach((c: any) => { activeCycle.add(c.student_id); if (c.end_date) cycleEnd[c.student_id] = c.end_date; });
       const painByStudent: Record<string, string> = {};
       (pains ?? []).forEach((p: any) => { if (!painByStudent[p.student_id]) painByStudent[p.student_id] = `${p.region} (${p.severity})`; });
+      // Última avaliação funcional por aluno (já vem ordenado desc) — reavaliação devida após 60 dias.
+      const lastAssessment: Record<string, string> = {};
+      (assessments ?? []).forEach((a: any) => { if (!lastAssessment[a.student_id]) lastAssessment[a.student_id] = a.created_at; });
 
       const now = Date.now();
       const out: RiskRow[] = [];
@@ -97,9 +101,13 @@ export function AtRiskStudents() {
         };
         const status = deriveStudentStatus(signals);
         const pain = painByStudent[s.id] ?? null;
-        // Entra no painel: risco/renovação (como antes) OU dor moderada/severa relatada (mesmo "ativo").
-        if (status === "risco" || status === "renovacao" || (pain && status === "ativo")) {
+        // Reavaliação devida: aluno ativo com ciclo, última avaliação > 60 dias (base p/ renovar com evidência).
+        const la = lastAssessment[s.id];
+        const reassessDue = activeCycle.has(s.id) && la && (now - new Date(la).getTime()) / 86400000 > 60;
+        // Entra no painel: risco/renovação (como antes) OU dor relatada OU reavaliação devida (mesmo "ativo").
+        if (status === "risco" || status === "renovacao" || ((pain || reassessDue) && status === "ativo")) {
           const reasons = riskReasons(signals);
+          if (reassessDue) reasons.unshift(`Reavaliação devida (última há ${Math.floor((now - new Date(la).getTime()) / 86400000)}d)`);
           if (pain) reasons.unshift(`Dor: ${pain}`);
           out.push({
             id: s.id, name: s.full_name, status, reasons, chatId: chatByStudent[s.id], pain,

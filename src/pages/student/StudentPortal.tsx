@@ -20,6 +20,8 @@ import { groupWorkoutExercises, WORKOUT_METHODS, type MethodId } from "@/lib/wor
 import { MethodBadge } from "@/components/workout/MethodBadge";
 import { PeriodizationBanner } from "@/components/student/PeriodizationBanner";
 import { WhySafetyCard } from "@/components/student/WhySafetyCard";
+import { CheckinCard } from "@/components/student/CheckinCard";
+import { PushBanner } from "@/components/student/PushBanner";
 import { StatsCharts } from "@/components/student/StatsCharts";
 import { VolumeInsights } from "@/components/student/VolumeInsights";
 import { WarmupGuide } from "@/components/student/WarmupGuide";
@@ -805,6 +807,9 @@ export default function StudentPortal() {
           >
         {/* HOME VIEW */}
         {activeView === "home" && (
+          <div className="space-y-3">
+          {user?.id && <PushBanner userId={user.id} companyId={companyId} />}
+          {studentId && <CheckinCard studentId={studentId} companyId={companyId} />}
           <StudentHome
             studentName={studentName}
             enrollmentInfo={enrollmentInfo}
@@ -831,7 +836,7 @@ export default function StudentPortal() {
             hasCiclismo={hasCiclismo}
             onNavigate={handleNavigate}
           />
-
+          </div>
         )}
 
         {/* PRESCRIÇÕES — abas condicionais (só aparecem quando o treinador publicou a modalidade) */}

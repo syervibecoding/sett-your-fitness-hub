@@ -65,6 +65,41 @@ export default function PrescriptionStudio() {
   const [editPlan, setEditPlan] = useState<any | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [library, setLibrary] = useState<{ id: string; name: string; muscle_group: string | null }[]>([]);
+  // #4 Templates de ciclo — salvar a prescrição editada e reusar em outros alunos.
+  const [templates, setTemplates] = useState<{ id: string; name: string; plan: any }[]>([]);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  useEffect(() => {
+    if (!companyId) { setTemplates([]); return; }
+    db.from("cycle_templates").select("id, name, plan").eq("company_id", companyId).order("created_at", { ascending: false }).limit(24)
+      .then(({ data }: any) => setTemplates(data || []));
+  }, [companyId]);
+  const saveAsTemplate = async () => {
+    const plan = editPlan || results.musculacao;
+    if (!plan || !companyId) return;
+    const name = window.prompt("Nome do template (ex.: Hipertrofia feminino 4d):", plan.cycle_name || "");
+    if (!name?.trim()) return;
+    setSavingTemplate(true);
+    const { data, error: tErr } = await db.from("cycle_templates")
+      .insert({ company_id: companyId, name: name.trim(), plan, created_by: user?.id ?? null })
+      .select("id, name, plan").single();
+    setSavingTemplate(false);
+    if (tErr) { toast.error("Não consegui salvar o template"); return; }
+    setTemplates((t) => [data, ...t]);
+    toast.success(`Template "${name.trim()}" salvo — aparece pra todos os seus alunos.`);
+  };
+  const useTemplate = (t: { id: string; name: string; plan: any }) => {
+    const clone = JSON.parse(JSON.stringify(t.plan));
+    setResults((r: any) => ({ ...r, musculacao: clone }));
+    setStatus((s) => ({ ...s, musculacao: "done" }));
+    setEditPlan(JSON.parse(JSON.stringify(clone)));
+    setShowEdit(true);
+    toast.success(`Template "${t.name}" carregado — revise e personalize antes de publicar.`);
+  };
+  const deleteTemplate = async (id: string) => {
+    if (!window.confirm("Excluir este template?")) return;
+    await db.from("cycle_templates").delete().eq("id", id);
+    setTemplates((t) => t.filter((x) => x.id !== id));
+  };
   const [pickerTarget, setPickerTarget] = useState<{ wi: number; ei: number | null } | null>(null);
   const [pickerGroup, setPickerGroup] = useState("");
   const [pickerSearch, setPickerSearch] = useState("");
@@ -183,14 +218,39 @@ export default function PrescriptionStudio() {
   const assessmentContext = assessment?.assessment_json
     ? { ...assessment.assessment_json, report_text: assessment.report_text, id: assessment.id, created_at: assessment.created_at }
     : null;
+  // Check-in diário do aluno (últimas 48h) — pode escalar o readiness pra "cautela" (nunca o contrário).
+  const [lastCheckin, setLastCheckin] = useState<any>(null);
+  useEffect(() => {
+    if (!studentId) { setLastCheckin(null); return; }
+    const cutoff = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+    (db.from("student_checkins").select("checkin_date, sleep_quality, stress, pain")
+      .eq("student_id", studentId).gte("checkin_date", cutoff)
+      .order("checkin_date", { ascending: false }).limit(1).maybeSingle())
+      .then(({ data }: any) => setLastCheckin(data));
+  }, [studentId]);
   const prescriptionIntegration = useMemo(
-    () => buildPrescriptionIntegration({
-      anamnese,
-      assessment: assessmentContext,
-      assessmentId,
-      assessmentCreatedAt: assessment?.created_at,
-    }),
-    [anamnese, assessmentContext, assessmentId, assessment?.created_at],
+    () => {
+      const base = buildPrescriptionIntegration({
+        anamnese,
+        assessment: assessmentContext,
+        assessmentId,
+        assessmentCreatedAt: assessment?.created_at,
+      });
+      const c = lastCheckin;
+      const bad = c && ((c.pain ?? 0) >= 4 || (c.sleep_quality ?? 5) <= 2 || (c.stress ?? 1) >= 4);
+      if (bad && base.readiness.status === "pronto") {
+        return {
+          ...base,
+          readiness: {
+            ...base.readiness,
+            status: "cautela" as typeof base.readiness.status,
+            reason: `${base.readiness.reason} Check-in do aluno (${c.checkin_date}): ${[(c.pain ?? 0) >= 4 ? `dor ${c.pain}/10` : null, (c.sleep_quality ?? 5) <= 2 ? "sono ruim" : null, (c.stress ?? 1) >= 4 ? "estresse alto" : null].filter(Boolean).join(", ")} → volume reduzido.`,
+          },
+        };
+      }
+      return base;
+    },
+    [anamnese, assessmentContext, assessmentId, assessment?.created_at, lastCheckin],
   );
   const bnitoOrchestration = useMemo(
     () => buildBnitoOrchestrationPlan(prescriptionIntegration),
@@ -273,12 +333,8 @@ export default function PrescriptionStudio() {
     try {
       // Avaliação funcional como contexto
       const assessmentCtx = assessmentContext;
-      const integrationCtx = buildPrescriptionIntegration({
-        anamnese,
-        assessment: assessmentCtx,
-        assessmentId,
-        assessmentCreatedAt: assessment?.created_at,
-      });
+      // Usa a integração já com o override do CHECK-IN do aluno (readiness "cautela" corta volume no motor).
+      const integrationCtx = prescriptionIntegration;
       const orchestrationCtx = buildBnitoOrchestrationPlan(integrationCtx);
       const a = anamnese || {};
 
@@ -435,6 +491,10 @@ export default function PrescriptionStudio() {
         aiOriginal: results.musculacao, // P9/P15 — versiona + resume edições do professor.
       });
       setPublished({ workoutsCreated: r.workoutsCreated, createdEnrollment: r.createdEnrollment });
+      // #5 Push — avisa o aluno no celular que a prescrição chegou (best-effort, não bloqueia).
+      supabase.functions.invoke("push-send", {
+        body: { action: "notify", student_ids: [studentId], title: "Prescrição nova no app 🎉", body: "Seu novo ciclo de treino já está disponível. Bora começar!", url: "/aluno" },
+      }).catch(() => {});
       // P14 — trilha de decisão desta publicação (best-effort; não bloqueia).
       try {
         const readiness = (prescriptionIntegration as any)?.readiness?.status ?? null;
@@ -951,6 +1011,23 @@ export default function PrescriptionStudio() {
                   {generating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando…</>
                     : `Gerar ${modalities.size} ${modalities.size > 1 ? "prescrições integradas" : "prescrição integrada"}`}
                 </Button>
+
+                {/* #4 Templates de ciclo — começar de um treino salvo em vez de gerar do zero */}
+                {templates.length > 0 && studentId && (
+                  <div className="mt-3 border rounded-lg p-2 bg-slate-50/60">
+                    <p className="text-[11px] font-medium text-slate-600 mb-1.5">📋 Ou comece de um template seu:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {templates.map((t) => (
+                        <span key={t.id} className="inline-flex items-center rounded-full border border-slate-200 bg-white overflow-hidden">
+                          <button type="button" onClick={() => useTemplate(t)}
+                            className="px-2.5 py-1 text-xs text-[#1B2B4A] hover:bg-[#F5EDD8]/60">{t.name}</button>
+                          <button type="button" title="Excluir template" onClick={() => deleteTemplate(t.id)}
+                            className="px-1.5 py-1 text-[10px] text-slate-400 hover:text-red-500 border-l border-slate-100">✕</button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -994,9 +1071,15 @@ export default function PrescriptionStudio() {
                   {/* Revisar e editar a prescrição de força ANTES de publicar no app */}
                   {editPlan && Array.isArray(editPlan.workouts) && (
                     <div className="border rounded-lg p-3 mt-2 bg-slate-50/60">
-                      <button type="button" onClick={() => setShowEdit(s => !s)} className="text-sm font-medium text-[#1B2B4A] underline">
-                        {showEdit ? "Ocultar edição" : "✏️ Revisar e editar o treino antes de enviar"}
-                      </button>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <button type="button" onClick={() => setShowEdit(s => !s)} className="text-sm font-medium text-[#1B2B4A] underline">
+                          {showEdit ? "Ocultar edição" : "✏️ Revisar e editar o treino antes de enviar"}
+                        </button>
+                        <button type="button" onClick={saveAsTemplate} disabled={savingTemplate}
+                          className="text-xs text-[#8B7355] underline disabled:opacity-50">
+                          {savingTemplate ? "Salvando…" : "💾 Salvar como template"}
+                        </button>
+                      </div>
                       {showEdit && (
                         <div className="mt-3 space-y-3">
                           <p className="text-xs text-slate-500">Edite séries / reps / descanso / obs. Ao publicar, vai a versão editada pro app do aluno.</p>
