@@ -1,10 +1,9 @@
 // ============================================================================
-// UnifiedPrescriber — Prescrição Integrada com IA
-//   1. Seleciona aluno → carrega anamnese salva (se houver)
-//   2. Preenche/edita a anamnese (uma vez, usada por todas as IAs)
-//   3. Marca quais prescrições gerar (musculação e/ou corrida)
-//   4. "Gerar" roda em sequência passando contexto entre as IAs:
-//      Musculação → Corrida (recebe o plano de força para anti-interferência)
+// UnifiedPrescriber — Studio de Prescrição (fluxo em etapas)
+//   Topo: seleciona aluno (com busca) + enviar/gerar link de anamnese
+//   1. Anamnese  → resumo do que o aluno respondeu + edição (prefill unificado)
+//   2. Avaliação → Avaliação Funcional embutida (fotos/vídeo)
+//   3. Prescrição → gera musculação e/ou corrida (IA metodologia BN) + PDFs
 // ============================================================================
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,14 +16,17 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Loader2, CheckCircle2, Circle, AlertCircle, Dumbbell, Activity,
-  ChevronDown, ChevronUp, ClipboardCheck,
+  ChevronDown, ChevronUp, ClipboardCheck, Send, Link2, Sparkles, Search, ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
+import { useAssistantName } from "@/hooks/useAssistantName";
+import FunctionalAssessmentPanel from "@/components/admin/FunctionalAssessmentPanel";
 
 interface Student { id: string; full_name: string; }
 interface Anamnese {
@@ -41,6 +43,10 @@ interface Anamnese {
 }
 type Modality = "musculacao" | "corrida";
 type GenStatus = "idle" | "generating" | "done" | "error";
+type Step = "anamnese" | "avaliacao" | "prescricao";
+interface AnsweredSummary {
+  objective: string; level: string; modality: string; days: string; injuries: string;
+}
 
 const DEFAULT_ANAMNESE: Anamnese = {
   age: "", body_fat_percent: "", objective: "performance",
@@ -52,6 +58,26 @@ const DEFAULT_ANAMNESE: Anamnese = {
   current_volume_weekly: "", cardio_goal: "",
   stress_score: "", sleep_quality: "", injuries: "", notes: "",
 };
+
+// ── Mapeamento anamnese respondida pelo aluno → estrutura da prescrição ──
+const ACTIVITY_ENUM = ["sedentario", "leve", "moderado", "muito_ativo", "extremo"];
+const toInt = (v: any): string => {
+  const n = parseInt(String(v ?? "").replace(/[^\d]/g, ""), 10);
+  return isNaN(n) ? "" : String(n);
+};
+function inferObjective(goals?: string | null): string {
+  const g = (goals || "").toLowerCase();
+  if (/emagre|perda|gordura|peso|definic|secar/.test(g)) return "emagrecimento";
+  if (/hipertrof|massa|m[uú]sculo|volume|ganho/.test(g)) return "hipertrofia";
+  return "performance";
+}
+function inferSport(mods?: string[] | string | null): string {
+  const m = (Array.isArray(mods) ? mods.join(" ") : (mods || "")).toLowerCase();
+  if (/nata|swim/.test(m)) return "natacao";
+  if (/cicl|bike|pedal/.test(m)) return "ciclismo";
+  if (/triat/.test(m)) return "triathlon";
+  return "corrida";
+}
 
 // ── UI helpers (module-level para NÃO remontar os inputs a cada tecla) ──
 const inputCls = "h-9 text-sm";
@@ -90,21 +116,26 @@ const Section = ({ id, label, open, setOpen, children }: {
 export default function UnifiedPrescriber() {
   const { role, companyId: authCompanyId } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
+  const assistant = useAssistantName();
   const companyId = role === "master"
     ? (isViewingCompany ? viewingCompany?.id ?? null : null)
     : authCompanyId;
 
   const [students, setStudents]     = useState<Student[]>([]);
+  const [search, setSearch]         = useState("");
   const [studentId, setStudentId]   = useState("");
   const [anamnese, setAnamnese]     = useState<Anamnese>(DEFAULT_ANAMNESE);
   const [anamneseId, setAnamneseId] = useState<string | null>(null);
+  const [answered, setAnswered]     = useState<AnsweredSummary | null>(null);
   const [assessmentExists, setAssessmentExists] = useState(false);
   const [modalities, setModalities] = useState<Set<Modality>>(new Set(["musculacao"]));
-  const [open, setOpen]             = useState({ personal: true, training: true, cardio: false, health: false });
+  const [open, setOpen]             = useState<OpenState>({ personal: true, training: true, cardio: false, health: false });
   const [status, setStatus]         = useState<Record<Modality, GenStatus>>({ musculacao: "idle", corrida: "idle" });
   const [results, setResults]       = useState<Record<Modality, any>>({ musculacao: null, corrida: null });
   const [generating, setGenerating] = useState(false);
+  const [sending, setSending]       = useState(false);
   const [error, setError]           = useState("");
+  const [step, setStep]             = useState<Step>("anamnese");
 
   useEffect(() => {
     if (!companyId) { setStudents([]); return; }
@@ -116,38 +147,80 @@ export default function UnifiedPrescriber() {
   }, [companyId]);
 
   useEffect(() => {
-    if (!studentId) return;
+    if (!studentId) { setAnswered(null); return; }
+    setStep("anamnese");
     (async () => {
-      const { data } = await supabase.from("student_anamneses")
-        .select("*").eq("student_id", studentId).maybeSingle();
-      if (data) {
-        setAnamneseId(data.id);
-        setAnamnese({
-          age: data.age?.toString() ?? "",
-          body_fat_percent: data.body_fat_percent?.toString() ?? "",
-          objective: data.objective ?? "performance",
-          activity_level: data.activity_level ?? "moderado",
-          is_endurance_athlete: data.is_endurance_athlete ?? false,
-          training_modality: data.training_modality ?? "",
-          days_per_week_strength: data.days_per_week_strength?.toString() ?? "3",
-          days_per_week_cardio: data.days_per_week_cardio?.toString() ?? "0",
-          session_duration_min: data.session_duration_min?.toString() ?? "60",
-          equipment: data.equipment ?? "academia_completa",
-          experience_months: data.experience_months?.toString() ?? "",
-          sport: data.sport ?? "corrida",
-          fcmax: data.fcmax?.toString() ?? "",
-          fcrep: data.fcrep?.toString() ?? "",
-          current_volume_weekly: data.current_volume_weekly?.toString() ?? "",
-          cardio_goal: data.cardio_goal ?? "",
-          stress_score: data.stress_score?.toString() ?? "",
-          sleep_quality: data.sleep_quality?.toString() ?? "",
-          injuries: data.injuries ?? "",
-          notes: data.notes ?? "",
-        });
+      const [{ data: sa }, { data: ans }] = await Promise.all([
+        supabase.from("student_anamneses").select("*").eq("student_id", studentId).maybeSingle(),
+        supabase.from("anamnesis").select("*").eq("student_id", studentId)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+
+      // Resumo do que o aluno respondeu (tabela pública `anamnesis`)
+      const modality = ans
+        ? (Array.isArray(ans.modalities) ? ans.modalities.join(", ") : (ans.modalities || ""))
+        : "";
+      setAnswered(ans ? {
+        objective: ans.goals || (ans as any).data?.objetivo_descricao || "—",
+        level: ans.physical_activity_level || "—",
+        modality: modality || "—",
+        days: ans.training_days || (ans.available_days != null ? String(ans.available_days) : "") || "—",
+        injuries: ans.injuries || "—",
+      } : null);
+
+      // Mapeamento da anamnese respondida para os campos da prescrição
+      const mapped: Partial<Anamnese> = ans ? {
+        objective: inferObjective(ans.goals),
+        activity_level: ACTIVITY_ENUM.includes(ans.physical_activity_level || "") ? (ans.physical_activity_level as string) : "",
+        training_modality: modality,
+        session_duration_min: toInt(ans.session_duration),
+        days_per_week_strength: toInt(ans.available_days ?? ans.training_days),
+        injuries: ans.injuries || "",
+        sleep_quality: toInt(ans.sleep_quality),
+        stress_score: toInt(ans.stress_level),
+        sport: inferSport(ans.modalities),
+        cardio_goal: ans.goals || "",
+      } : {};
+
+      if (sa) {
+        setAnamneseId(sa.id);
+        // student_anamneses tem prioridade; a resposta do aluno só preenche vazios
+        const base: Anamnese = {
+          age: sa.age?.toString() ?? "",
+          body_fat_percent: sa.body_fat_percent?.toString() ?? "",
+          objective: sa.objective ?? "performance",
+          activity_level: sa.activity_level ?? "moderado",
+          is_endurance_athlete: sa.is_endurance_athlete ?? false,
+          training_modality: sa.training_modality ?? "",
+          days_per_week_strength: sa.days_per_week_strength?.toString() ?? "3",
+          days_per_week_cardio: sa.days_per_week_cardio?.toString() ?? "0",
+          session_duration_min: sa.session_duration_min?.toString() ?? "60",
+          equipment: sa.equipment ?? "academia_completa",
+          experience_months: sa.experience_months?.toString() ?? "",
+          sport: sa.sport ?? "corrida",
+          fcmax: sa.fcmax?.toString() ?? "",
+          fcrep: sa.fcrep?.toString() ?? "",
+          current_volume_weekly: sa.current_volume_weekly?.toString() ?? "",
+          cardio_goal: sa.cardio_goal ?? "",
+          stress_score: sa.stress_score?.toString() ?? "",
+          sleep_quality: sa.sleep_quality?.toString() ?? "",
+          injuries: sa.injuries ?? "",
+          notes: sa.notes ?? "",
+        };
+        const merged: Anamnese = { ...base };
+        for (const [k, v] of Object.entries(mapped)) {
+          if (v !== undefined && v !== null && v !== "" && (merged as any)[k] === "") (merged as any)[k] = v;
+        }
+        setAnamnese(merged);
       } else {
         setAnamneseId(null);
-        setAnamnese(DEFAULT_ANAMNESE);
+        const merged: Anamnese = { ...DEFAULT_ANAMNESE };
+        for (const [k, v] of Object.entries(mapped)) {
+          if (v !== undefined && v !== null && v !== "") (merged as any)[k] = v;
+        }
+        setAnamnese(merged);
       }
+
       const { data: assess } = await supabase.from("functional_assessments")
         .select("id").eq("student_id", studentId).limit(1).maybeSingle();
       setAssessmentExists(!!assess);
@@ -165,6 +238,34 @@ export default function UnifiedPrescriber() {
     return next;
   });
   const student = students.find(s => s.id === studentId);
+  const filteredStudents = students.filter(s =>
+    s.full_name.toLowerCase().includes(search.trim().toLowerCase()));
+  const assistantInitials = (assistant.name || "BN").slice(0, 3).toUpperCase();
+
+  async function sendAnamneseWhatsapp() {
+    if (!studentId) return;
+    setSending(true);
+    try {
+      const { data, error: e } = await supabase.functions.invoke("whatsapp-manager", {
+        body: { action: "send-anamnesis-invite", studentIds: [studentId], baseUrl: window.location.origin },
+      });
+      if (e) throw e;
+      if (data?.sent > 0) toast.success("Convite de anamnese enviado no WhatsApp!");
+      else toast.error(data?.failed?.[0]?.reason || "Não foi possível enviar o convite.");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao enviar convite.");
+    }
+    setSending(false);
+  }
+
+  function copyAnamneseLink() {
+    if (!studentId) return;
+    const link = `${window.location.origin}/anamnese/${studentId}`;
+    navigator.clipboard.writeText(link).then(
+      () => toast.success("Link de anamnese copiado!"),
+      () => toast.error("Não foi possível copiar o link."),
+    );
+  }
 
   async function saveAnamnese(): Promise<string> {
     const payload = {
@@ -209,8 +310,6 @@ export default function UnifiedPrescriber() {
     setResults({ musculacao: null, corrida: null });
 
     let strengthPlan: any = null;
-    let strengthPlanId: string | null = null;
-    let runningPlanId: string | null = null;
     const bundleId = crypto.randomUUID();
 
     try {
@@ -242,7 +341,7 @@ export default function UnifiedPrescriber() {
           },
         });
         if (e || data?.error) throw new Error(data?.error || e?.message);
-        strengthPlan = data?.plan; strengthPlanId = data?.id ?? null;
+        strengthPlan = data?.plan;
         setResults(r => ({ ...r, musculacao: data?.plan }));
         setStatus(s => ({ ...s, musculacao: "done" }));
       }
@@ -279,22 +378,14 @@ export default function UnifiedPrescriber() {
           },
         });
         if (e || data?.error) throw new Error(data?.error || e?.message);
-        runningPlanId = data?.id ?? null;
         setResults(r => ({ ...r, corrida: data?.plan }));
         setStatus(s => ({ ...s, corrida: "done" }));
       }
 
-      await supabase.from("prescription_bundles").insert({
-        id: bundleId, company_id: companyId, student_id: studentId,
-        anamnese_id: savedAnamneseId,
-        strength_plan_id: strengthPlanId,
-        running_plan_id: runningPlanId,
-        has_strength: modalities.has("musculacao"),
-        has_cardio: modalities.has("corrida"),
-        status: "active",
-      });
+      toast.success("Prescrição integrada gerada!");
     } catch (err: any) {
-      setError(err.message || "Erro ao gerar prescrições.");
+      setError(err.message || "Erro ao gerar prescrição.");
+      toast.error(err.message || "Erro ao gerar prescrição.");
       setStatus(s => ({
         musculacao: s.musculacao === "generating" ? "error" : s.musculacao,
         corrida: s.corrida === "generating" ? "error" : s.corrida,
@@ -303,7 +394,6 @@ export default function UnifiedPrescriber() {
     setGenerating(false);
   }
 
-  // ── UI helpers ──
   const genStatusIcon = (s: GenStatus) => {
     if (s === "generating") return <Loader2 className="h-4 w-4 animate-spin text-navy" />;
     if (s === "done")       return <CheckCircle2 className="h-4 w-4 text-navy" />;
@@ -312,54 +402,123 @@ export default function UnifiedPrescriber() {
   };
 
   return (
-    <>
-      <div className="max-w-3xl mx-auto space-y-5">
+    <div className="max-w-3xl mx-auto space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">Prescrição</p>
-          <h1 className="font-display text-3xl">Prescrição Integrada</h1>
-          <p className="text-sm text-muted-foreground">Anamnese única · prescrição automática por metodologia BN · periodização sincronizada</p>
+          <h1 className="font-display text-3xl">Studio de Prescrição</h1>
+          <p className="text-sm text-muted-foreground">Anamnese → Avaliação → Prescrições integradas → PDFs</p>
         </div>
+        <span className="shrink-0 grid place-items-center h-11 w-11 rounded-full bg-navy/10 text-navy font-mono text-xs font-semibold tracking-wide">
+          {assistantInitials}
+        </span>
+      </div>
 
-        <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-base">Aluno</CardTitle></CardHeader>
-          <CardContent>
-            {!companyId ? (
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                Nenhuma empresa selecionada. Acesse pelo painel Master "Visualizar empresa" para liberar os alunos.
-              </p>
-            ) : students.length === 0 ? (
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                Nenhum aluno cadastrado nesta empresa ainda.
-              </p>
-            ) : (
-              <SS value={studentId} onChange={setStudentId} placeholder="Selecione..." opts={students.map(s => [s.id, s.full_name])} />
-            )}
-            {!studentId && (
-              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                Escolha um aluno para liberar a anamnese e gerar a prescrição.
-              </p>
-            )}
-            {anamneseId && <p className="text-xs text-navy mt-1">Anamnese salva carregada — edite se necessário.</p>}
-            {studentId && (
-              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                <ClipboardCheck className="h-3 w-3" />
-                {assessmentExists
-                  ? "Avaliação funcional disponível — será usada como contexto."
-                  : "Sem avaliação funcional. Gere uma na aba Avaliação Funcional para refinar a prescrição."}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+      {/* Aluno */}
+      <Card>
+        <CardHeader className="pb-3"><CardTitle className="text-base">Aluno</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          {!companyId ? (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              Nenhuma empresa selecionada. Acesse pelo painel Master "Visualizar empresa" para liberar os alunos.
+            </p>
+          ) : students.length === 0 ? (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              Nenhum aluno cadastrado nesta empresa ainda.
+            </p>
+          ) : (
+            <>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  className="h-9 text-sm pl-8"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Buscar aluno..."
+                />
+              </div>
+              <SS value={studentId} onChange={setStudentId} placeholder="Selecione..." opts={filteredStudents.map(s => [s.id, s.full_name])} />
 
-        {studentId && (
-          <>
+              {studentId && (
+                <div className="space-y-2 pt-1">
+                  <Button className="w-full" onClick={sendAnamneseWhatsapp} disabled={sending}>
+                    {sending
+                      ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enviando…</>
+                      : <><Send className="mr-2 h-4 w-4" /> Enviar anamnese no WhatsApp</>}
+                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" onClick={copyAnamneseLink}>
+                      <Link2 className="mr-2 h-4 w-4" /> Gerar link de anamnese
+                    </Button>
+                    <Button variant="outline" onClick={() => setStep("prescricao")}>
+                      <Sparkles className="mr-2 h-4 w-4" /> Fazer prescrição
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {!studentId && companyId && students.length > 0 && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              Escolha um aluno para liberar as etapas.
+            </p>
+          )}
+          {studentId && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <ClipboardCheck className="h-3 w-3" />
+              {assessmentExists
+                ? "Avaliação funcional disponível — será usada como contexto."
+                : "Sem avaliação funcional. Faça uma na etapa 2 para refinar a prescrição."}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {studentId && (
+        <Tabs value={step} onValueChange={(v) => setStep(v as Step)}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="anamnese">1. Anamnese</TabsTrigger>
+            <TabsTrigger value="avaliacao">2. Avaliação</TabsTrigger>
+            <TabsTrigger value="prescricao">3. Prescrição</TabsTrigger>
+          </TabsList>
+
+          {/* ETAPA 1 · ANAMNESE */}
+          <TabsContent value="anamnese" className="space-y-5 mt-5">
+            <Card>
+              <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-base flex items-center gap-2">
+                  {answered
+                    ? <CheckCircle2 className="h-4 w-4 text-navy" />
+                    : <Circle className="h-4 w-4 text-muted-foreground" />}
+                  Anamnese {answered ? "respondida pelo aluno" : "— aguardando resposta"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm">
+                {answered ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
+                    <p><span className="text-muted-foreground">Objetivo:</span> {answered.objective}</p>
+                    <p><span className="text-muted-foreground">Nível:</span> {answered.level}</p>
+                    <p><span className="text-muted-foreground">Modalidade:</span> {answered.modality}</p>
+                    <p><span className="text-muted-foreground">Dias força/sem:</span> {answered.days}</p>
+                    <p className="sm:col-span-2"><span className="text-muted-foreground">Lesões:</span> {answered.injuries}</p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    O aluno ainda não respondeu. Envie o link acima ou preencha manualmente abaixo.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Anamnese</CardTitle>
-                <p className="text-xs text-muted-foreground">Preenchida uma vez — usada por todas as IAs selecionadas.</p>
+                <CardTitle className="text-base">Dados para a prescrição</CardTitle>
+                <p className="text-xs text-muted-foreground">Pré-preenchida pela resposta do aluno — edite se necessário. Usada por todas as IAs.</p>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Section open={open} setOpen={setOpen} id="personal" label="Dados pessoais">
@@ -414,6 +573,25 @@ export default function UnifiedPrescriber() {
               </CardContent>
             </Card>
 
+            <Button className="w-full" onClick={() => setStep("avaliacao")}>
+              Avançar para Avaliação <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </TabsContent>
+
+          {/* ETAPA 2 · AVALIAÇÃO */}
+          <TabsContent value="avaliacao" className="space-y-5 mt-5">
+            <FunctionalAssessmentPanel
+              studentId={studentId}
+              companyId={companyId}
+              studentName={student?.full_name}
+            />
+            <Button className="w-full" onClick={() => setStep("prescricao")}>
+              Avançar para Prescrição <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </TabsContent>
+
+          {/* ETAPA 3 · PRESCRIÇÃO */}
+          <TabsContent value="prescricao" className="space-y-5 mt-5">
             <Card>
               <CardHeader className="pb-3"><CardTitle className="text-base">Quais prescrições gerar?</CardTitle></CardHeader>
               <CardContent>
@@ -524,9 +702,9 @@ export default function UnifiedPrescriber() {
                 )}
               </div>
             )}
-          </>
-        )}
-      </div>
-    </>
+          </TabsContent>
+        </Tabs>
+      )}
+    </div>
   );
 }
