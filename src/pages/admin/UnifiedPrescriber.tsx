@@ -362,7 +362,7 @@ export default function UnifiedPrescriber() {
                 <p className="text-xs text-muted-foreground">Preenchida uma vez — usada por todas as IAs selecionadas.</p>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Section id="personal" label="Dados pessoais">
+                <Section open={open} setOpen={setOpen} id="personal" label="Dados pessoais">
                   <F label="Idade"><SI type="number" value={anamnese.age} onChange={(e: any) => set("age", e.target.value)} /></F>
                   <F label="% Gordura corporal"><SI type="number" step="0.1" value={anamnese.body_fat_percent} onChange={(e: any) => set("body_fat_percent", e.target.value)} placeholder="opc." /></F>
                   <F label="Objetivo">
@@ -378,7 +378,7 @@ export default function UnifiedPrescriber() {
                   </F>
                 </Section>
 
-                <Section id="training" label="Treino">
+                <Section open={open} setOpen={setOpen} id="training" label="Treino">
                   <F label="Dias musculação/semana"><SI type="number" min="0" max="6" value={anamnese.days_per_week_strength} onChange={(e: any) => set("days_per_week_strength", e.target.value)} /></F>
                   <F label="Dias cardio/semana"><SI type="number" min="0" max="7" value={anamnese.days_per_week_cardio} onChange={(e: any) => set("days_per_week_cardio", e.target.value)} /></F>
                   <F label="Duração sessão (min)"><SI type="number" value={anamnese.session_duration_min} onChange={(e: any) => set("session_duration_min", e.target.value)} /></F>
@@ -395,7 +395,7 @@ export default function UnifiedPrescriber() {
                 </Section>
 
                 {(modalities.has("corrida") || open.cardio) && (
-                  <Section id="cardio" label="Específico corrida / pedal / natação">
+                  <Section open={open} setOpen={setOpen} id="cardio" label="Específico corrida / pedal / natação">
                     <F label="Modalidade">
                       <SS value={anamnese.sport} onChange={(v: string) => set("sport", v)}
                         opts={[["corrida","Corrida"],["ciclismo","Ciclismo"],["natacao","Natação"],["triathlon","Triathlon"]]} />
@@ -407,7 +407,7 @@ export default function UnifiedPrescriber() {
                   </Section>
                 )}
 
-                <Section id="health" label="Saúde e bem-estar">
+                <Section open={open} setOpen={setOpen} id="health" label="Saúde e bem-estar">
                   <F label="Estresse (0-10)"><SI type="number" min="0" max="10" value={anamnese.stress_score} onChange={(e: any) => set("stress_score", e.target.value)} /></F>
                   <F label="Qualidade do sono (0-10)"><SI type="number" min="0" max="10" value={anamnese.sleep_quality} onChange={(e: any) => set("sleep_quality", e.target.value)} /></F>
                 </Section>
