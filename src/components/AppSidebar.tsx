@@ -92,8 +92,6 @@ const managementItems = [
 
 
 const financialItem = { title: "Financeiro", url: "/admin/financial", icon: DollarSign };
-const adminAiCoachItem = { title: "Central de IA", url: "/admin/ai-studio", icon: Sparkles };
-const coordinatorAiCoachItem = { title: "Central de IA", url: "/coordinator/ai-studio", icon: Sparkles };
 
 const whatsappSubItems = [
   { title: "Conversas", url: "/admin/whatsapp-chat", icon: MessageSquare },
