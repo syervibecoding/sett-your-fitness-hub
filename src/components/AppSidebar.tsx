@@ -310,37 +310,24 @@ export function AppSidebar() {
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/prescricao`}>
+                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/prescricao` || location.pathname === `${exercisePrefix}/studio` || location.pathname === `${exercisePrefix}/nutricao` || location.pathname === `${exercisePrefix}/avaliacao`}>
                             <NavLink to={`${exercisePrefix}/prescricao`} end>
-                              <Sparkles className="h-4 w-4" />
-                              <span>Prescrição BN</span>
-                            </NavLink>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/studio`}>
-                            <NavLink to={`${exercisePrefix}/studio`} end>
                               <Cpu className="h-4 w-4" />
-                              <span>Studio de Prescrição</span>
+                              <span>Studio Integrado</span>
                             </NavLink>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/nutricao`}>
-                            <NavLink to={`${exercisePrefix}/nutricao`} end>
-                              <Apple className="h-4 w-4" />
-                              <span>Studio de Nutrição</span>
-                            </NavLink>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/avaliacao`}>
-                            <NavLink to={`${exercisePrefix}/avaliacao`} end>
-                              <Activity className="h-4 w-4" />
-                              <span>Avaliação Funcional</span>
-                            </NavLink>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
+                        {(features.hasAiCoach || showAdminView) && (
+                          <SidebarMenuSubItem>
+                            <SidebarMenuSubButton asChild isActive={location.pathname === `${exercisePrefix}/ai-studio`}>
+                              <NavLink to={`${exercisePrefix}/ai-studio`} end>
+                                <Sparkles className="h-4 w-4" />
+                                <span>Central de IA</span>
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        )}
+
 
                       </SidebarMenuSub>
                     </CollapsibleContent>
