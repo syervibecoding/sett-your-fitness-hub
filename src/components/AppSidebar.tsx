@@ -20,9 +20,7 @@ import {
   ClipboardCheck,
   Megaphone,
   Sparkles,
-  Activity,
   Cpu,
-  Apple,
 
 
 } from "lucide-react";
