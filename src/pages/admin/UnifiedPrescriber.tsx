@@ -53,6 +53,40 @@ const DEFAULT_ANAMNESE: Anamnese = {
   stress_score: "", sleep_quality: "", injuries: "", notes: "",
 };
 
+// ── UI helpers (module-level para NÃO remontar os inputs a cada tecla) ──
+const inputCls = "h-9 text-sm";
+const SI = (props: any) => <Input {...props} className={inputCls} />;
+const F = ({ label, span, children }: { label: string; span?: string; children: React.ReactNode }) => (
+  <div className={span}>
+    <Label className="text-xs text-muted-foreground mb-1">{label}</Label>
+    {children}
+  </div>
+);
+const SS = ({ value, onChange, opts, placeholder }: any) => (
+  <Select value={value || undefined} onValueChange={onChange}>
+    <SelectTrigger className={inputCls}><SelectValue placeholder={placeholder} /></SelectTrigger>
+    <SelectContent>{opts.map(([v, l]: [string, string]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
+  </Select>
+);
+type OpenState = { personal: boolean; training: boolean; cardio: boolean; health: boolean };
+const Section = ({ id, label, open, setOpen, children }: {
+  id: keyof OpenState; label: string;
+  open: OpenState; setOpen: React.Dispatch<React.SetStateAction<OpenState>>;
+  children: React.ReactNode;
+}) => (
+  <div className="border border-line rounded-lg overflow-hidden">
+    <button
+      type="button"
+      className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-left hover:bg-muted/50"
+      onClick={() => setOpen(o => ({ ...o, [id]: !o[id] }))}
+    >
+      {label}
+      {open[id] ? <ChevronUp className="h-4 w-4 opacity-50" /> : <ChevronDown className="h-4 w-4 opacity-50" />}
+    </button>
+    {open[id] && <div className="px-4 pb-4 pt-2 grid gap-3 grid-cols-2 md:grid-cols-3 border-t border-line">{children}</div>}
+  </div>
+);
+
 export default function UnifiedPrescriber() {
   const { role, companyId: authCompanyId } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
