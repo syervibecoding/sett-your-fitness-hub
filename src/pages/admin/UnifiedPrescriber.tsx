@@ -53,6 +53,40 @@ const DEFAULT_ANAMNESE: Anamnese = {
   stress_score: "", sleep_quality: "", injuries: "", notes: "",
 };
 
+// ── UI helpers (module-level para NÃO remontar os inputs a cada tecla) ──
+const inputCls = "h-9 text-sm";
+const SI = (props: any) => <Input {...props} className={inputCls} />;
+const F = ({ label, span, children }: { label: string; span?: string; children: React.ReactNode }) => (
+  <div className={span}>
+    <Label className="text-xs text-muted-foreground mb-1">{label}</Label>
+    {children}
+  </div>
+);
+const SS = ({ value, onChange, opts, placeholder }: any) => (
+  <Select value={value || undefined} onValueChange={onChange}>
+    <SelectTrigger className={inputCls}><SelectValue placeholder={placeholder} /></SelectTrigger>
+    <SelectContent>{opts.map(([v, l]: [string, string]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
+  </Select>
+);
+type OpenState = { personal: boolean; training: boolean; cardio: boolean; health: boolean };
+const Section = ({ id, label, open, setOpen, children }: {
+  id: keyof OpenState; label: string;
+  open: OpenState; setOpen: React.Dispatch<React.SetStateAction<OpenState>>;
+  children: React.ReactNode;
+}) => (
+  <div className="border border-line rounded-lg overflow-hidden">
+    <button
+      type="button"
+      className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-left hover:bg-muted/50"
+      onClick={() => setOpen(o => ({ ...o, [id]: !o[id] }))}
+    >
+      {label}
+      {open[id] ? <ChevronUp className="h-4 w-4 opacity-50" /> : <ChevronDown className="h-4 w-4 opacity-50" />}
+    </button>
+    {open[id] && <div className="px-4 pb-4 pt-2 grid gap-3 grid-cols-2 md:grid-cols-3 border-t border-line">{children}</div>}
+  </div>
+);
+
 export default function UnifiedPrescriber() {
   const { role, companyId: authCompanyId } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
@@ -270,33 +304,6 @@ export default function UnifiedPrescriber() {
   }
 
   // ── UI helpers ──
-  const inputCls = "h-9 text-sm";
-  const Section = ({ id, label, children }: { id: keyof typeof open; label: string; children: React.ReactNode }) => (
-    <div className="border border-line rounded-lg overflow-hidden">
-      <button
-        type="button"
-        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-left hover:bg-muted/50"
-        onClick={() => setOpen(o => ({ ...o, [id]: !o[id] }))}
-      >
-        {label}
-        {open[id] ? <ChevronUp className="h-4 w-4 opacity-50" /> : <ChevronDown className="h-4 w-4 opacity-50" />}
-      </button>
-      {open[id] && <div className="px-4 pb-4 pt-2 grid gap-3 grid-cols-2 md:grid-cols-3 border-t border-line">{children}</div>}
-    </div>
-  );
-  const F = ({ label, span, children }: { label: string; span?: string; children: React.ReactNode }) => (
-    <div className={span}>
-      <Label className="text-xs text-muted-foreground mb-1">{label}</Label>
-      {children}
-    </div>
-  );
-  const SI = (props: any) => <Input {...props} className={inputCls} />;
-  const SS = ({ value, onChange, opts, placeholder }: any) => (
-    <Select value={value || undefined} onValueChange={onChange}>
-      <SelectTrigger className={inputCls}><SelectValue placeholder={placeholder} /></SelectTrigger>
-      <SelectContent>{opts.map(([v, l]: [string, string]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
-    </Select>
-  );
   const genStatusIcon = (s: GenStatus) => {
     if (s === "generating") return <Loader2 className="h-4 w-4 animate-spin text-navy" />;
     if (s === "done")       return <CheckCircle2 className="h-4 w-4 text-navy" />;
@@ -355,7 +362,7 @@ export default function UnifiedPrescriber() {
                 <p className="text-xs text-muted-foreground">Preenchida uma vez — usada por todas as IAs selecionadas.</p>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Section id="personal" label="Dados pessoais">
+                <Section open={open} setOpen={setOpen} id="personal" label="Dados pessoais">
                   <F label="Idade"><SI type="number" value={anamnese.age} onChange={(e: any) => set("age", e.target.value)} /></F>
                   <F label="% Gordura corporal"><SI type="number" step="0.1" value={anamnese.body_fat_percent} onChange={(e: any) => set("body_fat_percent", e.target.value)} placeholder="opc." /></F>
                   <F label="Objetivo">
@@ -371,7 +378,7 @@ export default function UnifiedPrescriber() {
                   </F>
                 </Section>
 
-                <Section id="training" label="Treino">
+                <Section open={open} setOpen={setOpen} id="training" label="Treino">
                   <F label="Dias musculação/semana"><SI type="number" min="0" max="6" value={anamnese.days_per_week_strength} onChange={(e: any) => set("days_per_week_strength", e.target.value)} /></F>
                   <F label="Dias cardio/semana"><SI type="number" min="0" max="7" value={anamnese.days_per_week_cardio} onChange={(e: any) => set("days_per_week_cardio", e.target.value)} /></F>
                   <F label="Duração sessão (min)"><SI type="number" value={anamnese.session_duration_min} onChange={(e: any) => set("session_duration_min", e.target.value)} /></F>
@@ -388,7 +395,7 @@ export default function UnifiedPrescriber() {
                 </Section>
 
                 {(modalities.has("corrida") || open.cardio) && (
-                  <Section id="cardio" label="Específico corrida / pedal / natação">
+                  <Section open={open} setOpen={setOpen} id="cardio" label="Específico corrida / pedal / natação">
                     <F label="Modalidade">
                       <SS value={anamnese.sport} onChange={(v: string) => set("sport", v)}
                         opts={[["corrida","Corrida"],["ciclismo","Ciclismo"],["natacao","Natação"],["triathlon","Triathlon"]]} />
@@ -400,7 +407,7 @@ export default function UnifiedPrescriber() {
                   </Section>
                 )}
 
-                <Section id="health" label="Saúde e bem-estar">
+                <Section open={open} setOpen={setOpen} id="health" label="Saúde e bem-estar">
                   <F label="Estresse (0-10)"><SI type="number" min="0" max="10" value={anamnese.stress_score} onChange={(e: any) => set("stress_score", e.target.value)} /></F>
                   <F label="Qualidade do sono (0-10)"><SI type="number" min="0" max="10" value={anamnese.sleep_quality} onChange={(e: any) => set("sleep_quality", e.target.value)} /></F>
                 </Section>
