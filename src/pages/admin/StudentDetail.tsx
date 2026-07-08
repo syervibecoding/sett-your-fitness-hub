@@ -869,18 +869,52 @@ export default function StudentDetail() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="w-full justify-start overflow-x-auto flex-nowrap h-auto p-1">
-            <TabsTrigger value="overview" className="text-xs sm:text-sm">Visão Geral</TabsTrigger>
-            <TabsTrigger value="program" className="text-xs sm:text-sm">Programa</TabsTrigger>
-            <TabsTrigger value="workouts" className="text-xs sm:text-sm">Treinos</TabsTrigger>
-            <TabsTrigger value="analytics" className="text-xs sm:text-sm">Análises</TabsTrigger>
-            <TabsTrigger value="anamnesis" className="text-xs sm:text-sm">Anamnese</TabsTrigger>
-            <TabsTrigger value="limitations" className="text-xs sm:text-sm">Limitações</TabsTrigger>
-            <TabsTrigger value="financial" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
-            <TabsTrigger value="evaluations" className="text-xs sm:text-sm">Avaliações</TabsTrigger>
-          </TabsList>
+        {/* Tabs — agrupadas em Programa / Avaliações / Visão 360 */}
+        <div className="w-full space-y-3">
+          {/* Grupos principais */}
+          <div className="flex flex-wrap gap-2 border-b border-border pb-2">
+            {([
+              { key: "programa", label: "Programa" },
+              { key: "avaliacoes", label: "Avaliações" },
+              { key: "visao360", label: "Visão 360" },
+            ] as const).map((g) => (
+              <button
+                key={g.key}
+                onClick={() => selectMain(g.key)}
+                className={`px-4 py-2 text-sm font-sans font-semibold rounded-md transition-colors ${
+                  mainTab === g.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
+
+          <Tabs value={subTab} onValueChange={setSubTab} className="w-full">
+            <TabsList className="w-full justify-start overflow-x-auto flex-nowrap h-auto p-1">
+              {mainTab === "programa" && (
+                <>
+                  <TabsTrigger value="program" className="text-xs sm:text-sm">Programa</TabsTrigger>
+                  <TabsTrigger value="workouts" className="text-xs sm:text-sm">Treinos</TabsTrigger>
+                  <TabsTrigger value="analytics" className="text-xs sm:text-sm">Análises</TabsTrigger>
+                </>
+              )}
+              {mainTab === "avaliacoes" && (
+                <>
+                  <TabsTrigger value="anamnesis" className="text-xs sm:text-sm">Anamnese</TabsTrigger>
+                  <TabsTrigger value="evaluations" className="text-xs sm:text-sm">Avaliações</TabsTrigger>
+                  <TabsTrigger value="progresso" className="text-xs sm:text-sm">Progresso</TabsTrigger>
+                </>
+              )}
+              {mainTab === "visao360" && (
+                <>
+                  <TabsTrigger value="overview" className="text-xs sm:text-sm">Visão Geral</TabsTrigger>
+                  <TabsTrigger value="financial" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
+                  <TabsTrigger value="acompanhamento" className="text-xs sm:text-sm">Acompanhamento</TabsTrigger>
+                </>
+              )}
+            </TabsList>
+
 
 
 
