@@ -22,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Loader2, CheckCircle2, Circle, AlertCircle, Dumbbell, Activity, Waves, Bike, Apple,
   ChevronDown, ChevronUp, ClipboardCheck, Send, Link2, Sparkles, Search, ArrowRight,
-  Trash2, Plus, FileDown, Rocket,
+  Trash2, Plus, FileDown, Rocket, Layers, Info, ShieldAlert, AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -32,6 +32,10 @@ import FunctionalAssessmentPanel from "@/components/admin/FunctionalAssessmentPa
 import { generateNutritionPlan } from "@/lib/nutrition";
 import type { NutritionInput, NutritionObjective, ActivityLevel, Sex } from "@/lib/nutrition";
 import { jsPDF } from "jspdf";
+import { ExerciseLibraryPicker, type LibraryExercise } from "@/components/trainer/ExerciseLibraryPicker";
+import { GROUP_DEFS, GROUP_ORDER, type GroupType } from "@/lib/workoutGroups";
+import { useStudentLimitations } from "@/hooks/useStudentLimitations";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Student { id: string; full_name: string; gender: string | null; birth_date: string | null; }
 interface Cycle { id: string; cycle_number: number; status: string; start_date: string; end_date: string; }
