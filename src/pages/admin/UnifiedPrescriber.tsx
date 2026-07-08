@@ -1205,6 +1205,13 @@ export default function UnifiedPrescriber() {
           </TabsContent>
         </Tabs>
       )}
+
+      <ExerciseLibraryPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        alreadyAddedIds={new Set(((editableWorkouts[pickerTarget]?.exercises) || []).map((e: any) => e.exercise_id).filter(Boolean))}
+        onAdd={addFromPicker}
+      />
     </div>
   );
 }
