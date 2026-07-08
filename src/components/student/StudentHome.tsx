@@ -50,6 +50,7 @@ export function StudentHome({
   streak,
   goalEditor,
   achievementsPanel,
+  prescribedModalities = [],
   onNavigate,
 
 }: StudentHomeProps) {
