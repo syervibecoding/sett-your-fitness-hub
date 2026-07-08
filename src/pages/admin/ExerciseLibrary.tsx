@@ -21,6 +21,7 @@ interface Exercise {
   description: string | null;
   muscle_group: string;
   category: string | null;
+  categories: string[] | null;
   video_url: string | null;
   video_path: string | null;
   thumbnail_url: string | null;
@@ -28,6 +29,28 @@ interface Exercise {
   company_id: string | null;
   created_by: string;
 }
+
+// Categorias disponíveis para marcação (múltipla escolha)
+const CATEGORY_OPTIONS = [
+  "mobilidade",
+  "controle_motor",
+  "ativacao",
+  "core",
+  "performance",
+  "base",
+  "fisioterapia",
+  "pesos_livres",
+  "peso_corporal",
+  "maquinas",
+  "pliometria",
+];
+
+// Retorna a lista de categorias de um exercício com fallback para o campo antigo `category`.
+const getExerciseCategories = (ex: { categories?: string[] | null; category?: string | null }): string[] => {
+  if (ex.categories && ex.categories.length > 0) return ex.categories;
+  if (ex.category) return [ex.category];
+  return [];
+};
 
 const CATEGORY_LABELS: Record<string, string> = {
   base: "Base",
