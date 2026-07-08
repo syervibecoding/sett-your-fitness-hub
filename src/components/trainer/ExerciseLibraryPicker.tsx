@@ -88,6 +88,11 @@ export function ExerciseLibraryPicker({ open, onOpenChange, alreadyAddedIds, onA
   const [showBody, setShowBody] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  // Sugestão automática por objetivos
+  const [objectives, setObjectives] = useState<Set<string>>(new Set());
+  const [perObjective, setPerObjective] = useState(2);
+
+
   useEffect(() => {
     (async () => {
       const { data } = await supabase
