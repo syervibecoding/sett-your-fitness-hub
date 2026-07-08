@@ -1,70 +1,46 @@
+# Seletor de biblioteca unificado na Prescrição
+
+## Problema
+Na etapa **"4. Editar treino"** da Prescrição (`UnifiedPrescriber`), os exercícios só podem ser digitados em campos de texto. Não existe o seletor da biblioteca com abas por categoria, filtro por região, multi-seleção, agrupamentos (bi-set/tri-set/etc.), painel BNITO nem limitações da anamnese — recursos que só estão no Montar Treino (`WorkoutBuilder`), e mesmo lá com um visual diferente do desejado.
+
 ## Objetivo
+1. Criar **um seletor de biblioteca reutilizável** com o visual da referência: abas de categoria, chip de região muscular, grade de cards com miniatura de vídeo e rodapé de multi-seleção.
+2. Usar esse seletor **na Prescrição e no Montar Treino** (padronização).
+3. Trazer para a Prescrição **todos os recursos**: multi-seleção, agrupamentos, BNITO (placeholder) e limitações reais da anamnese.
 
-Evoluir o construtor **Montar Treino** (`src/pages/admin/WorkoutBuilder.tsx`) com: seleção múltipla na biblioteca, agrupamento de 2+ exercícios (Bi-set, Tri-set, Super-set, Série gigante, Circuito) com definições explicativas, painel BNITO como placeholder (sem conexão) e um painel de limitações reais lidas da anamnese do aluno. O agrupamento é salvo no treino e exibido também na visão do aluno.
+## Componentes a criar
 
-Sem mudanças de banco: o agrupamento entra como campos novos dentro do JSONB `workouts.exercises`, e as limitações já existem em `student_body_limitations`.
+### 1. `src/components/trainer/ExerciseLibraryPicker.tsx` (novo)
+Diálogo reutilizável de seleção de exercícios.
+- **Abas de categoria** (a partir do campo `category` de `exercise_library`): Todos, Mobilidade, Controle Motor, Ativação, Core, Performance, Base, Fisioterapia, Pesos Livres, Peso Corporal, Máquinas, Pliometria (rótulos amigáveis mapeados dos valores do banco).
+- **Chip de região muscular** (Peitoral, Dorsal, etc.) com botão "Limpar" — usa o mapeamento `bodyMap` já existente; opção de manter o boneco anatômico atrás de um botão "Selecionar pelo boneco".
+- **Busca** por nome.
+- **Grade de cards** com miniatura (`thumbnail_url`/capa do vídeo via `exerciseCover`), nome, badge de músculo e checkbox de seleção; item já adicionado fica esmaecido.
+- **Rodapé fixo**: "N exercício(s) selecionado(s)" + botão "Adicionar (N)".
+- Recebe `alreadyAddedIds` e dispara `onAdd(exercises[])`; não conhece o modelo de treino (reutilizável).
 
-## 1. Biblioteca com seleção múltipla
+### 2. `src/hooks/useStudentLimitations.ts` (novo)
+Extrai a lógica de carregar `student_body_limitations` (já usada no WorkoutBuilder) para reuso na Prescrição.
 
-Na dialog "Biblioteca de exercícios":
-- Cada item ganha um checkbox; clicar seleciona/desseleciona (mantém o filtro por boneco/busca/grupo atual).
-- Rodapé fixo com contador "N selecionado(s)" e botão **Adicionar selecionados (N)**, que insere todos de uma vez no treino-alvo.
-- Itens já adicionados aparecem marcados/desabilitados como hoje.
+## Alterações
 
-## 2. Modelo de dados do exercício (JSONB, sem migração)
+### `src/pages/admin/WorkoutBuilder.tsx`
+- Substituir o diálogo de biblioteca atual pelo `ExerciseLibraryPicker`, mantendo `addSelectedExercises`.
+- Reaproveitar `useStudentLimitations`.
 
-Adicionar dois campos opcionais em cada exercício do treino:
-
-```text
-group_id?:   string   // id compartilhado pelos exercícios do mesmo agrupamento
-group_type?: 'bi_set' | 'tri_set' | 'super_set' | 'giant_set' | 'circuit'
-```
-
-Atualizar a interface `WorkoutExercise` no construtor e na visão do aluno (`StudentPortal.tsx`). Como `handleSaveAll` já grava o array `exercises` inteiro, o agrupamento é persistido automaticamente.
-
-## 3. Agrupar exercícios no construtor
-
-Em cada treino:
-- Modo de seleção: checkbox em cada card de exercício.
-- Ao ter 2+ selecionados, aparece uma barra de ações: **agrupar:** `Bi-set` · `Tri-set` · `Super-set` · `Série gigante` · `Circuito` · `Desagrupar`.
-- Ao escolher um tipo: gera um `group_id`, aplica `group_type` aos selecionados e os **reordena para ficarem contíguos** (necessário para o "colchete" visual). "Desagrupar" limpa os campos.
-- Cada opção de agrupamento tem um ícone de informação com **tooltip/definição**:
-  - Bi-set: 2 exercícios em sequência, sem descanso entre eles.
-  - Tri-set: 3 exercícios em sequência, sem descanso.
-  - Super-set: 2 exercícios de músculos antagonistas em sequência.
-  - Série gigante: 4+ exercícios seguidos para o mesmo grupo.
-  - Circuito: vários exercícios em sequência, descanso só ao final da volta.
-- Visual do grupo: borda/etiqueta colorida à esquerda dos cards do mesmo `group_id` + badge com o rótulo (ex.: "SUPER-SET").
-
-## 4. Visão do aluno
-
-Em `StudentPortal.tsx`, ao renderizar `selectedWorkout.exercises` (lista de `ExerciseCard`):
-- Detectar sequências consecutivas com mesmo `group_id` e envolvê-las com um cabeçalho/colchete e um badge do rótulo do agrupamento.
-- Exercícios sem `group_id` continuam exibidos normalmente.
-
-## 5. Painel BNITO (placeholder)
-
-Adicionar um card "BNITO — Copiloto técnico" no construtor:
-- Botão **Auditar treino** desabilitado com legenda "em breve" e um campo de pergunta desabilitado.
-- Sem nenhuma chamada a edge function (não conectar agora).
-
-## 6. Painel de limitações reais
-
-No construtor, carregar as limitações do aluno do ciclo:
-- Resolver `student_id` via `training_cycles → enrollments` (já feito em `loadCycleInfo`).
-- Buscar `student_body_limitations` (region, type, severity, note) desse aluno.
-- Exibir card read-only listando cada limitação (região · tipo · gravidade · observação), com destaque para gravidade severa.
-- Se não houver nenhuma: "Nenhuma limitação registrada na anamnese."
+### `src/pages/admin/UnifiedPrescriber.tsx` (etapa "Editar treino")
+- Adicionar botão **"Adicionar da biblioteca"** por treino, abrindo o `ExerciseLibraryPicker`; os exercícios escolhidos entram em `editableWorkouts[wi].exercises` já com `exercise_id`, `exercise_name`, `muscle_group`, `video_url`, `video_path` (os campos de texto manuais continuam disponíveis para ajustes).
+- Adicionar a **barra de agrupamento** (aparece com 2+ exercícios marcados): Bi-set, Tri-set, Super-set, Série gigante, Circuito + Desagrupar, com tooltip explicativo de cada técnica. Grava `group_id`/`group_type` em cada exercício.
+- Adicionar **card BNITO — Copiloto técnico** (placeholder, botão "Auditar treino" desabilitado, sem chamada de IA).
+- Adicionar **painel de limitações** (somente leitura) via `useStudentLimitations`, destacando limitações severas.
+- Ajustar `publishWorkout` para gravar também `group_id` e `group_type` no JSONB de `workouts.exercises`, garantindo que os agrupamentos apareçam no app do aluno (já suportado no `StudentPortal`).
 
 ## Detalhes técnicos
+- Sem migração de banco: `category`, `thumbnail_url` e `video_*` já existem em `exercise_library`; agrupamentos ficam no JSONB de `workouts.exercises`.
+- Modelo de dados da Prescrição (`sets` número, `rest_seconds`, `cues`) é preservado; o picker preenche apenas identidade do exercício, mídia e agrupamento.
+- Reuso de helpers existentes: `bodyMap` (região), `exerciseCover` (capa), `GROUP_DEFS` (movido para módulo compartilhado, ex.: `src/lib/workoutGroups.ts`, e importado nos dois lugares).
+- Sem alterações de RLS, edge functions ou conexão real do BNITO.
 
-- Arquivos alterados: `src/pages/admin/WorkoutBuilder.tsx` (principal), `src/pages/student/StudentPortal.tsx` e possivelmente `src/components/student/ExerciseCard.tsx` (apenas para o invólucro/badge de grupo).
-- Sem migração, sem edge function, sem alteração de RLS.
-- Tokens semânticos do design system para as cores dos badges/bordas de grupo (nada de cores hardcoded).
-- Retrocompatível: treinos antigos sem `group_id` seguem funcionando igual.
-
-## Fora de escopo (por ora)
-
-- Técnicas por exercício (drop-set/rest-pause/cluster/isometria/picos) — os tipos de série W/Normal/F/D atuais permanecem.
-- Conexão real da IA BNITO.
-- Abas de categoria da biblioteca (Mobilidade, Controle Motor etc.).
+## Fora de escopo
+- Conectar o BNITO a uma IA (segue placeholder).
+- Redesenhar as demais etapas da Prescrição.
