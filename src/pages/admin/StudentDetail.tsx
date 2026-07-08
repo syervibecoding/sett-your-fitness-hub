@@ -39,6 +39,10 @@ const TrainerWeeklyBar = lazy(() => import("@/components/trainer/TrainerWeeklyBa
 const MuscleRadar = lazy(() => import("@/components/student/MuscleRadar").then(m => ({ default: m.MuscleRadar })));
 const BodyLimitationsEditor = lazy(() => import("@/components/trainer/BodyLimitationsEditor").then(m => ({ default: m.BodyLimitationsEditor })));
 const BodyMeasurements = lazy(() => import("@/components/student/BodyMeasurements").then(m => ({ default: m.BodyMeasurements })));
+const StudentGoalsEditor = lazy(() => import("@/components/trainer/StudentGoalsEditor").then(m => ({ default: m.StudentGoalsEditor })));
+const StudentTimeline = lazy(() => import("@/components/trainer/StudentTimeline").then(m => ({ default: m.StudentTimeline })));
+const StudentDocuments = lazy(() => import("@/components/trainer/StudentDocuments").then(m => ({ default: m.StudentDocuments })));
+const StudentContactPanel = lazy(() => import("@/components/trainer/StudentContactPanel").then(m => ({ default: m.StudentContactPanel })));
 
 
 const TabFallback = () => (
