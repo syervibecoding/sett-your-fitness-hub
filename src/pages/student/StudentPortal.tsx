@@ -122,6 +122,7 @@ export default function StudentPortal() {
   const [companyWhatsapp, setCompanyWhatsapp] = useState<string | null>(null);
   const [workoutSessions, setWorkoutSessions] = useState<any[]>([]);
   const [weeklyGoal, setWeeklyGoal] = useState<number>(3);
+  const [goals, setGoals] = useState<{ id: string; title: string; type: string; target_date: string }[]>([]);
   const [activeEnrollmentId, setActiveEnrollmentId] = useState<string | null>(null);
   const [warmupOpen, setWarmupOpen] = useState(false);
   
