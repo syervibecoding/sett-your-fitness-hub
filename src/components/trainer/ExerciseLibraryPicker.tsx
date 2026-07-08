@@ -60,6 +60,19 @@ const CATEGORY_ORDER = [
   "pliometria",
 ];
 
+// Categorias tratadas como "objetivos" para a sugestão automática
+// (deixa de fora categorias de equipamento como máquinas / pesos livres).
+const OBJECTIVE_CATEGORIES = [
+  "mobilidade",
+  "controle_motor",
+  "ativacao",
+  "core",
+  "performance",
+  "base",
+  "fisioterapia",
+  "pliometria",
+];
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
