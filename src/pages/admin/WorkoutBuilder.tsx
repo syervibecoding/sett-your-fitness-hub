@@ -853,8 +853,9 @@ export default function WorkoutBuilder() {
       </div>
 
       {/* Library picker dialog */}
-      <Dialog open={libraryOpen} onOpenChange={setLibraryOpen}>
-        <DialogContent className="bg-card border-border max-w-2xl max-h-[80vh] overflow-y-auto">
+      <Dialog open={libraryOpen} onOpenChange={(o) => { setLibraryOpen(o); if (!o) setSelectedLibIds(new Set()); }}>
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[85vh] overflow-y-auto flex flex-col">
+
           <DialogHeader>
             <DialogTitle className="text-primary">BIBLIOTECA DE EXERCÍCIOS</DialogTitle>
           </DialogHeader>
