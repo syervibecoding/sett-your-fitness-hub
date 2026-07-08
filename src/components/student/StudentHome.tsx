@@ -30,7 +30,8 @@ interface StudentHomeProps {
   streak: number;
   goalEditor?: React.ReactNode;
   achievementsPanel?: React.ReactNode;
-  onNavigate: (view: "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos" | "medidas" | "nutricao" | "cardio") => void;
+  prescribedModalities?: string[];
+  onNavigate: (view: "treino" | "stats" | "calendario" | "historico" | "atividades" | "avisos" | "medidas" | "nutricao" | "cardio" | "natacao" | "corrida" | "ciclismo") => void;
 }
 
 
