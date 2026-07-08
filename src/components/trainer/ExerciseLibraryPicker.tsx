@@ -405,10 +405,20 @@ export function ExerciseLibraryPicker({ open, onOpenChange, alreadyAddedIds, onA
                     </div>
                     <div className="p-2 space-y-1">
                       <p className="text-xs font-sans font-medium text-foreground line-clamp-2 leading-tight">{ex.name}</p>
-                      {ex.muscle_group && (
-                        <Badge variant="outline" className="text-[10px] capitalize">{ex.muscle_group}</Badge>
-                      )}
+                      <div className="flex flex-wrap gap-1">
+                        {ex.muscle_group && (
+                          <Badge variant="outline" className="text-[10px] capitalize">{ex.muscle_group}</Badge>
+                        )}
+                        {getExerciseCategories(ex)
+                          .filter((c) => objectives.has(c))
+                          .map((c) => (
+                            <Badge key={c} className="text-[10px] bg-primary/15 text-primary border-primary/30">
+                              {CATEGORY_LABELS[c] || c}
+                            </Badge>
+                          ))}
+                      </div>
                     </div>
+
                   </button>
                 );
               })}
