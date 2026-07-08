@@ -346,7 +346,7 @@ export default function ExerciseLibrary() {
     setPrimaryMuscleIds([]);
     setSecondaryMuscleIds([]);
     setCompanyVolumes({});
-    setForm({ name: "", description: "", muscle_group: "geral", category: "", video_url: "", is_global: false });
+    setForm({ name: "", description: "", muscle_group: "geral", categories: [], video_url: "", is_global: false });
   };
 
   const getEmbedUrl = (url: string) => {
