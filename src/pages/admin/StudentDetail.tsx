@@ -266,6 +266,16 @@ export default function StudentDetail() {
   const [financialEnrollment, setFinancialEnrollment] = useState<Enrollment | null>(null);
   const [financialForm, setFinancialForm] = useState({ payment_status: "", payment_date: "", payment_method: "", financial_notes: "" });
 
+  // Navegação em grupos (Programa / Avaliações / Visão 360) + subabas
+  type MainTab = "programa" | "avaliacoes" | "visao360";
+  const [mainTab, setMainTab] = useState<MainTab>("programa");
+  const [subTab, setSubTab] = useState<string>("program");
+  const [measGender, setMeasGender] = useState<any>(null);
+  const selectMain = (m: MainTab) => {
+    setMainTab(m);
+    setSubTab(m === "programa" ? "program" : m === "avaliacoes" ? "anamnesis" : "overview");
+  };
+
   // Evaluations
   const [evalNotes, setEvalNotes] = useState("");
   const [uploading, setUploading] = useState(false);
