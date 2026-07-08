@@ -16,18 +16,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, X, Info, Layers, Sparkles, AlertTriangle, ShieldAlert } from "lucide-react";
-import { BodyMap } from "@/components/body/BodyMap";
-import { muscleGroupToRegion, REGION_LABEL, type BodyRegionId } from "@/lib/bodyMap";
-
-const GROUP_DEFS = {
-  bi_set: { label: "Bi-set", short: "BI-SET", desc: "2 exercícios em sequência, sem descanso entre eles." },
-  tri_set: { label: "Tri-set", short: "TRI-SET", desc: "3 exercícios em sequência, sem descanso." },
-  super_set: { label: "Super-set", short: "SUPER-SET", desc: "2 exercícios de músculos antagonistas em sequência." },
-  giant_set: { label: "Série gigante", short: "SÉRIE GIGANTE", desc: "4+ exercícios seguidos para o mesmo grupo." },
-  circuit: { label: "Circuito", short: "CIRCUITO", desc: "Vários exercícios em sequência, descanso só ao final da volta." },
-} as const;
-type GroupType = keyof typeof GROUP_DEFS;
-const GROUP_ORDER: GroupType[] = ["bi_set", "tri_set", "super_set", "giant_set", "circuit"];
+import { ExerciseLibraryPicker, type LibraryExercise } from "@/components/trainer/ExerciseLibraryPicker";
+import { GROUP_DEFS, GROUP_ORDER, type GroupType } from "@/lib/workoutGroups";
 
 interface BodyLimitation {
   id: string;
@@ -107,15 +97,11 @@ export default function WorkoutBuilder() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [targetWorkoutIdx, setTargetWorkoutIdx] = useState(0);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [libraryExercises, setLibraryExercises] = useState<Exercise[]>([]);
-  const [libSearch, setLibSearch] = useState("");
-  const [libGroup, setLibGroup] = useState("all");
-  const [libRegion, setLibRegion] = useState<BodyRegionId | null>(null);
   const [videoModal, setVideoModal] = useState<{ type: "path" | "url"; value: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [cycleInfo, setCycleInfo] = useState<{ cycle_number: number; student_name: string } | null>(null);
   const [showVolume, setShowVolume] = useState(true);
-  const [selectedLibIds, setSelectedLibIds] = useState<Set<string>>(new Set());
+  
   const [selKeys, setSelKeys] = useState<Set<string>>(new Set());
   const [limitations, setLimitations] = useState<BodyLimitation[]>([]);
 
@@ -127,7 +113,7 @@ export default function WorkoutBuilder() {
       loadExisting();
       loadCycleInfo();
     }
-    loadLibrary();
+    
     loadMuscleTargets();
   }, [cycleId]);
 
@@ -186,14 +172,6 @@ export default function WorkoutBuilder() {
     }
   };
 
-  const loadLibrary = async () => {
-    const { data } = await supabase
-      .from("exercise_library")
-      .select("id, name, muscle_group, video_url, video_path, description")
-      .order("muscle_group")
-      .order("name");
-    setLibraryExercises((data as Exercise[]) || []);
-  };
 
   const loadMuscleTargets = async () => {
     const { data } = await (supabase as any)
@@ -242,30 +220,9 @@ export default function WorkoutBuilder() {
     notes: "",
   });
 
-  const addExercise = (ex: Exercise) => {
+  const addFromPicker = (exs: LibraryExercise[]) => {
     const idx = targetWorkoutIdx;
-    setWorkouts(prev => prev.map((w, i) => i === idx ? { ...w, exercises: [...w.exercises, makeWX(ex)] } : w));
-    setLibraryOpen(false);
-  };
-
-  const toggleLibSelect = (id: string) => {
-    setSelectedLibIds(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
-  const addSelectedExercises = () => {
-    const idx = targetWorkoutIdx;
-    const current = workouts[idx]?.exercises || [];
-    const toAdd = libraryExercises.filter(
-      ex => selectedLibIds.has(ex.id) && !current.some(w => w.exercise_id === ex.id)
-    );
-    if (toAdd.length === 0) { setLibraryOpen(false); return; }
-    setWorkouts(prev => prev.map((w, i) => i === idx ? { ...w, exercises: [...w.exercises, ...toAdd.map(makeWX)] } : w));
-    setSelectedLibIds(new Set());
-    setLibraryOpen(false);
+    setWorkouts(prev => prev.map((w, i) => i === idx ? { ...w, exercises: [...w.exercises, ...exs.map(makeWX)] } : w));
   };
 
   // ---- Grouping selection (key = `${wIdx}:${exIdx}`) ----
@@ -422,12 +379,6 @@ export default function WorkoutBuilder() {
     return "bg-red-500";
   };
 
-  const filteredLib = libraryExercises.filter((ex) => {
-    const matchSearch = ex.name.toLowerCase().includes(libSearch.toLowerCase());
-    const matchGroup = libGroup === "all" || ex.muscle_group === libGroup;
-    const matchRegion = !libRegion || muscleGroupToRegion(ex.muscle_group) === libRegion;
-    return matchSearch && matchGroup && matchRegion;
-  });
 
 
   const getEmbedUrl = (url: string) => {
