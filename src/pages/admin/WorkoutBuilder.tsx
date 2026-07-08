@@ -341,6 +341,7 @@ export default function WorkoutBuilder() {
   };
 
   const moveExercise = (workoutIdx: number, exIdx: number, direction: "up" | "down") => {
+    setSelKeys(new Set());
     const newIdx = direction === "up" ? exIdx - 1 : exIdx + 1;
     setWorkouts(prev => prev.map((w, i) => {
       if (i !== workoutIdx) return w;
