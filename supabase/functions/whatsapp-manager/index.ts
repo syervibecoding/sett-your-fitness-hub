@@ -514,8 +514,9 @@ Deno.serve(async (req) => {
 
       if (!student) return json({ error: "Aluno não encontrado" }, 404);
 
-      const phone = normalizeBrazilPhone(student.whatsapp || "");
-      if (!phone) return json({ error: "Aluno sem WhatsApp cadastrado" }, 400);
+      const phoneResult = validateBrazilMobile(student.whatsapp || "");
+      if ("error" in phoneResult) return json({ error: phoneResult.error }, 400);
+      const phone = phoneResult.phone;
 
       const firstName = (student.full_name || "").split(" ")[0] || "";
       const text = message.replace(/\{nome\}/g, firstName);
