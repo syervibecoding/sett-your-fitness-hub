@@ -261,6 +261,20 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
               )}
             </div>
 
+            {(goalsByDate[format(selectedDate, "yyyy-MM-dd")] || []).length > 0 && (
+              <div className="mb-3 space-y-2">
+                {(goalsByDate[format(selectedDate, "yyyy-MM-dd")] || []).map(g => (
+                  <div key={g.id} className="flex items-center gap-2 rounded-lg bg-primary/10 p-2">
+                    <Target className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-sm font-medium text-foreground font-sans">
+                      {g.type === "prova" ? "Prova" : "Meta"}: {g.title}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+
             {selectedDateTrained && selectedDateWorkouts.length > 0 ? (
               <div className="space-y-5">
                 {selectedDateWorkouts.map(({ workout, logs, session, prevVolume }) => {
