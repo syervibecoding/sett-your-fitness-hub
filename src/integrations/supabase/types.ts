@@ -2093,6 +2093,56 @@ export type Database = {
           },
         ]
       }
+      student_documents: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          file_name: string
+          file_path: string
+          id: string
+          mime_type: string | null
+          notes: string | null
+          size: number | null
+          student_id: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          file_name: string
+          file_path: string
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          size?: number | null
+          student_id: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          size?: number | null
+          student_id?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_documents_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_evaluations: {
         Row: {
           body_fat_percentage: number | null
@@ -2158,6 +2208,56 @@ export type Database = {
           },
           {
             foreignKeyName: "student_evaluations_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_goals: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          status: string
+          student_id: string
+          target_date: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          student_id: string
+          target_date: string
+          title: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          student_id?: string
+          target_date?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_goals_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
