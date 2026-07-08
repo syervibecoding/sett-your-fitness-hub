@@ -144,6 +144,14 @@ export default function StudentPortal() {
     setGender((student as any).gender === "male" || (student as any).gender === "female" ? (student as any).gender : null);
     setWeeklyGoal((student as any).weekly_workout_goal || 3);
 
+    const { data: sa } = await supabase
+      .from("student_anamneses")
+      .select("prescribed_modalities")
+      .eq("student_id", student.id)
+      .maybeSingle();
+    setPrescribedModalities(Array.isArray((sa as any)?.prescribed_modalities) ? (sa as any).prescribed_modalities : []);
+
+
 
     if (student.company_id) {
       const { data: waInstance } = await supabase
