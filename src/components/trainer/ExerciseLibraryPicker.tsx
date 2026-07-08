@@ -18,8 +18,16 @@ export interface LibraryExercise {
   video_path: string | null;
   description: string | null;
   category: string | null;
+  categories: string[] | null;
   thumbnail_url: string | null;
 }
+
+// Retorna a lista de categorias de um exercício com fallback para o campo antigo `category`.
+const getExerciseCategories = (ex: { categories?: string[] | null; category?: string | null }): string[] => {
+  if (ex.categories && ex.categories.length > 0) return ex.categories;
+  if (ex.category) return [ex.category];
+  return [];
+};
 
 // Rótulos amigáveis para as categorias armazenadas em exercise_library.category
 const CATEGORY_LABELS: Record<string, string> = {
