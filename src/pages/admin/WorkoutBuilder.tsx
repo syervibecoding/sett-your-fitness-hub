@@ -10,12 +10,32 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, X, Info, Layers, Sparkles, AlertTriangle, ShieldAlert } from "lucide-react";
 import { BodyMap } from "@/components/body/BodyMap";
 import { muscleGroupToRegion, REGION_LABEL, type BodyRegionId } from "@/lib/bodyMap";
+
+const GROUP_DEFS = {
+  bi_set: { label: "Bi-set", short: "BI-SET", desc: "2 exercícios em sequência, sem descanso entre eles." },
+  tri_set: { label: "Tri-set", short: "TRI-SET", desc: "3 exercícios em sequência, sem descanso." },
+  super_set: { label: "Super-set", short: "SUPER-SET", desc: "2 exercícios de músculos antagonistas em sequência." },
+  giant_set: { label: "Série gigante", short: "SÉRIE GIGANTE", desc: "4+ exercícios seguidos para o mesmo grupo." },
+  circuit: { label: "Circuito", short: "CIRCUITO", desc: "Vários exercícios em sequência, descanso só ao final da volta." },
+} as const;
+type GroupType = keyof typeof GROUP_DEFS;
+const GROUP_ORDER: GroupType[] = ["bi_set", "tri_set", "super_set", "giant_set", "circuit"];
+
+interface BodyLimitation {
+  id: string;
+  region: string;
+  type: string | null;
+  severity: string | null;
+  note: string | null;
+}
 
 interface Exercise {
   id: string;
@@ -37,6 +57,8 @@ interface WorkoutExercise {
   rest: string;
   notes: string;
   set_types?: string[];
+  group_id?: string;
+  group_type?: GroupType;
 }
 
 interface Workout {
