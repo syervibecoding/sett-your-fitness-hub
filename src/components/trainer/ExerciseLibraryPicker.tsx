@@ -78,7 +78,7 @@ export function ExerciseLibraryPicker({ open, onOpenChange, alreadyAddedIds, onA
     (async () => {
       const { data } = await supabase
         .from("exercise_library")
-        .select("id, name, muscle_group, video_url, video_path, description, category, thumbnail_url")
+        .select("id, name, muscle_group, video_url, video_path, description, category, categories, thumbnail_url")
         .order("name");
       setExercises((data as LibraryExercise[]) || []);
     })();
