@@ -15,19 +15,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, X, Info, Layers, Sparkles, AlertTriangle, ShieldAlert } from "lucide-react";
-import { BodyMap } from "@/components/body/BodyMap";
-import { muscleGroupToRegion, REGION_LABEL, type BodyRegionId } from "@/lib/bodyMap";
-
-const GROUP_DEFS = {
-  bi_set: { label: "Bi-set", short: "BI-SET", desc: "2 exercícios em sequência, sem descanso entre eles." },
-  tri_set: { label: "Tri-set", short: "TRI-SET", desc: "3 exercícios em sequência, sem descanso." },
-  super_set: { label: "Super-set", short: "SUPER-SET", desc: "2 exercícios de músculos antagonistas em sequência." },
-  giant_set: { label: "Série gigante", short: "SÉRIE GIGANTE", desc: "4+ exercícios seguidos para o mesmo grupo." },
-  circuit: { label: "Circuito", short: "CIRCUITO", desc: "Vários exercícios em sequência, descanso só ao final da volta." },
-} as const;
-type GroupType = keyof typeof GROUP_DEFS;
-const GROUP_ORDER: GroupType[] = ["bi_set", "tri_set", "super_set", "giant_set", "circuit"];
+import { ArrowLeft, Plus, Trash2, Save, Play, ChevronUp, ChevronDown, BarChart3, Info, Layers, Sparkles, AlertTriangle, ShieldAlert } from "lucide-react";
+import { ExerciseLibraryPicker, type LibraryExercise } from "@/components/trainer/ExerciseLibraryPicker";
+import { GROUP_DEFS, GROUP_ORDER, type GroupType } from "@/lib/workoutGroups";
 
 interface BodyLimitation {
   id: string;
@@ -102,20 +92,16 @@ export default function WorkoutBuilder() {
   const { user } = useAuth();
   const { toast } = useToast();
   const muscleGroupsList = useMuscleGroups();
-  const MUSCLE_GROUP_NAMES = muscleGroupsList.map(g => g.name);
+  
 
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [targetWorkoutIdx, setTargetWorkoutIdx] = useState(0);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [libraryExercises, setLibraryExercises] = useState<Exercise[]>([]);
-  const [libSearch, setLibSearch] = useState("");
-  const [libGroup, setLibGroup] = useState("all");
-  const [libRegion, setLibRegion] = useState<BodyRegionId | null>(null);
   const [videoModal, setVideoModal] = useState<{ type: "path" | "url"; value: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [cycleInfo, setCycleInfo] = useState<{ cycle_number: number; student_name: string } | null>(null);
   const [showVolume, setShowVolume] = useState(true);
-  const [selectedLibIds, setSelectedLibIds] = useState<Set<string>>(new Set());
+  
   const [selKeys, setSelKeys] = useState<Set<string>>(new Set());
   const [limitations, setLimitations] = useState<BodyLimitation[]>([]);
 
@@ -127,7 +113,7 @@ export default function WorkoutBuilder() {
       loadExisting();
       loadCycleInfo();
     }
-    loadLibrary();
+    
     loadMuscleTargets();
   }, [cycleId]);
 
@@ -186,14 +172,6 @@ export default function WorkoutBuilder() {
     }
   };
 
-  const loadLibrary = async () => {
-    const { data } = await supabase
-      .from("exercise_library")
-      .select("id, name, muscle_group, video_url, video_path, description")
-      .order("muscle_group")
-      .order("name");
-    setLibraryExercises((data as Exercise[]) || []);
-  };
 
   const loadMuscleTargets = async () => {
     const { data } = await (supabase as any)
@@ -242,30 +220,9 @@ export default function WorkoutBuilder() {
     notes: "",
   });
 
-  const addExercise = (ex: Exercise) => {
+  const addFromPicker = (exs: LibraryExercise[]) => {
     const idx = targetWorkoutIdx;
-    setWorkouts(prev => prev.map((w, i) => i === idx ? { ...w, exercises: [...w.exercises, makeWX(ex)] } : w));
-    setLibraryOpen(false);
-  };
-
-  const toggleLibSelect = (id: string) => {
-    setSelectedLibIds(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
-  const addSelectedExercises = () => {
-    const idx = targetWorkoutIdx;
-    const current = workouts[idx]?.exercises || [];
-    const toAdd = libraryExercises.filter(
-      ex => selectedLibIds.has(ex.id) && !current.some(w => w.exercise_id === ex.id)
-    );
-    if (toAdd.length === 0) { setLibraryOpen(false); return; }
-    setWorkouts(prev => prev.map((w, i) => i === idx ? { ...w, exercises: [...w.exercises, ...toAdd.map(makeWX)] } : w));
-    setSelectedLibIds(new Set());
-    setLibraryOpen(false);
+    setWorkouts(prev => prev.map((w, i) => i === idx ? { ...w, exercises: [...w.exercises, ...exs.map(makeWX)] } : w));
   };
 
   // ---- Grouping selection (key = `${wIdx}:${exIdx}`) ----
@@ -422,12 +379,6 @@ export default function WorkoutBuilder() {
     return "bg-red-500";
   };
 
-  const filteredLib = libraryExercises.filter((ex) => {
-    const matchSearch = ex.name.toLowerCase().includes(libSearch.toLowerCase());
-    const matchGroup = libGroup === "all" || ex.muscle_group === libGroup;
-    const matchRegion = !libRegion || muscleGroupToRegion(ex.muscle_group) === libRegion;
-    return matchSearch && matchGroup && matchRegion;
-  });
 
 
   const getEmbedUrl = (url: string) => {
@@ -853,105 +804,13 @@ export default function WorkoutBuilder() {
       </div>
 
       {/* Library picker dialog */}
-      <Dialog open={libraryOpen} onOpenChange={(o) => { setLibraryOpen(o); if (!o) setSelectedLibIds(new Set()); }}>
-        <DialogContent className="bg-card border-border max-w-2xl max-h-[85vh] overflow-y-auto flex flex-col">
+      <ExerciseLibraryPicker
+        open={libraryOpen}
+        onOpenChange={setLibraryOpen}
+        alreadyAddedIds={new Set((currentWorkout?.exercises || []).map((w) => w.exercise_id))}
+        onAdd={addFromPicker}
+      />
 
-          <DialogHeader>
-            <DialogTitle className="text-primary">BIBLIOTECA DE EXERCÍCIOS</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {/* Anatomical body picker */}
-            <div className="rounded-lg border border-border bg-secondary/40 p-4">
-              <p className="text-center text-sm font-sans text-muted-foreground mb-2">
-                Selecione pelo boneco
-                {libRegion ? <> · <span className="text-foreground font-medium">{REGION_LABEL[libRegion]}</span></> : null}
-              </p>
-              <BodyMap
-                activeRegions={libRegion ? [libRegion] : []}
-                onRegionClick={(region) =>
-                  setLibRegion((prev) => (prev === region ? null : region))
-                }
-                scale={0.85}
-                footer={
-                  libRegion ? (
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="text-xs"
-                      onClick={() => setLibRegion(null)}
-                    >
-                      <X className="h-3 w-3 mr-1" />
-                      Limpar filtro ({REGION_LABEL[libRegion]})
-                    </Button>
-                  ) : null
-                }
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input value={libSearch} onChange={(e) => setLibSearch(e.target.value)} placeholder="Buscar..." className="pl-10 bg-secondary border-border" />
-              </div>
-              <Select value={libGroup} onValueChange={setLibGroup}>
-                <SelectTrigger className="w-40 bg-secondary border-border">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {MUSCLE_GROUP_NAMES.map((g) => (
-                    <SelectItem key={g} value={g} className="capitalize">{g}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {filteredLib.length === 0 && (
-              <p className="text-center text-muted-foreground font-sans py-6">Nenhum exercício encontrado</p>
-            )}
-
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {filteredLib.map((ex) => {
-                const currentExercises = currentWorkout?.exercises || [];
-                const alreadyAdded = currentExercises.some((w) => w.exercise_id === ex.id);
-                const checked = selectedLibIds.has(ex.id);
-                return (
-                  <div
-                    key={ex.id}
-                    className={`flex items-center justify-between gap-2 p-3 rounded-md transition-colors ${alreadyAdded ? "bg-secondary/50 opacity-60" : "bg-secondary hover:bg-muted cursor-pointer"} ${checked ? "ring-2 ring-primary/50" : ""}`}
-                    onClick={() => !alreadyAdded && toggleLibSelect(ex.id)}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Checkbox
-                        checked={checked}
-                        disabled={alreadyAdded}
-                        onCheckedChange={() => toggleLibSelect(ex.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <p className="font-sans font-medium text-foreground text-sm truncate">{ex.name}</p>
-                      <Badge variant="outline" className="capitalize text-xs shrink-0">{ex.muscle_group}</Badge>
-                    </div>
-                    {alreadyAdded && (
-                      <span className="text-xs text-muted-foreground font-sans shrink-0">Adicionado</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Footer: add selected */}
-            <div className="flex items-center justify-between border-t border-border pt-3">
-              <span className="text-sm font-sans text-muted-foreground">
-                {selectedLibIds.size} selecionado(s)
-              </span>
-              <Button disabled={selectedLibIds.size === 0} onClick={addSelectedExercises}>
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar selecionados ({selectedLibIds.size})
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Video Modal */}
       <Dialog open={!!videoModal} onOpenChange={() => setVideoModal(null)}>
