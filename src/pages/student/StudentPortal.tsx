@@ -55,7 +55,17 @@ interface WorkoutExercise {
   reps: string;
   rest: string;
   notes: string;
+  group_id?: string;
+  group_type?: string;
 }
+
+const GROUP_LABELS: Record<string, string> = {
+  bi_set: "BI-SET",
+  tri_set: "TRI-SET",
+  super_set: "SUPER-SET",
+  giant_set: "SÉRIE GIGANTE",
+  circuit: "CIRCUITO",
+};
 
 interface WorkoutData {
   id: string;
@@ -772,29 +782,50 @@ export default function StudentPortal() {
                         })()}
 
                         <div className="space-y-2">
-                          {selectedWorkout.exercises.map((ex, idx) => (
-                            <ExerciseCard
-                              key={idx}
-                              exercise={ex}
-                              index={idx}
-                              workoutId={selectedWorkout.id}
-                              isExpanded={expandedExercise === idx}
-                              onToggle={() => setExpandedExercise(expandedExercise === idx ? null : idx)}
-                              onVideoPlay={() => openVideoForExercise(ex)}
-                              logs={logs}
-                              previousLogs={previousLogs}
-                              onUpdateLog={updateLog}
-                              exerciseHistory={getExerciseHistory(selectedWorkout.id, idx)}
-                              isSessionActive={isSessionForCurrentWorkout}
-                              activeRest={activeRest}
-                              onSetComplete={startRest}
-                              onRestComplete={clearRest}
-                              totalSets={getTotalSets(idx)}
-                              onAddSet={handleAddSet}
-                              onRemoveSet={handleRemoveSet}
-                            />
-                          ))}
+                          {selectedWorkout.exercises.map((ex, idx) => {
+                            const prevEx = selectedWorkout.exercises[idx - 1];
+                            const inGroup = !!ex.group_id;
+                            const isGroupStart = inGroup && (!prevEx || prevEx.group_id !== ex.group_id);
+                            const card = (
+                              <ExerciseCard
+                                key={idx}
+                                exercise={ex}
+                                index={idx}
+                                workoutId={selectedWorkout.id}
+                                isExpanded={expandedExercise === idx}
+                                onToggle={() => setExpandedExercise(expandedExercise === idx ? null : idx)}
+                                onVideoPlay={() => openVideoForExercise(ex)}
+                                logs={logs}
+                                previousLogs={previousLogs}
+                                onUpdateLog={updateLog}
+                                exerciseHistory={getExerciseHistory(selectedWorkout.id, idx)}
+                                isSessionActive={isSessionForCurrentWorkout}
+                                activeRest={activeRest}
+                                onSetComplete={startRest}
+                                onRestComplete={clearRest}
+                                totalSets={getTotalSets(idx)}
+                                onAddSet={handleAddSet}
+                                onRemoveSet={handleRemoveSet}
+                              />
+                            );
+                            if (!inGroup) return card;
+                            return (
+                              <div key={idx}>
+                                {isGroupStart && ex.group_type && (
+                                  <div className="flex items-center gap-2 mt-2 mb-1 ml-1">
+                                    <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px] tracking-wide">
+                                      {GROUP_LABELS[ex.group_type] || ex.group_type}
+                                    </Badge>
+                                  </div>
+                                )}
+                                <div className="border-l-2 border-primary/50 pl-2">
+                                  {card}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
+
 
                         <Button className="w-full" onClick={saveCurrentLogs} disabled={savingLogs}>
                           <Save className="h-4 w-4 mr-2" />

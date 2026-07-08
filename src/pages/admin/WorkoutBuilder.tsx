@@ -10,12 +10,32 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, X, Info, Layers, Sparkles, AlertTriangle, ShieldAlert } from "lucide-react";
 import { BodyMap } from "@/components/body/BodyMap";
 import { muscleGroupToRegion, REGION_LABEL, type BodyRegionId } from "@/lib/bodyMap";
+
+const GROUP_DEFS = {
+  bi_set: { label: "Bi-set", short: "BI-SET", desc: "2 exercícios em sequência, sem descanso entre eles." },
+  tri_set: { label: "Tri-set", short: "TRI-SET", desc: "3 exercícios em sequência, sem descanso." },
+  super_set: { label: "Super-set", short: "SUPER-SET", desc: "2 exercícios de músculos antagonistas em sequência." },
+  giant_set: { label: "Série gigante", short: "SÉRIE GIGANTE", desc: "4+ exercícios seguidos para o mesmo grupo." },
+  circuit: { label: "Circuito", short: "CIRCUITO", desc: "Vários exercícios em sequência, descanso só ao final da volta." },
+} as const;
+type GroupType = keyof typeof GROUP_DEFS;
+const GROUP_ORDER: GroupType[] = ["bi_set", "tri_set", "super_set", "giant_set", "circuit"];
+
+interface BodyLimitation {
+  id: string;
+  region: string;
+  type: string | null;
+  severity: string | null;
+  note: string | null;
+}
 
 interface Exercise {
   id: string;
@@ -37,6 +57,8 @@ interface WorkoutExercise {
   rest: string;
   notes: string;
   set_types?: string[];
+  group_id?: string;
+  group_type?: GroupType;
 }
 
 interface Workout {
@@ -93,6 +115,9 @@ export default function WorkoutBuilder() {
   const [saving, setSaving] = useState(false);
   const [cycleInfo, setCycleInfo] = useState<{ cycle_number: number; student_name: string } | null>(null);
   const [showVolume, setShowVolume] = useState(true);
+  const [selectedLibIds, setSelectedLibIds] = useState<Set<string>>(new Set());
+  const [selKeys, setSelKeys] = useState<Set<string>>(new Set());
+  const [limitations, setLimitations] = useState<BodyLimitation[]>([]);
 
   // Muscle targets for all exercises in library (cached)
   const [muscleTargets, setMuscleTargets] = useState<MuscleTarget[]>([]);
@@ -128,8 +153,17 @@ export default function WorkoutBuilder() {
           cycle_number: data.cycle_number,
           student_name: student?.full_name || "Aluno",
         });
+        loadLimitations(enrollment.student_id);
       }
     }
+  };
+
+  const loadLimitations = async (studentId: string) => {
+    const { data } = await (supabase as any)
+      .from("student_body_limitations")
+      .select("id, region, type, severity, note")
+      .eq("student_id", studentId);
+    setLimitations((data as BodyLimitation[]) || []);
   };
 
   const loadExisting = async () => {
@@ -196,29 +230,100 @@ export default function WorkoutBuilder() {
     setWorkouts(prev => prev.map((w, i) => i === idx ? { ...w, [field]: value } : w));
   };
 
+  const makeWX = (ex: Exercise): WorkoutExercise => ({
+    exercise_id: ex.id,
+    exercise_name: ex.name,
+    muscle_group: ex.muscle_group,
+    video_url: ex.video_url,
+    video_path: ex.video_path,
+    sets: "3",
+    reps: "12",
+    rest: "60s",
+    notes: "",
+  });
+
   const addExercise = (ex: Exercise) => {
     const idx = targetWorkoutIdx;
-    setWorkouts(prev => prev.map((w, i) => {
-      if (i !== idx) return w;
-      return {
-        ...w,
-        exercises: [...w.exercises, {
-          exercise_id: ex.id,
-          exercise_name: ex.name,
-          muscle_group: ex.muscle_group,
-          video_url: ex.video_url,
-          video_path: ex.video_path,
-          sets: "3",
-          reps: "12",
-          rest: "60s",
-          notes: "",
-        }],
-      };
-    }));
+    setWorkouts(prev => prev.map((w, i) => i === idx ? { ...w, exercises: [...w.exercises, makeWX(ex)] } : w));
     setLibraryOpen(false);
   };
 
+  const toggleLibSelect = (id: string) => {
+    setSelectedLibIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const addSelectedExercises = () => {
+    const idx = targetWorkoutIdx;
+    const current = workouts[idx]?.exercises || [];
+    const toAdd = libraryExercises.filter(
+      ex => selectedLibIds.has(ex.id) && !current.some(w => w.exercise_id === ex.id)
+    );
+    if (toAdd.length === 0) { setLibraryOpen(false); return; }
+    setWorkouts(prev => prev.map((w, i) => i === idx ? { ...w, exercises: [...w.exercises, ...toAdd.map(makeWX)] } : w));
+    setSelectedLibIds(new Set());
+    setLibraryOpen(false);
+  };
+
+  // ---- Grouping selection (key = `${wIdx}:${exIdx}`) ----
+  const toggleExSelect = (wIdx: number, exIdx: number) => {
+    setSelKeys(prev => {
+      const next = new Set(prev);
+      const key = `${wIdx}:${exIdx}`;
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
+  const selectedIdxsFor = (wIdx: number) =>
+    (workouts[wIdx]?.exercises || [])
+      .map((_, j) => j)
+      .filter(j => selKeys.has(`${wIdx}:${j}`));
+
+  const clearSelForWorkout = (wIdx: number) => {
+    setSelKeys(prev => {
+      const next = new Set<string>();
+      prev.forEach(k => { if (!k.startsWith(`${wIdx}:`)) next.add(k); });
+      return next;
+    });
+  };
+
+  const applyGroup = (wIdx: number, type: GroupType) => {
+    const idxs = selectedIdxsFor(wIdx);
+    if (idxs.length < 2) return;
+    const gid = (crypto as any).randomUUID ? crypto.randomUUID() : `g-${Date.now()}-${Math.random()}`;
+    setWorkouts(prev => prev.map((w, i) => {
+      if (i !== wIdx) return w;
+      const minIdx = Math.min(...idxs);
+      const selected = idxs.map(j => ({ ...w.exercises[j], group_id: gid, group_type: type }));
+      const rest = w.exercises.filter((_, j) => !idxs.includes(j));
+      const arr = [...rest.slice(0, minIdx), ...selected, ...rest.slice(minIdx)];
+      return { ...w, exercises: arr };
+    }));
+    clearSelForWorkout(wIdx);
+  };
+
+  const ungroupSelected = (wIdx: number) => {
+    const idxs = selectedIdxsFor(wIdx);
+    setWorkouts(prev => prev.map((w, i) => {
+      if (i !== wIdx) return w;
+      return {
+        ...w,
+        exercises: w.exercises.map((ex, j) => {
+          if (!idxs.includes(j)) return ex;
+          const { group_id, group_type, ...rest } = ex;
+          return rest;
+        }),
+      };
+    }));
+    clearSelForWorkout(wIdx);
+  };
+
   const removeExercise = (workoutIdx: number, exIdx: number) => {
+    setSelKeys(new Set());
     setWorkouts(prev => prev.map((w, i) => {
       if (i !== workoutIdx) return w;
       return { ...w, exercises: w.exercises.filter((_, j) => j !== exIdx) };
@@ -236,6 +341,7 @@ export default function WorkoutBuilder() {
   };
 
   const moveExercise = (workoutIdx: number, exIdx: number, direction: "up" | "down") => {
+    setSelKeys(new Set());
     const newIdx = direction === "up" ? exIdx - 1 : exIdx + 1;
     setWorkouts(prev => prev.map((w, i) => {
       if (i !== workoutIdx) return w;
@@ -430,12 +536,58 @@ export default function WorkoutBuilder() {
                     </Card>
                   )}
 
+                  {/* Grouping toolbar */}
+                  {selectedIdxsFor(wIdx).length >= 2 && (
+                    <Card className="bg-secondary/60 border-primary/30">
+                      <CardContent className="p-2.5 space-y-2">
+                        <p className="text-xs font-sans text-muted-foreground">
+                          {selectedIdxsFor(wIdx).length} selecionado(s) — agrupar:
+                        </p>
+                        <TooltipProvider>
+                          <div className="flex flex-wrap gap-1.5">
+                            {GROUP_ORDER.map((gt) => (
+                              <Tooltip key={gt}>
+                                <TooltipTrigger asChild>
+                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => applyGroup(wIdx, gt)}>
+                                    {GROUP_DEFS[gt].label}
+                                    <Info className="h-3 w-3 opacity-60" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-[220px] text-xs">
+                                  {GROUP_DEFS[gt].desc}
+                                </TooltipContent>
+                              </Tooltip>
+                            ))}
+                            <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => ungroupSelected(wIdx)}>
+                              Desagrupar
+                            </Button>
+                          </div>
+                        </TooltipProvider>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   <div className="space-y-3">
-                    {workout.exercises.map((ex, exIdx) => (
-                      <Card key={exIdx} className="bg-card border-border">
+                    {workout.exercises.map((ex, exIdx) => {
+                      const selected = selKeys.has(`${wIdx}:${exIdx}`);
+                      const prevEx = workout.exercises[exIdx - 1];
+                      const isGroupStart = !!ex.group_id && (!prevEx || prevEx.group_id !== ex.group_id);
+                      const inGroup = !!ex.group_id;
+                      return (
+                      <div key={exIdx} className="space-y-3">
+                        {isGroupStart && ex.group_type && (
+                          <div className="flex items-center gap-2 pt-1">
+                            <Layers className="h-3.5 w-3.5 text-primary" />
+                            <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px] tracking-wide">
+                              {GROUP_DEFS[ex.group_type].short}
+                            </Badge>
+                          </div>
+                        )}
+                      <Card className={`bg-card ${inGroup ? "border-primary/40 border-l-2 border-l-primary" : "border-border"} ${selected ? "ring-2 ring-primary/50" : ""}`}>
                         <CardContent className="p-3">
                           <div className="flex items-start gap-2">
-                            <div className="flex flex-col gap-0.5 pt-1">
+                            <div className="flex flex-col items-center gap-0.5 pt-1">
+                              <Checkbox checked={selected} onCheckedChange={() => toggleExSelect(wIdx, exIdx)} className="mb-1" />
                               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => moveExercise(wIdx, exIdx, "up")} disabled={exIdx === 0}>
                                 <ChevronUp className="h-3.5 w-3.5" />
                               </Button>
@@ -549,7 +701,9 @@ export default function WorkoutBuilder() {
                           </div>
                         </CardContent>
                       </Card>
-                    ))}
+                      </div>
+                      );
+                    })}
                   </div>
 
                   {/* Add exercise to this column */}
@@ -580,9 +734,73 @@ export default function WorkoutBuilder() {
           </div>
 
 
-          {/* Volume Sidebar */}
-          {showVolume && (
-            <div className="lg:w-72 shrink-0">
+          {/* Right sidebar */}
+          <div className="lg:w-80 shrink-0 space-y-4">
+            {/* Limitations from anamnese */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-primary text-sm flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4" />
+                  LIMITAÇÕES DA ANAMNESE
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {limitations.length === 0 ? (
+                  <p className="text-xs text-muted-foreground font-sans py-2">
+                    Nenhuma limitação registrada na anamnese.
+                  </p>
+                ) : (
+                  limitations.map((lim) => {
+                    const severe = (lim.severity || "").toLowerCase().includes("sev");
+                    return (
+                      <div
+                        key={lim.id}
+                        className={`rounded-md border p-2.5 ${severe ? "border-destructive/40 bg-destructive/5" : "border-border bg-secondary/40"}`}
+                      >
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {severe && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
+                          <span className="text-xs font-sans font-medium text-foreground capitalize">{lim.region}</span>
+                          {lim.type && <Badge variant="outline" className="text-[10px] capitalize">{lim.type}</Badge>}
+                          {lim.severity && (
+                            <Badge variant={severe ? "destructive" : "secondary"} className="text-[10px] capitalize">{lim.severity}</Badge>
+                          )}
+                        </div>
+                        {lim.note && <p className="text-xs text-muted-foreground font-sans mt-1">{lim.note}</p>}
+                      </div>
+                    );
+                  })
+                )}
+              </CardContent>
+            </Card>
+
+            {/* BNITO placeholder */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-primary text-sm flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  BNITO — COPILOTO TÉCNICO
+                </CardTitle>
+                <p className="text-xs text-muted-foreground font-sans">
+                  Revisão técnica do treino antes de salvar.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button className="w-full gap-2" disabled>
+                  <Sparkles className="h-4 w-4" />
+                  Auditar treino
+                </Button>
+                <Textarea
+                  disabled
+                  rows={2}
+                  placeholder="Ex.: apareceu dor no joelho na anamnese, como ajusto esse treino?"
+                  className="bg-secondary border-border text-sm resize-none"
+                />
+                <p className="text-[11px] text-muted-foreground font-sans text-center">Em breve</p>
+              </CardContent>
+            </Card>
+
+            {/* Volume Sidebar */}
+            {showVolume && (
               <Card className="bg-card border-border sticky top-4">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-primary text-sm flex items-center gap-2">
@@ -629,14 +847,15 @@ export default function WorkoutBuilder() {
                   )}
                 </CardContent>
               </Card>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
       {/* Library picker dialog */}
-      <Dialog open={libraryOpen} onOpenChange={setLibraryOpen}>
-        <DialogContent className="bg-card border-border max-w-2xl max-h-[80vh] overflow-y-auto">
+      <Dialog open={libraryOpen} onOpenChange={(o) => { setLibraryOpen(o); if (!o) setSelectedLibIds(new Set()); }}>
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[85vh] overflow-y-auto flex flex-col">
+
           <DialogHeader>
             <DialogTitle className="text-primary">BIBLIOTECA DE EXERCÍCIOS</DialogTitle>
           </DialogHeader>
@@ -695,26 +914,40 @@ export default function WorkoutBuilder() {
               {filteredLib.map((ex) => {
                 const currentExercises = currentWorkout?.exercises || [];
                 const alreadyAdded = currentExercises.some((w) => w.exercise_id === ex.id);
+                const checked = selectedLibIds.has(ex.id);
                 return (
                   <div
                     key={ex.id}
-                    className="flex items-center justify-between p-3 rounded-md bg-secondary hover:bg-muted transition-colors"
+                    className={`flex items-center justify-between gap-2 p-3 rounded-md transition-colors ${alreadyAdded ? "bg-secondary/50 opacity-60" : "bg-secondary hover:bg-muted cursor-pointer"} ${checked ? "ring-2 ring-primary/50" : ""}`}
+                    onClick={() => !alreadyAdded && toggleLibSelect(ex.id)}
                   >
-                    <div className="flex items-center gap-2">
-                      <p className="font-sans font-medium text-foreground text-sm">{ex.name}</p>
-                      <Badge variant="outline" className="capitalize text-xs">{ex.muscle_group}</Badge>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Checkbox
+                        checked={checked}
+                        disabled={alreadyAdded}
+                        onCheckedChange={() => toggleLibSelect(ex.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <p className="font-sans font-medium text-foreground text-sm truncate">{ex.name}</p>
+                      <Badge variant="outline" className="capitalize text-xs shrink-0">{ex.muscle_group}</Badge>
                     </div>
-                    <Button
-                      size="sm"
-                      variant={alreadyAdded ? "secondary" : "default"}
-                      disabled={alreadyAdded}
-                      onClick={() => addExercise(ex)}
-                    >
-                      {alreadyAdded ? "Adicionado" : "Adicionar"}
-                    </Button>
+                    {alreadyAdded && (
+                      <span className="text-xs text-muted-foreground font-sans shrink-0">Adicionado</span>
+                    )}
                   </div>
                 );
               })}
+            </div>
+
+            {/* Footer: add selected */}
+            <div className="flex items-center justify-between border-t border-border pt-3">
+              <span className="text-sm font-sans text-muted-foreground">
+                {selectedLibIds.size} selecionado(s)
+              </span>
+              <Button disabled={selectedLibIds.size === 0} onClick={addSelectedExercises}>
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar selecionados ({selectedLibIds.size})
+              </Button>
             </div>
           </div>
         </DialogContent>
