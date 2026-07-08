@@ -219,6 +219,75 @@ export function ExerciseLibraryPicker({ open, onOpenChange, alreadyAddedIds, onA
           <DialogTitle className="text-primary">BIBLIOTECA DE EXERCÍCIOS</DialogTitle>
         </DialogHeader>
 
+        {/* Sugestão automática por objetivos */}
+        {availableObjectives.length > 0 && (
+          <div className="px-6 pb-3 shrink-0">
+            <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 space-y-2.5">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span className="text-xs font-sans font-semibold text-foreground uppercase tracking-wide">
+                  Sugestão por objetivos
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground font-sans">
+                Selecione os objetivos e monte automaticamente o melhor conjunto — exercícios que
+                abrangem várias finalidades são priorizados.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {availableObjectives.map((c) => {
+                  const active = objectives.has(c);
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => toggleObjective(c)}
+                      className={`rounded-full px-3 py-1 text-xs font-sans font-medium transition-colors border ${
+                        active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-secondary text-muted-foreground border-border hover:text-foreground"
+                      }`}
+                    >
+                      {CATEGORY_LABELS[c] || c}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-muted-foreground font-sans">Exercícios por objetivo</span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setPerObjective(n)}
+                        className={`h-7 w-7 rounded-md text-xs font-sans font-medium border transition-colors ${
+                          perObjective === n
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-secondary text-muted-foreground border-border hover:text-foreground"
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  className="gap-2"
+                  disabled={objectives.size === 0}
+                  onClick={suggestBestSet}
+                >
+                  <Wand2 className="h-4 w-4" />
+                  Sugerir melhor conjunto
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+
         {/* Category tabs */}
         <div className="px-6 shrink-0">
           <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
