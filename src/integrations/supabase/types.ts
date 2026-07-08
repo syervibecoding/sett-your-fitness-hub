@@ -1000,6 +1000,7 @@ export type Database = {
       }
       exercise_library: {
         Row: {
+          categories: string[]
           category: string | null
           company_id: string | null
           created_at: string
@@ -1018,6 +1019,7 @@ export type Database = {
           video_url: string | null
         }
         Insert: {
+          categories?: string[]
           category?: string | null
           company_id?: string | null
           created_at?: string
@@ -1036,6 +1038,7 @@ export type Database = {
           video_url?: string | null
         }
         Update: {
+          categories?: string[]
           category?: string | null
           company_id?: string | null
           created_at?: string

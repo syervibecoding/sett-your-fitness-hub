@@ -18,8 +18,16 @@ export interface LibraryExercise {
   video_path: string | null;
   description: string | null;
   category: string | null;
+  categories: string[] | null;
   thumbnail_url: string | null;
 }
+
+// Retorna a lista de categorias de um exercício com fallback para o campo antigo `category`.
+const getExerciseCategories = (ex: { categories?: string[] | null; category?: string | null }): string[] => {
+  if (ex.categories && ex.categories.length > 0) return ex.categories;
+  if (ex.category) return [ex.category];
+  return [];
+};
 
 // Rótulos amigáveis para as categorias armazenadas em exercise_library.category
 const CATEGORY_LABELS: Record<string, string> = {
@@ -70,7 +78,7 @@ export function ExerciseLibraryPicker({ open, onOpenChange, alreadyAddedIds, onA
     (async () => {
       const { data } = await supabase
         .from("exercise_library")
-        .select("id, name, muscle_group, video_url, video_path, description, category, thumbnail_url")
+        .select("id, name, muscle_group, video_url, video_path, description, category, categories, thumbnail_url")
         .order("name");
       setExercises((data as LibraryExercise[]) || []);
     })();
@@ -82,7 +90,7 @@ export function ExerciseLibraryPicker({ open, onOpenChange, alreadyAddedIds, onA
   }, [open]);
 
   const availableCategories = useMemo(() => {
-    const present = new Set(exercises.map((e) => e.category).filter(Boolean) as string[]);
+    const present = new Set(exercises.flatMap((e) => getExerciseCategories(e)));
     return CATEGORY_ORDER.filter((c) => present.has(c));
   }, [exercises]);
 
@@ -90,7 +98,7 @@ export function ExerciseLibraryPicker({ open, onOpenChange, alreadyAddedIds, onA
     const q = search.trim().toLowerCase();
     return exercises.filter((ex) => {
       const matchSearch = !q || ex.name.toLowerCase().includes(q);
-      const matchCat = category === "all" || ex.category === category;
+      const matchCat = category === "all" || getExerciseCategories(ex).includes(category);
       const matchRegion = !region || muscleGroupToRegion(ex.muscle_group || "") === region;
       return matchSearch && matchCat && matchRegion;
     });

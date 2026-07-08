@@ -21,6 +21,7 @@ interface Exercise {
   description: string | null;
   muscle_group: string;
   category: string | null;
+  categories: string[] | null;
   video_url: string | null;
   video_path: string | null;
   thumbnail_url: string | null;
@@ -28,6 +29,28 @@ interface Exercise {
   company_id: string | null;
   created_by: string;
 }
+
+// Categorias disponíveis para marcação (múltipla escolha)
+const CATEGORY_OPTIONS = [
+  "mobilidade",
+  "controle_motor",
+  "ativacao",
+  "core",
+  "performance",
+  "base",
+  "fisioterapia",
+  "pesos_livres",
+  "peso_corporal",
+  "maquinas",
+  "pliometria",
+];
+
+// Retorna a lista de categorias de um exercício com fallback para o campo antigo `category`.
+const getExerciseCategories = (ex: { categories?: string[] | null; category?: string | null }): string[] => {
+  if (ex.categories && ex.categories.length > 0) return ex.categories;
+  if (ex.category) return [ex.category];
+  return [];
+};
 
 const CATEGORY_LABELS: Record<string, string> = {
   base: "Base",
@@ -88,7 +111,7 @@ export default function ExerciseLibrary() {
   const [editing, setEditing] = useState<Exercise | null>(null);
   const [videoModal, setVideoModal] = useState<{ type: "path" | "url"; value: string } | null>(null);
   const [form, setForm] = useState({
-    name: "", description: "", muscle_group: "geral", category: "",
+    name: "", description: "", muscle_group: "geral", categories: [] as string[],
     video_url: "", is_global: false,
   });
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -228,7 +251,8 @@ export default function ExerciseLibrary() {
       name: form.name,
       description: form.description || null,
       muscle_group: form.muscle_group,
-      category: form.category || null,
+      categories: form.categories,
+      category: form.categories[0] || null,
       video_url: form.video_url || null,
       video_path: videoPath,
       is_global: isMaster ? form.is_global : false,
@@ -306,7 +330,7 @@ export default function ExerciseLibrary() {
     setEditing(ex);
     setForm({
       name: ex.name, description: ex.description || "",
-      muscle_group: ex.muscle_group, category: ex.category || "", video_url: ex.video_url || "",
+      muscle_group: ex.muscle_group, categories: getExerciseCategories(ex), video_url: ex.video_url || "",
       is_global: ex.is_global,
     });
     setVideoFile(null);
@@ -322,7 +346,7 @@ export default function ExerciseLibrary() {
     setPrimaryMuscleIds([]);
     setSecondaryMuscleIds([]);
     setCompanyVolumes({});
-    setForm({ name: "", description: "", muscle_group: "geral", category: "", video_url: "", is_global: false });
+    setForm({ name: "", description: "", muscle_group: "geral", categories: [], video_url: "", is_global: false });
   };
 
   const getEmbedUrl = (url: string) => {
@@ -350,13 +374,13 @@ export default function ExerciseLibrary() {
   };
 
   const categories = Array.from(
-    new Set(exercises.map((e) => e.category).filter((c): c is string => !!c))
+    new Set(exercises.flatMap((e) => getExerciseCategories(e)))
   ).sort();
 
   const filtered = exercises.filter((ex) => {
     const matchSearch = ex.name.toLowerCase().includes(search.toLowerCase());
     const matchGroup = filterGroup === "all" || ex.muscle_group === filterGroup;
-    const matchCategory = filterCategory === "all" || ex.category === filterCategory;
+    const matchCategory = filterCategory === "all" || getExerciseCategories(ex).includes(filterCategory);
     return matchSearch && matchGroup && matchCategory;
   });
 
@@ -502,11 +526,11 @@ export default function ExerciseLibrary() {
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline" className="capitalize text-xs">{ex.muscle_group}</Badge>
-                      {ex.category && (
-                        <Badge variant="outline" className="text-xs border-primary/40 text-primary">
-                          {categoryLabel(ex.category)}
+                      {getExerciseCategories(ex).map((c) => (
+                        <Badge key={c} variant="outline" className="text-xs border-primary/40 text-primary">
+                          {categoryLabel(c)}
                         </Badge>
-                      )}
+                      ))}
                       {ex.is_global && (
                         <Badge variant="secondary" className="text-xs">
                           <Globe className="h-3 w-3 mr-1" />Global
@@ -581,18 +605,36 @@ export default function ExerciseLibrary() {
             </div>
 
             <div className="space-y-2">
-              <Label className="font-sans">Categoria</Label>
-              <Select value={form.category || "none"} onValueChange={(v) => setForm({ ...form, category: v === "none" ? "" : v })}>
-                <SelectTrigger className="bg-secondary border-border">
-                  <SelectValue placeholder="Sem categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sem categoria</SelectItem>
-                  {Array.from(new Set([...Object.keys(CATEGORY_LABELS), ...categories])).sort().map((c) => (
-                    <SelectItem key={c} value={c}>{categoryLabel(c)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="font-sans">Categorias</Label>
+              <p className="text-xs text-muted-foreground font-sans">
+                Marque todas as finalidades que este exercício atende (pode selecionar mais de uma).
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {Array.from(new Set([...CATEGORY_OPTIONS, ...categories])).map((c) => {
+                  const active = form.categories.includes(c);
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          categories: active
+                            ? form.categories.filter((x) => x !== c)
+                            : [...form.categories, c],
+                        })
+                      }
+                      className={`rounded-full px-3 py-1.5 text-xs font-sans font-medium border transition-colors ${
+                        active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-secondary text-muted-foreground border-border hover:text-foreground"
+                      }`}
+                    >
+                      {categoryLabel(c)}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Muscle Target Configuration */}
