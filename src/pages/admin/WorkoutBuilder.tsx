@@ -734,9 +734,73 @@ export default function WorkoutBuilder() {
           </div>
 
 
-          {/* Volume Sidebar */}
-          {showVolume && (
-            <div className="lg:w-72 shrink-0">
+          {/* Right sidebar */}
+          <div className="lg:w-80 shrink-0 space-y-4">
+            {/* Limitations from anamnese */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-primary text-sm flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4" />
+                  LIMITAÇÕES DA ANAMNESE
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {limitations.length === 0 ? (
+                  <p className="text-xs text-muted-foreground font-sans py-2">
+                    Nenhuma limitação registrada na anamnese.
+                  </p>
+                ) : (
+                  limitations.map((lim) => {
+                    const severe = (lim.severity || "").toLowerCase().includes("sev");
+                    return (
+                      <div
+                        key={lim.id}
+                        className={`rounded-md border p-2.5 ${severe ? "border-destructive/40 bg-destructive/5" : "border-border bg-secondary/40"}`}
+                      >
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {severe && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
+                          <span className="text-xs font-sans font-medium text-foreground capitalize">{lim.region}</span>
+                          {lim.type && <Badge variant="outline" className="text-[10px] capitalize">{lim.type}</Badge>}
+                          {lim.severity && (
+                            <Badge variant={severe ? "destructive" : "secondary"} className="text-[10px] capitalize">{lim.severity}</Badge>
+                          )}
+                        </div>
+                        {lim.note && <p className="text-xs text-muted-foreground font-sans mt-1">{lim.note}</p>}
+                      </div>
+                    );
+                  })
+                )}
+              </CardContent>
+            </Card>
+
+            {/* BNITO placeholder */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-primary text-sm flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  BNITO — COPILOTO TÉCNICO
+                </CardTitle>
+                <p className="text-xs text-muted-foreground font-sans">
+                  Revisão técnica do treino antes de salvar.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button className="w-full gap-2" disabled>
+                  <Sparkles className="h-4 w-4" />
+                  Auditar treino
+                </Button>
+                <Textarea
+                  disabled
+                  rows={2}
+                  placeholder="Ex.: apareceu dor no joelho na anamnese, como ajusto esse treino?"
+                  className="bg-secondary border-border text-sm resize-none"
+                />
+                <p className="text-[11px] text-muted-foreground font-sans text-center">Em breve</p>
+              </CardContent>
+            </Card>
+
+            {/* Volume Sidebar */}
+            {showVolume && (
               <Card className="bg-card border-border sticky top-4">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-primary text-sm flex items-center gap-2">
@@ -783,8 +847,8 @@ export default function WorkoutBuilder() {
                   )}
                 </CardContent>
               </Card>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
