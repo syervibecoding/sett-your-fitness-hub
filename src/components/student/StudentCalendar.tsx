@@ -47,6 +47,13 @@ interface WorkoutSession {
   completed_at?: string | null;
 }
 
+interface StudentGoal {
+  id: string;
+  title: string;
+  type: string;
+  target_date: string;
+}
+
 interface StudentCalendarProps {
   workouts: Workout[];
   trainedDays: Set<number>;
@@ -56,11 +63,22 @@ interface StudentCalendarProps {
   cycleStartDate?: string;
   cycleEndDate?: string;
   workoutSessions?: WorkoutSession[];
+  goals?: StudentGoal[];
 }
 
-export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], workoutSessions = [] }: StudentCalendarProps) {
+export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], workoutSessions = [], goals = [] }: StudentCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+  const goalsByDate = useMemo(() => {
+    const map: Record<string, StudentGoal[]> = {};
+    goals.forEach(g => {
+      if (!g.target_date) return;
+      if (!map[g.target_date]) map[g.target_date] = [];
+      map[g.target_date].push(g);
+    });
+    return map;
+  }, [goals]);
 
   const logsByDate = useMemo(() => {
     const map: Record<string, { workout_id: string; logs: WorkoutLog[] }[]> = {};
@@ -184,6 +202,7 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
           const today = isDateToday(day);
           const trained = isDateTrained(day);
           const isSelected = selectedDate && isSameDay(day, selectedDate);
+          const dayGoals = goalsByDate[format(day, "yyyy-MM-dd")] || [];
 
           return (
             <button
@@ -196,6 +215,7 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
                 today && "ring-2 ring-primary ring-offset-1 ring-offset-background",
                 isSelected && "bg-primary text-primary-foreground",
                 !isSelected && trained && inMonth && "bg-green-500/20 text-green-400",
+                !isSelected && !trained && dayGoals.length > 0 && inMonth && "bg-primary/10",
               )}
             >
               <span className={cn("text-sm", !isSelected && !trained && inMonth && "text-foreground")}>
@@ -203,6 +223,9 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
               </span>
               {trained && inMonth && !isSelected && (
                 <CheckCircle2 className="absolute bottom-0.5 h-3 w-3 text-green-500" />
+              )}
+              {!trained && dayGoals.length > 0 && inMonth && !isSelected && (
+                <Target className="absolute bottom-0.5 h-3 w-3 text-primary" />
               )}
             </button>
           );
@@ -215,6 +238,12 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
           <CheckCircle2 className="h-3 w-3 text-green-500" />
           Treinado
         </div>
+        {goals.length > 0 && (
+          <div className="flex items-center gap-1">
+            <Target className="h-3 w-3 text-primary" />
+            Prova/Meta
+          </div>
+        )}
       </div>
 
       {/* Selected Day Detail Panel */}
@@ -231,6 +260,20 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
                 </Badge>
               )}
             </div>
+
+            {(goalsByDate[format(selectedDate, "yyyy-MM-dd")] || []).length > 0 && (
+              <div className="mb-3 space-y-2">
+                {(goalsByDate[format(selectedDate, "yyyy-MM-dd")] || []).map(g => (
+                  <div key={g.id} className="flex items-center gap-2 rounded-lg bg-primary/10 p-2">
+                    <Target className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-sm font-medium text-foreground font-sans">
+                      {g.type === "prova" ? "Prova" : "Meta"}: {g.title}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
 
             {selectedDateTrained && selectedDateWorkouts.length > 0 ? (
               <div className="space-y-5">

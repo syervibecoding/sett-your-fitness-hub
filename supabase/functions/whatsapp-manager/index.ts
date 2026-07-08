@@ -489,6 +489,42 @@ Deno.serve(async (req) => {
       return json({ success: true, sent, failed });
     }
 
+    // ─── SEND DIRECT TEXT TO A STUDENT (contato semanal) ───
+    if (action === "send-student-text") {
+      const { studentId, message } = body as { studentId?: string; message?: string };
+      if (!studentId) return json({ error: "studentId required" }, 400);
+      if (!message || !message.trim()) return json({ error: "message required" }, 400);
+
+      const { data: student } = await adminClient
+        .from("students")
+        .select("id, full_name, whatsapp, company_id")
+        .eq("id", studentId)
+        .eq("company_id", resolvedCompanyId)
+        .maybeSingle();
+
+      if (!student) return json({ error: "Aluno não encontrado" }, 404);
+
+      const phone = normalizeBrazilPhone(student.whatsapp || "");
+      if (!phone) return json({ error: "Aluno sem WhatsApp cadastrado" }, 400);
+
+      const firstName = (student.full_name || "").split(" ")[0] || "";
+      const text = message.replace(/\{nome\}/g, firstName);
+
+      const sendRes = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+        method: "POST",
+        headers: evoHeaders,
+        body: JSON.stringify({ number: phone, text }),
+      });
+      if (!sendRes.ok) {
+        const errText = await sendRes.text();
+        return json({ error: "Failed to send message", details: errText.slice(0, 200) }, 502);
+      }
+
+      return json({ success: true });
+    }
+
+
+
 
     // ─── SEND MEDIA ───
     if (action === "send-media") {

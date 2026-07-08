@@ -122,6 +122,7 @@ export default function StudentPortal() {
   const [companyWhatsapp, setCompanyWhatsapp] = useState<string | null>(null);
   const [workoutSessions, setWorkoutSessions] = useState<any[]>([]);
   const [weeklyGoal, setWeeklyGoal] = useState<number>(3);
+  const [goals, setGoals] = useState<{ id: string; title: string; type: string; target_date: string }[]>([]);
   const [activeEnrollmentId, setActiveEnrollmentId] = useState<string | null>(null);
   const [warmupOpen, setWarmupOpen] = useState(false);
   
@@ -160,6 +161,13 @@ export default function StudentPortal() {
       .eq("student_id", student.id)
       .maybeSingle();
     setPrescribedModalities(Array.isArray((sa as any)?.prescribed_modalities) ? (sa as any).prescribed_modalities : []);
+
+    const { data: goalsData } = await supabase
+      .from("student_goals")
+      .select("id, title, type, target_date")
+      .eq("student_id", student.id)
+      .order("target_date", { ascending: true });
+    setGoals((goalsData || []) as any);
 
 
 
@@ -866,6 +874,7 @@ export default function StudentPortal() {
             cycleStartDate={selectedCycle.start_date}
             cycleEndDate={selectedCycle.end_date}
             workoutSessions={workoutSessions}
+            goals={goals}
           />
         )}
 

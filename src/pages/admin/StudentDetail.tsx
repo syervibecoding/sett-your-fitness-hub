@@ -39,6 +39,10 @@ const TrainerWeeklyBar = lazy(() => import("@/components/trainer/TrainerWeeklyBa
 const MuscleRadar = lazy(() => import("@/components/student/MuscleRadar").then(m => ({ default: m.MuscleRadar })));
 const BodyLimitationsEditor = lazy(() => import("@/components/trainer/BodyLimitationsEditor").then(m => ({ default: m.BodyLimitationsEditor })));
 const BodyMeasurements = lazy(() => import("@/components/student/BodyMeasurements").then(m => ({ default: m.BodyMeasurements })));
+const StudentGoalsEditor = lazy(() => import("@/components/trainer/StudentGoalsEditor").then(m => ({ default: m.StudentGoalsEditor })));
+const StudentTimeline = lazy(() => import("@/components/trainer/StudentTimeline").then(m => ({ default: m.StudentTimeline })));
+const StudentDocuments = lazy(() => import("@/components/trainer/StudentDocuments").then(m => ({ default: m.StudentDocuments })));
+const StudentContactPanel = lazy(() => import("@/components/trainer/StudentContactPanel").then(m => ({ default: m.StudentContactPanel })));
 
 
 const TabFallback = () => (
@@ -52,19 +56,7 @@ const InlineFallback = () => (
   </div>
 );
 
-const ComingSoon = ({ title, description }: { title: string; description: string }) => (
-  <Card className="bg-card border-border border-dashed">
-    <CardHeader className="pb-2">
-      <CardTitle className="text-primary text-base flex items-center gap-2">
-        {title}
-        <Badge variant="outline" className="text-[10px] font-sans">Em breve</Badge>
-      </CardTitle>
-    </CardHeader>
-    <CardContent>
-      <p className="text-sm text-muted-foreground font-sans">{description}</p>
-    </CardContent>
-  </Card>
-);
+
 
 interface Student {
   id: string;
@@ -1035,7 +1027,7 @@ export default function StudentDetail() {
 
           {/* ===== PROGRAMA DE TREINO ===== */}
           <TabsContent value="program" className="space-y-4">
-            <ComingSoon title="Provas e Metas" description="Datas-alvo do aluno (provas e metas) que aparecem no calendário — em breve." />
+            <Suspense fallback={<TabFallback />}><StudentGoalsEditor studentId={id!} /></Suspense>
             {/* Enrollments */}
 
             <Card className="bg-card border-border">
@@ -1634,9 +1626,11 @@ export default function StudentDetail() {
 
           {/* ===== ACOMPANHAMENTO ===== */}
           <TabsContent value="acompanhamento" className="space-y-4">
-            <ComingSoon title="Contato semanal" description="Acompanhamento automático 2x por semana via assistente — em breve." />
-            <ComingSoon title="Linha do Tempo" description="Histórico de prescrições, treinos realizados e anamnese — em breve." />
-            <ComingSoon title="Pasta do Aluno" description="Upload e gestão de laudos e PDFs de avaliação — em breve." />
+            <Suspense fallback={<TabFallback />}>
+              <StudentContactPanel studentId={id!} studentName={student?.full_name} hasWhatsapp={!!student?.whatsapp} />
+              <StudentTimeline studentId={id!} />
+              <StudentDocuments studentId={id!} companyId={student?.company_id || ""} />
+            </Suspense>
           </TabsContent>
         </Tabs>
         </div>
