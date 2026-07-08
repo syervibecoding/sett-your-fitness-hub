@@ -20,35 +20,44 @@ function json(body: unknown, status = 200) {
  * - insere o "9" do celular quando o número vier com 8 dígitos.
  * Números já internacionais (não-BR) são mantidos apenas com dígitos.
  */
-function normalizeBrazilPhone(raw: string): string {
-  let d = (raw || "").replace(/\D/g, "");
-  if (!d) return "";
+// Valida e normaliza um celular brasileiro para o formato do WhatsApp: 55 + DDD (2) + 9 + 8 dígitos = 13 dígitos.
+// Retorna { phone } quando válido, ou { error } com o motivo quando o número estiver incompleto/inválido.
+// IMPORTANTE: não "completa" números às cegas — números incompletos (ex.: só 10 dígitos) são rejeitados,
+// evitando enviar mensagem para um número inexistente.
+function validateBrazilMobile(raw: string): { phone: string } | { error: string } {
+  const original = (raw || "").trim();
+  let d = original.replace(/\D/g, "");
+  if (!d) return { error: "Aluno sem WhatsApp cadastrado" };
 
   // Remove zeros à esquerda (ex.: 0DDD)
   d = d.replace(/^0+/, "");
 
-  // Já tem código do país BR
+  // Remove o código do país (55) quando presente em número completo
   if (d.startsWith("55") && (d.length === 12 || d.length === 13)) {
-    let national = d.slice(2);
-    if (national.length === 10) {
-      // DDD + 8 dígitos → insere o 9
-      national = national.slice(0, 2) + "9" + national.slice(2);
-    }
-    return "55" + national;
+    d = d.slice(2);
   }
 
-  // Número nacional (DDD + assinante)
-  if (d.length === 10 || d.length === 11) {
-    let national = d;
-    if (national.length === 10) {
-      national = national.slice(0, 2) + "9" + national.slice(2);
-    }
-    return "55" + national;
+  // Número nacional deve ter exatamente 11 dígitos: DDD (2) + 9 + assinante (8)
+  if (d.length !== 11) {
+    return {
+      error: `Número de WhatsApp inválido ou incompleto: "${original}". Use o formato (DD) 9XXXX-XXXX.`,
+    };
   }
 
-  // Formatos não reconhecidos (ex.: internacional) — mantém apenas dígitos
-  return d;
+  const ddd = Number(d.slice(0, 2));
+  if (ddd < 11 || ddd > 99) {
+    return { error: `DDD inválido no número de WhatsApp: "${original}".` };
+  }
+
+  if (d[2] !== "9") {
+    return {
+      error: `Número de WhatsApp inválido: "${original}". Celular deve começar com 9 após o DDD.`,
+    };
+  }
+
+  return { phone: "55" + d };
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -457,11 +466,12 @@ Deno.serve(async (req) => {
           failed.push({ id: sid, name: null, reason: "Aluno não encontrado" });
           continue;
         }
-        const phone = normalizeBrazilPhone(student.whatsapp || "");
-        if (!phone) {
-          failed.push({ id: sid, name: student.full_name, reason: "Sem WhatsApp cadastrado" });
+        const phoneResult = validateBrazilMobile(student.whatsapp || "");
+        if ("error" in phoneResult) {
+          failed.push({ id: sid, name: student.full_name, reason: phoneResult.error });
           continue;
         }
+        const phone = phoneResult.phone;
 
         const firstName = (student.full_name || "").split(" ")[0] || "";
         const link = `${cleanBase}/anamnese/${student.id}`;
@@ -504,8 +514,9 @@ Deno.serve(async (req) => {
 
       if (!student) return json({ error: "Aluno não encontrado" }, 404);
 
-      const phone = normalizeBrazilPhone(student.whatsapp || "");
-      if (!phone) return json({ error: "Aluno sem WhatsApp cadastrado" }, 400);
+      const phoneResult = validateBrazilMobile(student.whatsapp || "");
+      if ("error" in phoneResult) return json({ error: phoneResult.error }, 400);
+      const phone = phoneResult.phone;
 
       const firstName = (student.full_name || "").split(" ")[0] || "";
       const text = message.replace(/\{nome\}/g, firstName);

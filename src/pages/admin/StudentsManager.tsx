@@ -291,10 +291,17 @@ export default function StudentsManager() {
       });
       if (error) throw error;
       const sent = data?.sent || 0;
-      const failed = data?.failed?.length || 0;
+      const failedList: { name: string | null; reason: string }[] = data?.failed || [];
+      const failed = failedList.length;
+      const failDesc = failed > 0
+        ? failedList
+            .slice(0, 5)
+            .map((f) => `${f.name || "Aluno"}: ${f.reason}`)
+            .join(" · ") + (failed > 5 ? ` · +${failed - 5}` : "")
+        : undefined;
       toast({
         title: `Convites enviados: ${sent}`,
-        description: failed > 0 ? `${failed} não enviado(s) (ex.: sem WhatsApp).` : undefined,
+        description: failDesc,
         variant: sent === 0 ? "destructive" : undefined,
       });
       if (sent > 0) setSelectedIds(new Set());
