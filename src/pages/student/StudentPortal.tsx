@@ -93,6 +93,8 @@ export default function StudentPortal() {
   const [activeView, setActiveView] = useState<ActiveView>("home");
   const [studentId, setStudentId] = useState<string | null>(null);
   const [studentName, setStudentName] = useState("");
+  const [prescribedModalities, setPrescribedModalities] = useState<string[]>([]);
+  const [cardioSport, setCardioSport] = useState<string | null>(null);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [gender, setGender] = useState<Gender | null>(null);
   const [cycles, setCycles] = useState<Cycle[]>([]);
