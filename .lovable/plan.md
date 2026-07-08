@@ -1,50 +1,47 @@
 ## Objetivo
 
-Fazer a tela **Explorar** do app do aluno refletir apenas as modalidades que o treinador escolheu na **Anamnese** do Studio de Prescrição. Cards básicos (Treino, Estatísticas, Calendário, Histórico, Medidas, Avisos, Atividades) continuam sempre visíveis. **Nutrição** e os esportes de **cardio** (Natação, Corrida, Ciclismo) só aparecem quando prescritos — cada esporte com seu próprio card nomeado.
+Reorganizar a página de detalhe do aluno (`src/pages/admin/StudentDetail.tsx`) das **8 abas planas** atuais para a **nova divisão em 3 grupos com subabas**, conforme as imagens. Nenhuma mudança de banco: apenas reestruturação da navegação e reaproveitamento dos blocos já existentes. Os blocos ainda inexistentes entram como placeholders "em breve".
 
-A visibilidade é dirigida pela **seleção salva na anamnese** (não pela existência do plano), então o card aparece assim que o treinador marca a modalidade, mesmo antes de gerar/publicar o plano.
+## Nova estrutura de abas
 
-## Etapas
+```text
+[ Programa ]   [ Avaliações ]   [ Visão 360 ]
+     |               |                |
+ Programa        Anamnese        Visão Geral
+ Treinos         Avaliações      Financeiro
+ Análises        Progresso       Acompanhamento
+```
 
-### 1. Banco — salvar as modalidades escolhidas
-Adicionar coluna `prescribed_modalities text[]` (default `'{}'`) na tabela `student_anamneses`. Guarda as chaves escolhidas no Studio: `musculacao`, `corrida`, `natacao`, `ciclismo`, `nutricao`.
+### Programa (aba principal)
+- **Programa** → bloco *Provas e Metas* (placeholder "em breve") + o conteúdo atual de MATRÍCULAS (aba `program` de hoje).
+- **Treinos** → conteúdo atual da aba `workouts` (ciclos, Editar Treinos, radar por treino).
+- **Análises** → conteúdo atual da aba `analytics` (`TrainerWeeklyBar` + `WorkoutAnalysis`).
 
-### 2. Studio de Prescrição (`UnifiedPrescriber.tsx`)
-- No `saveAnamnese()`: incluir `prescribed_modalities: [...modalities]` no payload de insert/update.
-- Ao carregar a anamnese de um aluno já existente: preencher o estado `modalities` a partir de `prescribed_modalities` salvo (caindo para `["musculacao"]` quando vazio), para o treinador ver o que já foi definido.
+### Avaliações (aba principal)
+- **Anamnese** → conteúdo atual da aba `anamnesis`.
+- **Avaliações** → conteúdo atual da aba `evaluations`.
+- **Progresso** → reaproveita `BodyMeasurements` (medidas + avatar) e `MuscleRadar` já existentes, mais o `BodyLimitationsEditor` (a aba "Limitações" atual é dobrada aqui, já que some da barra principal).
 
-### 3. Portal do aluno (`StudentPortal.tsx`)
-- Carregar `prescribed_modalities` de `student_anamneses` do aluno logado.
-- Passar essa lista para `StudentHome`.
-- Ampliar `ActiveView` e a renderização de cardio para aceitar um esporte específico (Natação / Corrida / Ciclismo), passando o filtro de esporte para `CardioPlanView`.
+### Visão 360 (aba principal)
+- **Visão Geral** → bloco *Acesso do App* (área do botão "Ativar Acesso" já existente) + conteúdo atual da aba `overview` (MATRÍCULA ATIVA).
+- **Financeiro** → conteúdo atual da aba `financial`.
+- **Acompanhamento** → placeholders "em breve": *Contato semanal*, *Linha do Tempo* e *Pasta do Aluno*.
 
-### 4. Home do aluno (`StudentHome.tsx`)
-- Receber `prescribedModalities: string[]`.
-- Manter fixos: Treino, Estatísticas, Calendário, Histórico, Atividades, Avisos, Medidas.
-- Renderizar condicionalmente:
-  - **Nutrição** → só se `nutricao` prescrito.
-  - **Natação** → só se `natacao` prescrito (card próprio, ícone de ondas).
-  - **Corrida** → só se `corrida` prescrito (card próprio).
-  - **Ciclismo** → só se `ciclismo` prescrito (card próprio, ícone de bike).
-- Remover o card genérico "Cardio", substituído pelos cards por esporte.
-- Cada card de esporte navega para a visão de cardio já filtrada por aquele esporte.
+## Implementação (frontend apenas)
 
-### 5. Visão de cardio (`CardioPlanView.tsx`)
-- Aceitar prop opcional `sport` para exibir apenas o plano do esporte selecionado quando vindo de um card específico.
+- Trocar o `<Tabs>` único por **Tabs aninhadas**: 3 `TabsTrigger` principais (`programa`, `avaliacoes`, `visao360`) e, dentro de cada `TabsContent`, um novo `<Tabs>` com as subabas.
+- Mover os `TabsContent` existentes (overview, program, workouts, analytics, anamnesis, limitations, financial, evaluations) para dentro dos grupos, sem alterar o conteúdo/lógica de cada um.
+- Progresso: renderizar `BodyMeasurements` (recebe `studentId`, `companyId`, `gender` — já disponíveis na página) + `MuscleRadar` + `BodyLimitationsEditor`.
+- Placeholders: um componente simples de card "Em breve" reutilizado para Provas e Metas, Contato semanal, Linha do Tempo e Pasta do Aluno, para a estrutura já refletir as imagens.
+- Ajustar `defaultValue` para abrir em **Programa** (ou Visão Geral, se preferir) e garantir que as subabas tenham `defaultValue` próprio.
+- Barra de subabas com o mesmo estilo visual das imagens (subabas menores, abaixo das principais).
 
 ## Detalhes técnicos
 
-- **Migração** (via ferramenta de migração):
-```sql
-ALTER TABLE public.student_anamneses
-  ADD COLUMN IF NOT EXISTS prescribed_modalities text[] NOT NULL DEFAULT '{}';
-```
-Sem novos GRANTs/policies — a tabela já tem RLS e privilégios configurados; apenas nova coluna.
+- Arquivo único afetado: `src/pages/admin/StudentDetail.tsx`.
+- Sem migrações, sem edge functions, sem mudanças de RLS.
+- Os componentes reaproveitados já recebem `studentId`/`companyId` e respeitam as policies atuais (admin/treinador já lê medidas e limitações do aluno nas abas existentes).
 
-- **Compatibilidade retroativa**: alunos sem `prescribed_modalities` (array vazio) não mostram cards de modalidade. Se preferir, posso fazer um fallback: quando vazio, inferir de planos existentes (`nutrition_plans` / `running_plans.sport`) para não "sumir" modalidades de quem já tem plano. Sigo sem fallback salvo indicação contrária.
+## Fora de escopo (fica como placeholder "em breve")
 
-- Mapa de esportes usado nos cards: `natacao → "Natação"`, `corrida → "Corrida"`, `ciclismo → "Ciclismo"`.
-
-## Fora de escopo
-- Novos motores de IA, tabelas ou mudanças no fluxo de geração/publicação de planos.
-- Alterações no BNITO ou em outras telas do aluno.
+- Provas e Metas (datas-alvo), Linha do Tempo (histórico automático), Pasta do Aluno (upload de arquivos) e Contato semanal (toggle do assistente) — serão construídos depois, com as tabelas/storage necessários, num próximo passo.

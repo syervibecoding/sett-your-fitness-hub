@@ -38,6 +38,7 @@ const WorkoutAnalysis = lazy(() => import("@/components/trainer/WorkoutAnalysis"
 const TrainerWeeklyBar = lazy(() => import("@/components/trainer/TrainerWeeklyBar").then(m => ({ default: m.TrainerWeeklyBar })));
 const MuscleRadar = lazy(() => import("@/components/student/MuscleRadar").then(m => ({ default: m.MuscleRadar })));
 const BodyLimitationsEditor = lazy(() => import("@/components/trainer/BodyLimitationsEditor").then(m => ({ default: m.BodyLimitationsEditor })));
+const BodyMeasurements = lazy(() => import("@/components/student/BodyMeasurements").then(m => ({ default: m.BodyMeasurements })));
 
 
 const TabFallback = () => (
@@ -49,6 +50,20 @@ const InlineFallback = () => (
   <div className="flex items-center justify-center py-6">
     <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
   </div>
+);
+
+const ComingSoon = ({ title, description }: { title: string; description: string }) => (
+  <Card className="bg-card border-border border-dashed">
+    <CardHeader className="pb-2">
+      <CardTitle className="text-primary text-base flex items-center gap-2">
+        {title}
+        <Badge variant="outline" className="text-[10px] font-sans">Em breve</Badge>
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      <p className="text-sm text-muted-foreground font-sans">{description}</p>
+    </CardContent>
+  </Card>
 );
 
 interface Student {
@@ -265,6 +280,16 @@ export default function StudentDetail() {
   const [financialOpen, setFinancialOpen] = useState(false);
   const [financialEnrollment, setFinancialEnrollment] = useState<Enrollment | null>(null);
   const [financialForm, setFinancialForm] = useState({ payment_status: "", payment_date: "", payment_method: "", financial_notes: "" });
+
+  // Navegação em grupos (Programa / Avaliações / Visão 360) + subabas
+  type MainTab = "programa" | "avaliacoes" | "visao360";
+  const [mainTab, setMainTab] = useState<MainTab>("programa");
+  const [subTab, setSubTab] = useState<string>("program");
+  const [measGender, setMeasGender] = useState<any>(null);
+  const selectMain = (m: MainTab) => {
+    setMainTab(m);
+    setSubTab(m === "programa" ? "program" : m === "avaliacoes" ? "anamnesis" : "overview");
+  };
 
   // Evaluations
   const [evalNotes, setEvalNotes] = useState("");
@@ -869,18 +894,52 @@ export default function StudentDetail() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="w-full justify-start overflow-x-auto flex-nowrap h-auto p-1">
-            <TabsTrigger value="overview" className="text-xs sm:text-sm">Visão Geral</TabsTrigger>
-            <TabsTrigger value="program" className="text-xs sm:text-sm">Programa</TabsTrigger>
-            <TabsTrigger value="workouts" className="text-xs sm:text-sm">Treinos</TabsTrigger>
-            <TabsTrigger value="analytics" className="text-xs sm:text-sm">Análises</TabsTrigger>
-            <TabsTrigger value="anamnesis" className="text-xs sm:text-sm">Anamnese</TabsTrigger>
-            <TabsTrigger value="limitations" className="text-xs sm:text-sm">Limitações</TabsTrigger>
-            <TabsTrigger value="financial" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
-            <TabsTrigger value="evaluations" className="text-xs sm:text-sm">Avaliações</TabsTrigger>
-          </TabsList>
+        {/* Tabs — agrupadas em Programa / Avaliações / Visão 360 */}
+        <div className="w-full space-y-3">
+          {/* Grupos principais */}
+          <div className="flex flex-wrap gap-2 border-b border-border pb-2">
+            {([
+              { key: "programa", label: "Programa" },
+              { key: "avaliacoes", label: "Avaliações" },
+              { key: "visao360", label: "Visão 360" },
+            ] as const).map((g) => (
+              <button
+                key={g.key}
+                onClick={() => selectMain(g.key)}
+                className={`px-4 py-2 text-sm font-sans font-semibold rounded-md transition-colors ${
+                  mainTab === g.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
+
+          <Tabs value={subTab} onValueChange={setSubTab} className="w-full">
+            <TabsList className="w-full justify-start overflow-x-auto flex-nowrap h-auto p-1">
+              {mainTab === "programa" && (
+                <>
+                  <TabsTrigger value="program" className="text-xs sm:text-sm">Programa</TabsTrigger>
+                  <TabsTrigger value="workouts" className="text-xs sm:text-sm">Treinos</TabsTrigger>
+                  <TabsTrigger value="analytics" className="text-xs sm:text-sm">Análises</TabsTrigger>
+                </>
+              )}
+              {mainTab === "avaliacoes" && (
+                <>
+                  <TabsTrigger value="anamnesis" className="text-xs sm:text-sm">Anamnese</TabsTrigger>
+                  <TabsTrigger value="evaluations" className="text-xs sm:text-sm">Avaliações</TabsTrigger>
+                  <TabsTrigger value="progresso" className="text-xs sm:text-sm">Progresso</TabsTrigger>
+                </>
+              )}
+              {mainTab === "visao360" && (
+                <>
+                  <TabsTrigger value="overview" className="text-xs sm:text-sm">Visão Geral</TabsTrigger>
+                  <TabsTrigger value="financial" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
+                  <TabsTrigger value="acompanhamento" className="text-xs sm:text-sm">Acompanhamento</TabsTrigger>
+                </>
+              )}
+            </TabsList>
+
 
 
 
@@ -976,7 +1035,9 @@ export default function StudentDetail() {
 
           {/* ===== PROGRAMA DE TREINO ===== */}
           <TabsContent value="program" className="space-y-4">
+            <ComingSoon title="Provas e Metas" description="Datas-alvo do aluno (provas e metas) que aparecem no calendário — em breve." />
             {/* Enrollments */}
+
             <Card className="bg-card border-border">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-primary text-lg">MATRÍCULAS</CardTitle>
@@ -1311,12 +1372,8 @@ export default function StudentDetail() {
             </Suspense>
           </TabsContent>
 
-          {/* ===== LIMITAÇÕES ===== */}
-          <TabsContent value="limitations" className="space-y-4">
-            <Suspense fallback={<TabFallback />}>
-              <BodyLimitationsEditor studentId={id!} />
-            </Suspense>
-          </TabsContent>
+          {/* Limitações agora fica em Avaliações → Progresso */}
+
 
           {/* ===== ANAMNESE ===== */}
           <TabsContent value="anamnesis">
@@ -1561,7 +1618,29 @@ export default function StudentDetail() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* ===== PROGRESSO ===== */}
+          <TabsContent value="progresso" className="space-y-4">
+            <Suspense fallback={<TabFallback />}>
+              <BodyMeasurements
+                studentId={id!}
+                companyId={student?.company_id || ""}
+                gender={measGender ?? ((student as any)?.gender ?? null)}
+                onGenderChange={setMeasGender}
+              />
+              <BodyLimitationsEditor studentId={id!} />
+            </Suspense>
+          </TabsContent>
+
+          {/* ===== ACOMPANHAMENTO ===== */}
+          <TabsContent value="acompanhamento" className="space-y-4">
+            <ComingSoon title="Contato semanal" description="Acompanhamento automático 2x por semana via assistente — em breve." />
+            <ComingSoon title="Linha do Tempo" description="Histórico de prescrições, treinos realizados e anamnese — em breve." />
+            <ComingSoon title="Pasta do Aluno" description="Upload e gestão de laudos e PDFs de avaliação — em breve." />
+          </TabsContent>
         </Tabs>
+        </div>
+
 
         {/* Enrollment Dialog */}
         <Dialog open={enrollOpen} onOpenChange={setEnrollOpen}>
