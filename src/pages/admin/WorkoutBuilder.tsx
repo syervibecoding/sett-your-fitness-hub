@@ -701,7 +701,9 @@ export default function WorkoutBuilder() {
                           </div>
                         </CardContent>
                       </Card>
-                    ))}
+                      </div>
+                      );
+                    })}
                   </div>
 
                   {/* Add exercise to this column */}
