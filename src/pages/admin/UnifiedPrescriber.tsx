@@ -635,6 +635,8 @@ export default function UnifiedPrescriber() {
           reps: String(ex.reps ?? ""),
           rest: Number(ex.rest_seconds) || null,
           notes: ex.cues || ex.biomechanical_note || "",
+          ...(ex.group_id ? { group_id: ex.group_id } : {}),
+          ...(ex.group_type ? { group_type: ex.group_type } : {}),
         })),
       }));
       const { error } = await supabase.from("workouts").insert(rows as any);
