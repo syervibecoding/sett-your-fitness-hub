@@ -105,8 +105,82 @@ export function ExerciseLibraryPicker({ open, onOpenChange, alreadyAddedIds, onA
 
   // Reset seleção ao fechar
   useEffect(() => {
-    if (!open) setSelected(new Set());
+    if (!open) {
+      setSelected(new Set());
+      setObjectives(new Set());
+    }
   }, [open]);
+
+  // Objetivos disponíveis na biblioteca (interseção com categorias de objetivo)
+  const availableObjectives = useMemo(() => {
+    const present = new Set(exercises.flatMap((e) => getExerciseCategories(e)));
+    return OBJECTIVE_CATEGORIES.filter((c) => present.has(c));
+  }, [exercises]);
+
+  const toggleObjective = (c: string) => {
+    setObjectives((prev) => {
+      const next = new Set(prev);
+      next.has(c) ? next.delete(c) : next.add(c);
+      return next;
+    });
+  };
+
+  // Sugestão automática: cobertura gulosa dos objetivos escolhidos,
+  // priorizando exercícios que abrangem várias finalidades ao mesmo tempo.
+  const suggestBestSet = () => {
+    const objs = Array.from(objectives);
+    if (objs.length === 0) {
+      toast.error("Escolha ao menos um objetivo.");
+      return;
+    }
+    const needed = new Map<string, number>();
+    objs.forEach((o) => needed.set(o, perObjective));
+
+    const pool = exercises.filter((ex) => !alreadyAddedIds.has(ex.id));
+    const chosen = new Set<string>();
+
+    while (Array.from(needed.values()).some((v) => v > 0)) {
+      let best: LibraryExercise | null = null;
+      let bestCovers = 0;
+      let bestVersatility = 0;
+      for (const ex of pool) {
+        if (chosen.has(ex.id)) continue;
+        const cats = getExerciseCategories(ex).filter((c) => objectives.has(c));
+        if (cats.length === 0) continue;
+        const covers = cats.filter((c) => (needed.get(c) || 0) > 0).length;
+        if (covers === 0) continue;
+        if (covers > bestCovers || (covers === bestCovers && cats.length > bestVersatility)) {
+          best = ex;
+          bestCovers = covers;
+          bestVersatility = cats.length;
+        }
+      }
+      if (!best) break;
+      chosen.add(best.id);
+      getExerciseCategories(best).forEach((c) => {
+        if (needed.has(c)) needed.set(c, (needed.get(c) || 0) - 1);
+      });
+    }
+
+    if (chosen.size === 0) {
+      toast.error("Nenhum exercício encontrado para os objetivos escolhidos.");
+      return;
+    }
+
+    setSelected(chosen);
+    setCategory("all");
+    setSearch("");
+    setRegion(null);
+
+    const uncovered = objs.filter((o) => (needed.get(o) || 0) > 0);
+    if (uncovered.length > 0) {
+      const labels = uncovered.map((o) => CATEGORY_LABELS[o] || o).join(", ");
+      toast.warning(`${chosen.size} exercícios sugeridos. Cobertura parcial em: ${labels}.`);
+    } else {
+      toast.success(`${chosen.size} exercícios sugeridos cobrindo todos os objetivos.`);
+    }
+  };
+
 
   const availableCategories = useMemo(() => {
     const present = new Set(exercises.flatMap((e) => getExerciseCategories(e)));
