@@ -1,45 +1,50 @@
-## Studio de Prescrição — alinhar ao fluxo integrado (5 etapas)
+## Objetivo
 
-Objetivo: deixar o `/prescricao` (UnifiedPrescriber) igual ao fluxo das imagens e garantir que **tanto a Prescrição quanto o Studio Integrado publiquem no app do aluno**.
+Fazer a tela **Explorar** do app do aluno refletir apenas as modalidades que o treinador escolheu na **Anamnese** do Studio de Prescrição. Cards básicos (Treino, Estatísticas, Calendário, Histórico, Medidas, Avisos, Atividades) continuam sempre visíveis. **Nutrição** e os esportes de **cardio** (Natação, Corrida, Ciclismo) só aparecem quando prescritos — cada esporte com seu próprio card nomeado.
 
-### Validação atual (o que o git diz)
+A visibilidade é dirigida pela **seleção salva na anamnese** (não pela existência do plano), então o card aparece assim que o treinador marca a modalidade, mesmo antes de gerar/publicar o plano.
 
-- **Corrida/Natação/Ciclismo** já caem no app do aluno ao gerar (`ai-running-plan` → `running_plans`, lido pelo `CardioPlanView`).
-- **Nutrição** também (motor `generateNutritionPlan` → `nutrition_plans` status `active`, lido pelo `NutritionPlanView`).
-- **Musculação NÃO chega** hoje: a IA grava só em `ai_strength_plans` (rascunho), mas o aluno lê `training_cycles` + `workouts`. Falta o passo de publicar.
-- **Vídeo**: cortes em frações desiguais e sem intervalo por segundos.
-- **Edição de treino** e **botão publicar**: não existem no Studio Integrado.
+## Etapas
 
----
+### 1. Banco — salvar as modalidades escolhidas
+Adicionar coluna `prescribed_modalities text[]` (default `'{}'`) na tabela `student_anamneses`. Guarda as chaves escolhidas no Studio: `musculacao`, `corrida`, `natacao`, `ciclismo`, `nutricao`.
 
-### Etapa 1 — Avaliação por vídeo: cortes em segundos iguais
-`src/components/VideoAssessment.tsx`
-- Trocar os `fractions` fixos por cálculo de **intervalos iguais** a partir da duração: N cortes distribuídos uniformemente (pontos médios de N segmentos iguais). Mantém os rótulos de vista por protocolo.
-- Mostrar o tempo (s) de cada corte. Revisão continua manual (marcar compensações), sem IA — conforme escolhido.
+### 2. Studio de Prescrição (`UnifiedPrescriber.tsx`)
+- No `saveAnamnese()`: incluir `prescribed_modalities: [...modalities]` no payload de insert/update.
+- Ao carregar a anamnese de um aluno já existente: preencher o estado `modalities` a partir de `prescribed_modalities` salvo (caindo para `["musculacao"]` quando vazio), para o treinador ver o que já foi definido.
 
-### Etapa 2 — Anamnese seleciona o que o aluno recebe + orquestração
-`src/pages/admin/UnifiedPrescriber.tsx`
-- Mover o seletor de modalidades da etapa 3 para a **etapa Anamnese**, em cards "O que esse aluno vai receber?" com 5 opções: **Musculação, Corrida, Natação, Ciclismo, Nutrição** (ícone + subtítulo, igual à imagem).
-- Mapeamento (motores existentes): Musculação → `ai-prescribe-workout`; Corrida/Natação/Ciclismo → `ai-running-plan` (param `sport`); Nutrição → `generateNutritionPlan`.
-- Card **"Orquestração"** com os blocos de 6 semanas (Semanas 1‑2 base técnica → 3‑4 acumulação/progressão → 5‑6 consolidação/refino), derivado da anamnese.
+### 3. Portal do aluno (`StudentPortal.tsx`)
+- Carregar `prescribed_modalities` de `student_anamneses` do aluno logado.
+- Passar essa lista para `StudentHome`.
+- Ampliar `ActiveView` e a renderização de cardio para aceitar um esporte específico (Natação / Corrida / Ciclismo), passando o filtro de esporte para `CardioPlanView`.
 
-### Etapa 3 — Prescrição integrada + PDFs
-- "Gerar N prescrições integradas" passa a iterar sobre **todas** as modalidades marcadas (não só 2).
-- Lista "Prescrições geradas" com status *pronta* por modalidade + cards de **Periodização 6 semanas** para musculação (SEM 1…6, RIR, %vol).
-- "Baixar PDFs separados (N)" reaproveitando os helpers de PDF já existentes por modalidade.
+### 4. Home do aluno (`StudentHome.tsx`)
+- Receber `prescribedModalities: string[]`.
+- Manter fixos: Treino, Estatísticas, Calendário, Histórico, Atividades, Avisos, Medidas.
+- Renderizar condicionalmente:
+  - **Nutrição** → só se `nutricao` prescrito.
+  - **Natação** → só se `natacao` prescrito (card próprio, ícone de ondas).
+  - **Corrida** → só se `corrida` prescrito (card próprio).
+  - **Ciclismo** → só se `ciclismo` prescrito (card próprio, ícone de bike).
+- Remover o card genérico "Cardio", substituído pelos cards por esporte.
+- Cada card de esporte navega para a visão de cardio já filtrada por aquele esporte.
 
-### Etapa 4 — Editar treino (fallback)
-- Após gerar musculação, seção expansível "Revisar e editar o treino" → **Treino A/B/C** com campos editáveis de Série / Reps / Descanso / Obs, adicionar/remover exercício e remover treino (estado local derivado do plano da IA).
+### 5. Visão de cardio (`CardioPlanView.tsx`)
+- Aceitar prop opcional `sport` para exibir apenas o plano do esporte selecionado quando vindo de um card específico.
 
-### Etapa 5 — Publicar no app do aluno
-- Seletor de **ciclo de treino** do aluno (busca ciclos via `enrollments` → `training_cycles`; escolher/atualizar ciclo, conforme escolhido).
-- Botão **"Publicar treino no app do aluno"**: grava os treinos (já editados) em `workouts` do ciclo escolhido — reaproveitando a mesma lógica do `PrescriptionStudio.handleApply` (limpa e reinsere workouts do ciclo).
-- Corrida/natação/ciclismo/nutrição já ficam visíveis ao gerar; a publicação explícita cobre a musculação.
+## Detalhes técnicos
 
----
+- **Migração** (via ferramenta de migração):
+```sql
+ALTER TABLE public.student_anamneses
+  ADD COLUMN IF NOT EXISTS prescribed_modalities text[] NOT NULL DEFAULT '{}';
+```
+Sem novos GRANTs/policies — a tabela já tem RLS e privilégios configurados; apenas nova coluna.
 
-### Detalhes técnicos
-- Arquivos: `UnifiedPrescriber.tsx` (reestruturação maior), `VideoAssessment.tsx` (intervalos iguais). Sem novos edge functions, sem mudança de schema.
-- Publicação reusa padrão existente: `delete workouts where cycle_id` + `insert` dos treinos (com `company_id`, `created_by`).
-- Ambos os caminhos (PrescriptionStudio determinístico + UnifiedPrescriber IA) passam a publicar em `training_cycles/workouts` → app do aluno.
-- Fora de escopo: novos motores de IA, novas tabelas, mudança na visibilidade do portal do aluno.
+- **Compatibilidade retroativa**: alunos sem `prescribed_modalities` (array vazio) não mostram cards de modalidade. Se preferir, posso fazer um fallback: quando vazio, inferir de planos existentes (`nutrition_plans` / `running_plans.sport`) para não "sumir" modalidades de quem já tem plano. Sigo sem fallback salvo indicação contrária.
+
+- Mapa de esportes usado nos cards: `natacao → "Natação"`, `corrida → "Corrida"`, `ciclismo → "Ciclismo"`.
+
+## Fora de escopo
+- Novos motores de IA, tabelas ou mudanças no fluxo de geração/publicação de planos.
+- Alterações no BNITO ou em outras telas do aluno.
