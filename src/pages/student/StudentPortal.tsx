@@ -55,7 +55,17 @@ interface WorkoutExercise {
   reps: string;
   rest: string;
   notes: string;
+  group_id?: string;
+  group_type?: string;
 }
+
+const GROUP_LABELS: Record<string, string> = {
+  bi_set: "BI-SET",
+  tri_set: "TRI-SET",
+  super_set: "SUPER-SET",
+  giant_set: "SÉRIE GIGANTE",
+  circuit: "CIRCUITO",
+};
 
 interface WorkoutData {
   id: string;
