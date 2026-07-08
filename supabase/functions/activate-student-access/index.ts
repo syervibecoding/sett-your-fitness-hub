@@ -180,7 +180,10 @@ Deno.serve(async (req) => {
       success: true, 
       user_id: userId,
       temp_password: tempPassword,
-      message: "Student access activated. Temporary password generated."
+      reactivated,
+      message: reactivated
+        ? "Student access reactivated. New temporary password generated."
+        : "Student access activated. Temporary password generated."
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
