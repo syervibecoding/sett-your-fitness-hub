@@ -230,29 +230,100 @@ export default function WorkoutBuilder() {
     setWorkouts(prev => prev.map((w, i) => i === idx ? { ...w, [field]: value } : w));
   };
 
+  const makeWX = (ex: Exercise): WorkoutExercise => ({
+    exercise_id: ex.id,
+    exercise_name: ex.name,
+    muscle_group: ex.muscle_group,
+    video_url: ex.video_url,
+    video_path: ex.video_path,
+    sets: "3",
+    reps: "12",
+    rest: "60s",
+    notes: "",
+  });
+
   const addExercise = (ex: Exercise) => {
     const idx = targetWorkoutIdx;
-    setWorkouts(prev => prev.map((w, i) => {
-      if (i !== idx) return w;
-      return {
-        ...w,
-        exercises: [...w.exercises, {
-          exercise_id: ex.id,
-          exercise_name: ex.name,
-          muscle_group: ex.muscle_group,
-          video_url: ex.video_url,
-          video_path: ex.video_path,
-          sets: "3",
-          reps: "12",
-          rest: "60s",
-          notes: "",
-        }],
-      };
-    }));
+    setWorkouts(prev => prev.map((w, i) => i === idx ? { ...w, exercises: [...w.exercises, makeWX(ex)] } : w));
     setLibraryOpen(false);
   };
 
+  const toggleLibSelect = (id: string) => {
+    setSelectedLibIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const addSelectedExercises = () => {
+    const idx = targetWorkoutIdx;
+    const current = workouts[idx]?.exercises || [];
+    const toAdd = libraryExercises.filter(
+      ex => selectedLibIds.has(ex.id) && !current.some(w => w.exercise_id === ex.id)
+    );
+    if (toAdd.length === 0) { setLibraryOpen(false); return; }
+    setWorkouts(prev => prev.map((w, i) => i === idx ? { ...w, exercises: [...w.exercises, ...toAdd.map(makeWX)] } : w));
+    setSelectedLibIds(new Set());
+    setLibraryOpen(false);
+  };
+
+  // ---- Grouping selection (key = `${wIdx}:${exIdx}`) ----
+  const toggleExSelect = (wIdx: number, exIdx: number) => {
+    setSelKeys(prev => {
+      const next = new Set(prev);
+      const key = `${wIdx}:${exIdx}`;
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
+  const selectedIdxsFor = (wIdx: number) =>
+    (workouts[wIdx]?.exercises || [])
+      .map((_, j) => j)
+      .filter(j => selKeys.has(`${wIdx}:${j}`));
+
+  const clearSelForWorkout = (wIdx: number) => {
+    setSelKeys(prev => {
+      const next = new Set<string>();
+      prev.forEach(k => { if (!k.startsWith(`${wIdx}:`)) next.add(k); });
+      return next;
+    });
+  };
+
+  const applyGroup = (wIdx: number, type: GroupType) => {
+    const idxs = selectedIdxsFor(wIdx);
+    if (idxs.length < 2) return;
+    const gid = (crypto as any).randomUUID ? crypto.randomUUID() : `g-${Date.now()}-${Math.random()}`;
+    setWorkouts(prev => prev.map((w, i) => {
+      if (i !== wIdx) return w;
+      const minIdx = Math.min(...idxs);
+      const selected = idxs.map(j => ({ ...w.exercises[j], group_id: gid, group_type: type }));
+      const rest = w.exercises.filter((_, j) => !idxs.includes(j));
+      const arr = [...rest.slice(0, minIdx), ...selected, ...rest.slice(minIdx)];
+      return { ...w, exercises: arr };
+    }));
+    clearSelForWorkout(wIdx);
+  };
+
+  const ungroupSelected = (wIdx: number) => {
+    const idxs = selectedIdxsFor(wIdx);
+    setWorkouts(prev => prev.map((w, i) => {
+      if (i !== wIdx) return w;
+      return {
+        ...w,
+        exercises: w.exercises.map((ex, j) => {
+          if (!idxs.includes(j)) return ex;
+          const { group_id, group_type, ...rest } = ex;
+          return rest;
+        }),
+      };
+    }));
+    clearSelForWorkout(wIdx);
+  };
+
   const removeExercise = (workoutIdx: number, exIdx: number) => {
+    setSelKeys(new Set());
     setWorkouts(prev => prev.map((w, i) => {
       if (i !== workoutIdx) return w;
       return { ...w, exercises: w.exercises.filter((_, j) => j !== exIdx) };
