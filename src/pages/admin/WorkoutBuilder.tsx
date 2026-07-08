@@ -913,26 +913,40 @@ export default function WorkoutBuilder() {
               {filteredLib.map((ex) => {
                 const currentExercises = currentWorkout?.exercises || [];
                 const alreadyAdded = currentExercises.some((w) => w.exercise_id === ex.id);
+                const checked = selectedLibIds.has(ex.id);
                 return (
                   <div
                     key={ex.id}
-                    className="flex items-center justify-between p-3 rounded-md bg-secondary hover:bg-muted transition-colors"
+                    className={`flex items-center justify-between gap-2 p-3 rounded-md transition-colors ${alreadyAdded ? "bg-secondary/50 opacity-60" : "bg-secondary hover:bg-muted cursor-pointer"} ${checked ? "ring-2 ring-primary/50" : ""}`}
+                    onClick={() => !alreadyAdded && toggleLibSelect(ex.id)}
                   >
-                    <div className="flex items-center gap-2">
-                      <p className="font-sans font-medium text-foreground text-sm">{ex.name}</p>
-                      <Badge variant="outline" className="capitalize text-xs">{ex.muscle_group}</Badge>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Checkbox
+                        checked={checked}
+                        disabled={alreadyAdded}
+                        onCheckedChange={() => toggleLibSelect(ex.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <p className="font-sans font-medium text-foreground text-sm truncate">{ex.name}</p>
+                      <Badge variant="outline" className="capitalize text-xs shrink-0">{ex.muscle_group}</Badge>
                     </div>
-                    <Button
-                      size="sm"
-                      variant={alreadyAdded ? "secondary" : "default"}
-                      disabled={alreadyAdded}
-                      onClick={() => addExercise(ex)}
-                    >
-                      {alreadyAdded ? "Adicionado" : "Adicionar"}
-                    </Button>
+                    {alreadyAdded && (
+                      <span className="text-xs text-muted-foreground font-sans shrink-0">Adicionado</span>
+                    )}
                   </div>
                 );
               })}
+            </div>
+
+            {/* Footer: add selected */}
+            <div className="flex items-center justify-between border-t border-border pt-3">
+              <span className="text-sm font-sans text-muted-foreground">
+                {selectedLibIds.size} selecionado(s)
+              </span>
+              <Button disabled={selectedLibIds.size === 0} onClick={addSelectedExercises}>
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar selecionados ({selectedLibIds.size})
+              </Button>
             </div>
           </div>
         </DialogContent>
