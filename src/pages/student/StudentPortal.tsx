@@ -502,7 +502,13 @@ export default function StudentPortal() {
   }, [allLogs, weeklyGoal]);
 
 
-  const handleNavigate = (view: ActiveView) => {
+  const handleNavigate = (view: ActiveView | "natacao" | "corrida" | "ciclismo") => {
+    if (view === "natacao" || view === "corrida" || view === "ciclismo") {
+      setCardioSport(view);
+      setActiveView("cardio");
+      return;
+    }
+    setCardioSport(null);
     setActiveView(view);
   };
 
