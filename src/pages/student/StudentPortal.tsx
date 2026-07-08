@@ -874,6 +874,7 @@ export default function StudentPortal() {
             cycleStartDate={selectedCycle.start_date}
             cycleEndDate={selectedCycle.end_date}
             workoutSessions={workoutSessions}
+            goals={goals}
           />
         )}
 
