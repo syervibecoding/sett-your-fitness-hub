@@ -111,7 +111,7 @@ export default function ExerciseLibrary() {
   const [editing, setEditing] = useState<Exercise | null>(null);
   const [videoModal, setVideoModal] = useState<{ type: "path" | "url"; value: string } | null>(null);
   const [form, setForm] = useState({
-    name: "", description: "", muscle_group: "geral", category: "",
+    name: "", description: "", muscle_group: "geral", categories: [] as string[],
     video_url: "", is_global: false,
   });
   const [videoFile, setVideoFile] = useState<File | null>(null);
