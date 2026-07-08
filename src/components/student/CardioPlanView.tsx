@@ -112,7 +112,13 @@ function sportLabel(sport?: string | null) {
   return sport || "Cardio";
 }
 
-export function CardioPlanView({ studentId }: { studentId: string }) {
+const SPORT_PATTERN: Record<string, string> = {
+  natacao: "%nata%",
+  corrida: "%corr%",
+  ciclismo: "%cicl%",
+};
+
+export function CardioPlanView({ studentId, sport }: { studentId: string; sport?: string }) {
   const [plan, setPlan] = useState<CardioPlanRow | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -120,19 +126,23 @@ export function CardioPlanView({ studentId }: { studentId: string }) {
     if (!studentId) return;
     (async () => {
       setLoading(true);
-      const { data } = await supabase
+      let query = supabase
         .from("running_plans")
         .select(
           "id, plan_name, sport, goal, model, duration_weeks, weeks, fc_zones, general_tips, warnings, complementary_strength, nutrition_alert, created_at"
         )
-        .eq("student_id", studentId)
+        .eq("student_id", studentId);
+      const pattern = sport ? SPORT_PATTERN[sport.toLowerCase()] : null;
+      if (pattern) query = query.ilike("sport", pattern);
+      const { data } = await query
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
       setPlan((data as unknown as CardioPlanRow) || null);
       setLoading(false);
     })();
-  }, [studentId]);
+  }, [studentId, sport]);
+
 
   if (loading) return null;
 
