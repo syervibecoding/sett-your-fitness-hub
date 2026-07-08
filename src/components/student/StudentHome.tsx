@@ -221,35 +221,72 @@ export function StudentHome({
             </CardContent>
           </Card>
         </button>
-        <button onClick={() => onNavigate("nutricao")} className="text-left">
-          <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
-            <CardContent className="p-5 flex flex-col gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Apple className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-bold text-foreground font-sans text-sm">Nutrição</h3>
-                <p className="text-xs text-muted-foreground font-sans mt-0.5">Plano alimentar e macros</p>
-              </div>
-            </CardContent>
-          </Card>
-        </button>
+        {prescribedModalities.includes("nutricao") && (
+          <button onClick={() => onNavigate("nutricao")} className="text-left">
+            <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
+              <CardContent className="p-5 flex flex-col gap-3">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Apple className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-foreground font-sans text-sm">Dicas Nutricionais</h3>
+                  <p className="text-xs text-muted-foreground font-sans mt-0.5">Plano alimentar e macros</p>
+                </div>
+              </CardContent>
+            </Card>
+          </button>
+        )}
 
-        <button onClick={() => onNavigate("cardio")} className="text-left">
-          <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
-            <CardContent className="p-5 flex flex-col gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <HeartPulse className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-bold text-foreground font-sans text-sm">Cardio</h3>
-                <p className="text-xs text-muted-foreground font-sans mt-0.5">Corrida, natação e ciclismo</p>
-              </div>
-            </CardContent>
-          </Card>
-        </button>
+        {prescribedModalities.includes("natacao") && (
+          <button onClick={() => onNavigate("natacao")} className="text-left">
+            <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
+              <CardContent className="p-5 flex flex-col gap-3">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Waves className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-foreground font-sans text-sm">Natação</h3>
+                  <p className="text-xs text-muted-foreground font-sans mt-0.5">Plano de natação</p>
+                </div>
+              </CardContent>
+            </Card>
+          </button>
+        )}
+
+        {prescribedModalities.includes("corrida") && (
+          <button onClick={() => onNavigate("corrida")} className="text-left">
+            <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
+              <CardContent className="p-5 flex flex-col gap-3">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Footprints className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-foreground font-sans text-sm">Corrida</h3>
+                  <p className="text-xs text-muted-foreground font-sans mt-0.5">Plano de corrida</p>
+                </div>
+              </CardContent>
+            </Card>
+          </button>
+        )}
+
+        {prescribedModalities.includes("ciclismo") && (
+          <button onClick={() => onNavigate("ciclismo")} className="text-left">
+            <Card className="bg-card border-border hover:border-primary/50 transition-all h-full">
+              <CardContent className="p-5 flex flex-col gap-3">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Bike className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-foreground font-sans text-sm">Ciclismo</h3>
+                  <p className="text-xs text-muted-foreground font-sans mt-0.5">Plano de ciclismo</p>
+                </div>
+              </CardContent>
+            </Card>
+          </button>
+        )}
       </div>
     </div>
 
   );
 }
+
