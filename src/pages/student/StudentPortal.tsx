@@ -162,6 +162,13 @@ export default function StudentPortal() {
       .maybeSingle();
     setPrescribedModalities(Array.isArray((sa as any)?.prescribed_modalities) ? (sa as any).prescribed_modalities : []);
 
+    const { data: goalsData } = await supabase
+      .from("student_goals")
+      .select("id, title, type, target_date")
+      .eq("student_id", student.id)
+      .order("target_date", { ascending: true });
+    setGoals((goalsData || []) as any);
+
 
 
     if (student.company_id) {
