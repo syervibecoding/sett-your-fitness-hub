@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, X, PersonStanding, Check } from "lucide-react";
+import { Search, X, PersonStanding, Check, Sparkles, Wand2 } from "lucide-react";
+import { toast } from "sonner";
 import { BodyMap } from "@/components/body/BodyMap";
 import { muscleGroupToRegion, REGION_LABEL, type BodyRegionId } from "@/lib/bodyMap";
 import { getExerciseCover } from "@/lib/exerciseCover";
@@ -59,6 +60,19 @@ const CATEGORY_ORDER = [
   "pliometria",
 ];
 
+// Categorias tratadas como "objetivos" para a sugestão automática
+// (deixa de fora categorias de equipamento como máquinas / pesos livres).
+const OBJECTIVE_CATEGORIES = [
+  "mobilidade",
+  "controle_motor",
+  "ativacao",
+  "core",
+  "performance",
+  "base",
+  "fisioterapia",
+  "pliometria",
+];
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -74,6 +88,11 @@ export function ExerciseLibraryPicker({ open, onOpenChange, alreadyAddedIds, onA
   const [showBody, setShowBody] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  // Sugestão automática por objetivos
+  const [objectives, setObjectives] = useState<Set<string>>(new Set());
+  const [perObjective, setPerObjective] = useState(2);
+
+
   useEffect(() => {
     (async () => {
       const { data } = await supabase
@@ -86,8 +105,82 @@ export function ExerciseLibraryPicker({ open, onOpenChange, alreadyAddedIds, onA
 
   // Reset seleção ao fechar
   useEffect(() => {
-    if (!open) setSelected(new Set());
+    if (!open) {
+      setSelected(new Set());
+      setObjectives(new Set());
+    }
   }, [open]);
+
+  // Objetivos disponíveis na biblioteca (interseção com categorias de objetivo)
+  const availableObjectives = useMemo(() => {
+    const present = new Set(exercises.flatMap((e) => getExerciseCategories(e)));
+    return OBJECTIVE_CATEGORIES.filter((c) => present.has(c));
+  }, [exercises]);
+
+  const toggleObjective = (c: string) => {
+    setObjectives((prev) => {
+      const next = new Set(prev);
+      next.has(c) ? next.delete(c) : next.add(c);
+      return next;
+    });
+  };
+
+  // Sugestão automática: cobertura gulosa dos objetivos escolhidos,
+  // priorizando exercícios que abrangem várias finalidades ao mesmo tempo.
+  const suggestBestSet = () => {
+    const objs = Array.from(objectives);
+    if (objs.length === 0) {
+      toast.error("Escolha ao menos um objetivo.");
+      return;
+    }
+    const needed = new Map<string, number>();
+    objs.forEach((o) => needed.set(o, perObjective));
+
+    const pool = exercises.filter((ex) => !alreadyAddedIds.has(ex.id));
+    const chosen = new Set<string>();
+
+    while (Array.from(needed.values()).some((v) => v > 0)) {
+      let best: LibraryExercise | null = null;
+      let bestCovers = 0;
+      let bestVersatility = 0;
+      for (const ex of pool) {
+        if (chosen.has(ex.id)) continue;
+        const cats = getExerciseCategories(ex).filter((c) => objectives.has(c));
+        if (cats.length === 0) continue;
+        const covers = cats.filter((c) => (needed.get(c) || 0) > 0).length;
+        if (covers === 0) continue;
+        if (covers > bestCovers || (covers === bestCovers && cats.length > bestVersatility)) {
+          best = ex;
+          bestCovers = covers;
+          bestVersatility = cats.length;
+        }
+      }
+      if (!best) break;
+      chosen.add(best.id);
+      getExerciseCategories(best).forEach((c) => {
+        if (needed.has(c)) needed.set(c, (needed.get(c) || 0) - 1);
+      });
+    }
+
+    if (chosen.size === 0) {
+      toast.error("Nenhum exercício encontrado para os objetivos escolhidos.");
+      return;
+    }
+
+    setSelected(chosen);
+    setCategory("all");
+    setSearch("");
+    setRegion(null);
+
+    const uncovered = objs.filter((o) => (needed.get(o) || 0) > 0);
+    if (uncovered.length > 0) {
+      const labels = uncovered.map((o) => CATEGORY_LABELS[o] || o).join(", ");
+      toast.warning(`${chosen.size} exercícios sugeridos. Cobertura parcial em: ${labels}.`);
+    } else {
+      toast.success(`${chosen.size} exercícios sugeridos cobrindo todos os objetivos.`);
+    }
+  };
+
 
   const availableCategories = useMemo(() => {
     const present = new Set(exercises.flatMap((e) => getExerciseCategories(e)));
@@ -125,6 +218,75 @@ export function ExerciseLibraryPicker({ open, onOpenChange, alreadyAddedIds, onA
         <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
           <DialogTitle className="text-primary">BIBLIOTECA DE EXERCÍCIOS</DialogTitle>
         </DialogHeader>
+
+        {/* Sugestão automática por objetivos */}
+        {availableObjectives.length > 0 && (
+          <div className="px-6 pb-3 shrink-0">
+            <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 space-y-2.5">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span className="text-xs font-sans font-semibold text-foreground uppercase tracking-wide">
+                  Sugestão por objetivos
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground font-sans">
+                Selecione os objetivos e monte automaticamente o melhor conjunto — exercícios que
+                abrangem várias finalidades são priorizados.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {availableObjectives.map((c) => {
+                  const active = objectives.has(c);
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => toggleObjective(c)}
+                      className={`rounded-full px-3 py-1 text-xs font-sans font-medium transition-colors border ${
+                        active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-secondary text-muted-foreground border-border hover:text-foreground"
+                      }`}
+                    >
+                      {CATEGORY_LABELS[c] || c}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-muted-foreground font-sans">Exercícios por objetivo</span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setPerObjective(n)}
+                        className={`h-7 w-7 rounded-md text-xs font-sans font-medium border transition-colors ${
+                          perObjective === n
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-secondary text-muted-foreground border-border hover:text-foreground"
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  className="gap-2"
+                  disabled={objectives.size === 0}
+                  onClick={suggestBestSet}
+                >
+                  <Wand2 className="h-4 w-4" />
+                  Sugerir melhor conjunto
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+
 
         {/* Category tabs */}
         <div className="px-6 shrink-0">
@@ -243,10 +405,20 @@ export function ExerciseLibraryPicker({ open, onOpenChange, alreadyAddedIds, onA
                     </div>
                     <div className="p-2 space-y-1">
                       <p className="text-xs font-sans font-medium text-foreground line-clamp-2 leading-tight">{ex.name}</p>
-                      {ex.muscle_group && (
-                        <Badge variant="outline" className="text-[10px] capitalize">{ex.muscle_group}</Badge>
-                      )}
+                      <div className="flex flex-wrap gap-1">
+                        {ex.muscle_group && (
+                          <Badge variant="outline" className="text-[10px] capitalize">{ex.muscle_group}</Badge>
+                        )}
+                        {getExerciseCategories(ex)
+                          .filter((c) => objectives.has(c))
+                          .map((c) => (
+                            <Badge key={c} className="text-[10px] bg-primary/15 text-primary border-primary/30">
+                              {CATEGORY_LABELS[c] || c}
+                            </Badge>
+                          ))}
+                      </div>
                     </div>
+
                   </button>
                 );
               })}
