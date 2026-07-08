@@ -239,6 +239,11 @@ export default function UnifiedPrescriber() {
 
       if (sa) {
         setAnamneseId(sa.id);
+        const savedMods = Array.isArray((sa as any).prescribed_modalities)
+          ? ((sa as any).prescribed_modalities as string[]).filter((m): m is Modality =>
+              ["musculacao", "corrida", "natacao", "ciclismo", "nutricao"].includes(m))
+          : [];
+        setModalities(new Set(savedMods.length ? (savedMods as Modality[]) : ["musculacao"]));
         const base: Anamnese = {
           age: sa.age?.toString() ?? "",
           body_fat_percent: sa.body_fat_percent?.toString() ?? "",
