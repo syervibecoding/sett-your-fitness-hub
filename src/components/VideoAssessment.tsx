@@ -168,13 +168,18 @@ export default function VideoAssessment({ studentId, companyId, studentName, con
     setExtracting(true);
     setError("");
     try {
-      const { vistas, fractions } = PROTOCOLS[protocol];
+      const { vistas } = PROTOCOLS[protocol];
+      const n = vistas.length;
+      // Cortes em intervalos de segundos IGUAIS: ponto médio de cada um dos
+      // n segmentos de duração igual → tempos uniformemente espaçados.
       const out: Frame[] = [];
-      for (let i = 0; i < fractions.length; i++) {
-        const { dataUrl, time } = await captureAt(fractions[i] * v.duration);
+      for (let i = 0; i < n; i++) {
+        const fraction = (i + 0.5) / n;
+        const { dataUrl, time } = await captureAt(fraction * v.duration);
         out.push({ index: i, vista: vistas[i], time, dataUrl, findings: [] });
       }
       setFrames(out);
+
     } catch {
       setError("Erro ao extrair os quadros do vídeo.");
     }

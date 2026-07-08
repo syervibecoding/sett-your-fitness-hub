@@ -1,9 +1,11 @@
 // ============================================================================
-// UnifiedPrescriber — Studio de Prescrição (fluxo em etapas)
+// UnifiedPrescriber — Studio de Prescrição (fluxo integrado em 5 etapas)
 //   Topo: seleciona aluno (com busca) + enviar/gerar link de anamnese
-//   1. Anamnese  → resumo do que o aluno respondeu + edição (prefill unificado)
-//   2. Avaliação → Avaliação Funcional embutida (fotos/vídeo)
-//   3. Prescrição → gera musculação e/ou corrida (IA metodologia BN) + PDFs
+//   1. Anamnese  → resumo do aluno + "O que o aluno vai receber?" + orquestração
+//   2. Avaliação → Avaliação Funcional embutida (fotos/vídeo, cortes iguais)
+//   3. Prescrição → gera TODAS as modalidades marcadas (IA + motores) + PDFs
+//   4. Editar    → revisar/editar treino de musculação (fallback)
+//   5. Publicar  → escolher ciclo e publicar treino no app do aluno
 // ============================================================================
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,18 +19,22 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Loader2, CheckCircle2, Circle, AlertCircle, Dumbbell, Activity,
+  Loader2, CheckCircle2, Circle, AlertCircle, Dumbbell, Activity, Waves, Bike, Apple,
   ChevronDown, ChevronUp, ClipboardCheck, Send, Link2, Sparkles, Search, ArrowRight,
+  Trash2, Plus, FileDown, Rocket,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 import { useAssistantName } from "@/hooks/useAssistantName";
 import FunctionalAssessmentPanel from "@/components/admin/FunctionalAssessmentPanel";
+import { generateNutritionPlan } from "@/lib/nutrition";
+import type { NutritionInput, NutritionObjective, ActivityLevel, Sex } from "@/lib/nutrition";
+import { jsPDF } from "jspdf";
 
-interface Student { id: string; full_name: string; }
+interface Student { id: string; full_name: string; gender: string | null; birth_date: string | null; }
+interface Cycle { id: string; cycle_number: number; status: string; start_date: string; end_date: string; }
 interface Anamnese {
   age: string; body_fat_percent: string;
   objective: string; activity_level: string;
@@ -41,12 +47,25 @@ interface Anamnese {
   stress_score: string; sleep_quality: string; injuries: string;
   notes: string;
 }
-type Modality = "musculacao" | "corrida";
+type Modality = "musculacao" | "corrida" | "natacao" | "ciclismo" | "nutricao";
 type GenStatus = "idle" | "generating" | "done" | "error";
-type Step = "anamnese" | "avaliacao" | "prescricao";
+type Step = "anamnese" | "avaliacao" | "prescricao" | "editar" | "publicar";
 interface AnsweredSummary {
   objective: string; level: string; modality: string; days: string; injuries: string;
 }
+
+const CARDIO_MODS: Modality[] = ["corrida", "natacao", "ciclismo"];
+const MODALITIES: { key: Modality; icon: any; label: string; sub: string }[] = [
+  { key: "musculacao", icon: Dumbbell, label: "Musculação", sub: "Força + biomecânica" },
+  { key: "corrida",    icon: Activity, label: "Corrida",    sub: "Zonas FC + periodização" },
+  { key: "natacao",    icon: Waves,    label: "Natação",    sub: "Volume + técnica" },
+  { key: "ciclismo",   icon: Bike,     label: "Ciclismo",   sub: "Potência + zonas" },
+  { key: "nutricao",   icon: Apple,    label: "Nutrição",   sub: "Dicas práticas" },
+];
+const MOD_LABEL: Record<Modality, string> = {
+  musculacao: "Musculação", corrida: "Corrida", natacao: "Natação",
+  ciclismo: "Ciclismo", nutricao: "Nutrição",
+};
 
 const DEFAULT_ANAMNESE: Anamnese = {
   age: "", body_fat_percent: "", objective: "performance",
@@ -77,6 +96,22 @@ function inferSport(mods?: string[] | string | null): string {
   if (/cicl|bike|pedal/.test(m)) return "ciclismo";
   if (/triat/.test(m)) return "triathlon";
   return "corrida";
+}
+function nutObjective(o: string): NutritionObjective {
+  if (o === "hipertrofia" || o === "emagrecimento" || o === "performance") return o;
+  return "manutencao";
+}
+function nutActivity(a: string): ActivityLevel {
+  if (a === "muito_ativo") return "intenso";
+  if (a === "extremo") return "muito_intenso";
+  if (a === "sedentario" || a === "leve" || a === "moderado") return a;
+  return "moderado";
+}
+function ageFromBirth(birth: string | null): string {
+  if (!birth) return "";
+  const d = new Date(birth); if (isNaN(d.getTime())) return "";
+  const diff = Date.now() - d.getTime();
+  return String(Math.max(0, Math.floor(diff / (365.25 * 24 * 3600 * 1000))));
 }
 
 // ── UI helpers (module-level para NÃO remontar os inputs a cada tecla) ──
@@ -113,8 +148,15 @@ const Section = ({ id, label, open, setOpen, children }: {
   </div>
 );
 
+// Blocos de orquestração (6 semanas) — derivados da metodologia BN.
+const ORCHESTRATION = [
+  { weeks: "Semanas 1-2", title: "Base técnica e tolerância", note: "sem métodos avançados no bloco 1" },
+  { weeks: "Semanas 3-4", title: "Acumulação e progressão", note: "progressão dupla / up-set técnico opcional" },
+  { weeks: "Semanas 5-6", title: "Consolidação e refino", note: "pirâmide leve se técnica estável" },
+];
+
 export default function UnifiedPrescriber() {
-  const { role, companyId: authCompanyId } = useAuth();
+  const { user, role, companyId: authCompanyId } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
   const assistant = useAssistantName();
   const companyId = role === "master"
@@ -129,10 +171,19 @@ export default function UnifiedPrescriber() {
   const [answered, setAnswered]     = useState<AnsweredSummary | null>(null);
   const [assessmentExists, setAssessmentExists] = useState(false);
   const [modalities, setModalities] = useState<Set<Modality>>(new Set(["musculacao"]));
+  const [nut, setNut]               = useState({ weight: "", height: "", sex: "masculino" as Sex, meals: "4" });
   const [open, setOpen]             = useState<OpenState>({ personal: true, training: true, cardio: false, health: false });
-  const [status, setStatus]         = useState<Record<Modality, GenStatus>>({ musculacao: "idle", corrida: "idle" });
-  const [results, setResults]       = useState<Record<Modality, any>>({ musculacao: null, corrida: null });
+  const [status, setStatus]         = useState<Record<Modality, GenStatus>>({
+    musculacao: "idle", corrida: "idle", natacao: "idle", ciclismo: "idle", nutricao: "idle",
+  });
+  const [results, setResults]       = useState<Record<Modality, any>>({
+    musculacao: null, corrida: null, natacao: null, ciclismo: null, nutricao: null,
+  });
+  const [editableWorkouts, setEditableWorkouts] = useState<any[]>([]);
+  const [cycles, setCycles]         = useState<Cycle[]>([]);
+  const [cycleId, setCycleId]       = useState("");
   const [generating, setGenerating] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [sending, setSending]       = useState(false);
   const [error, setError]           = useState("");
   const [step, setStep]             = useState<Step>("anamnese");
@@ -141,15 +192,19 @@ export default function UnifiedPrescriber() {
     if (!companyId) { setStudents([]); return; }
     (async () => {
       const { data: list } = await supabase.from("students")
-        .select("id, full_name").eq("company_id", companyId).order("full_name");
-      setStudents(list || []);
+        .select("id, full_name, gender, birth_date").eq("company_id", companyId).order("full_name");
+      setStudents((list as Student[]) || []);
     })();
   }, [companyId]);
 
   useEffect(() => {
     if (!studentId) { setAnswered(null); return; }
     setStep("anamnese");
+    setResults({ musculacao: null, corrida: null, natacao: null, ciclismo: null, nutricao: null });
+    setStatus({ musculacao: "idle", corrida: "idle", natacao: "idle", ciclismo: "idle", nutricao: "idle" });
+    setEditableWorkouts([]);
     (async () => {
+      const s = students.find(x => x.id === studentId);
       const [{ data: sa }, { data: ans }] = await Promise.all([
         supabase.from("student_anamneses").select("*").eq("student_id", studentId).maybeSingle(),
         supabase.from("anamnesis").select("*").eq("student_id", studentId)
@@ -184,7 +239,6 @@ export default function UnifiedPrescriber() {
 
       if (sa) {
         setAnamneseId(sa.id);
-        // student_anamneses tem prioridade; a resposta do aluno só preenche vazios
         const base: Anamnese = {
           age: sa.age?.toString() ?? "",
           body_fat_percent: sa.body_fat_percent?.toString() ?? "",
@@ -221,14 +275,34 @@ export default function UnifiedPrescriber() {
         setAnamnese(merged);
       }
 
+      // Nutrição: pré-preenche sexo/idade a partir do cadastro do aluno
+      setNut(n => ({
+        ...n, weight: "", height: "",
+        sex: (s?.gender === "feminino" || s?.gender === "F" || s?.gender === "Feminino") ? "feminino" : "masculino",
+      }));
+
       const { data: assess } = await supabase.from("functional_assessments")
         .select("id").eq("student_id", studentId).limit(1).maybeSingle();
       setAssessmentExists(!!assess);
+
+      // Ciclos de treino do aluno (para publicar)
+      const { data: enr } = await supabase.from("enrollments")
+        .select("id").eq("student_id", studentId).order("created_at", { ascending: false });
+      const enrollmentIds = (enr || []).map(e => e.id);
+      if (enrollmentIds.length === 0) { setCycles([]); setCycleId(""); return; }
+      const { data: cyc } = await supabase.from("training_cycles")
+        .select("id, cycle_number, status, start_date, end_date")
+        .in("enrollment_id", enrollmentIds)
+        .order("cycle_number", { ascending: true });
+      const list = (cyc || []) as Cycle[];
+      setCycles(list);
+      const active = list.find(c => c.status === "active") || list.find(c => c.status === "pending") || list[0];
+      setCycleId(active?.id || "");
     })();
   }, [studentId]);
 
   useEffect(() => {
-    if (modalities.has("corrida")) setOpen(o => ({ ...o, cardio: true }));
+    if (CARDIO_MODS.some(m => modalities.has(m))) setOpen(o => ({ ...o, cardio: true }));
   }, [modalities]);
 
   const set = (k: keyof Anamnese, v: any) => setAnamnese(a => ({ ...a, [k]: v }));
@@ -241,6 +315,7 @@ export default function UnifiedPrescriber() {
   const filteredStudents = students.filter(s =>
     s.full_name.toLowerCase().includes(search.trim().toLowerCase()));
   const assistantInitials = (assistant.name || "BN").slice(0, 3).toUpperCase();
+  const generatedCount = MODALITIES.filter(m => results[m.key]).length;
 
   async function sendAnamneseWhatsapp() {
     if (!studentId) return;
@@ -299,15 +374,12 @@ export default function UnifiedPrescriber() {
   }
 
   async function generate() {
-    if (!studentId) {
-      const msg = "Selecione um aluno antes de gerar a prescrição.";
-      setError(msg); toast.error(msg); return;
-    }
-    if (!companyId) { const msg = "Empresa não identificada. Recarregue a página."; setError(msg); toast.error(msg); return; }
-    if (modalities.size === 0) { const msg = "Selecione ao menos uma prescrição."; setError(msg); toast.error(msg); return; }
+    if (!studentId) { const m = "Selecione um aluno antes de gerar a prescrição."; setError(m); toast.error(m); return; }
+    if (!companyId) { const m = "Empresa não identificada. Recarregue a página."; setError(m); toast.error(m); return; }
+    if (modalities.size === 0) { const m = "Selecione ao menos uma modalidade na anamnese."; setError(m); toast.error(m); return; }
     setGenerating(true); setError("");
-    setStatus({ musculacao: "idle", corrida: "idle" });
-    setResults({ musculacao: null, corrida: null });
+    setStatus({ musculacao: "idle", corrida: "idle", natacao: "idle", ciclismo: "idle", nutricao: "idle" });
+    setResults({ musculacao: null, corrida: null, natacao: null, ciclismo: null, nutricao: null });
 
     let strengthPlan: any = null;
     const bundleId = crypto.randomUUID();
@@ -333,7 +405,7 @@ export default function UnifiedPrescriber() {
             duration_weeks: 6, equipment: anamnese.equipment, block_number: 1,
             is_endurance_athlete: anamnese.is_endurance_athlete,
             restrictions: anamnese.injuries, notes: anamnese.notes,
-            running_days_context: modalities.has("corrida") ? {
+            running_days_context: CARDIO_MODS.some(m => modalities.has(m)) ? {
               days_per_week: Number(anamnese.days_per_week_cardio),
               sport: anamnese.sport,
             } : null,
@@ -343,19 +415,23 @@ export default function UnifiedPrescriber() {
         if (e || data?.error) throw new Error(data?.error || e?.message);
         strengthPlan = data?.plan;
         setResults(r => ({ ...r, musculacao: data?.plan }));
+        setEditableWorkouts((data?.plan?.workouts ?? []).map((w: any) => ({
+          ...w, exercises: (w.exercises ?? []).map((ex: any) => ({ ...ex })),
+        })));
         setStatus(s => ({ ...s, musculacao: "done" }));
       }
 
-      // 2) Corrida
-      if (modalities.has("corrida")) {
-        setStatus(s => ({ ...s, corrida: "generating" }));
+      // 2) Cardio (corrida / natação / ciclismo) — mesmo motor, sport diferente
+      for (const cardio of CARDIO_MODS) {
+        if (!modalities.has(cardio)) continue;
+        setStatus(s => ({ ...s, [cardio]: "generating" }));
         const { data, error: e } = await supabase.functions.invoke("ai-running-plan", {
           body: {
             student_id: studentId, student_name: student?.full_name, company_id: companyId,
             anamnese_id: savedAnamneseId, bundle_id: bundleId,
-            sport: anamnese.sport, goal: anamnese.cardio_goal || "Melhora de performance geral",
+            sport: cardio, goal: anamnese.cardio_goal || "Melhora de performance geral",
             duration_weeks: 8,
-            days_per_week: Number(anamnese.days_per_week_cardio),
+            days_per_week: Number(anamnese.days_per_week_cardio) || 3,
             session_duration: Number(anamnese.session_duration_min),
             current_volume: anamnese.current_volume_weekly ? Number(anamnese.current_volume_weekly) : null,
             fcmax: anamnese.fcmax ? Number(anamnese.fcmax) : null,
@@ -366,32 +442,152 @@ export default function UnifiedPrescriber() {
             strength_plan_context: strengthPlan ? {
               days_per_week: Number(anamnese.days_per_week_strength),
               workouts: strengthPlan.workouts?.map((w: any) => ({
-                day: w.day_of_week,
-                focus: w.split_focus,
-                has_heavy_legs: w.exercises?.some((ex: any) =>
-                  ["forca_global", "controle_motor"].includes(ex.phase) &&
-                  ["quadríceps", "posterior", "glúteos"].some(m => ex.muscle_group?.toLowerCase().includes(m))
-                ),
+                day: w.day_of_week, focus: w.split_focus,
               })) ?? [],
             } : null,
             assessment_context: assessmentCtx,
           },
         });
         if (e || data?.error) throw new Error(data?.error || e?.message);
-        setResults(r => ({ ...r, corrida: data?.plan }));
-        setStatus(s => ({ ...s, corrida: "done" }));
+        setResults(r => ({ ...r, [cardio]: data?.plan }));
+        setStatus(s => ({ ...s, [cardio]: "done" }));
+      }
+
+      // 3) Nutrição (motor determinístico local)
+      if (modalities.has("nutricao")) {
+        setStatus(s => ({ ...s, nutricao: "generating" }));
+        const weight = Number(nut.weight);
+        const height = Number(nut.height);
+        if (!weight || !height) {
+          setStatus(s => ({ ...s, nutricao: "error" }));
+          throw new Error("Informe peso e altura na seção de Nutrição da anamnese para gerar o plano alimentar.");
+        }
+        const input: NutritionInput = {
+          objective: nutObjective(anamnese.objective),
+          sex: nut.sex,
+          age: Number(anamnese.age) || Number(ageFromBirth(student?.birth_date ?? null)) || 30,
+          weightKg: weight, heightCm: height,
+          activity: nutActivity(anamnese.activity_level),
+          mealsPerDay: Number(nut.meals) || 4,
+        };
+        const plan = generateNutritionPlan(input);
+        const { error: e } = await supabase.from("nutrition_plans").insert([{
+          student_id: studentId, company_id: companyId, created_by: user?.id ?? null,
+          title: `Plano Alimentar — ${MOD_LABEL.nutricao}`,
+          objective: input.objective, status: "active",
+          total_calories: plan.targets.calories, protein_g: plan.targets.protein,
+          carbs_g: plan.targets.carbs, fat_g: plan.targets.fat, water_ml: plan.targets.waterMl,
+          meals: plan.meals as unknown as object, notes: anamnese.injuries || null,
+        }] as never);
+        if (e) throw new Error(e.message);
+        setResults(r => ({ ...r, nutricao: plan }));
+        setStatus(s => ({ ...s, nutricao: "done" }));
       }
 
       toast.success("Prescrição integrada gerada!");
+      if (modalities.has("musculacao")) setStep("editar");
     } catch (err: any) {
       setError(err.message || "Erro ao gerar prescrição.");
       toast.error(err.message || "Erro ao gerar prescrição.");
-      setStatus(s => ({
-        musculacao: s.musculacao === "generating" ? "error" : s.musculacao,
-        corrida: s.corrida === "generating" ? "error" : s.corrida,
-      }));
+      setStatus(s => {
+        const next = { ...s };
+        (Object.keys(next) as Modality[]).forEach(k => { if (next[k] === "generating") next[k] = "error"; });
+        return next;
+      });
     }
     setGenerating(false);
+  }
+
+  // ── Edição de treino (fallback) ────────────────────────────────────────
+  const patchEx = (wi: number, ei: number, key: string, val: any) =>
+    setEditableWorkouts(ws => ws.map((w, i) => i !== wi ? w : {
+      ...w, exercises: w.exercises.map((ex: any, j: number) => j !== ei ? ex : { ...ex, [key]: val }),
+    }));
+  const removeEx = (wi: number, ei: number) =>
+    setEditableWorkouts(ws => ws.map((w, i) => i !== wi ? w : {
+      ...w, exercises: w.exercises.filter((_: any, j: number) => j !== ei),
+    }));
+  const addEx = (wi: number) =>
+    setEditableWorkouts(ws => ws.map((w, i) => i !== wi ? w : {
+      ...w, exercises: [...w.exercises, { exercise_name: "", sets: 3, reps: "10", rest_seconds: 60, cues: "" }],
+    }));
+  const removeWorkout = (wi: number) =>
+    setEditableWorkouts(ws => ws.filter((_, i) => i !== wi));
+  const patchWorkoutName = (wi: number, val: string) =>
+    setEditableWorkouts(ws => ws.map((w, i) => i !== wi ? w : { ...w, name: val }));
+
+  // ── Publicar musculação no app do aluno ────────────────────────────────
+  async function publishWorkout() {
+    if (!cycleId) { toast.error("Selecione um ciclo de treino para publicar."); return; }
+    if (editableWorkouts.length === 0) { toast.error("Gere a musculação antes de publicar."); return; }
+    if (!user) { toast.error("Sessão expirada. Recarregue a página."); return; }
+    setPublishing(true);
+    try {
+      await supabase.from("workouts").delete().eq("cycle_id", cycleId);
+      const rows = editableWorkouts.map((w, i) => ({
+        cycle_id: cycleId,
+        title: w.name || `Treino ${String.fromCharCode(65 + i)}`,
+        description: w.split_focus || null,
+        sort_order: i,
+        company_id: companyId,
+        created_by: user.id,
+        exercises: (w.exercises || []).map((ex: any) => ({
+          exercise_id: ex.exercise_id ?? null,
+          exercise_name: ex.exercise_name,
+          muscle_group: ex.muscle_group ?? null,
+          video_url: ex.video_url ?? null,
+          video_path: ex.video_path ?? null,
+          sets: Number(ex.sets) || null,
+          reps: String(ex.reps ?? ""),
+          rest: Number(ex.rest_seconds) || null,
+          notes: ex.cues || ex.biomechanical_note || "",
+        })),
+      }));
+      const { error } = await supabase.from("workouts").insert(rows as any);
+      if (error) throw new Error(error.message);
+      toast.success("Treino publicado no app do aluno!");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao publicar.");
+    }
+    setPublishing(false);
+  }
+
+  // ── PDFs separados por modalidade ───────────────────────────────────────
+  function exportPdfs() {
+    const name = student?.full_name || "aluno";
+    const safe = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase();
+    MODALITIES.forEach(({ key, label }) => {
+      const res = results[key];
+      if (!res) return;
+      const doc = new jsPDF({ unit: "mm", format: "a4" });
+      let y = 18;
+      const line = (t: string, size = 10, bold = false) => {
+        doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(size);
+        for (const chunk of doc.splitTextToSize(t, 178)) { doc.text(chunk, 16, y); y += size * 0.5; if (y > 280) { doc.addPage(); y = 18; } }
+      };
+      line(`${label} — ${name}`, 15, true); y += 2;
+      if (key === "musculacao") {
+        line(`${res.cycle_name || ""}  ·  ${res.objective || ""}  ·  ${res.duration_weeks || 6} semanas`, 9); y += 2;
+        (editableWorkouts.length ? editableWorkouts : res.workouts || []).forEach((w: any) => {
+          line(w.name || "Treino", 12, true);
+          (w.exercises || []).forEach((ex: any) =>
+            line(`• ${ex.exercise_name}  —  ${ex.sets}x${ex.reps}  ·  desc ${ex.rest_seconds ?? "-"}s  ${ex.cues ? "· " + ex.cues : ""}`, 9));
+          y += 2;
+        });
+      } else if (key === "nutricao") {
+        line(`Meta: ${res.targets.calories} kcal · P ${res.targets.protein}g · C ${res.targets.carbs}g · G ${res.targets.fat}g · Água ${res.targets.waterMl}ml`, 9); y += 2;
+        (res.meals || []).forEach((meal: any) => {
+          line(`${meal.name} (${meal.time}) — ${meal.kcal} kcal`, 12, true);
+          (meal.items || []).forEach((it: any) => line(`• ${it.food} — ${it.amount}`, 9));
+          y += 2;
+        });
+      } else {
+        line(`${res.plan_name || label} · ${res.sport || ""} · modelo ${res.model || "-"} · ${res.duration_weeks || 8} semanas`, 9); y += 2;
+        if (res.general_tips) line(String(res.general_tips), 9);
+        (res.warnings || []).forEach((w: string) => line(`⚠ ${w}`, 9));
+      }
+      doc.save(`${key}-${safe}.pdf`);
+    });
   }
 
   const genStatusIcon = (s: GenStatus) => {
@@ -408,7 +604,7 @@ export default function UnifiedPrescriber() {
         <div>
           <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">Prescrição</p>
           <h1 className="font-display text-3xl">Studio de Prescrição</h1>
-          <p className="text-sm text-muted-foreground">Anamnese → Avaliação → Prescrições integradas → PDFs</p>
+          <p className="text-sm text-muted-foreground">Anamnese → Avaliação → Prescrição → Edição → Publicar no app</p>
         </div>
         <span className="shrink-0 grid place-items-center h-11 w-11 rounded-full bg-navy/10 text-navy font-mono text-xs font-semibold tracking-wide">
           {assistantInitials}
@@ -481,10 +677,12 @@ export default function UnifiedPrescriber() {
 
       {studentId && (
         <Tabs value={step} onValueChange={(v) => setStep(v as Step)}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="anamnese">1. Anamnese</TabsTrigger>
             <TabsTrigger value="avaliacao">2. Avaliação</TabsTrigger>
             <TabsTrigger value="prescricao">3. Prescrição</TabsTrigger>
+            <TabsTrigger value="editar">4. Editar</TabsTrigger>
+            <TabsTrigger value="publicar">5. Publicar</TabsTrigger>
           </TabsList>
 
           {/* ETAPA 1 · ANAMNESE */}
@@ -512,6 +710,63 @@ export default function UnifiedPrescriber() {
                     O aluno ainda não respondeu. Envie o link acima ou preencha manualmente abaixo.
                   </p>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* O que o aluno vai receber? */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">O que esse aluno vai receber?</CardTitle>
+                <p className="text-xs text-muted-foreground">Escolha as modalidades — todas serão geradas e vão para o app do aluno.</p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {MODALITIES.map(({ key, icon: Icon, label, sub }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => toggleMod(key)}
+                      className={`rounded-lg border-2 p-3 text-left transition relative ${
+                        modalities.has(key) ? "border-navy bg-navy/5" : "border-line hover:border-navy/40"
+                      }`}
+                    >
+                      {modalities.has(key) && <CheckCircle2 className="h-4 w-4 text-navy absolute top-2 right-2" />}
+                      <Icon className="h-5 w-5 mb-1 text-navy" />
+                      <div className="text-sm font-medium">{label}</div>
+                      <div className="text-xs text-muted-foreground">{sub}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {modalities.has("nutricao") && (
+                  <div className="mt-4 grid gap-3 grid-cols-2 md:grid-cols-4 border-t border-line pt-4">
+                    <F label="Peso (kg)"><SI type="number" step="0.1" value={nut.weight} onChange={(e: any) => setNut(n => ({ ...n, weight: e.target.value }))} /></F>
+                    <F label="Altura (cm)"><SI type="number" value={nut.height} onChange={(e: any) => setNut(n => ({ ...n, height: e.target.value }))} /></F>
+                    <F label="Sexo">
+                      <SS value={nut.sex} onChange={(v: string) => setNut(n => ({ ...n, sex: v as Sex }))}
+                        opts={[["masculino", "Masculino"], ["feminino", "Feminino"]]} />
+                    </F>
+                    <F label="Refeições/dia"><SI type="number" min="3" max="6" value={nut.meals} onChange={(e: any) => setNut(n => ({ ...n, meals: e.target.value }))} /></F>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Orquestração */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  Orquestração <Badge variant="outline" className="text-xs">6 semanas</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {ORCHESTRATION.map((b) => (
+                  <div key={b.weeks} className="border border-line rounded-lg p-3">
+                    <div className="text-sm font-medium">{b.weeks}</div>
+                    <div className="text-sm">{b.title}</div>
+                    <div className="text-xs text-muted-foreground mt-1">{b.note}</div>
+                  </div>
+                ))}
               </CardContent>
             </Card>
 
@@ -547,13 +802,9 @@ export default function UnifiedPrescriber() {
                       opts={[["academia_completa","Academia completa"],["casa_halteres","Casa (halteres)"],["funcional","Funcional"]]} />
                   </F>
                   <F label="Modalidade principal"><SI value={anamnese.training_modality} onChange={(e: any) => set("training_modality", e.target.value)} placeholder="Ex: corrida + musculação" /></F>
-                  <div className="col-span-2 md:col-span-3 flex items-center gap-2 pt-1">
-                    <Checkbox checked={anamnese.is_endurance_athlete} onCheckedChange={v => set("is_endurance_athlete", !!v)} id="endurance" />
-                    <label htmlFor="endurance" className="text-sm cursor-pointer">Atleta de endurance (corrida / triathlon)</label>
-                  </div>
                 </Section>
 
-                {(modalities.has("corrida") || open.cardio) && (
+                {(CARDIO_MODS.some(m => modalities.has(m)) || open.cardio) && (
                   <Section open={open} setOpen={setOpen} id="cardio" label="Específico corrida / pedal / natação">
                     <F label="Modalidade">
                       <SS value={anamnese.sport} onChange={(v: string) => set("sport", v)}
@@ -593,52 +844,26 @@ export default function UnifiedPrescriber() {
           {/* ETAPA 3 · PRESCRIÇÃO */}
           <TabsContent value="prescricao" className="space-y-5 mt-5">
             <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-base">Quais prescrições gerar?</CardTitle></CardHeader>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Prescrições integradas</CardTitle>
+                <p className="text-xs text-muted-foreground">Modalidades escolhidas na anamnese: {[...modalities].map(m => MOD_LABEL[m]).join(", ") || "nenhuma"}.</p>
+              </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-3">
-                  {([
-                    ["musculacao", Dumbbell, "Musculação", "Força + biomecânica"],
-                    ["corrida", Activity, "Corrida / Pedal / Natação", "Zonas FC + periodização"],
-                  ] as [Modality, any, string, string][]).map(([mod, Icon, label, sub]) => (
-                    <button
-                      key={mod}
-                      type="button"
-                      onClick={() => toggleMod(mod)}
-                      className={`rounded-lg border-2 p-3 text-left transition ${
-                        modalities.has(mod) ? "border-navy bg-navy/5" : "border-line hover:border-navy/40"
-                      }`}
-                    >
-                      <Icon className="h-5 w-5 mb-1 text-navy" />
-                      <div className="text-sm font-medium">{label}</div>
-                      <div className="text-xs text-muted-foreground">{sub}</div>
-                    </button>
-                  ))}
-                </div>
-
                 {(generating || Object.values(status).some(s => s !== "idle")) && (
-                  <div className="mt-4 space-y-2 border border-line rounded-lg p-4 bg-muted/30">
+                  <div className="mb-4 space-y-2 border border-line rounded-lg p-4 bg-muted/30">
                     <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-2">Progresso</p>
-                    {modalities.has("musculacao") && (
-                      <div className="flex items-center gap-2 text-sm">
-                        {genStatusIcon(status.musculacao)}
-                        <span>Musculação {status.musculacao === "generating" ? "— gerando plano de força…" : status.musculacao === "done" ? "— concluído" : ""}</span>
+                    {MODALITIES.filter(m => modalities.has(m.key)).map(({ key, label }) => (
+                      <div key={key} className="flex items-center gap-2 text-sm">
+                        {genStatusIcon(status[key])}
+                        <span>{label} {status[key] === "generating" ? "— gerando…" : status[key] === "done" ? "— concluído" : ""}</span>
                       </div>
-                    )}
-                    {modalities.has("corrida") && (
-                      <div className="flex items-center gap-2 text-sm">
-                        {genStatusIcon(status.corrida)}
-                        <span>Corrida {status.corrida === "generating" ? "— calculando zonas FC e periodização…" : status.corrida === "done" ? "— concluído" : ""}</span>
-                        {modalities.has("musculacao") && status.corrida !== "idle" && (
-                          <Badge variant="outline" className="text-xs">sincroniza com musculação</Badge>
-                        )}
-                      </div>
-                    )}
+                    ))}
                   </div>
                 )}
 
-                {error && <p className="text-sm text-destructive mt-3">{error}</p>}
+                {error && <p className="text-sm text-destructive mb-3">{error}</p>}
 
-                <Button className="w-full mt-4" onClick={generate} disabled={generating || modalities.size === 0}>
+                <Button className="w-full" onClick={generate} disabled={generating || modalities.size === 0}>
                   {generating
                     ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando prescrições…</>
                     : `Gerar ${modalities.size} prescriç${modalities.size > 1 ? "ões" : "ão"} integrada${modalities.size > 1 ? "s" : ""}`}
@@ -646,62 +871,143 @@ export default function UnifiedPrescriber() {
               </CardContent>
             </Card>
 
-            {Object.values(results).some(Boolean) && (
-              <div className="space-y-4">
-                <h2 className="font-display text-xl">Prescrições geradas</h2>
-                {results.musculacao && (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Dumbbell className="h-4 w-4 text-navy" /> Musculação — {results.musculacao.cycle_name}
-                      </CardTitle>
-                      <p className="text-xs text-muted-foreground">{results.musculacao.objective} · {results.musculacao.duration_weeks} semanas</p>
-                    </CardHeader>
-                    <CardContent>
-                      {results.musculacao.biomechanical_notes && (
-                        <p className="text-xs bg-muted rounded p-2 mb-3">{results.musculacao.biomechanical_notes}</p>
-                      )}
-                      <div className="space-y-2">
-                        {results.musculacao.workouts?.map((w: any, i: number) => (
-                          <div key={i} className="text-sm border-l-2 border-navy pl-3">
-                            <span className="font-medium">{w.name}</span>
-                            <span className="text-muted-foreground text-xs ml-2">{w.split_focus} · {w.duration_min}min</span>
-                          </div>
-                        ))}
+            {generatedCount > 0 && (
+              <>
+                <Card>
+                  <CardHeader className="pb-3"><CardTitle className="text-base">Prescrições geradas</CardTitle></CardHeader>
+                  <CardContent className="space-y-2">
+                    {MODALITIES.filter(m => results[m.key]).map(({ key, icon: Icon, label }) => (
+                      <div key={key} className="flex items-center gap-2 text-sm border-l-2 border-navy pl-3">
+                        <Icon className="h-4 w-4 text-navy" />
+                        <span className="font-medium">{label}</span>
+                        <span className="text-xs text-muted-foreground">pronta</span>
                       </div>
-                    </CardContent>
-                  </Card>
-                )}
-                {results.corrida && (
+                    ))}
+                    <Button variant="outline" className="w-full mt-3" onClick={exportPdfs}>
+                      <FileDown className="mr-2 h-4 w-4" /> Baixar PDFs separados ({generatedCount})
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {results.musculacao?.periodization_blocks?.length > 0 && (
                   <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Activity className="h-4 w-4 text-navy" /> {results.corrida.plan_name}
-                      </CardTitle>
-                      <p className="text-xs text-muted-foreground">{results.corrida.sport} · modelo {results.corrida.model} · {results.corrida.duration_weeks} semanas</p>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Periodização — {results.musculacao.duration_weeks || 6} semanas</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      {results.corrida.fc_zones && (
-                        <div className="grid grid-cols-5 gap-1 text-xs text-center mb-3">
-                          {["z1","z2","z3","z4","z5"].map(z => results.corrida.fc_zones[z] && (
-                            <div key={z} className="border border-line rounded p-1">
-                              <div className="font-medium uppercase">{z}</div>
-                              <div className="text-muted-foreground">{results.corrida.fc_zones[z].min}–{results.corrida.fc_zones[z].max}</div>
-                            </div>
-                          ))}
+                    <CardContent className="grid grid-cols-3 gap-2">
+                      {results.musculacao.periodization_blocks.map((b: any, i: number) => (
+                        <div key={i} className="border border-line rounded-lg p-2 text-center">
+                          <div className="font-mono text-[10px] uppercase text-muted-foreground">Sem {b.weeks}</div>
+                          <div className="text-xs font-medium mt-0.5">{b.stimulus}</div>
                         </div>
-                      )}
-                      {results.corrida.warnings?.length > 0 && (
-                        <p className="text-xs text-navy bg-navy/5 rounded p-2 mb-2">{results.corrida.warnings[0]}</p>
-                      )}
-                      {results.corrida.general_tips && (
-                        <p className="text-xs text-muted-foreground whitespace-pre-line">{results.corrida.general_tips}</p>
-                      )}
+                      ))}
                     </CardContent>
                   </Card>
                 )}
-              </div>
+
+                {results.musculacao && (
+                  <Button className="w-full" onClick={() => setStep("editar")}>
+                    Revisar e editar o treino <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                )}
+              </>
             )}
+          </TabsContent>
+
+          {/* ETAPA 4 · EDITAR TREINO */}
+          <TabsContent value="editar" className="space-y-5 mt-5">
+            {editableWorkouts.length === 0 ? (
+              <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">
+                Gere a musculação na etapa 3 para editar os treinos aqui.
+              </CardContent></Card>
+            ) : (
+              <>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Revisar e editar o treino</CardTitle>
+                    <p className="text-xs text-muted-foreground">Ajuste séries / reps / descanso / obs. Ao publicar, vai a versão editada para o app do aluno.</p>
+                  </CardHeader>
+                </Card>
+
+                {editableWorkouts.map((w, wi) => (
+                  <Card key={wi}>
+                    <CardHeader className="pb-3 flex-row items-center justify-between space-y-0 gap-2">
+                      <Input
+                        className="h-9 text-sm font-medium"
+                        value={w.name}
+                        onChange={e => patchWorkoutName(wi, e.target.value)}
+                      />
+                      <Button variant="ghost" size="sm" className="text-destructive shrink-0" onClick={() => removeWorkout(wi)}>
+                        Remover treino
+                      </Button>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="hidden md:grid grid-cols-[1fr_56px_88px_72px_1.3fr_28px] gap-2 text-[10px] uppercase tracking-wide text-muted-foreground px-1">
+                        <span>Exercício</span><span>Sér</span><span>Reps</span><span>Desc(s)</span><span>Obs</span><span />
+                      </div>
+                      {w.exercises.map((ex: any, ei: number) => (
+                        <div key={ei} className="grid grid-cols-2 md:grid-cols-[1fr_56px_88px_72px_1.3fr_28px] gap-2 items-center">
+                          <Input className="h-8 text-sm col-span-2 md:col-span-1" value={ex.exercise_name || ""} onChange={e => patchEx(wi, ei, "exercise_name", e.target.value)} placeholder="Exercício" />
+                          <Input className="h-8 text-sm" type="number" value={ex.sets ?? ""} onChange={e => patchEx(wi, ei, "sets", e.target.value)} />
+                          <Input className="h-8 text-sm" value={ex.reps ?? ""} onChange={e => patchEx(wi, ei, "reps", e.target.value)} />
+                          <Input className="h-8 text-sm" type="number" value={ex.rest_seconds ?? ""} onChange={e => patchEx(wi, ei, "rest_seconds", e.target.value)} />
+                          <Input className="h-8 text-sm" value={ex.cues ?? ""} onChange={e => patchEx(wi, ei, "cues", e.target.value)} placeholder="Obs" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeEx(wi, ei)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button variant="ghost" size="sm" className="text-navy" onClick={() => addEx(wi)}>
+                        <Plus className="h-4 w-4 mr-1" /> Adicionar exercício
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+
+                <Button className="w-full" onClick={() => setStep("publicar")}>
+                  Ir para publicar <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </>
+            )}
+          </TabsContent>
+
+          {/* ETAPA 5 · PUBLICAR */}
+          <TabsContent value="publicar" className="space-y-5 mt-5">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Publicar treino no app do aluno</CardTitle>
+                <p className="text-xs text-muted-foreground">A musculação é gravada no ciclo escolhido. Corrida / natação / ciclismo / nutrição já ficam visíveis ao gerar.</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {cycles.length === 0 ? (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Este aluno não tem ciclo de treino. Defina a data de início da matrícula para gerar os ciclos.
+                  </p>
+                ) : (
+                  <F label="Ciclo de treino">
+                    <SS
+                      value={cycleId}
+                      onChange={setCycleId}
+                      placeholder="Selecione o ciclo..."
+                      opts={cycles.map(c => [c.id, `Ciclo ${c.cycle_number} · ${c.status}${c.start_date ? ` · ${new Date(c.start_date).toLocaleDateString("pt-BR")}` : ""}`])}
+                    />
+                  </F>
+                )}
+
+                {editableWorkouts.length > 0 ? (
+                  <p className="text-xs text-muted-foreground">{editableWorkouts.length} treino(s) prontos para publicar.</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Gere a musculação para publicar treinos no ciclo.</p>
+                )}
+
+                <Button className="w-full" onClick={publishWorkout} disabled={publishing || !cycleId || editableWorkouts.length === 0}>
+                  {publishing
+                    ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publicando…</>
+                    : <><Rocket className="mr-2 h-4 w-4" /> Publicar treino no app do aluno</>}
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       )}
