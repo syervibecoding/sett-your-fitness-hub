@@ -1039,7 +1039,7 @@ export default function StudentDetail() {
 
           {/* ===== PROGRAMA DE TREINO ===== */}
           <TabsContent value="program" className="space-y-4">
-            <ComingSoon title="Provas e Metas" description="Datas-alvo do aluno (provas e metas) que aparecem no calendário — em breve." />
+            <Suspense fallback={<TabFallback />}><StudentGoalsEditor studentId={id!} /></Suspense>
             {/* Enrollments */}
 
             <Card className="bg-card border-border">
