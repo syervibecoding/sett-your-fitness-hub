@@ -536,12 +536,58 @@ export default function WorkoutBuilder() {
                     </Card>
                   )}
 
+                  {/* Grouping toolbar */}
+                  {selectedIdxsFor(wIdx).length >= 2 && (
+                    <Card className="bg-secondary/60 border-primary/30">
+                      <CardContent className="p-2.5 space-y-2">
+                        <p className="text-xs font-sans text-muted-foreground">
+                          {selectedIdxsFor(wIdx).length} selecionado(s) — agrupar:
+                        </p>
+                        <TooltipProvider>
+                          <div className="flex flex-wrap gap-1.5">
+                            {GROUP_ORDER.map((gt) => (
+                              <Tooltip key={gt}>
+                                <TooltipTrigger asChild>
+                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => applyGroup(wIdx, gt)}>
+                                    {GROUP_DEFS[gt].label}
+                                    <Info className="h-3 w-3 opacity-60" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-[220px] text-xs">
+                                  {GROUP_DEFS[gt].desc}
+                                </TooltipContent>
+                              </Tooltip>
+                            ))}
+                            <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => ungroupSelected(wIdx)}>
+                              Desagrupar
+                            </Button>
+                          </div>
+                        </TooltipProvider>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   <div className="space-y-3">
-                    {workout.exercises.map((ex, exIdx) => (
-                      <Card key={exIdx} className="bg-card border-border">
+                    {workout.exercises.map((ex, exIdx) => {
+                      const selected = selKeys.has(`${wIdx}:${exIdx}`);
+                      const prevEx = workout.exercises[exIdx - 1];
+                      const isGroupStart = !!ex.group_id && (!prevEx || prevEx.group_id !== ex.group_id);
+                      const inGroup = !!ex.group_id;
+                      return (
+                      <div key={exIdx} className="space-y-3">
+                        {isGroupStart && ex.group_type && (
+                          <div className="flex items-center gap-2 pt-1">
+                            <Layers className="h-3.5 w-3.5 text-primary" />
+                            <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px] tracking-wide">
+                              {GROUP_DEFS[ex.group_type].short}
+                            </Badge>
+                          </div>
+                        )}
+                      <Card className={`bg-card ${inGroup ? "border-primary/40 border-l-2 border-l-primary" : "border-border"} ${selected ? "ring-2 ring-primary/50" : ""}`}>
                         <CardContent className="p-3">
                           <div className="flex items-start gap-2">
-                            <div className="flex flex-col gap-0.5 pt-1">
+                            <div className="flex flex-col items-center gap-0.5 pt-1">
+                              <Checkbox checked={selected} onCheckedChange={() => toggleExSelect(wIdx, exIdx)} className="mb-1" />
                               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => moveExercise(wIdx, exIdx, "up")} disabled={exIdx === 0}>
                                 <ChevronUp className="h-3.5 w-3.5" />
                               </Button>
