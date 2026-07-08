@@ -47,6 +47,13 @@ interface WorkoutSession {
   completed_at?: string | null;
 }
 
+interface StudentGoal {
+  id: string;
+  title: string;
+  type: string;
+  target_date: string;
+}
+
 interface StudentCalendarProps {
   workouts: Workout[];
   trainedDays: Set<number>;
@@ -56,11 +63,22 @@ interface StudentCalendarProps {
   cycleStartDate?: string;
   cycleEndDate?: string;
   workoutSessions?: WorkoutSession[];
+  goals?: StudentGoal[];
 }
 
-export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], workoutSessions = [] }: StudentCalendarProps) {
+export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], workoutSessions = [], goals = [] }: StudentCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+  const goalsByDate = useMemo(() => {
+    const map: Record<string, StudentGoal[]> = {};
+    goals.forEach(g => {
+      if (!g.target_date) return;
+      if (!map[g.target_date]) map[g.target_date] = [];
+      map[g.target_date].push(g);
+    });
+    return map;
+  }, [goals]);
 
   const logsByDate = useMemo(() => {
     const map: Record<string, { workout_id: string; logs: WorkoutLog[] }[]> = {};
