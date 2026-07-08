@@ -1638,9 +1638,11 @@ export default function StudentDetail() {
 
           {/* ===== ACOMPANHAMENTO ===== */}
           <TabsContent value="acompanhamento" className="space-y-4">
-            <ComingSoon title="Contato semanal" description="Acompanhamento automático 2x por semana via assistente — em breve." />
-            <ComingSoon title="Linha do Tempo" description="Histórico de prescrições, treinos realizados e anamnese — em breve." />
-            <ComingSoon title="Pasta do Aluno" description="Upload e gestão de laudos e PDFs de avaliação — em breve." />
+            <Suspense fallback={<TabFallback />}>
+              <StudentContactPanel studentId={id!} studentName={student?.full_name} hasWhatsapp={!!student?.whatsapp} />
+              <StudentTimeline studentId={id!} />
+              <StudentDocuments studentId={id!} companyId={student?.company_id || ""} />
+            </Suspense>
           </TabsContent>
         </Tabs>
         </div>
