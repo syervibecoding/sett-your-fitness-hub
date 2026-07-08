@@ -202,6 +202,7 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
           const today = isDateToday(day);
           const trained = isDateTrained(day);
           const isSelected = selectedDate && isSameDay(day, selectedDate);
+          const dayGoals = goalsByDate[format(day, "yyyy-MM-dd")] || [];
 
           return (
             <button
@@ -214,6 +215,7 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
                 today && "ring-2 ring-primary ring-offset-1 ring-offset-background",
                 isSelected && "bg-primary text-primary-foreground",
                 !isSelected && trained && inMonth && "bg-green-500/20 text-green-400",
+                !isSelected && !trained && dayGoals.length > 0 && inMonth && "bg-primary/10",
               )}
             >
               <span className={cn("text-sm", !isSelected && !trained && inMonth && "text-foreground")}>
@@ -221,6 +223,9 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
               </span>
               {trained && inMonth && !isSelected && (
                 <CheckCircle2 className="absolute bottom-0.5 h-3 w-3 text-green-500" />
+              )}
+              {!trained && dayGoals.length > 0 && inMonth && !isSelected && (
+                <Target className="absolute bottom-0.5 h-3 w-3 text-primary" />
               )}
             </button>
           );
@@ -233,6 +238,12 @@ export function StudentCalendar({ workouts, onSelectWorkout, allLogs = [], worko
           <CheckCircle2 className="h-3 w-3 text-green-500" />
           Treinado
         </div>
+        {goals.length > 0 && (
+          <div className="flex items-center gap-1">
+            <Target className="h-3 w-3 text-primary" />
+            Prova/Meta
+          </div>
+        )}
       </div>
 
       {/* Selected Day Detail Panel */}
