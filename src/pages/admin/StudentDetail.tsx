@@ -1561,7 +1561,29 @@ export default function StudentDetail() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* ===== PROGRESSO ===== */}
+          <TabsContent value="progresso" className="space-y-4">
+            <Suspense fallback={<TabFallback />}>
+              <BodyMeasurements
+                studentId={id!}
+                companyId={student?.company_id || ""}
+                gender={measGender ?? ((student as any)?.gender ?? null)}
+                onGenderChange={setMeasGender}
+              />
+              <BodyLimitationsEditor studentId={id!} />
+            </Suspense>
+          </TabsContent>
+
+          {/* ===== ACOMPANHAMENTO ===== */}
+          <TabsContent value="acompanhamento" className="space-y-4">
+            <ComingSoon title="Contato semanal" description="Acompanhamento automático 2x por semana via assistente — em breve." />
+            <ComingSoon title="Linha do Tempo" description="Histórico de prescrições, treinos realizados e anamnese — em breve." />
+            <ComingSoon title="Pasta do Aluno" description="Upload e gestão de laudos e PDFs de avaliação — em breve." />
+          </TabsContent>
         </Tabs>
+        </div>
+
 
         {/* Enrollment Dialog */}
         <Dialog open={enrollOpen} onOpenChange={setEnrollOpen}>
