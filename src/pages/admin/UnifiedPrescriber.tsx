@@ -191,6 +191,10 @@ export default function UnifiedPrescriber() {
   const [sending, setSending]       = useState(false);
   const [error, setError]           = useState("");
   const [step, setStep]             = useState<Step>("anamnese");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerTarget, setPickerTarget] = useState(0);
+  const [selKeys, setSelKeys]       = useState<Set<string>>(new Set());
+  const limitations = useStudentLimitations(studentId);
 
   useEffect(() => {
     if (!companyId) { setStudents([]); return; }
