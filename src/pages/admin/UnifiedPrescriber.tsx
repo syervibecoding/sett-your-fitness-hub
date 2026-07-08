@@ -531,6 +531,85 @@ export default function UnifiedPrescriber() {
   const patchWorkoutName = (wi: number, val: string) =>
     setEditableWorkouts(ws => ws.map((w, i) => i !== wi ? w : { ...w, name: val }));
 
+  // ── Biblioteca de exercícios (seletor + agrupamentos) ───────────────────
+  const openPicker = (wi: number) => { setPickerTarget(wi); setPickerOpen(true); };
+
+  const addFromPicker = (exs: LibraryExercise[]) => {
+    const wi = pickerTarget;
+    setEditableWorkouts(ws => ws.map((w, i) => {
+      if (i !== wi) return w;
+      const existing = new Set((w.exercises || []).map((e: any) => e.exercise_id).filter(Boolean));
+      const toAdd = exs
+        .filter(ex => !existing.has(ex.id))
+        .map(ex => ({
+          exercise_id: ex.id,
+          exercise_name: ex.name,
+          muscle_group: ex.muscle_group,
+          video_url: ex.video_url,
+          video_path: ex.video_path,
+          sets: 3,
+          reps: "10",
+          rest_seconds: 60,
+          cues: "",
+        }));
+      return { ...w, exercises: [...(w.exercises || []), ...toAdd] };
+    }));
+  };
+
+  const toggleExSelect = (wi: number, ei: number) => {
+    setSelKeys(prev => {
+      const next = new Set(prev);
+      const key = `${wi}:${ei}`;
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
+  const selectedIdxsFor = (wi: number) =>
+    (editableWorkouts[wi]?.exercises || [])
+      .map((_: any, j: number) => j)
+      .filter((j: number) => selKeys.has(`${wi}:${j}`));
+
+  const clearSelForWorkout = (wi: number) =>
+    setSelKeys(prev => {
+      const next = new Set<string>();
+      prev.forEach(k => { if (!k.startsWith(`${wi}:`)) next.add(k); });
+      return next;
+    });
+
+  const applyGroup = (wi: number, type: GroupType) => {
+    const idxs = selectedIdxsFor(wi);
+    if (idxs.length < 2) return;
+    const gid = (crypto as any).randomUUID ? crypto.randomUUID() : `g-${Date.now()}-${Math.random()}`;
+    setEditableWorkouts(ws => ws.map((w, i) => {
+      if (i !== wi) return w;
+      const minIdx = Math.min(...idxs);
+      const selected = idxs.map((j: number) => ({ ...w.exercises[j], group_id: gid, group_type: type }));
+      const rest = w.exercises.filter((_: any, j: number) => !idxs.includes(j));
+      const arr = [...rest.slice(0, minIdx), ...selected, ...rest.slice(minIdx)];
+      return { ...w, exercises: arr };
+    }));
+    clearSelForWorkout(wi);
+  };
+
+  const ungroupSelected = (wi: number) => {
+    const idxs = selectedIdxsFor(wi);
+    setEditableWorkouts(ws => ws.map((w, i) => {
+      if (i !== wi) return w;
+      return {
+        ...w,
+        exercises: w.exercises.map((ex: any, j: number) => {
+          if (!idxs.includes(j)) return ex;
+          const { group_id, group_type, ...rest } = ex;
+          return rest;
+        }),
+      };
+    }));
+    clearSelForWorkout(wi);
+  };
+
+
+
   // ── Publicar musculação no app do aluno ────────────────────────────────
   async function publishWorkout() {
     if (!cycleId) { toast.error("Selecione um ciclo de treino para publicar."); return; }
