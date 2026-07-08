@@ -92,7 +92,7 @@ export default function WorkoutBuilder() {
   const { user } = useAuth();
   const { toast } = useToast();
   const muscleGroupsList = useMuscleGroups();
-  const MUSCLE_GROUP_NAMES = muscleGroupsList.map(g => g.name);
+  
 
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [targetWorkoutIdx, setTargetWorkoutIdx] = useState(0);
