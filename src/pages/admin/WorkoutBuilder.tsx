@@ -804,105 +804,13 @@ export default function WorkoutBuilder() {
       </div>
 
       {/* Library picker dialog */}
-      <Dialog open={libraryOpen} onOpenChange={(o) => { setLibraryOpen(o); if (!o) setSelectedLibIds(new Set()); }}>
-        <DialogContent className="bg-card border-border max-w-2xl max-h-[85vh] overflow-y-auto flex flex-col">
+      <ExerciseLibraryPicker
+        open={libraryOpen}
+        onOpenChange={setLibraryOpen}
+        alreadyAddedIds={new Set((currentWorkout?.exercises || []).map((w) => w.exercise_id))}
+        onAdd={addFromPicker}
+      />
 
-          <DialogHeader>
-            <DialogTitle className="text-primary">BIBLIOTECA DE EXERCÍCIOS</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {/* Anatomical body picker */}
-            <div className="rounded-lg border border-border bg-secondary/40 p-4">
-              <p className="text-center text-sm font-sans text-muted-foreground mb-2">
-                Selecione pelo boneco
-                {libRegion ? <> · <span className="text-foreground font-medium">{REGION_LABEL[libRegion]}</span></> : null}
-              </p>
-              <BodyMap
-                activeRegions={libRegion ? [libRegion] : []}
-                onRegionClick={(region) =>
-                  setLibRegion((prev) => (prev === region ? null : region))
-                }
-                scale={0.85}
-                footer={
-                  libRegion ? (
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="text-xs"
-                      onClick={() => setLibRegion(null)}
-                    >
-                      <X className="h-3 w-3 mr-1" />
-                      Limpar filtro ({REGION_LABEL[libRegion]})
-                    </Button>
-                  ) : null
-                }
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input value={libSearch} onChange={(e) => setLibSearch(e.target.value)} placeholder="Buscar..." className="pl-10 bg-secondary border-border" />
-              </div>
-              <Select value={libGroup} onValueChange={setLibGroup}>
-                <SelectTrigger className="w-40 bg-secondary border-border">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {MUSCLE_GROUP_NAMES.map((g) => (
-                    <SelectItem key={g} value={g} className="capitalize">{g}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {filteredLib.length === 0 && (
-              <p className="text-center text-muted-foreground font-sans py-6">Nenhum exercício encontrado</p>
-            )}
-
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {filteredLib.map((ex) => {
-                const currentExercises = currentWorkout?.exercises || [];
-                const alreadyAdded = currentExercises.some((w) => w.exercise_id === ex.id);
-                const checked = selectedLibIds.has(ex.id);
-                return (
-                  <div
-                    key={ex.id}
-                    className={`flex items-center justify-between gap-2 p-3 rounded-md transition-colors ${alreadyAdded ? "bg-secondary/50 opacity-60" : "bg-secondary hover:bg-muted cursor-pointer"} ${checked ? "ring-2 ring-primary/50" : ""}`}
-                    onClick={() => !alreadyAdded && toggleLibSelect(ex.id)}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Checkbox
-                        checked={checked}
-                        disabled={alreadyAdded}
-                        onCheckedChange={() => toggleLibSelect(ex.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <p className="font-sans font-medium text-foreground text-sm truncate">{ex.name}</p>
-                      <Badge variant="outline" className="capitalize text-xs shrink-0">{ex.muscle_group}</Badge>
-                    </div>
-                    {alreadyAdded && (
-                      <span className="text-xs text-muted-foreground font-sans shrink-0">Adicionado</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Footer: add selected */}
-            <div className="flex items-center justify-between border-t border-border pt-3">
-              <span className="text-sm font-sans text-muted-foreground">
-                {selectedLibIds.size} selecionado(s)
-              </span>
-              <Button disabled={selectedLibIds.size === 0} onClick={addSelectedExercises}>
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar selecionados ({selectedLibIds.size})
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Video Modal */}
       <Dialog open={!!videoModal} onOpenChange={() => setVideoModal(null)}>
