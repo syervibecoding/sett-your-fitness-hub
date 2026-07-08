@@ -31,7 +31,7 @@ import { useAssistantName } from "@/hooks/useAssistantName";
 import FunctionalAssessmentPanel from "@/components/admin/FunctionalAssessmentPanel";
 import { generateNutritionPlan } from "@/lib/nutrition";
 import type { NutritionInput, NutritionObjective, ActivityLevel, Sex } from "@/lib/nutrition";
-import jsPDF from "jspdf";
+import { jsPDF } from "jspdf";
 
 interface Student { id: string; full_name: string; gender: string | null; birth_date: string | null; }
 interface Cycle { id: string; cycle_number: number; status: string; start_date: string; end_date: string; }
