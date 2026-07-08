@@ -976,7 +976,9 @@ export default function StudentDetail() {
 
           {/* ===== PROGRAMA DE TREINO ===== */}
           <TabsContent value="program" className="space-y-4">
+            <ComingSoon title="Provas e Metas" description="Datas-alvo do aluno (provas e metas) que aparecem no calendário — em breve." />
             {/* Enrollments */}
+
             <Card className="bg-card border-border">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-primary text-lg">MATRÍCULAS</CardTitle>
