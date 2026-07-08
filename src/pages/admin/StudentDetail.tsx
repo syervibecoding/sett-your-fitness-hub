@@ -38,6 +38,7 @@ const WorkoutAnalysis = lazy(() => import("@/components/trainer/WorkoutAnalysis"
 const TrainerWeeklyBar = lazy(() => import("@/components/trainer/TrainerWeeklyBar").then(m => ({ default: m.TrainerWeeklyBar })));
 const MuscleRadar = lazy(() => import("@/components/student/MuscleRadar").then(m => ({ default: m.MuscleRadar })));
 const BodyLimitationsEditor = lazy(() => import("@/components/trainer/BodyLimitationsEditor").then(m => ({ default: m.BodyLimitationsEditor })));
+const BodyMeasurements = lazy(() => import("@/components/student/BodyMeasurements").then(m => ({ default: m.BodyMeasurements })));
 
 
 const TabFallback = () => (
