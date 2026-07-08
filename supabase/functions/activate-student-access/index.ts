@@ -78,13 +78,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (student.user_id) {
-      return new Response(JSON.stringify({ error: "Student already has access", user_id: student.user_id }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     if (!student.email) {
       return new Response(JSON.stringify({ error: "Student has no email" }), {
         status: 400,
@@ -92,37 +85,71 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Create auth user with a temporary password (student will reset via email)
+    // Generate a temporary password that will actually be applied to the account
     const tempPassword = crypto.randomUUID().slice(0, 12) + "Aa1!";
 
     let userId: string;
-    const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
-      email: student.email,
-      password: tempPassword,
-      email_confirm: true,
-      user_metadata: { full_name: student.full_name },
-    });
+    let reactivated = false;
 
-    if (createError) {
-      console.error("createUser error", createError);
-      if (createError.message?.includes("already been registered") || createError.message?.includes("already registered")) {
-        const { data: { users } } = await adminClient.auth.admin.listUsers();
-        const existingUser = users?.find((u: any) => u.email === student.email);
-        if (!existingUser) {
-          return new Response(JSON.stringify({ error: "User not found" }), {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        userId = existingUser.id;
-      } else {
-        return new Response(JSON.stringify({ error: createError.message }), {
+    // Case 1: student already linked to an auth user → reset its password
+    if (student.user_id) {
+      userId = student.user_id;
+      reactivated = true;
+      const { error: updErr } = await adminClient.auth.admin.updateUserById(userId, {
+        password: tempPassword,
+        email_confirm: true,
+      });
+      if (updErr) {
+        console.error("updateUserById error (linked user)", updErr);
+        return new Response(JSON.stringify({ error: updErr.message }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     } else {
-      userId = newUser.user.id;
+      // Case 2: create a new auth user
+      const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+        email: student.email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: { full_name: student.full_name },
+      });
+
+      if (createError) {
+        console.error("createUser error", createError);
+        if (createError.message?.includes("already been registered") || createError.message?.includes("already registered")) {
+          // Case 3: an auth account already exists for this email but wasn't linked.
+          // Find it and reset its password so the returned password actually works.
+          const { data: { users } } = await adminClient.auth.admin.listUsers();
+          const existingUser = users?.find((u: any) => u.email === student.email);
+          if (!existingUser) {
+            return new Response(JSON.stringify({ error: "User not found" }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          userId = existingUser.id;
+          reactivated = true;
+          const { error: updErr } = await adminClient.auth.admin.updateUserById(userId, {
+            password: tempPassword,
+            email_confirm: true,
+          });
+          if (updErr) {
+            console.error("updateUserById error (existing user)", updErr);
+            return new Response(JSON.stringify({ error: updErr.message }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        } else {
+          return new Response(JSON.stringify({ error: createError.message }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } else {
+        userId = newUser.user.id;
+      }
     }
 
     // Assign student role
