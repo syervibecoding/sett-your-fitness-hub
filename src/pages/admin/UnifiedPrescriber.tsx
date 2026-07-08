@@ -272,6 +272,7 @@ export default function UnifiedPrescriber() {
         }
         setAnamnese(merged);
       } else {
+        setModalities(new Set(["musculacao"]));
         setAnamneseId(null);
         const merged: Anamnese = { ...DEFAULT_ANAMNESE };
         for (const [k, v] of Object.entries(mapped)) {
