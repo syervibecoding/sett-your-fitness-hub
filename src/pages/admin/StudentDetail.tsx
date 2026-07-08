@@ -1311,12 +1311,8 @@ export default function StudentDetail() {
             </Suspense>
           </TabsContent>
 
-          {/* ===== LIMITAÇÕES ===== */}
-          <TabsContent value="limitations" className="space-y-4">
-            <Suspense fallback={<TabFallback />}>
-              <BodyLimitationsEditor studentId={id!} />
-            </Suspense>
-          </TabsContent>
+          {/* Limitações agora fica em Avaliações → Progresso */}
+
 
           {/* ===== ANAMNESE ===== */}
           <TabsContent value="anamnesis">
