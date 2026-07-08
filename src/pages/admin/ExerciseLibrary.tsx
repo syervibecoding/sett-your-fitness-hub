@@ -605,18 +605,36 @@ export default function ExerciseLibrary() {
             </div>
 
             <div className="space-y-2">
-              <Label className="font-sans">Categoria</Label>
-              <Select value={form.category || "none"} onValueChange={(v) => setForm({ ...form, category: v === "none" ? "" : v })}>
-                <SelectTrigger className="bg-secondary border-border">
-                  <SelectValue placeholder="Sem categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sem categoria</SelectItem>
-                  {Array.from(new Set([...Object.keys(CATEGORY_LABELS), ...categories])).sort().map((c) => (
-                    <SelectItem key={c} value={c}>{categoryLabel(c)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="font-sans">Categorias</Label>
+              <p className="text-xs text-muted-foreground font-sans">
+                Marque todas as finalidades que este exercício atende (pode selecionar mais de uma).
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {Array.from(new Set([...CATEGORY_OPTIONS, ...categories])).map((c) => {
+                  const active = form.categories.includes(c);
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          categories: active
+                            ? form.categories.filter((x) => x !== c)
+                            : [...form.categories, c],
+                        })
+                      }
+                      className={`rounded-full px-3 py-1.5 text-xs font-sans font-medium border transition-colors ${
+                        active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-secondary text-muted-foreground border-border hover:text-foreground"
+                      }`}
+                    >
+                      {categoryLabel(c)}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Muscle Target Configuration */}
