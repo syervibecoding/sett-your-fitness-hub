@@ -362,6 +362,7 @@ export default function UnifiedPrescriber() {
       stress_score: anamnese.stress_score ? Number(anamnese.stress_score) : null,
       sleep_quality: anamnese.sleep_quality ? Number(anamnese.sleep_quality) : null,
       injuries: anamnese.injuries, notes: anamnese.notes,
+      prescribed_modalities: [...modalities],
     };
     if (anamneseId) {
       await supabase.from("student_anamneses").update(payload).eq("id", anamneseId);
