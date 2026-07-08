@@ -52,6 +52,20 @@ const InlineFallback = () => (
   </div>
 );
 
+const ComingSoon = ({ title, description }: { title: string; description: string }) => (
+  <Card className="bg-card border-border border-dashed">
+    <CardHeader className="pb-2">
+      <CardTitle className="text-primary text-base flex items-center gap-2">
+        {title}
+        <Badge variant="outline" className="text-[10px] font-sans">Em breve</Badge>
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      <p className="text-sm text-muted-foreground font-sans">{description}</p>
+    </CardContent>
+  </Card>
+);
+
 interface Student {
   id: string;
   full_name: string;
