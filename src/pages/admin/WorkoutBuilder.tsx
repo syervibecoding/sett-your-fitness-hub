@@ -153,8 +153,17 @@ export default function WorkoutBuilder() {
           cycle_number: data.cycle_number,
           student_name: student?.full_name || "Aluno",
         });
+        loadLimitations(enrollment.student_id);
       }
     }
+  };
+
+  const loadLimitations = async (studentId: string) => {
+    const { data } = await (supabase as any)
+      .from("student_body_limitations")
+      .select("id, region, type, severity, note")
+      .eq("student_id", studentId);
+    setLimitations((data as BodyLimitation[]) || []);
   };
 
   const loadExisting = async () => {
