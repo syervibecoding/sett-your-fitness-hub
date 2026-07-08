@@ -1021,11 +1021,58 @@ export default function UnifiedPrescriber() {
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base">Revisar e editar o treino</CardTitle>
-                    <p className="text-xs text-muted-foreground">Ajuste séries / reps / descanso / obs. Ao publicar, vai a versão editada para o app do aluno.</p>
+                    <p className="text-xs text-muted-foreground">Adicione exercícios da biblioteca, agrupe técnicas e ajuste séries / reps / descanso. Ao publicar, vai a versão editada para o app do aluno.</p>
                   </CardHeader>
                 </Card>
 
-                {editableWorkouts.map((w, wi) => (
+                {/* Limitações da anamnese */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <ShieldAlert className="h-4 w-4" /> Limitações da anamnese
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {limitations.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Nenhuma limitação registrada na anamnese.</p>
+                    ) : (
+                      <div className="grid sm:grid-cols-2 gap-2">
+                        {limitations.map((lim) => {
+                          const severe = (lim.severity || "").toLowerCase().includes("sev");
+                          return (
+                            <div key={lim.id} className={`rounded-md border p-2.5 ${severe ? "border-destructive/40 bg-destructive/5" : "border-border bg-secondary/40"}`}>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {severe && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
+                                <span className="text-xs font-medium capitalize">{lim.region}</span>
+                                {lim.type && <Badge variant="outline" className="text-[10px] capitalize">{lim.type}</Badge>}
+                                {lim.severity && <Badge variant={severe ? "destructive" : "secondary"} className="text-[10px] capitalize">{lim.severity}</Badge>}
+                              </div>
+                              {lim.note && <p className="text-xs text-muted-foreground mt-1">{lim.note}</p>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* BNITO placeholder */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Sparkles className="h-4 w-4" /> BNITO — Copiloto técnico
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">Revisão técnica do treino antes de publicar.</p>
+                  </CardHeader>
+                  <CardContent className="flex items-center gap-3">
+                    <Button disabled className="gap-2"><Sparkles className="h-4 w-4" /> Auditar treino</Button>
+                    <span className="text-[11px] text-muted-foreground">Em breve</span>
+                  </CardContent>
+                </Card>
+
+                {editableWorkouts.map((w, wi) => {
+                  const sel = selectedIdxsFor(wi);
+                  return (
                   <Card key={wi}>
                     <CardHeader className="pb-3 flex-row items-center justify-between space-y-0 gap-2">
                       <Input
@@ -1038,27 +1085,77 @@ export default function UnifiedPrescriber() {
                       </Button>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                      <div className="hidden md:grid grid-cols-[1fr_56px_88px_72px_1.3fr_28px] gap-2 text-[10px] uppercase tracking-wide text-muted-foreground px-1">
-                        <span>Exercício</span><span>Sér</span><span>Reps</span><span>Desc(s)</span><span>Obs</span><span />
-                      </div>
-                      {w.exercises.map((ex: any, ei: number) => (
-                        <div key={ei} className="grid grid-cols-2 md:grid-cols-[1fr_56px_88px_72px_1.3fr_28px] gap-2 items-center">
-                          <Input className="h-8 text-sm col-span-2 md:col-span-1" value={ex.exercise_name || ""} onChange={e => patchEx(wi, ei, "exercise_name", e.target.value)} placeholder="Exercício" />
-                          <Input className="h-8 text-sm" type="number" value={ex.sets ?? ""} onChange={e => patchEx(wi, ei, "sets", e.target.value)} />
-                          <Input className="h-8 text-sm" value={ex.reps ?? ""} onChange={e => patchEx(wi, ei, "reps", e.target.value)} />
-                          <Input className="h-8 text-sm" type="number" value={ex.rest_seconds ?? ""} onChange={e => patchEx(wi, ei, "rest_seconds", e.target.value)} />
-                          <Input className="h-8 text-sm" value={ex.cues ?? ""} onChange={e => patchEx(wi, ei, "cues", e.target.value)} placeholder="Obs" />
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeEx(wi, ei)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                      {/* Barra de agrupamento */}
+                      {sel.length >= 2 && (
+                        <div className="rounded-md border border-primary/30 bg-secondary/60 p-2.5 space-y-2">
+                          <p className="text-xs text-muted-foreground">{sel.length} selecionado(s) — agrupar:</p>
+                          <TooltipProvider>
+                            <div className="flex flex-wrap gap-1.5">
+                              {GROUP_ORDER.map((gt) => (
+                                <Tooltip key={gt}>
+                                  <TooltipTrigger asChild>
+                                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => applyGroup(wi, gt)}>
+                                      {GROUP_DEFS[gt].label}
+                                      <Info className="h-3 w-3 opacity-60" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-[220px] text-xs">{GROUP_DEFS[gt].desc}</TooltipContent>
+                                </Tooltip>
+                              ))}
+                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => ungroupSelected(wi)}>Desagrupar</Button>
+                            </div>
+                          </TooltipProvider>
                         </div>
-                      ))}
-                      <Button variant="ghost" size="sm" className="text-navy" onClick={() => addEx(wi)}>
-                        <Plus className="h-4 w-4 mr-1" /> Adicionar exercício
-                      </Button>
+                      )}
+
+                      <div className="hidden md:grid grid-cols-[28px_1fr_56px_88px_72px_1.3fr_28px] gap-2 text-[10px] uppercase tracking-wide text-muted-foreground px-1">
+                        <span /><span>Exercício</span><span>Sér</span><span>Reps</span><span>Desc(s)</span><span>Obs</span><span />
+                      </div>
+                      {w.exercises.map((ex: any, ei: number) => {
+                        const grouped = !!ex.group_id;
+                        const isGroupStart = grouped && (ei === 0 || w.exercises[ei - 1].group_id !== ex.group_id);
+                        return (
+                        <div key={ei} className={grouped ? "border-l-2 border-primary/60 pl-2" : ""}>
+                          {isGroupStart && ex.group_type && (
+                            <Badge variant="secondary" className="text-[10px] mb-1">{GROUP_DEFS[ex.group_type as GroupType]?.short || ex.group_type}</Badge>
+                          )}
+                          <div className="grid grid-cols-[28px_1fr_auto] md:grid-cols-[28px_1fr_56px_88px_72px_1.3fr_28px] gap-2 items-center">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 accent-[hsl(var(--primary))]"
+                              checked={selKeys.has(`${wi}:${ei}`)}
+                              onChange={() => toggleExSelect(wi, ei)}
+                            />
+                            <Input className="h-8 text-sm col-span-1" value={ex.exercise_name || ""} onChange={e => patchEx(wi, ei, "exercise_name", e.target.value)} placeholder="Exercício" />
+                            <Input className="h-8 text-sm hidden md:block" type="number" value={ex.sets ?? ""} onChange={e => patchEx(wi, ei, "sets", e.target.value)} />
+                            <Input className="h-8 text-sm hidden md:block" value={ex.reps ?? ""} onChange={e => patchEx(wi, ei, "reps", e.target.value)} />
+                            <Input className="h-8 text-sm hidden md:block" type="number" value={ex.rest_seconds ?? ""} onChange={e => patchEx(wi, ei, "rest_seconds", e.target.value)} />
+                            <Input className="h-8 text-sm hidden md:block" value={ex.cues ?? ""} onChange={e => patchEx(wi, ei, "cues", e.target.value)} placeholder="Obs" />
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeEx(wi, ei)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          {/* Campos compactos no mobile */}
+                          <div className="grid grid-cols-3 gap-2 md:hidden mt-1 pl-[36px]">
+                            <Input className="h-8 text-sm" type="number" value={ex.sets ?? ""} onChange={e => patchEx(wi, ei, "sets", e.target.value)} placeholder="Sér" />
+                            <Input className="h-8 text-sm" value={ex.reps ?? ""} onChange={e => patchEx(wi, ei, "reps", e.target.value)} placeholder="Reps" />
+                            <Input className="h-8 text-sm" type="number" value={ex.rest_seconds ?? ""} onChange={e => patchEx(wi, ei, "rest_seconds", e.target.value)} placeholder="Desc" />
+                          </div>
+                        </div>
+                        );
+                      })}
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Button variant="default" size="sm" className="gap-1" onClick={() => openPicker(wi)}>
+                          <Layers className="h-4 w-4" /> Adicionar da biblioteca
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-navy" onClick={() => addEx(wi)}>
+                          <Plus className="h-4 w-4 mr-1" /> Linha manual
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
 
                 <Button className="w-full" onClick={() => setStep("publicar")}>
                   Ir para publicar <ArrowRight className="ml-2 h-4 w-4" />
@@ -1066,6 +1163,7 @@ export default function UnifiedPrescriber() {
               </>
             )}
           </TabsContent>
+
 
           {/* ETAPA 5 · PUBLICAR */}
           <TabsContent value="publicar" className="space-y-5 mt-5">
