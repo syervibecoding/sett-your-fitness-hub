@@ -93,6 +93,8 @@ export default function StudentPortal() {
   const [activeView, setActiveView] = useState<ActiveView>("home");
   const [studentId, setStudentId] = useState<string | null>(null);
   const [studentName, setStudentName] = useState("");
+  const [prescribedModalities, setPrescribedModalities] = useState<string[]>([]);
+  const [cardioSport, setCardioSport] = useState<string | null>(null);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [gender, setGender] = useState<Gender | null>(null);
   const [cycles, setCycles] = useState<Cycle[]>([]);
@@ -141,6 +143,14 @@ export default function StudentPortal() {
     setCompanyId(student.company_id);
     setGender((student as any).gender === "male" || (student as any).gender === "female" ? (student as any).gender : null);
     setWeeklyGoal((student as any).weekly_workout_goal || 3);
+
+    const { data: sa } = await supabase
+      .from("student_anamneses")
+      .select("prescribed_modalities")
+      .eq("student_id", student.id)
+      .maybeSingle();
+    setPrescribedModalities(Array.isArray((sa as any)?.prescribed_modalities) ? (sa as any).prescribed_modalities : []);
+
 
 
     if (student.company_id) {
@@ -492,7 +502,13 @@ export default function StudentPortal() {
   }, [allLogs, weeklyGoal]);
 
 
-  const handleNavigate = (view: ActiveView) => {
+  const handleNavigate = (view: ActiveView | "natacao" | "corrida" | "ciclismo") => {
+    if (view === "natacao" || view === "corrida" || view === "ciclismo") {
+      setCardioSport(view);
+      setActiveView("cardio");
+      return;
+    }
+    setCardioSport(null);
     setActiveView(view);
   };
 
@@ -551,7 +567,9 @@ export default function StudentPortal() {
               )}
               <Dumbbell className="h-6 w-6 text-primary" />
               <h1 className="text-2xl text-primary font-bold tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
-                {viewTitles[activeView]}
+                {activeView === "cardio" && cardioSport
+                  ? cardioSport.toUpperCase()
+                  : viewTitles[activeView]}
               </h1>
             </div>
             <div className="flex items-center gap-1">
@@ -605,6 +623,7 @@ export default function StudentPortal() {
             streak={streak}
             goalEditor={studentId ? <WeeklyGoalEditor studentId={studentId} currentGoal={weeklyGoal} onSaved={setWeeklyGoal} /> : null}
             achievementsPanel={studentId ? <AchievementsPanel studentId={studentId} /> : null}
+            prescribedModalities={prescribedModalities}
             onNavigate={handleNavigate}
           />
 
@@ -855,7 +874,7 @@ export default function StudentPortal() {
 
         {/* CARDIO VIEW */}
         {activeView === "cardio" && studentId && (
-          <CardioPlanView studentId={studentId} />
+          <CardioPlanView studentId={studentId} sport={cardioSport ?? undefined} />
         )}
           </motion.div>
         </AnimatePresence>

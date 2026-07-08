@@ -239,6 +239,11 @@ export default function UnifiedPrescriber() {
 
       if (sa) {
         setAnamneseId(sa.id);
+        const savedMods = Array.isArray((sa as any).prescribed_modalities)
+          ? ((sa as any).prescribed_modalities as string[]).filter((m): m is Modality =>
+              ["musculacao", "corrida", "natacao", "ciclismo", "nutricao"].includes(m))
+          : [];
+        setModalities(new Set(savedMods.length ? (savedMods as Modality[]) : ["musculacao"]));
         const base: Anamnese = {
           age: sa.age?.toString() ?? "",
           body_fat_percent: sa.body_fat_percent?.toString() ?? "",
@@ -267,6 +272,7 @@ export default function UnifiedPrescriber() {
         }
         setAnamnese(merged);
       } else {
+        setModalities(new Set(["musculacao"]));
         setAnamneseId(null);
         const merged: Anamnese = { ...DEFAULT_ANAMNESE };
         for (const [k, v] of Object.entries(mapped)) {
@@ -362,6 +368,7 @@ export default function UnifiedPrescriber() {
       stress_score: anamnese.stress_score ? Number(anamnese.stress_score) : null,
       sleep_quality: anamnese.sleep_quality ? Number(anamnese.sleep_quality) : null,
       injuries: anamnese.injuries, notes: anamnese.notes,
+      prescribed_modalities: [...modalities],
     };
     if (anamneseId) {
       await supabase.from("student_anamneses").update(payload).eq("id", anamneseId);

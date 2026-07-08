@@ -1928,6 +1928,7 @@ export type Database = {
           meals_per_day: number | null
           notes: string | null
           objective: string | null
+          prescribed_modalities: string[]
           session_duration_min: number | null
           sleep_quality: number | null
           sport: string | null
@@ -1959,6 +1960,7 @@ export type Database = {
           meals_per_day?: number | null
           notes?: string | null
           objective?: string | null
+          prescribed_modalities?: string[]
           session_duration_min?: number | null
           sleep_quality?: number | null
           sport?: string | null
@@ -1990,6 +1992,7 @@ export type Database = {
           meals_per_day?: number | null
           notes?: string | null
           objective?: string | null
+          prescribed_modalities?: string[]
           session_duration_min?: number | null
           sleep_quality?: number | null
           sport?: string | null
