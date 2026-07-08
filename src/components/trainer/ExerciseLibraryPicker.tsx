@@ -90,7 +90,7 @@ export function ExerciseLibraryPicker({ open, onOpenChange, alreadyAddedIds, onA
   }, [open]);
 
   const availableCategories = useMemo(() => {
-    const present = new Set(exercises.map((e) => e.category).filter(Boolean) as string[]);
+    const present = new Set(exercises.flatMap((e) => getExerciseCategories(e)));
     return CATEGORY_ORDER.filter((c) => present.has(c));
   }, [exercises]);
 
@@ -98,7 +98,7 @@ export function ExerciseLibraryPicker({ open, onOpenChange, alreadyAddedIds, onA
     const q = search.trim().toLowerCase();
     return exercises.filter((ex) => {
       const matchSearch = !q || ex.name.toLowerCase().includes(q);
-      const matchCat = category === "all" || ex.category === category;
+      const matchCat = category === "all" || getExerciseCategories(ex).includes(category);
       const matchRegion = !region || muscleGroupToRegion(ex.muscle_group || "") === region;
       return matchSearch && matchCat && matchRegion;
     });
