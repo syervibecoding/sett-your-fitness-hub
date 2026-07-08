@@ -15,7 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Search, Save, Play, ChevronUp, ChevronDown, BarChart3, X, Info, Layers, Sparkles, AlertTriangle, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Play, ChevronUp, ChevronDown, BarChart3, Info, Layers, Sparkles, AlertTriangle, ShieldAlert } from "lucide-react";
 import { ExerciseLibraryPicker, type LibraryExercise } from "@/components/trainer/ExerciseLibraryPicker";
 import { GROUP_DEFS, GROUP_ORDER, type GroupType } from "@/lib/workoutGroups";
 
