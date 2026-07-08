@@ -374,13 +374,13 @@ export default function ExerciseLibrary() {
   };
 
   const categories = Array.from(
-    new Set(exercises.map((e) => e.category).filter((c): c is string => !!c))
+    new Set(exercises.flatMap((e) => getExerciseCategories(e)))
   ).sort();
 
   const filtered = exercises.filter((ex) => {
     const matchSearch = ex.name.toLowerCase().includes(search.toLowerCase());
     const matchGroup = filterGroup === "all" || ex.muscle_group === filterGroup;
-    const matchCategory = filterCategory === "all" || ex.category === filterCategory;
+    const matchCategory = filterCategory === "all" || getExerciseCategories(ex).includes(filterCategory);
     return matchSearch && matchGroup && matchCategory;
   });
 
