@@ -873,7 +873,7 @@ export default function StudentPortal() {
 
         {/* CARDIO VIEW */}
         {activeView === "cardio" && studentId && (
-          <CardioPlanView studentId={studentId} />
+          <CardioPlanView studentId={studentId} sport={cardioSport ?? undefined} />
         )}
           </motion.div>
         </AnimatePresence>
