@@ -567,7 +567,9 @@ export default function StudentPortal() {
               )}
               <Dumbbell className="h-6 w-6 text-primary" />
               <h1 className="text-2xl text-primary font-bold tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
-                {viewTitles[activeView]}
+                {activeView === "cardio" && cardioSport
+                  ? cardioSport.toUpperCase()
+                  : viewTitles[activeView]}
               </h1>
             </div>
             <div className="flex items-center gap-1">
