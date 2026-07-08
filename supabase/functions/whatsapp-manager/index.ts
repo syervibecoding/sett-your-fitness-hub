@@ -466,11 +466,12 @@ Deno.serve(async (req) => {
           failed.push({ id: sid, name: null, reason: "Aluno não encontrado" });
           continue;
         }
-        const phone = normalizeBrazilPhone(student.whatsapp || "");
-        if (!phone) {
-          failed.push({ id: sid, name: student.full_name, reason: "Sem WhatsApp cadastrado" });
+        const phoneResult = validateBrazilMobile(student.whatsapp || "");
+        if ("error" in phoneResult) {
+          failed.push({ id: sid, name: student.full_name, reason: phoneResult.error });
           continue;
         }
+        const phone = phoneResult.phone;
 
         const firstName = (student.full_name || "").split(" ")[0] || "";
         const link = `${cleanBase}/anamnese/${student.id}`;
