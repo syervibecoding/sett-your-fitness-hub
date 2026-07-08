@@ -115,6 +115,9 @@ export default function WorkoutBuilder() {
   const [saving, setSaving] = useState(false);
   const [cycleInfo, setCycleInfo] = useState<{ cycle_number: number; student_name: string } | null>(null);
   const [showVolume, setShowVolume] = useState(true);
+  const [selectedLibIds, setSelectedLibIds] = useState<Set<string>>(new Set());
+  const [selKeys, setSelKeys] = useState<Set<string>>(new Set());
+  const [limitations, setLimitations] = useState<BodyLimitation[]>([]);
 
   // Muscle targets for all exercises in library (cached)
   const [muscleTargets, setMuscleTargets] = useState<MuscleTarget[]>([]);
