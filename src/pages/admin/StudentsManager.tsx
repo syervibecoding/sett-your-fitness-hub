@@ -316,6 +316,48 @@ export default function StudentsManager() {
     }
   };
 
+  const buildRegistrationLink = async () => {
+    let link = `${window.location.origin}/inscricao`;
+    if (effectiveCompanyId) {
+      const { data } = await supabase.from("companies").select("slug").eq("id", effectiveCompanyId).maybeSingle();
+      if (data?.slug) link = `${window.location.origin}/inscricao/${data.slug}`;
+    }
+    return link;
+  };
+
+  const openRegistrationWhatsApp = async () => {
+    const link = await buildRegistrationLink();
+    setWaRegPhone("");
+    setWaRegMessage(`Olá! Para começar, faça seu cadastro neste link: ${link}`);
+    setWaRegOpen(true);
+  };
+
+  const sendRegistrationWhatsApp = async () => {
+    if (!waRegPhone.trim()) {
+      toast({ title: "Informe o número de WhatsApp", variant: "destructive" });
+      return;
+    }
+    setWaRegSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-manager", {
+        body: { action: "send-text-to-number", phone: waRegPhone, message: waRegMessage },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) {
+        toast({ title: "Não enviado", description: (data as any).error, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Link de cadastro enviado no WhatsApp!" });
+      setWaRegOpen(false);
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar", description: e?.message || "Verifique se o WhatsApp está conectado", variant: "destructive" });
+    } finally {
+      setWaRegSending(false);
+    }
+  };
+
+
+
 
 
   return (
