@@ -55,6 +55,17 @@ export default function FormFieldEditor({ formType, title, subtitle, publicPath 
   const [form, setForm] = useState({ label: "", field_type: "text", is_required: false, options: [] as string[] });
   const [newOption, setNewOption] = useState("");
   const [saving, setSaving] = useState(false);
+  // WhatsApp — envio do link de cadastro para um número
+  const [waRegOpen, setWaRegOpen] = useState(false);
+  const [waPhone, setWaPhone] = useState("");
+  const [waMessage, setWaMessage] = useState("");
+  const [waSending, setWaSending] = useState(false);
+  // WhatsApp — envio da anamnese para um aluno
+  const [waAnamOpen, setWaAnamOpen] = useState(false);
+  const [studentList, setStudentList] = useState<{ id: string; full_name: string | null; whatsapp: string | null }[]>([]);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [waSendingAnam, setWaSendingAnam] = useState<string | null>(null);
   const { toast } = useToast();
   const { companyId, role } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
