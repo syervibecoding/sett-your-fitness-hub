@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
     // Get student
     const { data: student, error: studentError } = await adminClient
       .from("students")
-      .select("id, email, full_name, user_id, company_id")
+      .select("id, email, full_name, user_id, company_id, whatsapp")
       .eq("id", student_id)
       .single();
 
