@@ -1,35 +1,49 @@
-## Objetivo
+# Envio direto pelo WhatsApp da plataforma
 
-Permitir que cada exercício da Biblioteca tenha **mais de uma categoria** (Mobilidade, Controle Motor, Ativação, Core, Performance, Base, Fisioterapia, Máquinas, etc.), já que muitos exercícios servem para várias finalidades. Hoje cada exercício aceita só uma.
+Hoje a plataforma só permite **copiar link** nos formulários. Vamos adicionar botões de **envio direto pelo WhatsApp conectado** (Evolution API) em três lugares, reaproveitando a infraestrutura já existente (`whatsapp-manager` + `EVOLUTION_API_*`).
 
-## Banco de dados (migração)
+## 1. Backend — nova ação no `whatsapp-manager`
 
-Na tabela `exercise_library`:
+Criar a ação `send-text-to-number` na edge function `supabase/functions/whatsapp-manager/index.ts`:
+- Recebe `{ phone, message }`.
+- Valida o número com a função `validateBrazilMobile` já existente (rejeita número incompleto e retorna motivo claro).
+- Envia via `POST {evoUrl}/message/sendText/{instanceName}` (mesmo padrão de `send-student-text`).
+- Escopo por empresa e checagem de instância conectada, iguais às ações atuais.
+- Retorna erro explícito quando o WhatsApp não está conectado ou o número é inválido.
 
-- Adicionar coluna `categories text[]` com default `'{}'`.
-- Backfill: para os 1024 exercícios já categorizados, preencher `categories` com a categoria única atual (ex.: `{maquinas}`, `{mobilidade}`). Os 182 sem categoria ficam com `{}`.
-- Manter a coluna `category` existente para compatibilidade; a partir de agora ela guarda a primeira categoria da lista (para não quebrar nada que ainda a leia).
+A anamnese continuará usando a ação já existente `send-anamnesis-invite` (que gera o link individual `/anamnese/{studentId}`).
 
-## Tela: Biblioteca de Exercícios (`ExerciseLibrary.tsx`)
+## 2. Questionários › Cadastro (`src/components/FormFieldEditor.tsx`)
 
-**Formulário (criar/editar):**
-- Trocar o `Select` único de "Categoria" por uma seleção múltipla — lista de opções (as mesmas de `CATEGORY_LABELS`) onde é possível marcar várias, exibidas como chips/badges clicáveis.
-- Ao salvar, gravar o array em `categories` e sincronizar `category` com o primeiro item.
-- Ao editar, pré-carregar as categorias marcadas a partir de `categories` (com fallback para `category` em registros antigos).
+Ao lado de **Copiar link**, adicionar botão **Enviar por WhatsApp** (só no `formType === "registration"`):
+- Abre um diálogo com: campo de telefone (com máscara BR) e uma mensagem pré-preenchida contendo o link público de cadastro (`/inscricao/{slug}` ou `/cadastro/{slug}`, usando o slug da empresa como já é feito no `copyPublicLink`).
+- Botão "Enviar" chama `whatsapp-manager` → `send-text-to-number`.
+- Toasts de sucesso / erro (ex.: "Número incompleto", "WhatsApp não conectado").
 
-**Listagem e filtros:**
-- Nos cards, exibir todos os badges de categoria do exercício, não só um.
-- No filtro "Categoria" do topo, um exercício aparece se **qualquer** uma das suas categorias bater com a selecionada.
+## 3. Questionários › Anamnese (`src/components/FormFieldEditor.tsx`)
 
-## Seletor de exercícios (`ExerciseLibraryPicker.tsx`)
+O link de anamnese é individual por aluno, então em vez de campo de telefone:
+- Adicionar botão **Enviar anamnese por WhatsApp** (só no `formType === "anamnesis"`).
+- Abre um diálogo com busca/seleção de aluno (lista de `students` da empresa, com nome e WhatsApp).
+- Ao confirmar, chama `whatsapp-manager` → `send-anamnesis-invite` com o `studentId` selecionado e `baseUrl`.
+- Mostra o mesmo feedback detalhado de falha por aluno já usado no `StudentsManager`.
 
-- As abas por categoria (Mobilidade, Controle Motor, Core, etc.) passam a considerar o array: o exercício aparece na aba se a categoria estiver **contida** em `categories`.
-- Um mesmo exercício que abrange várias finalidades aparecerá em todas as abas correspondentes.
+## 4. Tela de Alunos (`src/pages/admin/StudentsManager.tsx`)
+
+Transformar o botão **Link de Cadastro** em um menu com duas opções:
+- **Copiar link** (comportamento atual).
+- **Enviar por WhatsApp** → abre diálogo com campo de telefone + mensagem com o link de cadastro e envia via `send-text-to-number`.
+
+O envio em lote de anamnese por WhatsApp (seleção de alunos) já existe e será mantido como está.
 
 ## Detalhes técnicos
 
-- A migração roda via ferramenta de migração; depois os tipos do Supabase (`types.ts`) são regenerados automaticamente para incluir `categories`.
-- Apenas telas de frontend que usam `category` são ajustadas (`ExerciseLibrary.tsx`, `ExerciseLibraryPicker.tsx`). O motor de prescrição e o WarmupGuide não dependem dessa coluna, então não mudam.
-- Sem alteração nas regras de acesso (RLS) — a coluna nova herda as políticas já existentes de `exercise_library`.
+- Reutilizar `validateBrazilMobile` no backend; não duplicar validação.
+- Frontend usa `supabase.functions.invoke("whatsapp-manager", ...)` e lê o erro real com `FunctionsHttpError`/`error.context.text()` para exibir a causa (número inválido, WhatsApp desconectado).
+- Máscara de telefone com `formatPhone`/`formatPhone` já disponível em `src/lib/masks.ts` (mesmo helper usado no cadastro de aluno).
+- Sem mudanças de banco de dados. Nenhum segredo novo (usa `EVOLUTION_API_URL`/`EVOLUTION_API_KEY` já configurados).
+- Componentes de UI: `Dialog`, `Input`, `Textarea`, `Button`, `DropdownMenu` (shadcn, já no projeto).
 
-Sem pré-classificação automática: a marcação de múltiplas categorias nos exercícios existentes será feita manualmente por você conforme necessário.
+## Resultado
+
+Em Cadastro, Anamnese e na lista de Alunos você poderá enviar o link direto pelo WhatsApp da plataforma, sem sair para copiar/colar, com validação de número e mensagens de erro claras.
