@@ -524,6 +524,38 @@ export default function StudentsManager() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={waRegOpen} onOpenChange={setWaRegOpen}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader>
+              <DialogTitle className="text-primary">ENVIAR CADASTRO POR WHATSAPP</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="font-sans">Número de WhatsApp</Label>
+                <Input
+                  value={waRegPhone}
+                  onChange={(e) => setWaRegPhone(formatPhone(e.target.value))}
+                  placeholder="(00) 00000-0000"
+                  className="bg-secondary border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="font-sans">Mensagem</Label>
+                <Textarea
+                  value={waRegMessage}
+                  onChange={(e) => setWaRegMessage(e.target.value)}
+                  rows={4}
+                  maxLength={1000}
+                  className="bg-secondary border-border"
+                />
+              </div>
+              <Button onClick={sendRegistrationWhatsApp} disabled={waRegSending || !waRegPhone.trim()} className="w-full">
+                <MessageCircle className="h-4 w-4 mr-2" />{waRegSending ? "Enviando..." : "Enviar"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </>
   );
