@@ -389,6 +389,9 @@ export default function StudentsManager() {
             >
               <Copy className="h-4 w-4 mr-2" />Link de Cadastro
             </Button>
+            <Button variant="outline" onClick={openRegistrationWhatsApp}>
+              <MessageCircle className="h-4 w-4 mr-2" />Enviar cadastro (WhatsApp)
+            </Button>
             <Button onClick={openCreate}><UserPlus className="h-4 w-4 mr-2" />Novo Aluno</Button>
           </div>
         </div>
