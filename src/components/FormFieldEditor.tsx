@@ -225,6 +225,114 @@ export default function FormFieldEditor({ formType, title, subtitle, publicPath 
     }
   };
 
+  // Monta o link público de cadastro (com slug da empresa quando existir)
+  const buildPublicUrl = async () => {
+    let url = `${window.location.origin}${publicPath}`;
+    if (companyId) {
+      const { data: company } = await supabase
+        .from("companies")
+        .select("slug")
+        .eq("id", companyId)
+        .maybeSingle();
+      if (company?.slug) {
+        url = `${window.location.origin}${publicPath}/${company.slug}`;
+      }
+    }
+    return url;
+  };
+
+  const openRegistrationWhatsApp = async () => {
+    const url = await buildPublicUrl();
+    setWaPhone("");
+    setWaMessage(
+      `Olá! Para começar, faça seu cadastro neste link: ${url}`
+    );
+    setWaRegOpen(true);
+  };
+
+  const readInvokeError = async (error: unknown, fallback: string) => {
+    if (error instanceof FunctionsHttpError) {
+      try {
+        const body = await error.context.json();
+        return body?.error || body?.details || fallback;
+      } catch {
+        return fallback;
+      }
+    }
+    return (error as any)?.message || fallback;
+  };
+
+  const sendRegistrationWhatsApp = async () => {
+    if (!waPhone.trim()) {
+      toast({ title: "Informe o número de WhatsApp", variant: "destructive" });
+      return;
+    }
+    setWaSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-manager", {
+        body: { action: "send-text-to-number", phone: waPhone, message: waMessage },
+      });
+      if (error) {
+        const msg = await readInvokeError(error, "Verifique se o WhatsApp está conectado");
+        toast({ title: "Não enviado", description: msg, variant: "destructive" });
+        return;
+      }
+      if ((data as any)?.error) {
+        toast({ title: "Não enviado", description: (data as any).error, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Link enviado no WhatsApp!" });
+      setWaRegOpen(false);
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar", description: e?.message || "Tente novamente", variant: "destructive" });
+    } finally {
+      setWaSending(false);
+    }
+  };
+
+  const openAnamnesisWhatsApp = async () => {
+    setStudentSearch("");
+    setWaAnamOpen(true);
+    setStudentsLoading(true);
+    let query = supabase
+      .from("students")
+      .select("id, full_name, whatsapp")
+      .order("full_name", { ascending: true })
+      .limit(500);
+    if (effectiveCompanyId) query = query.eq("company_id", effectiveCompanyId);
+    const { data } = await query;
+    setStudentList((data as any) || []);
+    setStudentsLoading(false);
+  };
+
+  const sendAnamnesisWhatsApp = async (studentId: string) => {
+    setWaSendingAnam(studentId);
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-manager", {
+        body: { action: "send-anamnesis-invite", studentIds: [studentId], baseUrl: window.location.origin },
+      });
+      if (error) {
+        const msg = await readInvokeError(error, "Verifique se o WhatsApp está conectado");
+        toast({ title: "Não enviado", description: msg, variant: "destructive" });
+        return;
+      }
+      const sent = (data as any)?.sent || 0;
+      const failed: { name: string | null; reason: string }[] = (data as any)?.failed || [];
+      if (sent > 0) {
+        toast({ title: "Anamnese enviada no WhatsApp!" });
+        setWaAnamOpen(false);
+      } else {
+        toast({ title: "Não enviado", description: failed[0]?.reason || "Falha no envio", variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar", description: e?.message || "Tente novamente", variant: "destructive" });
+    } finally {
+      setWaSendingAnam(null);
+    }
+  };
+
+
+
   const renderFieldPreview = (f: FormField) => {
     const baseClass = "bg-secondary border-border text-foreground pointer-events-none";
     switch (f.field_type) {
