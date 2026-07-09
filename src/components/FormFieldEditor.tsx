@@ -532,6 +532,91 @@ export default function FormFieldEditor({ formType, title, subtitle, publicPath 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* WhatsApp — enviar link de cadastro */}
+      <Dialog open={waRegOpen} onOpenChange={setWaRegOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-primary">ENVIAR CADASTRO POR WHATSAPP</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="font-sans">Número de WhatsApp</Label>
+              <Input
+                value={waPhone}
+                onChange={(e) => setWaPhone(formatPhone(e.target.value))}
+                placeholder="(00) 00000-0000"
+                className="bg-secondary border-border"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-sans">Mensagem</Label>
+              <Textarea
+                value={waMessage}
+                onChange={(e) => setWaMessage(e.target.value)}
+                rows={4}
+                maxLength={1000}
+                className="bg-secondary border-border"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWaRegOpen(false)}>Cancelar</Button>
+            <Button onClick={sendRegistrationWhatsApp} disabled={waSending || !waPhone.trim()}>
+              <Send className="h-4 w-4 mr-1" />{waSending ? "Enviando..." : "Enviar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* WhatsApp — enviar anamnese para um aluno */}
+      <Dialog open={waAnamOpen} onOpenChange={setWaAnamOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-primary">ENVIAR ANAMNESE POR WHATSAPP</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                placeholder="Buscar aluno por nome..."
+                className="pl-9 bg-secondary border-border"
+              />
+            </div>
+            <div className="max-h-80 overflow-y-auto space-y-1.5">
+              {studentsLoading ? (
+                <p className="text-sm text-muted-foreground font-sans text-center py-6">Carregando alunos...</p>
+              ) : (
+                (() => {
+                  const filtered = studentList.filter((s) =>
+                    (s.full_name || "").toLowerCase().includes(studentSearch.toLowerCase())
+                  );
+                  if (filtered.length === 0) {
+                    return <p className="text-sm text-muted-foreground font-sans text-center py-6">Nenhum aluno encontrado.</p>;
+                  }
+                  return filtered.map((s) => (
+                    <div key={s.id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-secondary px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-sans font-medium text-foreground truncate">{s.full_name || "Sem nome"}</p>
+                        <p className="text-xs text-muted-foreground font-sans truncate">{s.whatsapp || "Sem WhatsApp"}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => sendAnamnesisWhatsApp(s.id)}
+                        disabled={waSendingAnam === s.id}
+                      >
+                        <Send className="h-4 w-4 mr-1" />{waSendingAnam === s.id ? "Enviando..." : "Enviar"}
+                      </Button>
+                    </div>
+                  ));
+                })()
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
