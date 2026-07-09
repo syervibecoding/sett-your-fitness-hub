@@ -338,7 +338,14 @@ export default function StudentDetail() {
       } else if ((data as any)?.error) {
         toast({ title: "Erro", description: (data as any).error, variant: "destructive" });
       } else {
-        toast({ title: "Acesso ativado!", description: `Senha temporária: ${(data as any)?.temp_password}. Compartilhe com o aluno.` });
+        const sent = (data as any)?.sent || {};
+        const channels: string[] = [];
+        if (sent.whatsapp) channels.push("WhatsApp");
+        if (sent.email) channels.push("e-mail");
+        const desc = channels.length
+          ? `Login enviado por ${channels.join(" e ")}. Senha temporária: ${(data as any)?.temp_password}.`
+          : `Não foi possível enviar automaticamente. Senha temporária: ${(data as any)?.temp_password}. Compartilhe com o aluno.`;
+        toast({ title: "Acesso ativado!", description: desc });
       }
     } catch (err: any) {
       toast({ title: "Erro ao ativar acesso", description: err?.message, variant: "destructive" });

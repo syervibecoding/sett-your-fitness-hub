@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
     // Get student
     const { data: student, error: studentError } = await adminClient
       .from("students")
-      .select("id, email, full_name, user_id, company_id")
+      .select("id, email, full_name, user_id, company_id, whatsapp")
       .eq("id", student_id)
       .single();
 
@@ -176,11 +176,92 @@ Deno.serve(async (req) => {
       if (cmError) console.error("company_members upsert error", cmError);
     }
 
+    // ─── Send login credentials automatically (WhatsApp + Email) ───
+    const firstName = (student.full_name || "").split(" ")[0] || "";
+    const loginUrl = "https://www.settapp.com.br/auth";
+    const loginMessage =
+      `Olá ${firstName}! Seu acesso ao Set Training App foi ativado.\n\n` +
+      `Acesse: ${loginUrl}\n` +
+      `E-mail: ${student.email}\n` +
+      `Senha temporária: ${tempPassword}\n\n` +
+      `Recomendamos alterar a senha após o primeiro login.`;
+
+    const sent = { whatsapp: false, email: false };
+    const sendErrors: { channel: string; error: string }[] = [];
+
+    // WhatsApp — reuse whatsapp-manager (Evolution API), forwarding caller auth
+    try {
+      const waRes = await fetch(
+        `${Deno.env.get("SUPABASE_URL")}/functions/v1/whatsapp-manager`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": authHeader,
+            "apikey": Deno.env.get("SUPABASE_ANON_KEY")!,
+          },
+          body: JSON.stringify({
+            action: "send-text-to-number",
+            phone: student.whatsapp || "",
+            message: loginMessage,
+          }),
+        }
+      );
+      if (waRes.ok) {
+        sent.whatsapp = true;
+      } else {
+        const errText = await waRes.text();
+        sendErrors.push({ channel: "whatsapp", error: errText.slice(0, 200) });
+      }
+    } catch (e) {
+      sendErrors.push({ channel: "whatsapp", error: String(e).slice(0, 200) });
+    }
+
+    // Email — via Resend through the Lovable connector gateway
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    const resendKey = Deno.env.get("RESEND_API_KEY");
+    if (lovableKey && resendKey) {
+      try {
+        const emailRes = await fetch("https://connector-gateway.lovable.dev/resend/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${lovableKey}`,
+            "X-Connection-Api-Key": resendKey,
+          },
+          body: JSON.stringify({
+            from: "Set Training App <onboarding@resend.dev>",
+            to: [student.email],
+            subject: "Seu acesso ao Set Training App",
+            html:
+              `<p>Olá ${firstName}!</p>` +
+              `<p>Seu acesso ao <strong>Set Training App</strong> foi ativado.</p>` +
+              `<p><strong>Acesse:</strong> <a href="${loginUrl}">${loginUrl}</a><br/>` +
+              `<strong>E-mail:</strong> ${student.email}<br/>` +
+              `<strong>Senha temporária:</strong> ${tempPassword}</p>` +
+              `<p>Recomendamos alterar a senha após o primeiro login.</p>`,
+          }),
+        });
+        if (emailRes.ok) {
+          sent.email = true;
+        } else {
+          const errText = await emailRes.text();
+          sendErrors.push({ channel: "email", error: errText.slice(0, 200) });
+        }
+      } catch (e) {
+        sendErrors.push({ channel: "email", error: String(e).slice(0, 200) });
+      }
+    } else {
+      sendErrors.push({ channel: "email", error: "E-mail (Resend) não configurado" });
+    }
+
     return new Response(JSON.stringify({ 
       success: true, 
       user_id: userId,
       temp_password: tempPassword,
       reactivated,
+      sent,
+      send_errors: sendErrors,
       message: reactivated
         ? "Student access reactivated. New temporary password generated."
         : "Student access activated. Temporary password generated."
