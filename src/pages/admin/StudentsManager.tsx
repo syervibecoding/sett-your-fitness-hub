@@ -65,6 +65,10 @@ export default function StudentsManager() {
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sendingBatch, setSendingBatch] = useState(false);
+  const [waRegOpen, setWaRegOpen] = useState(false);
+  const [waRegPhone, setWaRegPhone] = useState("");
+  const [waRegMessage, setWaRegMessage] = useState("");
+  const [waRegSending, setWaRegSending] = useState(false);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [searchParams] = useSearchParams();
