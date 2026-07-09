@@ -316,31 +316,28 @@ export default function UnifiedPrescriber() {
           .order("created_at", { ascending: false }).limit(1).maybeSingle(),
       ]);
 
-      // Resumo do que o aluno respondeu (tabela pública `anamnesis`)
-      const modality = ans
-        ? (Array.isArray(ans.modalities) ? ans.modalities.join(", ") : (ans.modalities || ""))
-        : "";
+      // Anamnese respondida pelo aluno (colunas + JSONB `data`) — fonte da verdade.
+      const { mapped, interests, nut: nutMapped } = mapAnsweredAnamnesis(ans);
+      const d = (ans?.data && typeof ans.data === "object" && !Array.isArray(ans.data))
+        ? ans.data as Record<string, any> : {};
+
+      // Resumo do que o aluno respondeu
       setAnswered(ans ? {
-        objective: ans.goals || (ans as any).data?.objetivo_descricao || "—",
-        level: ans.physical_activity_level || "—",
-        modality: modality || "—",
-        days: ans.training_days || (ans.available_days != null ? String(ans.available_days) : "") || "—",
-        injuries: ans.injuries || "—",
+        objective: pick(d.objetivo_descricao, d.objetivo_principal, ans.goals) || "—",
+        level: pick(d.nivel_atividade, ans.physical_activity_level) || "—",
+        modality: mapped.training_modality || "—",
+        days: pick(d.dias_por_semana, ans.available_days, ans.training_days) || "—",
+        injuries: pick(d.lesoes, ans.injuries) || "—",
       } : null);
 
-      // Mapeamento da anamnese respondida para os campos da prescrição
-      const mapped: Partial<Anamnese> = ans ? {
-        objective: inferObjective(ans.goals),
-        activity_level: ACTIVITY_ENUM.includes(ans.physical_activity_level || "") ? (ans.physical_activity_level as string) : "",
-        training_modality: modality,
-        session_duration_min: toInt(ans.session_duration),
-        days_per_week_strength: toInt(ans.available_days ?? ans.training_days),
-        injuries: ans.injuries || "",
-        sleep_quality: toInt(ans.sleep_quality),
-        stress_score: toInt(ans.stress_level),
-        sport: inferSport(ans.modalities),
-        cardio_goal: ans.goals || "",
-      } : {};
+      // Aplica a anamnese com PRIORIDADE sobre a base salva / defaults.
+      const applyMapped = (base: Anamnese): Anamnese => {
+        const merged: Anamnese = { ...base };
+        for (const [k, v] of Object.entries(mapped)) {
+          if (v !== undefined && v !== null && v !== "") (merged as any)[k] = v;
+        }
+        return merged;
+      };
 
       if (sa) {
         setAnamneseId(sa.id);
@@ -348,7 +345,8 @@ export default function UnifiedPrescriber() {
           ? ((sa as any).prescribed_modalities as string[]).filter((m): m is Modality =>
               ["musculacao", "corrida", "natacao", "ciclismo", "nutricao"].includes(m))
           : [];
-        setModalities(new Set(savedMods.length ? (savedMods as Modality[]) : ["musculacao"]));
+        const initialMods = savedMods.length ? savedMods : (interests.length ? interests : ["musculacao"]);
+        setModalities(new Set(initialMods as Modality[]));
         const base: Anamnese = {
           age: sa.age?.toString() ?? "",
           body_fat_percent: sa.body_fat_percent?.toString() ?? "",
@@ -371,26 +369,23 @@ export default function UnifiedPrescriber() {
           injuries: sa.injuries ?? "",
           notes: sa.notes ?? "",
         };
-        const merged: Anamnese = { ...base };
-        for (const [k, v] of Object.entries(mapped)) {
-          if (v !== undefined && v !== null && v !== "" && (merged as any)[k] === "") (merged as any)[k] = v;
-        }
-        setAnamnese(merged);
+        setAnamnese(applyMapped(base));
       } else {
-        setModalities(new Set(["musculacao"]));
         setAnamneseId(null);
-        const merged: Anamnese = { ...DEFAULT_ANAMNESE };
-        for (const [k, v] of Object.entries(mapped)) {
-          if (v !== undefined && v !== null && v !== "") (merged as any)[k] = v;
-        }
-        setAnamnese(merged);
+        setModalities(new Set((interests.length ? interests : ["musculacao"]) as Modality[]));
+        setAnamnese(applyMapped({ ...DEFAULT_ANAMNESE }));
       }
 
-      // Nutrição: pré-preenche sexo/idade a partir do cadastro do aluno
+      // Nutrição: pré-preenche a partir da anamnese respondida (fallback ao cadastro).
       setNut(n => ({
-        ...n, weight: "", height: "",
-        sex: (s?.gender === "feminino" || s?.gender === "F" || s?.gender === "Feminino") ? "feminino" : "masculino",
+        ...n,
+        weight: nutMapped.weight || "",
+        height: nutMapped.height || "",
+        meals: nutMapped.meals || n.meals,
+        sex: nutMapped.sex
+          ?? ((s?.gender === "feminino" || s?.gender === "F" || s?.gender === "Feminino") ? "feminino" : "masculino"),
       }));
+
 
       const { data: assess } = await supabase.from("functional_assessments")
         .select("id").eq("student_id", studentId).limit(1).maybeSingle();
