@@ -1,17 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, GripVertical, Pencil, Trash2, ChevronUp, ChevronDown, X, Copy, Check } from "lucide-react";
+import { Plus, GripVertical, Pencil, Trash2, ChevronUp, ChevronDown, X, Copy, Check, MessageCircle, Send, Search } from "lucide-react";
+import { formatPhone } from "@/lib/masks";
 import { Badge } from "@/components/ui/badge";
 
 interface FormField {
@@ -52,6 +55,17 @@ export default function FormFieldEditor({ formType, title, subtitle, publicPath 
   const [form, setForm] = useState({ label: "", field_type: "text", is_required: false, options: [] as string[] });
   const [newOption, setNewOption] = useState("");
   const [saving, setSaving] = useState(false);
+  // WhatsApp — envio do link de cadastro para um número
+  const [waRegOpen, setWaRegOpen] = useState(false);
+  const [waPhone, setWaPhone] = useState("");
+  const [waMessage, setWaMessage] = useState("");
+  const [waSending, setWaSending] = useState(false);
+  // WhatsApp — envio da anamnese para um aluno
+  const [waAnamOpen, setWaAnamOpen] = useState(false);
+  const [studentList, setStudentList] = useState<{ id: string; full_name: string | null; whatsapp: string | null }[]>([]);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [waSendingAnam, setWaSendingAnam] = useState<string | null>(null);
   const { toast } = useToast();
   const { companyId, role } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
@@ -211,6 +225,114 @@ export default function FormFieldEditor({ formType, title, subtitle, publicPath 
     }
   };
 
+  // Monta o link público de cadastro (com slug da empresa quando existir)
+  const buildPublicUrl = async () => {
+    let url = `${window.location.origin}${publicPath}`;
+    if (companyId) {
+      const { data: company } = await supabase
+        .from("companies")
+        .select("slug")
+        .eq("id", companyId)
+        .maybeSingle();
+      if (company?.slug) {
+        url = `${window.location.origin}${publicPath}/${company.slug}`;
+      }
+    }
+    return url;
+  };
+
+  const openRegistrationWhatsApp = async () => {
+    const url = await buildPublicUrl();
+    setWaPhone("");
+    setWaMessage(
+      `Olá! Para começar, faça seu cadastro neste link: ${url}`
+    );
+    setWaRegOpen(true);
+  };
+
+  const readInvokeError = async (error: unknown, fallback: string) => {
+    if (error instanceof FunctionsHttpError) {
+      try {
+        const body = await error.context.json();
+        return body?.error || body?.details || fallback;
+      } catch {
+        return fallback;
+      }
+    }
+    return (error as any)?.message || fallback;
+  };
+
+  const sendRegistrationWhatsApp = async () => {
+    if (!waPhone.trim()) {
+      toast({ title: "Informe o número de WhatsApp", variant: "destructive" });
+      return;
+    }
+    setWaSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-manager", {
+        body: { action: "send-text-to-number", phone: waPhone, message: waMessage },
+      });
+      if (error) {
+        const msg = await readInvokeError(error, "Verifique se o WhatsApp está conectado");
+        toast({ title: "Não enviado", description: msg, variant: "destructive" });
+        return;
+      }
+      if ((data as any)?.error) {
+        toast({ title: "Não enviado", description: (data as any).error, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Link enviado no WhatsApp!" });
+      setWaRegOpen(false);
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar", description: e?.message || "Tente novamente", variant: "destructive" });
+    } finally {
+      setWaSending(false);
+    }
+  };
+
+  const openAnamnesisWhatsApp = async () => {
+    setStudentSearch("");
+    setWaAnamOpen(true);
+    setStudentsLoading(true);
+    let query = supabase
+      .from("students")
+      .select("id, full_name, whatsapp")
+      .order("full_name", { ascending: true })
+      .limit(500);
+    if (effectiveCompanyId) query = query.eq("company_id", effectiveCompanyId);
+    const { data } = await query;
+    setStudentList((data as any) || []);
+    setStudentsLoading(false);
+  };
+
+  const sendAnamnesisWhatsApp = async (studentId: string) => {
+    setWaSendingAnam(studentId);
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-manager", {
+        body: { action: "send-anamnesis-invite", studentIds: [studentId], baseUrl: window.location.origin },
+      });
+      if (error) {
+        const msg = await readInvokeError(error, "Verifique se o WhatsApp está conectado");
+        toast({ title: "Não enviado", description: msg, variant: "destructive" });
+        return;
+      }
+      const sent = (data as any)?.sent || 0;
+      const failed: { name: string | null; reason: string }[] = (data as any)?.failed || [];
+      if (sent > 0) {
+        toast({ title: "Anamnese enviada no WhatsApp!" });
+        setWaAnamOpen(false);
+      } else {
+        toast({ title: "Não enviado", description: failed[0]?.reason || "Falha no envio", variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar", description: e?.message || "Tente novamente", variant: "destructive" });
+    } finally {
+      setWaSendingAnam(null);
+    }
+  };
+
+
+
   const renderFieldPreview = (f: FormField) => {
     const baseClass = "bg-secondary border-border text-foreground pointer-events-none";
     switch (f.field_type) {
@@ -264,14 +386,24 @@ export default function FormFieldEditor({ formType, title, subtitle, publicPath 
           <p className="text-muted-foreground font-sans">{subtitle}</p>
         </div>
         {publicPath && formType === "registration" && (
-          <Button variant="outline" size="sm" onClick={copyPublicLink}>
-            <Copy className="h-4 w-4 mr-1" />Copiar link
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={copyPublicLink}>
+              <Copy className="h-4 w-4 mr-1" />Copiar link
+            </Button>
+            <Button size="sm" onClick={openRegistrationWhatsApp}>
+              <MessageCircle className="h-4 w-4 mr-1" />Enviar por WhatsApp
+            </Button>
+          </div>
         )}
         {formType === "anamnesis" && (
-          <p className="text-xs text-muted-foreground font-sans max-w-xs text-right">
-            O link da anamnese é individual por aluno, gerado após o cadastro.
-          </p>
+          <div className="flex flex-col items-end gap-2">
+            <Button size="sm" onClick={openAnamnesisWhatsApp}>
+              <MessageCircle className="h-4 w-4 mr-1" />Enviar anamnese por WhatsApp
+            </Button>
+            <p className="text-xs text-muted-foreground font-sans max-w-xs text-right">
+              O link da anamnese é individual por aluno, gerado após o cadastro.
+            </p>
+          </div>
         )}
       </div>
 
@@ -398,6 +530,91 @@ export default function FormFieldEditor({ formType, title, subtitle, publicPath 
               {saving ? "Salvando..." : editingField ? "Salvar" : "Adicionar"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* WhatsApp — enviar link de cadastro */}
+      <Dialog open={waRegOpen} onOpenChange={setWaRegOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-primary">ENVIAR CADASTRO POR WHATSAPP</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="font-sans">Número de WhatsApp</Label>
+              <Input
+                value={waPhone}
+                onChange={(e) => setWaPhone(formatPhone(e.target.value))}
+                placeholder="(00) 00000-0000"
+                className="bg-secondary border-border"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-sans">Mensagem</Label>
+              <Textarea
+                value={waMessage}
+                onChange={(e) => setWaMessage(e.target.value)}
+                rows={4}
+                maxLength={1000}
+                className="bg-secondary border-border"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWaRegOpen(false)}>Cancelar</Button>
+            <Button onClick={sendRegistrationWhatsApp} disabled={waSending || !waPhone.trim()}>
+              <Send className="h-4 w-4 mr-1" />{waSending ? "Enviando..." : "Enviar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* WhatsApp — enviar anamnese para um aluno */}
+      <Dialog open={waAnamOpen} onOpenChange={setWaAnamOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-primary">ENVIAR ANAMNESE POR WHATSAPP</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                placeholder="Buscar aluno por nome..."
+                className="pl-9 bg-secondary border-border"
+              />
+            </div>
+            <div className="max-h-80 overflow-y-auto space-y-1.5">
+              {studentsLoading ? (
+                <p className="text-sm text-muted-foreground font-sans text-center py-6">Carregando alunos...</p>
+              ) : (
+                (() => {
+                  const filtered = studentList.filter((s) =>
+                    (s.full_name || "").toLowerCase().includes(studentSearch.toLowerCase())
+                  );
+                  if (filtered.length === 0) {
+                    return <p className="text-sm text-muted-foreground font-sans text-center py-6">Nenhum aluno encontrado.</p>;
+                  }
+                  return filtered.map((s) => (
+                    <div key={s.id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-secondary px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-sans font-medium text-foreground truncate">{s.full_name || "Sem nome"}</p>
+                        <p className="text-xs text-muted-foreground font-sans truncate">{s.whatsapp || "Sem WhatsApp"}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => sendAnamnesisWhatsApp(s.id)}
+                        disabled={waSendingAnam === s.id}
+                      >
+                        <Send className="h-4 w-4 mr-1" />{waSendingAnam === s.id ? "Enviando..." : "Enviar"}
+                      </Button>
+                    </div>
+                  ));
+                })()
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

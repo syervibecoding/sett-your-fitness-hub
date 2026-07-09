@@ -534,6 +534,32 @@ Deno.serve(async (req) => {
       return json({ success: true });
     }
 
+    // ─── SEND DIRECT TEXT TO AN ARBITRARY NUMBER (link de cadastro, convites) ───
+    if (action === "send-text-to-number") {
+      const { phone: rawPhone, message } = body as { phone?: string; message?: string };
+      if (!rawPhone || typeof rawPhone !== "string") return json({ error: "phone required" }, 400);
+      if (!message || !message.trim()) return json({ error: "message required" }, 400);
+
+      const phoneResult = validateBrazilMobile(rawPhone);
+      if ("error" in phoneResult) return json({ error: phoneResult.error }, 400);
+      const phone = phoneResult.phone;
+
+      const sendRes = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+        method: "POST",
+        headers: evoHeaders,
+        body: JSON.stringify({ number: phone, text: message.slice(0, 4000) }),
+      });
+      if (!sendRes.ok) {
+        const errText = await sendRes.text();
+        return json({ error: "Failed to send message", details: errText.slice(0, 200) }, 502);
+      }
+
+      return json({ success: true });
+    }
+
+
+
+
 
 
 

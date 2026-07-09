@@ -65,6 +65,10 @@ export default function StudentsManager() {
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sendingBatch, setSendingBatch] = useState(false);
+  const [waRegOpen, setWaRegOpen] = useState(false);
+  const [waRegPhone, setWaRegPhone] = useState("");
+  const [waRegMessage, setWaRegMessage] = useState("");
+  const [waRegSending, setWaRegSending] = useState(false);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [searchParams] = useSearchParams();
@@ -312,6 +316,48 @@ export default function StudentsManager() {
     }
   };
 
+  const buildRegistrationLink = async () => {
+    let link = `${window.location.origin}/inscricao`;
+    if (effectiveCompanyId) {
+      const { data } = await supabase.from("companies").select("slug").eq("id", effectiveCompanyId).maybeSingle();
+      if (data?.slug) link = `${window.location.origin}/inscricao/${data.slug}`;
+    }
+    return link;
+  };
+
+  const openRegistrationWhatsApp = async () => {
+    const link = await buildRegistrationLink();
+    setWaRegPhone("");
+    setWaRegMessage(`Olá! Para começar, faça seu cadastro neste link: ${link}`);
+    setWaRegOpen(true);
+  };
+
+  const sendRegistrationWhatsApp = async () => {
+    if (!waRegPhone.trim()) {
+      toast({ title: "Informe o número de WhatsApp", variant: "destructive" });
+      return;
+    }
+    setWaRegSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("whatsapp-manager", {
+        body: { action: "send-text-to-number", phone: waRegPhone, message: waRegMessage },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) {
+        toast({ title: "Não enviado", description: (data as any).error, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Link de cadastro enviado no WhatsApp!" });
+      setWaRegOpen(false);
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar", description: e?.message || "Verifique se o WhatsApp está conectado", variant: "destructive" });
+    } finally {
+      setWaRegSending(false);
+    }
+  };
+
+
+
 
 
   return (
@@ -342,6 +388,9 @@ export default function StudentsManager() {
               }}
             >
               <Copy className="h-4 w-4 mr-2" />Link de Cadastro
+            </Button>
+            <Button variant="outline" onClick={openRegistrationWhatsApp}>
+              <MessageCircle className="h-4 w-4 mr-2" />Enviar cadastro (WhatsApp)
             </Button>
             <Button onClick={openCreate}><UserPlus className="h-4 w-4 mr-2" />Novo Aluno</Button>
           </div>
@@ -472,6 +521,38 @@ export default function StudentsManager() {
               </div>
               <div className="space-y-2"><Label className="font-sans">Observações</Label><Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="bg-secondary border-border" rows={3} /></div>
               <Button onClick={handleSave} className="w-full">{editing ? "Salvar" : "Cadastrar"}</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={waRegOpen} onOpenChange={setWaRegOpen}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader>
+              <DialogTitle className="text-primary">ENVIAR CADASTRO POR WHATSAPP</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="font-sans">Número de WhatsApp</Label>
+                <Input
+                  value={waRegPhone}
+                  onChange={(e) => setWaRegPhone(formatPhone(e.target.value))}
+                  placeholder="(00) 00000-0000"
+                  className="bg-secondary border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="font-sans">Mensagem</Label>
+                <Textarea
+                  value={waRegMessage}
+                  onChange={(e) => setWaRegMessage(e.target.value)}
+                  rows={4}
+                  maxLength={1000}
+                  className="bg-secondary border-border"
+                />
+              </div>
+              <Button onClick={sendRegistrationWhatsApp} disabled={waRegSending || !waRegPhone.trim()} className="w-full">
+                <MessageCircle className="h-4 w-4 mr-2" />{waRegSending ? "Enviando..." : "Enviar"}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
