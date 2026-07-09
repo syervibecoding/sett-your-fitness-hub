@@ -386,14 +386,24 @@ export default function FormFieldEditor({ formType, title, subtitle, publicPath 
           <p className="text-muted-foreground font-sans">{subtitle}</p>
         </div>
         {publicPath && formType === "registration" && (
-          <Button variant="outline" size="sm" onClick={copyPublicLink}>
-            <Copy className="h-4 w-4 mr-1" />Copiar link
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={copyPublicLink}>
+              <Copy className="h-4 w-4 mr-1" />Copiar link
+            </Button>
+            <Button size="sm" onClick={openRegistrationWhatsApp}>
+              <MessageCircle className="h-4 w-4 mr-1" />Enviar por WhatsApp
+            </Button>
+          </div>
         )}
         {formType === "anamnesis" && (
-          <p className="text-xs text-muted-foreground font-sans max-w-xs text-right">
-            O link da anamnese é individual por aluno, gerado após o cadastro.
-          </p>
+          <div className="flex flex-col items-end gap-2">
+            <Button size="sm" onClick={openAnamnesisWhatsApp}>
+              <MessageCircle className="h-4 w-4 mr-1" />Enviar anamnese por WhatsApp
+            </Button>
+            <p className="text-xs text-muted-foreground font-sans max-w-xs text-right">
+              O link da anamnese é individual por aluno, gerado após o cadastro.
+            </p>
+          </div>
         )}
       </div>
 
