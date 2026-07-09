@@ -118,6 +118,103 @@ function ageFromBirth(birth: string | null): string {
   return String(Math.max(0, Math.floor(diff / (365.25 * 24 * 3600 * 1000))));
 }
 
+// ── Normalização das respostas do aluno (JSONB `data` + colunas) ──
+const norm = (s: any) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const toDec = (v: any): string => {
+  const s = String(v ?? "").replace(",", ".").replace(/[^\d.]/g, "");
+  const n = parseFloat(s);
+  return isNaN(n) ? "" : String(n);
+};
+const pick = (...vals: any[]): string => {
+  for (const v of vals) { const s = String(v ?? "").trim(); if (s) return s; }
+  return "";
+};
+function mapActivity(raw?: string | null): string {
+  const t = norm(raw);
+  if (!t) return "";
+  if (t.includes("sedentar")) return "sedentario";
+  if (t.includes("muito ativo") || t.includes("5-6")) return "muito_ativo";
+  if (t.includes("extrem")) return "extremo";
+  if (t.includes("moderad") || t.includes("3-4")) return "moderado";
+  if (t.includes("leve") || t.includes("1-2")) return "leve";
+  if (ACTIVITY_ENUM.includes(t)) return t;
+  return "";
+}
+function mapEquipment(raw?: string | null): string {
+  const t = norm(raw);
+  if (!t) return "";
+  if (t.includes("academia")) return "academia_completa";
+  if (t.includes("halter")) return "casa_halteres";
+  if (t.includes("sem equip") || t.includes("ar livre") || t.includes("funcional")) return "funcional";
+  return "";
+}
+function interestsToModalities(d: any): Modality[] {
+  const raw = d?.interesses ?? d?.interests;
+  const arr = Array.isArray(raw) ? raw : (typeof raw === "string" && raw ? [raw] : []);
+  const out = new Set<Modality>();
+  for (const x of arr) {
+    const t = norm(x);
+    if (t.includes("muscula")) out.add("musculacao");
+    if (t.includes("corrid")) out.add("corrida");
+    if (t.includes("nata")) out.add("natacao");
+    if (t.includes("cicl")) out.add("ciclismo");
+    if (t.includes("nutri")) out.add("nutricao");
+  }
+  return [...out];
+}
+function objectiveFromAnswers(d: any, goals?: string | null): string {
+  const src = [
+    d?.objetivo_principal,
+    Array.isArray(d?.objetivos) ? d.objetivos.join(" ") : d?.objetivos,
+    d?.objetivo_descricao,
+    goals,
+  ].filter(Boolean).join(" ");
+  return src ? inferObjective(src) : "";
+}
+// Extrai a anamnese respondida pelo aluno → campos da prescrição (fonte da verdade).
+function mapAnsweredAnamnesis(ans: any): {
+  mapped: Partial<Anamnese>;
+  interests: Modality[];
+  nut: { weight: string; height: string; sex: Sex | null; meals: string };
+} {
+  const d = (ans?.data && typeof ans.data === "object" && !Array.isArray(ans.data))
+    ? ans.data as Record<string, any> : {};
+  const interests = interestsToModalities(d);
+  const modalityText = interests.length
+    ? interests.map(m => MOD_LABEL[m]).join(", ")
+    : (Array.isArray(ans?.modalities) ? ans.modalities.join(", ") : (ans?.modalities || ""));
+  const mapped: Partial<Anamnese> = {
+    age: toInt(pick(d.idade)),
+    body_fat_percent: toDec(pick(d.percentual_gordura)),
+    objective: objectiveFromAnswers(d, ans?.goals),
+    activity_level: mapActivity(pick(d.nivel_atividade, ans?.physical_activity_level)),
+    training_modality: modalityText,
+    days_per_week_strength: toInt(pick(d.dias_por_semana, ans?.available_days, ans?.training_days)),
+    session_duration_min: toInt(pick(d.minutos_sessao, ans?.session_duration)),
+    equipment: mapEquipment(pick(d.onde_treina, ans?.training_location, ans?.available_equipment)),
+    experience_months: toInt(pick(d.tempo_treino_meses)),
+    sport: inferSport(interests.length ? interests.join(" ") : ans?.modalities),
+    fcmax: toInt(pick(d.fc_maxima)),
+    fcrep: toInt(pick(d.fc_repouso)),
+    current_volume_weekly: pick(d.endurance_volume, d.corrida_volume, d.natacao_volume, d.ciclismo_volume),
+    cardio_goal: pick(d.endurance_objetivo, d.endurance_prova, ans?.goals),
+    stress_score: toInt(pick(d.estresse, ans?.stress_level)),
+    sleep_quality: toInt(pick(d.qualidade_sono, ans?.sleep_quality)),
+    injuries: pick(d.lesoes, ans?.injuries),
+    notes: pick(d.historico_treino, d.observacoes, ans?.additional_notes),
+  };
+  const sexRaw = norm(pick(d.sexo));
+  const sex: Sex | null = sexRaw.includes("fem") ? "feminino" : (sexRaw.includes("masc") ? "masculino" : null);
+  const nut = {
+    weight: toDec(pick(d.peso)),
+    height: toInt(pick(d.altura)),
+    sex,
+    meals: pick(d.refeicoes_dia).replace("+", ""),
+  };
+  return { mapped, interests, nut };
+}
+
+
 // ── UI helpers (module-level para NÃO remontar os inputs a cada tecla) ──
 const inputCls = "h-9 text-sm";
 const SI = (props: any) => <Input {...props} className={inputCls} />;
