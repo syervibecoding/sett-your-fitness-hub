@@ -487,6 +487,26 @@ export function DashboardAlerts({ trainerId }: Props) {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={!!bdayTarget} onOpenChange={(o) => !o && setBdayTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enviar parabéns {bdayTarget ? `— ${bdayTarget.full_name}` : ""}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Textarea value={bdayMessage} onChange={(e) => setBdayMessage(e.target.value)} rows={4} />
+            <p className="text-xs text-muted-foreground">
+              Será enviado por: {[bdayTarget?.phone ? "WhatsApp" : null, bdayTarget?.email ? "e-mail" : null].filter(Boolean).join(" e ") || "nenhum canal disponível"}.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBdayTarget(null)} disabled={bdaySending}>Cancelar</Button>
+            <Button onClick={sendBirthday} disabled={bdaySending}>
+              <Send className="h-4 w-4 mr-1" />{bdaySending ? "Enviando..." : "Enviar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
