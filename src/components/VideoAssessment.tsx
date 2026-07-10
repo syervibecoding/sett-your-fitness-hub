@@ -20,10 +20,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Loader2, Upload, Film, Save, Plus, X, Play, Camera, Maximize2, AlertCircle, FileDown,
+  Loader2, Upload, Film, Save, Plus, X, Play, Camera, Maximize2, AlertCircle, FileDown, PencilLine,
 } from "lucide-react";
 import { toast } from "sonner";
 import { downloadAssessmentPdf } from "@/lib/assessment/pdf";
+import FrameAnnotator, { type Annotation } from "@/components/assessment/FrameAnnotator";
 
 type Gravidade = "Leve" | "Moderada" | "Severa";
 interface Finding { gravidade: Gravidade; descricao: string; }
@@ -31,8 +32,11 @@ interface Frame {
   index: number;
   vista: string;
   time: number;
-  dataUrl: string;
+  dataUrl: string;          // imagem exibida (com marcações, se houver)
+  originalDataUrl: string;  // imagem original sem marcações (para reeditar)
+  annotations: Annotation[];
   findings: Finding[];
+  dark?: boolean;           // quadro ficou escuro → sugerir recaptura
 }
 
 type ProtocolKey = "posture_ohs" | "bn_sequence" | "free";
