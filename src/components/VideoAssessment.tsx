@@ -449,12 +449,30 @@ export default function VideoAssessment({ studentId, companyId, studentName, con
               <Card key={f.index}>
                 <CardContent className="p-3 space-y-3">
                   <div className="relative">
-                    <img src={f.dataUrl} alt={f.vista}
-                      className="w-full aspect-video object-cover rounded-md border border-line bg-ink/5" />
-                    <button type="button" onClick={() => setZoom(f.dataUrl)}
-                      className="absolute top-1.5 right-1.5 bg-ink/70 text-paper rounded-md p-1">
-                      <Maximize2 className="h-3.5 w-3.5" />
-                    </button>
+                    {f.dataUrl ? (
+                      <>
+                        <img src={f.dataUrl} alt={f.vista}
+                          className="w-full aspect-video object-cover rounded-md border border-line bg-ink/5" />
+                        <button type="button" onClick={() => setZoom(f.dataUrl)}
+                          className="absolute top-1.5 right-1.5 bg-ink/70 text-paper rounded-md p-1">
+                          <Maximize2 className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    ) : (
+                      <div className="w-full aspect-video rounded-md border border-dashed border-destructive/50 bg-ink/5 flex items-center justify-center text-xs text-destructive text-center px-3">
+                        Falha ao capturar este quadro. Ajuste o vídeo e use "Usar vídeo".
+                      </div>
+                    )}
+                    {f.dark && f.dataUrl && (
+                      <span className="absolute top-1.5 left-1.5 bg-destructive/80 text-paper text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" /> escuro
+                      </span>
+                    )}
+                    {f.annotations.length > 0 && (
+                      <span className="absolute bottom-1.5 right-1.5 bg-navy text-paper text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <PencilLine className="h-3 w-3" /> {f.annotations.length}
+                      </span>
+                    )}
                     <span className="absolute bottom-1.5 left-1.5 bg-ink/70 text-paper text-[10px] font-mono px-1.5 py-0.5 rounded">
                       {f.time.toFixed(1)}s
                     </span>
@@ -482,6 +500,10 @@ export default function VideoAssessment({ studentId, companyId, studentName, con
                     </Button>
                     <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => recapture(f.index, "current")}>
                       <Camera className="h-3 w-3 mr-1" /> Usar vídeo
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" disabled={!f.originalDataUrl}
+                      onClick={() => setAnnotating(f.index)}>
+                      <PencilLine className="h-3 w-3 mr-1" /> Marcar
                     </Button>
                   </div>
 
