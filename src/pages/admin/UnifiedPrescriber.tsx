@@ -85,8 +85,11 @@ const DEFAULT_ANAMNESE: Anamnese = {
 // ── Mapeamento anamnese respondida pelo aluno → estrutura da prescrição ──
 const ACTIVITY_ENUM = ["sedentario", "leve", "moderado", "muito_ativo", "extremo"];
 const toInt = (v: any): string => {
-  const n = parseInt(String(v ?? "").replace(/[^\d]/g, ""), 10);
-  return isNaN(n) ? "" : String(n);
+  // Extract number groups (handles ranges like "de 30 a 45 minutos" → 45, "3-4x" → 4).
+  const groups = String(v ?? "").match(/\d+/g);
+  if (!groups || groups.length === 0) return "";
+  const max = Math.max(...groups.map(g => parseInt(g, 10)).filter(n => !isNaN(n)));
+  return isNaN(max) ? "" : String(max);
 };
 function inferObjective(goals?: string | null): string {
   const g = (goals || "").toLowerCase();
