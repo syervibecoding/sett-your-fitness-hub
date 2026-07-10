@@ -1,7 +1,12 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, Timer } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { RefreshCw, Timer, Send } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
@@ -18,14 +23,14 @@ async function fetchRenewalsAndCycles(effectiveCompanyId: string | null | undefi
 
   let expiringQuery = supabase
     .from("enrollments")
-    .select("*, trainer_id, students(full_name, status), plans(name)")
+    .select("*, trainer_id, students(full_name, status, phone), plans(name)")
     .eq("status", "active")
     .lte("end_date", thirtyDaysFromNow)
     .order("end_date", { ascending: true });
 
   let awaitingRenewalQuery = supabase
     .from("enrollments")
-    .select("*, trainer_id, payment_status, students(full_name, status), plans(name)")
+    .select("*, trainer_id, payment_status, students(full_name, status, phone), plans(name)")
     .eq("status", "awaiting_renewal")
     .order("end_date", { ascending: true }) as any;
 
@@ -123,6 +128,38 @@ export function RenewalsAndCyclesPanel({ effectiveCompanyId, routePrefix, renewa
   const cycleCountdowns = data?.cycleCountdowns || [];
   const trainerMap = data?.trainerMap || {};
 
+  const [target, setTarget] = useState<any | null>(null);
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const openReminder = (contract: any) => {
+    const name = (contract.students?.full_name || "").split(" ")[0] || "aluno(a)";
+    const plan = contract.plans?.name || "seu plano";
+    setTarget(contract);
+    setMessage(`Olá ${name}! Seu plano (${plan}) está próximo do vencimento. Vamos renovar? Qualquer dúvida, estou à disposição. 💪`);
+  };
+
+  const sendReminder = async () => {
+    if (!target) return;
+    const phone = target.students?.phone;
+    const msg = message.trim();
+    if (!msg) { toast.error("Escreva uma mensagem antes de enviar."); return; }
+    if (!phone) { toast.error("Este aluno não tem WhatsApp cadastrado."); return; }
+    setSending(true);
+    try {
+      const { error } = await supabase.functions.invoke("whatsapp-manager", {
+        body: { action: "send-text-to-number", phone, message: msg },
+      });
+      if (error) throw error;
+      toast.success("Lembrete de renovação enviado por WhatsApp.");
+      setTarget(null);
+    } catch (e: any) {
+      toast.error("Falha ao enviar: " + (e?.message || "tente novamente"));
+    } finally {
+      setSending(false);
+    }
+  };
+
   const renewalsCard = (
     <Card className="bg-card border-border">
       <CardHeader>
@@ -146,11 +183,16 @@ export function RenewalsAndCyclesPanel({ effectiveCompanyId, routePrefix, renewa
                         <p className="text-muted-foreground/70 text-[11px] font-sans">Treinador: {trainerMap[contract.trainer_id]}</p>
                       )}
                     </div>
-                    <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
-                      isOverdue ? "bg-destructive/20 text-destructive" : "bg-warning/20 text-warning"
-                    }`}>
-                      {isOverdue ? "Inadimplente" : "Renovar"}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
+                        isOverdue ? "bg-destructive/20 text-destructive" : "bg-warning/20 text-warning"
+                      }`}>
+                        {isOverdue ? "Inadimplente" : "Renovar"}
+                      </span>
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => openReminder(contract)}>
+                        <Send className="h-3 w-3 mr-1" />Lembrar
+                      </Button>
+                    </div>
                   </div>
                 );
               })}
@@ -170,12 +212,17 @@ export function RenewalsAndCyclesPanel({ effectiveCompanyId, routePrefix, renewa
                       <p className="text-muted-foreground/70 text-[11px] font-sans">Treinador: {trainerMap[contract.trainer_id]}</p>
                     )}
                   </div>
-                  <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
-                    daysLeft <= 7 ? "bg-destructive/20 text-destructive" :
-                    daysLeft <= 15 ? "bg-warning/20 text-warning" : "bg-primary/20 text-primary"
-                  }`}>
-                    {daysLeft}d restantes
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
+                      daysLeft <= 7 ? "bg-destructive/20 text-destructive" :
+                      daysLeft <= 15 ? "bg-warning/20 text-warning" : "bg-primary/20 text-primary"
+                    }`}>
+                      {daysLeft}d restantes
+                    </span>
+                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => openReminder(contract)}>
+                      <Send className="h-3 w-3 mr-1" />Lembrar
+                    </Button>
+                  </div>
                 </div>
               );
             })}
@@ -222,13 +269,36 @@ export function RenewalsAndCyclesPanel({ effectiveCompanyId, routePrefix, renewa
     </Card>
   );
 
-  if (renewalsOnly) return renewalsCard;
+  const reminderDialog = (
+    <Dialog open={!!target} onOpenChange={(o) => !o && setTarget(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Lembrar renovação {target ? `— ${target.students?.full_name}` : ""}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4} />
+          <p className="text-xs text-muted-foreground">
+            {target?.students?.phone ? "Será enviado por WhatsApp." : "Este aluno não tem WhatsApp cadastrado."}
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setTarget(null)} disabled={sending}>Cancelar</Button>
+          <Button onClick={sendReminder} disabled={sending}>
+            <Send className="h-4 w-4 mr-1" />{sending ? "Enviando..." : "Enviar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  if (renewalsOnly) return <>{renewalsCard}{reminderDialog}</>;
   if (cyclesOnly) return cyclesCard;
 
   return (
     <>
       {renewalsCard}
       {cyclesCard}
+      {reminderDialog}
     </>
   );
 }

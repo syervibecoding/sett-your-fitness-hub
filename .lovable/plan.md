@@ -1,45 +1,50 @@
-# Envio automático de login ao ativar acesso
+## Objetivo
 
-Hoje o botão **"Ativar Acesso"** apenas gera uma senha temporária e mostra num toast para copiar e repassar à mão. Vamos fazer o sistema **enviar automaticamente as credenciais de login** (link de acesso + e-mail + senha temporária) por **WhatsApp e e-mail** assim que o acesso for ativado.
+Adicionar dois envios manuais (por botão, nada automático) no dashboard:
+1. **Cobrança/lembrete de renovação** por WhatsApp no card **RENOVAÇÃO**.
+2. **Parabéns de aniversário** por **WhatsApp + e-mail** no card **ANIVERSÁRIOS**, disparado por botão.
 
-## Comportamento
+Nenhum envio será agendado/automático — sempre por clique, com uma prévia editável da mensagem antes de enviar.
 
-Ao clicar em "Ativar Acesso":
-1. Gera/renova a senha temporária (como já faz hoje).
-2. **Dispara automaticamente**:
-   - **WhatsApp** — pelo número do aluno, via Evolution API (já conectada).
-   - **E-mail** — para o e-mail cadastrado do aluno.
-3. A tela mostra um resumo do que foi enviado (ex.: "Enviado por WhatsApp ✓ e e-mail ✓"), e ainda exibe a senha temporária caso você precise repassar manualmente.
-4. Se um canal falhar (ex.: aluno sem WhatsApp válido, ou e-mail não configurado), o outro ainda é enviado e a tela avisa o que não saiu — sem travar a ativação.
+## 1. Lembrete de renovação (WhatsApp) — card RENOVAÇÃO
 
-## Mensagem enviada
+Arquivo: `src/components/dashboard/RenewalsAndCyclesPanel.tsx`
 
-Conteúdo (WhatsApp e e-mail):
-```text
-Olá {nome}! Seu acesso ao Set Training App foi ativado.
+- Incluir `phone` nas queries de alunos (`students(full_name, status, phone)`) das listas "Aguardando renovação" e "Contratos vencendo".
+- Em cada linha, adicionar um botão discreto **"Lembrar renovação"** (ícone WhatsApp), sem quebrar a navegação existente ao clicar no cartão (usar `stopPropagation`).
+- Ao clicar, abrir um diálogo com a mensagem pré-preenchida e editável, ex.:
+  `"Olá {nome}! Seu plano {plano} está próximo do vencimento. Vamos renovar? Qualquer dúvida, estou à disposição. 💪"`
+- Enviar via `supabase.functions.invoke("whatsapp-manager", { action: "send-text-to-number", phone, message })` (ação já existente e implantada).
+- Feedback com `toast` de sucesso/erro; se o aluno não tiver telefone válido, avisar.
 
-Acesse: https://www.settapp.com.br/auth
-E-mail: {email do aluno}
-Senha temporária: {senha}
+## 2. Parabéns de aniversário (WhatsApp + e-mail) — card ANIVERSÁRIOS
 
-Recomendamos alterar a senha após o primeiro login.
-```
+Arquivo: `src/components/DashboardAlerts.tsx`
 
-## Detalhes técnicos
+- Adicionar `phone` e `email` à query de aniversariantes (hoje só traz `id, full_name, birth_date, ...`).
+- Em cada aniversariante, botão **"Enviar parabéns"** que abre diálogo com mensagem editável, ex.:
+  `"Feliz aniversário, {nome}! 🎉 Toda a equipe deseja um dia incrível. Conte com a gente nos seus próximos objetivos!"`
+- Ao confirmar, disparar **os dois canais**:
+  - WhatsApp: `whatsapp-manager` → `send-text-to-number` (se houver telefone).
+  - E-mail: nova edge function `send-email` (se houver e-mail).
+- `toast` informando quais canais foram enviados (ex.: "Enviado por WhatsApp e e-mail").
 
-**Edge function `activate-student-access`**
-- Após gerar a senha e vincular o usuário, montar a mensagem de login e disparar os dois canais.
-- WhatsApp: reutilizar a infraestrutura da Evolution API já existente no `whatsapp-manager` (buscar o número do aluno e enviar texto). Validar número brasileiro; se inválido, marcar `whatsapp: false` no retorno.
-- E-mail: enviar via **Resend** (serviço de e-mail transacional). Retornar `email: true/false`.
-- Retorno passa a incluir: `temp_password`, `sent: { whatsapp: bool, email: bool }` e mensagens de erro por canal.
+## 3. E-mail via Resend (necessário para o canal de e-mail)
 
-**Front-end `StudentDetail.tsx`**
-- Atualizar `handleActivateStudentAccess` para exibir no toast o status de envio por canal, mantendo a exibição da senha temporária como fallback.
+Hoje **não há Resend conectado**, então o canal de e-mail depende de uma configuração única:
+- Conectar o **Resend** (connector) e verificar um domínio remetente.
+- Criar edge function `supabase/functions/send-email/index.ts` que envia via gateway do Resend (`from` do domínio verificado, `to`, `subject`, `html`).
+- Enquanto o Resend não estiver conectado, o botão de aniversário **continua funcionando pelo WhatsApp**; o e-mail é ignorado com aviso claro ("e-mail não configurado"), sem travar o envio.
 
-**Configuração de e-mail (Resend)**
-- Este projeto usa um Supabase externo, então o envio de e-mail transacional será feito pela **Resend**. É uma configuração única: conectar a conta Resend (ou informar a API key) e verificar um domínio remetente para conseguir enviar aos alunos.
-- Enquanto o e-mail não estiver configurado, o **WhatsApp já funciona normalmente** e o canal de e-mail é apenas marcado como "não enviado".
+## Observações técnicas
 
-## Fora de escopo
-- Não altera o fluxo de login/senha do aluno em si (a página `/auth` continua igual).
-- Não cria página de "trocar senha no primeiro acesso" (a senha temporária continua válida até o aluno redefinir).
+- Reutiliza a Evolution API já configurada (`send-text-to-number`) — sem mudanças no backend de WhatsApp.
+- Sem novas tabelas nem migrações; apenas ajuste de `select` nas queries do dashboard.
+- Mensagens padrão ficam como texto inicial editável no diálogo (o treinador pode ajustar antes de enviar).
+- Nada é automático: todos os envios exigem clique + confirmação.
+
+## Passos de implementação
+
+1. Ajustar `RenewalsAndCyclesPanel.tsx`: query com `phone`, botão + diálogo de lembrete, envio WhatsApp.
+2. Ajustar `DashboardAlerts.tsx`: query com `phone`/`email`, botão + diálogo de parabéns, envio WhatsApp.
+3. Conectar Resend + criar edge function `send-email` e ligar ao botão de aniversário para o canal de e-mail.

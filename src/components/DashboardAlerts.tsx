@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -5,10 +6,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Cake, Dumbbell, UserCheck, CalendarDays, AlertTriangle, Bell, Check } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { Cake, Dumbbell, UserCheck, CalendarDays, AlertTriangle, Bell, Check, Send } from "lucide-react";
 import { differenceInDays, setYear } from "date-fns";
 
-interface Birthday { full_name: string; birth_date: string; daysUntil: number; student_id: string; }
+interface Birthday { full_name: string; birth_date: string; daysUntil: number; student_id: string; phone: string | null; email: string | null; }
 interface MissingWorkout { student_name: string; student_id: string; cycle_number: number; cycle_id: string; start_date: string; end_date: string; trainer_name?: string; }
 interface AwaitingTrainingDate { student_name: string; student_id: string; enrollment_id: string; trainer_name?: string; }
 interface AwaitingTrainer { student_name: string; student_id: string; }
@@ -39,7 +43,7 @@ async function fetchAlerts(
   };
 
   const queries: any[] = [
-    addCompanyFilter(supabase.from("students").select("id, full_name, birth_date, assigned_trainer_id, status")
+    addCompanyFilter(supabase.from("students").select("id, full_name, birth_date, assigned_trainer_id, status, phone, email")
       .not("birth_date", "is", null).eq("status", "active")),
   ];
 
@@ -84,7 +88,7 @@ async function fetchAlerts(
       const nextYear = setYear(bd, today.getFullYear() + 1);
       diff = differenceInDays(nextYear, today);
     }
-    if (diff <= 30) birthdays.push({ full_name: s.full_name, birth_date: s.birth_date, daysUntil: diff, student_id: s.id });
+    if (diff <= 30) birthdays.push({ full_name: s.full_name, birth_date: s.birth_date, daysUntil: diff, student_id: s.id, phone: s.phone ?? null, email: s.email ?? null });
   });
   birthdays.sort((a, b) => a.daysUntil - b.daysUntil);
 
@@ -243,6 +247,53 @@ export function DashboardAlerts({ trainerId }: Props) {
     queryClient.invalidateQueries({ queryKey: ["admin-alerts"] });
   };
 
+  const [bdayTarget, setBdayTarget] = useState<Birthday | null>(null);
+  const [bdayMessage, setBdayMessage] = useState("");
+  const [bdaySending, setBdaySending] = useState(false);
+
+  const openBirthday = (b: Birthday) => {
+    setBdayTarget(b);
+    setBdayMessage(`Feliz aniversário, ${b.full_name.split(" ")[0]}! 🎉 Toda a equipe deseja um dia incrível. Conte com a gente nos seus próximos objetivos!`);
+  };
+
+  const sendBirthday = async () => {
+    if (!bdayTarget) return;
+    const msg = bdayMessage.trim();
+    if (!msg) { toast.error("Escreva uma mensagem antes de enviar."); return; }
+    if (!bdayTarget.phone && !bdayTarget.email) {
+      toast.error("Este aluno não tem WhatsApp nem e-mail cadastrado.");
+      return;
+    }
+    setBdaySending(true);
+    const sent: string[] = [];
+    const failed: string[] = [];
+    try {
+      if (bdayTarget.phone) {
+        const { error } = await supabase.functions.invoke("whatsapp-manager", {
+          body: { action: "send-text-to-number", phone: bdayTarget.phone, message: msg },
+        });
+        if (error) failed.push("WhatsApp"); else sent.push("WhatsApp");
+      }
+      if (bdayTarget.email) {
+        const { error } = await supabase.functions.invoke("send-email", {
+          body: {
+            to: bdayTarget.email,
+            subject: `Feliz aniversário, ${bdayTarget.full_name.split(" ")[0]}! 🎉`,
+            html: `<p>${msg.replace(/\n/g, "<br/>")}</p>`,
+          },
+        });
+        if (error) failed.push("e-mail"); else sent.push("e-mail");
+      }
+      if (sent.length > 0) toast.success(`Parabéns enviado por ${sent.join(" e ")}.`);
+      if (failed.length > 0) toast.error(`Falha ao enviar por ${failed.join(" e ")}.`);
+      if (sent.length > 0) setBdayTarget(null);
+    } catch (e: any) {
+      toast.error("Erro ao enviar: " + (e?.message || "tente novamente"));
+    } finally {
+      setBdaySending(false);
+    }
+  };
+
   const birthdays = data?.birthdays ?? [];
   const missingWorkouts = data?.missingWorkouts ?? [];
   const awaitingTrainer = data?.awaitingTrainer ?? [];
@@ -392,10 +443,20 @@ export function DashboardAlerts({ trainerId }: Props) {
             <div className="space-y-2 max-h-[200px] overflow-auto">
               {birthdays.map((b, i) => (
                 <div key={i} className={`${itemClass} bg-secondary/50 border border-border`} onClick={() => goToStudent(b.student_id)}>
-                  <p className="text-sm font-sans text-foreground">{b.full_name}</p>
-                  <span className={`text-xs font-sans font-medium px-2 py-0.5 rounded ${b.daysUntil === 0 ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
-                    {b.daysUntil === 0 ? "🎉 Hoje!" : `em ${b.daysUntil}d`}
-                  </span>
+                  <p className="text-sm font-sans text-foreground flex-1 min-w-0 truncate">{b.full_name}</p>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-xs font-sans font-medium px-2 py-0.5 rounded ${b.daysUntil === 0 ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
+                      {b.daysUntil === 0 ? "🎉 Hoje!" : `em ${b.daysUntil}d`}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2 text-xs"
+                      onClick={(e) => { e.stopPropagation(); openBirthday(b); }}
+                    >
+                      <Send className="h-3 w-3 mr-1" />Parabéns
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -426,6 +487,26 @@ export function DashboardAlerts({ trainerId }: Props) {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={!!bdayTarget} onOpenChange={(o) => !o && setBdayTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enviar parabéns {bdayTarget ? `— ${bdayTarget.full_name}` : ""}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Textarea value={bdayMessage} onChange={(e) => setBdayMessage(e.target.value)} rows={4} />
+            <p className="text-xs text-muted-foreground">
+              Será enviado por: {[bdayTarget?.phone ? "WhatsApp" : null, bdayTarget?.email ? "e-mail" : null].filter(Boolean).join(" e ") || "nenhum canal disponível"}.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBdayTarget(null)} disabled={bdaySending}>Cancelar</Button>
+            <Button onClick={sendBirthday} disabled={bdaySending}>
+              <Send className="h-4 w-4 mr-1" />{bdaySending ? "Enviando..." : "Enviar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
