@@ -18,14 +18,14 @@ async function fetchRenewalsAndCycles(effectiveCompanyId: string | null | undefi
 
   let expiringQuery = supabase
     .from("enrollments")
-    .select("*, trainer_id, students(full_name, status), plans(name)")
+    .select("*, trainer_id, students(full_name, status, phone), plans(name)")
     .eq("status", "active")
     .lte("end_date", thirtyDaysFromNow)
     .order("end_date", { ascending: true });
 
   let awaitingRenewalQuery = supabase
     .from("enrollments")
-    .select("*, trainer_id, payment_status, students(full_name, status), plans(name)")
+    .select("*, trainer_id, payment_status, students(full_name, status, phone), plans(name)")
     .eq("status", "awaiting_renewal")
     .order("end_date", { ascending: true }) as any;
 
