@@ -128,6 +128,38 @@ export function RenewalsAndCyclesPanel({ effectiveCompanyId, routePrefix, renewa
   const cycleCountdowns = data?.cycleCountdowns || [];
   const trainerMap = data?.trainerMap || {};
 
+  const [target, setTarget] = useState<any | null>(null);
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const openReminder = (contract: any) => {
+    const name = (contract.students?.full_name || "").split(" ")[0] || "aluno(a)";
+    const plan = contract.plans?.name || "seu plano";
+    setTarget(contract);
+    setMessage(`Olá ${name}! Seu plano (${plan}) está próximo do vencimento. Vamos renovar? Qualquer dúvida, estou à disposição. 💪`);
+  };
+
+  const sendReminder = async () => {
+    if (!target) return;
+    const phone = target.students?.phone;
+    const msg = message.trim();
+    if (!msg) { toast.error("Escreva uma mensagem antes de enviar."); return; }
+    if (!phone) { toast.error("Este aluno não tem WhatsApp cadastrado."); return; }
+    setSending(true);
+    try {
+      const { error } = await supabase.functions.invoke("whatsapp-manager", {
+        body: { action: "send-text-to-number", phone, message: msg },
+      });
+      if (error) throw error;
+      toast.success("Lembrete de renovação enviado por WhatsApp.");
+      setTarget(null);
+    } catch (e: any) {
+      toast.error("Falha ao enviar: " + (e?.message || "tente novamente"));
+    } finally {
+      setSending(false);
+    }
+  };
+
   const renewalsCard = (
     <Card className="bg-card border-border">
       <CardHeader>
