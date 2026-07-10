@@ -606,7 +606,14 @@ export default function StudentDetail() {
   };
 
   // ---- EDIT ANAMNESIS ----
+  // O aluno respondeu o questionário quando o snapshot `data` está preenchido
+  // (só o formulário público grava `data`; a edição manual grava só nas colunas).
+  const studentAnswered = !!anamnesis?.data && typeof anamnesis.data === "object" && Object.keys(anamnesis.data).length > 0;
   const openEditAnamnesis = () => {
+    if (studentAnswered) {
+      toast({ title: "Edição bloqueada", description: "O aluno já respondeu a anamnese — não é possível editar manualmente para não sobrescrever as respostas dele.", variant: "destructive" });
+      return;
+    }
     if (anamnesis) {
       setAnamnesisForm({
         modalities: anamnesis.modalities || [], training_days: anamnesis.training_days || "",
