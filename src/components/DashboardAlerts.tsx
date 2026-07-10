@@ -247,6 +247,53 @@ export function DashboardAlerts({ trainerId }: Props) {
     queryClient.invalidateQueries({ queryKey: ["admin-alerts"] });
   };
 
+  const [bdayTarget, setBdayTarget] = useState<Birthday | null>(null);
+  const [bdayMessage, setBdayMessage] = useState("");
+  const [bdaySending, setBdaySending] = useState(false);
+
+  const openBirthday = (b: Birthday) => {
+    setBdayTarget(b);
+    setBdayMessage(`Feliz aniversário, ${b.full_name.split(" ")[0]}! 🎉 Toda a equipe deseja um dia incrível. Conte com a gente nos seus próximos objetivos!`);
+  };
+
+  const sendBirthday = async () => {
+    if (!bdayTarget) return;
+    const msg = bdayMessage.trim();
+    if (!msg) { toast.error("Escreva uma mensagem antes de enviar."); return; }
+    if (!bdayTarget.phone && !bdayTarget.email) {
+      toast.error("Este aluno não tem WhatsApp nem e-mail cadastrado.");
+      return;
+    }
+    setBdaySending(true);
+    const sent: string[] = [];
+    const failed: string[] = [];
+    try {
+      if (bdayTarget.phone) {
+        const { error } = await supabase.functions.invoke("whatsapp-manager", {
+          body: { action: "send-text-to-number", phone: bdayTarget.phone, message: msg },
+        });
+        if (error) failed.push("WhatsApp"); else sent.push("WhatsApp");
+      }
+      if (bdayTarget.email) {
+        const { error } = await supabase.functions.invoke("send-email", {
+          body: {
+            to: bdayTarget.email,
+            subject: `Feliz aniversário, ${bdayTarget.full_name.split(" ")[0]}! 🎉`,
+            html: `<p>${msg.replace(/\n/g, "<br/>")}</p>`,
+          },
+        });
+        if (error) failed.push("e-mail"); else sent.push("e-mail");
+      }
+      if (sent.length > 0) toast.success(`Parabéns enviado por ${sent.join(" e ")}.`);
+      if (failed.length > 0) toast.error(`Falha ao enviar por ${failed.join(" e ")}.`);
+      if (sent.length > 0) setBdayTarget(null);
+    } catch (e: any) {
+      toast.error("Erro ao enviar: " + (e?.message || "tente novamente"));
+    } finally {
+      setBdaySending(false);
+    }
+  };
+
   const birthdays = data?.birthdays ?? [];
   const missingWorkouts = data?.missingWorkouts ?? [];
   const awaitingTrainer = data?.awaitingTrainer ?? [];
