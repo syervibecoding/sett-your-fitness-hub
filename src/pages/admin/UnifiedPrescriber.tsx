@@ -194,20 +194,24 @@ function mapAnsweredAnamnesis(ans: any): {
 } {
   const d = (ans?.data && typeof ans.data === "object" && !Array.isArray(ans.data))
     ? ans.data as Record<string, any> : {};
-  const interests = interestsToModalities(d);
-  const modalityText = interests.length
-    ? interests.map(m => MOD_LABEL[m]).join(", ")
-    : (Array.isArray(ans?.modalities) ? ans.modalities.join(", ") : (ans?.modalities || ""));
+  const interests = interestsToModalities(d, ans?.modalities);
+  const modalityText = interests.length ? interests.map(m => MOD_LABEL[m]).join(", ") : "";
+  const isEndurance = interests.some(m => CARDIO_MODS.includes(m));
+  const cardioDays = interests.some(m => CARDIO_MODS.includes(m))
+    ? toInt(pick(d.dias_cardio, d.endurance_dias, d.corrida_dias, d.natacao_dias, d.ciclismo_dias))
+    : "";
   const mapped: Partial<Anamnese> = {
     age: toInt(pick(d.idade)),
     body_fat_percent: toDec(pick(d.percentual_gordura)),
     objective: objectiveFromAnswers(d, ans?.goals),
     activity_level: mapActivity(pick(d.nivel_atividade, ans?.physical_activity_level)),
+    is_endurance_athlete: isEndurance || undefined,
     training_modality: modalityText,
     days_per_week_strength: toInt(pick(d.dias_por_semana, ans?.available_days, ans?.training_days)),
+    days_per_week_cardio: cardioDays,
     session_duration_min: toInt(pick(d.minutos_sessao, ans?.session_duration)),
     equipment: mapEquipment(pick(d.onde_treina, ans?.training_location, ans?.available_equipment)),
-    experience_months: toInt(pick(d.tempo_treino_meses)),
+    experience_months: toInt(pick(d.tempo_treino_meses, ans?.experience_level)),
     sport: inferSport(interests.length ? interests.join(" ") : ans?.modalities),
     fcmax: toInt(pick(d.fc_maxima)),
     fcrep: toInt(pick(d.fc_repouso)),
