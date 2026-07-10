@@ -582,6 +582,21 @@ export default function VideoAssessment({ studentId, companyId, studentName, con
           <img src={zoom} alt="Quadro ampliado" className="max-h-full max-w-full rounded-lg" />
         </div>
       )}
+
+      {/* Editor de marcações */}
+      {annotating !== null && (() => {
+        const f = frames.find(x => x.index === annotating);
+        if (!f || !f.originalDataUrl) return null;
+        return (
+          <FrameAnnotator
+            open
+            imageUrl={f.originalDataUrl}
+            initial={f.annotations}
+            onApply={(dataUrl, annotations) => applyAnnotations(f.index, dataUrl, annotations)}
+            onClose={() => setAnnotating(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
