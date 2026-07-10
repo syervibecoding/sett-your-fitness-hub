@@ -72,13 +72,14 @@ Deno.serve(async (req) => {
         .from("anamnesis").select("id, version").eq("student_id", student.id)
         .order("version", { ascending: false }).limit(1).maybeSingle();
 
+      const nowIso = new Date().toISOString();
       let error;
       if (existing) {
         ({ error } = await supabase.from("anamnesis").update({
-          ...payload, version: (existing.version || 1) + 1, updated_at: new Date().toISOString(),
+          ...payload, version: (existing.version || 1) + 1, updated_at: nowIso, submitted_at: nowIso,
         }).eq("id", existing.id));
       } else {
-        ({ error } = await supabase.from("anamnesis").insert(payload));
+        ({ error } = await supabase.from("anamnesis").insert({ ...payload, submitted_at: nowIso }));
       }
       if (error) {
         return new Response(JSON.stringify({ error: error.message }), {
