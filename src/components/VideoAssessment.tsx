@@ -109,12 +109,54 @@ export default function VideoAssessment({ studentId, companyId, studentName, con
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [zoom, setZoom] = useState<string | null>(null);
+  const [annotating, setAnnotating] = useState<number | null>(null);
+
+  // Limite de brilho abaixo do qual consideramos o quadro "escuro/vazio".
+  const DARK_THRESHOLD = 14;
+
+  // ---- Espera o vídeo estar pronto para decodificar quadros --------------
+  function waitReady(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const v = videoRef.current;
+      if (!v) return reject(new Error("Vídeo indisponível."));
+      v.muted = true;
+      if (v.readyState >= 2 && v.duration && isFinite(v.duration)) return resolve();
+      const to = setTimeout(() => { cleanup(); reject(new Error("timeout")); }, 8000);
+      const ok = () => {
+        if (v.readyState >= 2 && v.duration && isFinite(v.duration)) { cleanup(); resolve(); }
+      };
+      const cleanup = () => {
+        clearTimeout(to);
+        v.removeEventListener("loadeddata", ok);
+        v.removeEventListener("canplay", ok);
+        v.removeEventListener("loadedmetadata", ok);
+      };
+      v.addEventListener("loadeddata", ok);
+      v.addEventListener("canplay", ok);
+      v.addEventListener("loadedmetadata", ok);
+    });
+  }
 
   // ---- Captura de um quadro no tempo `t` --------------------------------
+  // Aguarda o quadro estar realmente decodificado (requestVideoFrameCallback
+  // quando disponível) e usa timeout para não travar em codecs problemáticos.
   function seekTo(t: number): Promise<void> {
     return new Promise((resolve) => {
       const v = videoRef.current!;
-      const onSeeked = () => { v.removeEventListener("seeked", onSeeked); resolve(); };
+      let done = false;
+      const finish = () => {
+        if (done) return; done = true;
+        clearTimeout(to);
+        v.removeEventListener("seeked", onSeeked);
+        resolve();
+      };
+      // rVFC garante que há um frame pintado; fallback: seeked + atraso.
+      const rvfc = (v as any).requestVideoFrameCallback?.bind(v);
+      const onSeeked = () => {
+        if (rvfc) rvfc(() => setTimeout(finish, 30));
+        else setTimeout(finish, 120);
+      };
+      const to = setTimeout(finish, 3000); // não trava se seeked não vier
       v.addEventListener("seeked", onSeeked);
       v.currentTime = Math.max(0, Math.min(t, (v.duration || 0) - 0.05));
     });
@@ -142,16 +184,21 @@ export default function VideoAssessment({ studentId, companyId, studentName, con
     return { dataUrl: canvas.toDataURL("image/jpeg", 0.82), brightness };
   }
 
-  async function captureAt(t: number): Promise<{ dataUrl: string; time: number }> {
+  async function captureAt(t: number): Promise<{ dataUrl: string; time: number; dark: boolean }> {
     const v = videoRef.current!;
+    const dur = v.duration || 0;
     let time = t;
-    for (let attempt = 0; attempt < 4; attempt++) {
+    let best: { dataUrl: string; brightness: number; time: number } | null = null;
+    for (let attempt = 0; attempt < 6; attempt++) {
       await seekTo(time);
       const { dataUrl, brightness } = grab();
-      if (brightness > 12 || attempt === 3) return { dataUrl, time: v.currentTime };
-      time += 0.4; // quadro muito escuro → tenta um pouco adiante
+      if (!best || brightness > best.brightness) best = { dataUrl, brightness, time: v.currentTime };
+      if (brightness > DARK_THRESHOLD) return { dataUrl, time: v.currentTime, dark: false };
+      // quadro escuro/preto (fade, transição) → tenta um pouco adiante e atrás
+      time = attempt % 2 === 0 ? t + 0.4 * (attempt + 1) : t - 0.3 * attempt;
+      if (time < 0 || time > dur) time = Math.min(dur - 0.05, Math.max(0, t + 0.4 * (attempt + 1)));
     }
-    return { dataUrl: grab().dataUrl, time: v.currentTime };
+    return { dataUrl: best!.dataUrl, time: best!.time, dark: best!.brightness <= DARK_THRESHOLD };
   }
 
   async function handleVideo(file?: File) {
@@ -165,27 +212,42 @@ export default function VideoAssessment({ studentId, companyId, studentName, con
 
   async function extractFrames() {
     const v = videoRef.current;
-    if (!v || !v.duration || !isFinite(v.duration)) {
-      setError("Não foi possível ler a duração do vídeo. Aguarde o carregamento e tente novamente.");
-      return;
-    }
+    if (!v) { setError("Vídeo indisponível. Recarregue e tente novamente."); return; }
     setExtracting(true);
     setError("");
     try {
+      try {
+        await waitReady();
+      } catch {
+        setError("Não foi possível ler o vídeo (duração/codec). Tente converter para MP4 (H.264) e reenviar.");
+        setExtracting(false);
+        return;
+      }
       const { vistas } = PROTOCOLS[protocol];
       const n = vistas.length;
       // Cortes em intervalos de segundos IGUAIS: ponto médio de cada um dos
       // n segmentos de duração igual → tempos uniformemente espaçados.
       const out: Frame[] = [];
+      let darkCount = 0;
       for (let i = 0; i < n; i++) {
         const fraction = (i + 0.5) / n;
-        const { dataUrl, time } = await captureAt(fraction * v.duration);
-        out.push({ index: i, vista: vistas[i], time, dataUrl, findings: [] });
+        try {
+          const { dataUrl, time, dark } = await captureAt(fraction * v.duration);
+          if (dark) darkCount++;
+          out.push({ index: i, vista: vistas[i], time, dataUrl, originalDataUrl: dataUrl, annotations: [], findings: [], dark });
+        } catch {
+          // falha isolada num corte → registra placeholder p/ recaptura manual
+          const t = fraction * v.duration;
+          out.push({ index: i, vista: vistas[i], time: t, dataUrl: "", originalDataUrl: "", annotations: [], findings: [], dark: true });
+          darkCount++;
+        }
       }
       setFrames(out);
-
+      if (darkCount > 0) {
+        setError(`${darkCount} quadro(s) ficaram escuros ou falharam. Use −0,5s / +0,5s ou "Usar vídeo" para recapturar.`);
+      }
     } catch {
-      setError("Erro ao extrair os quadros do vídeo.");
+      setError("Erro ao extrair os quadros do vídeo. Tente reenviar em MP4 (H.264).");
     }
     setExtracting(false);
   }
@@ -200,8 +262,14 @@ export default function VideoAssessment({ studentId, companyId, studentName, con
     if (!v) return;
     const f = frames.find(x => x.index === index)!;
     const t = delta === "current" ? v.currentTime : f.time + delta;
-    const { dataUrl, time } = await captureAt(t);
-    patchFrame(index, { dataUrl, time });
+    const { dataUrl, time, dark } = await captureAt(t);
+    // recaptura substitui a imagem base e descarta marcações antigas
+    patchFrame(index, { dataUrl, originalDataUrl: dataUrl, annotations: [], time, dark });
+  }
+
+  function applyAnnotations(index: number, dataUrl: string, annotations: Annotation[]) {
+    patchFrame(index, { dataUrl, annotations });
+    setAnnotating(null);
   }
 
   function seekPreview(t: number) {
