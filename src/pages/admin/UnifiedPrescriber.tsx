@@ -905,11 +905,14 @@ export default function UnifiedPrescriber() {
             <Card>
               <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
                 <CardTitle className="text-base flex items-center gap-2">
-                  {answered
+                  {studentAnswered
                     ? <CheckCircle2 className="h-4 w-4 text-navy" />
                     : <Circle className="h-4 w-4 text-muted-foreground" />}
-                  Anamnese {answered ? "respondida pelo aluno" : "— aguardando resposta"}
+                  Anamnese {studentAnswered ? "respondida pelo aluno" : (answered ? "— preenchida manualmente" : "— aguardando resposta")}
                 </CardTitle>
+                <Badge variant={studentAnswered ? "default" : "outline"} className="text-[11px]">
+                  {studentAnswered ? "Puxado da anamnese do aluno" : "Sem resposta do aluno — dados manuais"}
+                </Badge>
               </CardHeader>
               <CardContent className="text-sm">
                 {answered ? (
