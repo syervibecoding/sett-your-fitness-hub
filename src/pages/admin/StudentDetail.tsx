@@ -81,6 +81,7 @@ interface Student {
 
 interface Anamnesis {
   id: string;
+  data: Record<string, any> | null;
   modalities: string[];
   training_days: string | null;
   available_days: number | null;
@@ -605,7 +606,14 @@ export default function StudentDetail() {
   };
 
   // ---- EDIT ANAMNESIS ----
+  // O aluno respondeu o questionário quando o snapshot `data` está preenchido
+  // (só o formulário público grava `data`; a edição manual grava só nas colunas).
+  const studentAnswered = !!anamnesis?.data && typeof anamnesis.data === "object" && Object.keys(anamnesis.data).length > 0;
   const openEditAnamnesis = () => {
+    if (studentAnswered) {
+      toast({ title: "Edição bloqueada", description: "O aluno já respondeu a anamnese — não é possível editar manualmente para não sobrescrever as respostas dele.", variant: "destructive" });
+      return;
+    }
     if (anamnesis) {
       setAnamnesisForm({
         modalities: anamnesis.modalities || [], training_days: anamnesis.training_days || "",
@@ -640,6 +648,10 @@ export default function StudentDetail() {
 
   const handleSaveAnamnesis = async () => {
     if (!id) return;
+    if (studentAnswered) {
+      toast({ title: "Edição bloqueada", description: "O aluno já respondeu a anamnese — não é possível sobrescrever manualmente.", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     const payload = {
       student_id: id,
@@ -1379,11 +1391,20 @@ export default function StudentDetail() {
             <Card className="bg-card border-border">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-primary text-lg">ANAMNESE</CardTitle>
-                <Button variant="ghost" size="sm" onClick={openEditAnamnesis}>
-                  <Pencil className="h-4 w-4 mr-1" />{anamnesis ? "Editar" : "Adicionar"}
-                </Button>
+                {studentAnswered ? (
+                  <Badge variant="secondary" className="text-xs">Respondida pelo aluno</Badge>
+                ) : (
+                  <Button variant="ghost" size="sm" onClick={openEditAnamnesis}>
+                    <Pencil className="h-4 w-4 mr-1" />{anamnesis ? "Editar" : "Adicionar"}
+                  </Button>
+                )}
               </CardHeader>
               <CardContent className="space-y-4 text-sm font-sans">
+                {studentAnswered && (
+                  <p className="text-xs text-muted-foreground">
+                    O aluno respondeu o questionário. A edição manual está bloqueada para não sobrescrever as respostas dele.
+                  </p>
+                )}
                 {!anamnesis ? (
                   <p className="text-muted-foreground">Nenhuma anamnese preenchida. Clique em "Adicionar" para preencher.</p>
                 ) : (

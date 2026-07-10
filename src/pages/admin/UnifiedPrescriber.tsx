@@ -85,8 +85,11 @@ const DEFAULT_ANAMNESE: Anamnese = {
 // ── Mapeamento anamnese respondida pelo aluno → estrutura da prescrição ──
 const ACTIVITY_ENUM = ["sedentario", "leve", "moderado", "muito_ativo", "extremo"];
 const toInt = (v: any): string => {
-  const n = parseInt(String(v ?? "").replace(/[^\d]/g, ""), 10);
-  return isNaN(n) ? "" : String(n);
+  // Extract number groups (handles ranges like "de 30 a 45 minutos" → 45, "3-4x" → 4).
+  const groups = String(v ?? "").match(/\d+/g);
+  if (!groups || groups.length === 0) return "";
+  const max = Math.max(...groups.map(g => parseInt(g, 10)).filter(n => !isNaN(n)));
+  return isNaN(max) ? "" : String(max);
 };
 function inferObjective(goals?: string | null): string {
   const g = (goals || "").toLowerCase();
@@ -148,12 +151,24 @@ function mapEquipment(raw?: string | null): string {
   if (t.includes("sem equip") || t.includes("ar livre") || t.includes("funcional")) return "funcional";
   return "";
 }
-function interestsToModalities(d: any): Modality[] {
-  const raw = d?.interesses ?? d?.interests;
-  const arr = Array.isArray(raw) ? raw : (typeof raw === "string" && raw ? [raw] : []);
+const INVALID_MOD_TOKENS = ["nenhum", "nenhuma", "n/a", "na", "-", "outro", "outra"];
+function parseModalityTokens(raw: any): string[] {
+  if (Array.isArray(raw)) return raw.map(String);
+  const s = String(raw ?? "").trim();
+  if (!s) return [];
+  // Legacy columns may store a JSON array string like '["Nenhum"]'.
+  if (s.startsWith("[")) { try { const p = JSON.parse(s); if (Array.isArray(p)) return p.map(String); } catch { /* ignore */ } }
+  return s.split(/[,;/|]/);
+}
+function interestsToModalities(d: any, legacy?: any): Modality[] {
+  const tokens = [
+    ...parseModalityTokens(d?.interesses ?? d?.interests),
+    ...parseModalityTokens(legacy),
+  ];
   const out = new Set<Modality>();
-  for (const x of arr) {
+  for (const x of tokens) {
     const t = norm(x);
+    if (!t || INVALID_MOD_TOKENS.includes(t.trim())) continue;
     if (t.includes("muscula")) out.add("musculacao");
     if (t.includes("corrid")) out.add("corrida");
     if (t.includes("nata")) out.add("natacao");
@@ -179,20 +194,24 @@ function mapAnsweredAnamnesis(ans: any): {
 } {
   const d = (ans?.data && typeof ans.data === "object" && !Array.isArray(ans.data))
     ? ans.data as Record<string, any> : {};
-  const interests = interestsToModalities(d);
-  const modalityText = interests.length
-    ? interests.map(m => MOD_LABEL[m]).join(", ")
-    : (Array.isArray(ans?.modalities) ? ans.modalities.join(", ") : (ans?.modalities || ""));
+  const interests = interestsToModalities(d, ans?.modalities);
+  const modalityText = interests.length ? interests.map(m => MOD_LABEL[m]).join(", ") : "";
+  const isEndurance = interests.some(m => CARDIO_MODS.includes(m));
+  const cardioDays = interests.some(m => CARDIO_MODS.includes(m))
+    ? toInt(pick(d.dias_cardio, d.endurance_dias, d.corrida_dias, d.natacao_dias, d.ciclismo_dias))
+    : "";
   const mapped: Partial<Anamnese> = {
     age: toInt(pick(d.idade)),
     body_fat_percent: toDec(pick(d.percentual_gordura)),
     objective: objectiveFromAnswers(d, ans?.goals),
     activity_level: mapActivity(pick(d.nivel_atividade, ans?.physical_activity_level)),
+    is_endurance_athlete: isEndurance || undefined,
     training_modality: modalityText,
     days_per_week_strength: toInt(pick(d.dias_por_semana, ans?.available_days, ans?.training_days)),
+    days_per_week_cardio: cardioDays,
     session_duration_min: toInt(pick(d.minutos_sessao, ans?.session_duration)),
     equipment: mapEquipment(pick(d.onde_treina, ans?.training_location, ans?.available_equipment)),
-    experience_months: toInt(pick(d.tempo_treino_meses)),
+    experience_months: toInt(pick(d.tempo_treino_meses, ans?.experience_level)),
     sport: inferSport(interests.length ? interests.join(" ") : ans?.modalities),
     fcmax: toInt(pick(d.fc_maxima)),
     fcrep: toInt(pick(d.fc_repouso)),
@@ -270,6 +289,7 @@ export default function UnifiedPrescriber() {
   const [anamnese, setAnamnese]     = useState<Anamnese>(DEFAULT_ANAMNESE);
   const [anamneseId, setAnamneseId] = useState<string | null>(null);
   const [answered, setAnswered]     = useState<AnsweredSummary | null>(null);
+  const [studentAnswered, setStudentAnswered] = useState(false);
   const [assessmentExists, setAssessmentExists] = useState(false);
   const [modalities, setModalities] = useState<Set<Modality>>(new Set(["musculacao"]));
   const [nut, setNut]               = useState({ weight: "", height: "", sex: "masculino" as Sex, meals: "4" });
@@ -303,7 +323,7 @@ export default function UnifiedPrescriber() {
   }, [companyId]);
 
   useEffect(() => {
-    if (!studentId) { setAnswered(null); return; }
+    if (!studentId) { setAnswered(null); setStudentAnswered(false); return; }
     setStep("anamnese");
     setResults({ musculacao: null, corrida: null, natacao: null, ciclismo: null, nutricao: null });
     setStatus({ musculacao: "idle", corrida: "idle", natacao: "idle", ciclismo: "idle", nutricao: "idle" });
@@ -320,6 +340,10 @@ export default function UnifiedPrescriber() {
       const { mapped, interests, nut: nutMapped } = mapAnsweredAnamnesis(ans);
       const d = (ans?.data && typeof ans.data === "object" && !Array.isArray(ans.data))
         ? ans.data as Record<string, any> : {};
+      // O aluno respondeu o questionário quando o snapshot `data` está preenchido
+      // (só o formulário público grava `data`; edição manual grava só nas colunas).
+      const answeredByStudent = Object.keys(d).length > 0;
+      setStudentAnswered(answeredByStudent);
 
       // Resumo do que o aluno respondeu
       setAnswered(ans ? {
@@ -345,7 +369,10 @@ export default function UnifiedPrescriber() {
           ? ((sa as any).prescribed_modalities as string[]).filter((m): m is Modality =>
               ["musculacao", "corrida", "natacao", "ciclismo", "nutricao"].includes(m))
           : [];
-        const initialMods = savedMods.length ? savedMods : (interests.length ? interests : ["musculacao"]);
+        // Quando o aluno respondeu, os interesses dele vencem; senão, usa o salvo manual.
+        const initialMods = answeredByStudent && interests.length
+          ? interests
+          : (savedMods.length ? savedMods : (interests.length ? interests : ["musculacao"]));
         setModalities(new Set(initialMods as Modality[]));
         const base: Anamnese = {
           age: sa.age?.toString() ?? "",
@@ -878,11 +905,14 @@ export default function UnifiedPrescriber() {
             <Card>
               <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
                 <CardTitle className="text-base flex items-center gap-2">
-                  {answered
+                  {studentAnswered
                     ? <CheckCircle2 className="h-4 w-4 text-navy" />
                     : <Circle className="h-4 w-4 text-muted-foreground" />}
-                  Anamnese {answered ? "respondida pelo aluno" : "— aguardando resposta"}
+                  Anamnese {studentAnswered ? "respondida pelo aluno" : (answered ? "— preenchida manualmente" : "— aguardando resposta")}
                 </CardTitle>
+                <Badge variant={studentAnswered ? "default" : "outline"} className="text-[11px]">
+                  {studentAnswered ? "Puxado da anamnese do aluno" : "Sem resposta do aluno — dados manuais"}
+                </Badge>
               </CardHeader>
               <CardContent className="text-sm">
                 {answered ? (
