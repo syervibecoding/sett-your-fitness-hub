@@ -269,13 +269,36 @@ export function RenewalsAndCyclesPanel({ effectiveCompanyId, routePrefix, renewa
     </Card>
   );
 
-  if (renewalsOnly) return renewalsCard;
+  const reminderDialog = (
+    <Dialog open={!!target} onOpenChange={(o) => !o && setTarget(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Lembrar renovação {target ? `— ${target.students?.full_name}` : ""}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4} />
+          <p className="text-xs text-muted-foreground">
+            {target?.students?.phone ? "Será enviado por WhatsApp." : "Este aluno não tem WhatsApp cadastrado."}
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setTarget(null)} disabled={sending}>Cancelar</Button>
+          <Button onClick={sendReminder} disabled={sending}>
+            <Send className="h-4 w-4 mr-1" />{sending ? "Enviando..." : "Enviar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  if (renewalsOnly) return <>{renewalsCard}{reminderDialog}</>;
   if (cyclesOnly) return cyclesCard;
 
   return (
     <>
       {renewalsCard}
       {cyclesCard}
+      {reminderDialog}
     </>
   );
 }
