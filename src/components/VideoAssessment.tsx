@@ -296,7 +296,8 @@ export default function VideoAssessment({ studentId, companyId, studentName, con
 
   // ---- Salvar ------------------------------------------------------------
   async function save() {
-    if (frames.length === 0) { setError("Extraia os quadros antes de salvar."); return; }
+    const usable = frames.filter(f => f.dataUrl);
+    if (usable.length === 0) { setError("Nenhum quadro válido para salvar. Recapture os quadros com falha."); return; }
     setSaving(true); setError("");
     try {
       const assessment_json = {
