@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Cake, Dumbbell, UserCheck, CalendarDays, AlertTriangle, Bell, Check } from "lucide-react";
 import { differenceInDays, setYear } from "date-fns";
 
-interface Birthday { full_name: string; birth_date: string; daysUntil: number; student_id: string; }
+interface Birthday { full_name: string; birth_date: string; daysUntil: number; student_id: string; phone: string | null; email: string | null; }
 interface MissingWorkout { student_name: string; student_id: string; cycle_number: number; cycle_id: string; start_date: string; end_date: string; trainer_name?: string; }
 interface AwaitingTrainingDate { student_name: string; student_id: string; enrollment_id: string; trainer_name?: string; }
 interface AwaitingTrainer { student_name: string; student_id: string; }
