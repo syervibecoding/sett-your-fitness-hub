@@ -81,6 +81,7 @@ interface Student {
 
 interface Anamnesis {
   id: string;
+  data: Record<string, any> | null;
   modalities: string[];
   training_days: string | null;
   available_days: number | null;
