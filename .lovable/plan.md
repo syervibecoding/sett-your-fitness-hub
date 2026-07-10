@@ -1,39 +1,58 @@
-## Problema
+# Avaliação por vídeo: corrigir cortes + marcadores
 
-No Prescritor Unificado (`Studio Integrado → Prescrição`), o painel **"Dados para a prescrição"** está mostrando o preenchimento **manual** (o que a equipe editou) em vez das respostas reais do aluno, mesmo quando o aluno já respondeu o questionário. Também há bugs de leitura (ex.: "de 30 a 45 minutos" vira `3045`, e `["Nenhum"]` aparece como modalidade).
+Dois ajustes no fluxo **Avaliação → Vídeo · manual** (`src/components/VideoAssessment.tsx`):
+1. Corrigir os cortes de quadros que saem **pretos/cinza** ou geram **erro na tela**.
+2. Adicionar um **editor de marcações** (linha reta, círculo/elipse, seta e ângulo) sobre cada quadro, com as marcações **gravadas na imagem** (aparecem no app e no laudo PDF).
 
-### Causa raiz
-- Existe **um único** registro por aluno na tabela `anamnesis`. Tanto o **formulário do aluno** (via `public-anamnesis`, que grava o snapshot completo no campo `data`) quanto a **edição manual da equipe** (na ficha do aluno) escrevem nesse mesmo registro — mas a edição manual grava só nas colunas e **nunca** no `data`.
-- O prescritor monta a base a partir de `student_anamneses` (cópia manual salva na prescrição) e só sobrepõe com respostas do aluno quando o mapeamento encontra valor. O mapeamento tem lacunas (não cobre `dias cardio/semana`, atleta de endurance) e um parser que quebra em faixas de texto ("30 a 45" → 3045).
-- Não há um sinal claro de "o aluno respondeu", então dados manuais antigos acabam prevalecendo.
+---
 
-## Decisões (confirmadas)
-- **Aluno vence**: quando o aluno respondeu, as respostas dele são a fonte da verdade; o manual só preenche **campo a campo** o que o aluno deixou em branco.
-- **Anamnese manual vira somente-leitura** na ficha do aluno quando o aluno já respondeu (evita sobrescrever).
+## 1. Corrigir os cortes de frames
 
-## O que será feito
+Hoje a captura faz `seek` no vídeo e desenha no canvas logo após o evento `seeked`. Em muitos codecs o quadro ainda não foi decodificado nesse instante → sai preto/cinza, e se o `seeked` nunca dispara a extração trava.
 
-### 1. Sinal confiável de "aluno respondeu"
-- Considerar que **o aluno respondeu quando `anamnesis.data` é um objeto não-vazio** (só o formulário público grava `data`).
-- Ajustar a edge function `public-anamnesis` para carimbar `submitted_at` a cada submissão do aluno, reforçando o sinal.
+Melhorias na captura:
+- **Garantir o vídeo pronto** antes de extrair: aguardar `loadedmetadata` + `canplay`, definir `video.muted = true` e `playsInline` (já existe) para permitir decodificação.
+- **Esperar o quadro decodificado**: usar `video.requestVideoFrameCallback()` (quando disponível) após o `seek` para desenhar só quando houver frame real; fallback para `seeked` + pequeno atraso (`~120ms`).
+- **Timeout no seek**: se `seeked`/callback não vier em ~3s, resolver mesmo assim e tentar o próximo ponto, em vez de travar.
+- **Retry de quadro escuro** mais robusto: aumentar tentativas e o passo de avanço quando o brilho médio ficar abaixo do limite (quadros de transição/preto).
+- **Tolerância a falha por quadro**: envolver cada corte em try/catch; se um falhar, seguir com os demais e sinalizar visualmente aquele quadro como "recapturar", sem derrubar todo o processo.
+- **Mensagens de erro claras**: diferenciar "não foi possível ler a duração", "vídeo protegido/codec não suportado" e "alguns quadros ficaram escuros — use ± ou 'Usar vídeo' para recapturar".
 
-### 2. Corrigir a leitura no Prescritor (`UnifiedPrescriber.tsx`)
-- Inverter a lógica de mescla para: **respostas do aluno (`data`) primeiro** → depois colunas legadas da `anamnesis` → depois `student_anamneses` (manual) apenas para campos ainda vazios → por fim os defaults.
-- Corrigir o parser numérico para faixas/textos: "de 30 a 45 minutos" passa a extrair um número válido (usa o maior da faixa), e valores como "Nenhum" não entram como modalidade.
-- Completar o mapeamento que hoje falta: `dias cardio/semana`, atleta de endurance, e leitura robusta das colunas legadas (`session_duration`, `available_days`, `modalities`, `goals`, `physical_activity_level`, `training_location`, `injuries`).
-- Melhorar o resumo "o aluno respondeu" no topo e exibir um selo claro (ex.: "Puxado da anamnese do aluno" vs "Sem resposta do aluno — usando dados manuais").
+O botão manual **Usar vídeo** / **±0,5s** já existente continua como recurso de ajuste fino.
 
-### 3. Anamnese manual somente-leitura quando o aluno respondeu (`StudentDetail.tsx`)
-- Na sub-aba **Avaliações → Anamnese**, quando `data` do aluno não estiver vazio: desabilitar o botão de editar (ou abrir em modo leitura) com aviso "O aluno já respondeu — edição bloqueada para não sobrescrever".
-- Quando o aluno **não** respondeu, a edição manual continua funcionando normalmente (fallback).
+## 2. Editor de marcações nos quadros
+
+Novo componente `src/components/assessment/FrameAnnotator.tsx` — abre o quadro em tamanho grande com um canvas de sobreposição.
+
+Ferramentas:
+- **Linha reta** (ex.: linha de prumo/alinhamento)
+- **Círculo/Elipse** (destacar articulação, ex.: valgo de joelho)
+- **Seta** (direção do desvio)
+- **Ângulo** (3 pontos → mostra o valor em graus sobre o desenho)
+
+Interação:
+- Seletor de ferramenta + cor (paleta da marca: Navy/Ink + vermelho para severa), espessura fixa.
+- Desenho por arraste (linha/círculo/seta) e por 3 cliques (ângulo).
+- **Desfazer** (última marca) e **Limpar tudo**.
+- As marcações ficam guardadas como vetores por quadro (`annotations[]`), então dá para **reabrir e editar** depois; o quadro guarda também a imagem original.
+- Ao **Aplicar**, o app compõe imagem original + marcações num novo JPEG e atualiza o quadro. Um selo "marcado" aparece no card.
+
+Como as marcações são gravadas no `dataUrl` do quadro, elas fluem automaticamente para:
+- o **upload** em `assessment-frames` (imagem salva já marcada);
+- o **laudo PDF** (`src/lib/assessment/pdf.ts` já embute `dataUrl` de cada vista — nenhuma mudança necessária lá).
+
+No card de cada quadro (`VideoAssessment.tsx`) entra um botão **Marcar** que abre o `FrameAnnotator`.
+
+---
 
 ## Detalhes técnicos
-- `supabase/functions/public-anamnesis/index.ts`: incluir `submitted_at: new Date().toISOString()` no update/insert do `submit`.
-- `src/pages/admin/UnifiedPrescriber.tsx`:
-  - Reescrever `mapAnsweredAnamnesis` e o bloco de carregamento (efeito do `studentId`) para priorizar `ans` (data + colunas) e usar `sa` só como preenchimento de lacunas.
-  - Novo parser `toRangeInt`/ajuste em `toInt` para lidar com "30 a 45", "45min", etc.
-  - Adicionar `days_per_week_cardio` e `is_endurance_athlete` ao mapeamento.
-  - Filtrar tokens inválidos ("nenhum", "n/a") de modalidades.
-- `src/pages/admin/StudentDetail.tsx`: computar `studentAnswered = !!anamnesis?.data && Object.keys(anamnesis.data).length > 0` e usar para travar `openEditAnamnesis`/`handleSaveAnamnesis`.
 
-Nenhuma alteração de schema é necessária (a coluna `submitted_at` já existe). Somente ajuste da edge function e do frontend.
+- **Arquivos alterados**
+  - `src/components/VideoAssessment.tsx`: captura mais robusta (`requestVideoFrameCallback`, timeout, retry, try/catch por quadro), estado extra por frame (`originalDataUrl`, `annotations`), botão **Marcar** e integração com o annotator.
+  - **Novo** `src/components/assessment/FrameAnnotator.tsx`: canvas de anotação com as 4 ferramentas, undo/limpar e composição final em JPEG.
+- **Sem mudança de banco**: `assessment_frames` continua guardando o JPEG (agora já marcado) em `image_url`; o vetor de marcações pode ir dentro de `trainer_findings`/`assessment_json` para permitir reedição futura (opcional, sem migração).
+- **Sem IA**: tudo roda no navegador, coerente com o fluxo manual atual. O vídeo continua **não** sendo armazenado.
+
+## Fora de escopo
+- Anotar diretamente sobre o vídeo em reprodução (marcação é feita sobre os quadros extraídos).
+- Reconhecimento automático de pose/ângulos por IA.
