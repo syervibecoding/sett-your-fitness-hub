@@ -341,7 +341,7 @@ export default function VideoAssessment({ studentId, companyId, studentName, con
 
       // upload dos quadros + inserção das linhas
       const rows: any[] = [];
-      for (const f of frames) {
+      for (const f of usable) {
         const path = `${companyId}/${assessmentId}/frame_${f.index}.jpg`;
         const { error: upErr } = await supabase.storage
           .from("assessment-frames")
