@@ -1391,11 +1391,20 @@ export default function StudentDetail() {
             <Card className="bg-card border-border">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-primary text-lg">ANAMNESE</CardTitle>
-                <Button variant="ghost" size="sm" onClick={openEditAnamnesis}>
-                  <Pencil className="h-4 w-4 mr-1" />{anamnesis ? "Editar" : "Adicionar"}
-                </Button>
+                {studentAnswered ? (
+                  <Badge variant="secondary" className="text-xs">Respondida pelo aluno</Badge>
+                ) : (
+                  <Button variant="ghost" size="sm" onClick={openEditAnamnesis}>
+                    <Pencil className="h-4 w-4 mr-1" />{anamnesis ? "Editar" : "Adicionar"}
+                  </Button>
+                )}
               </CardHeader>
               <CardContent className="space-y-4 text-sm font-sans">
+                {studentAnswered && (
+                  <p className="text-xs text-muted-foreground">
+                    O aluno respondeu o questionário. A edição manual está bloqueada para não sobrescrever as respostas dele.
+                  </p>
+                )}
                 {!anamnesis ? (
                   <p className="text-muted-foreground">Nenhuma anamnese preenchida. Clique em "Adicionar" para preencher.</p>
                 ) : (
