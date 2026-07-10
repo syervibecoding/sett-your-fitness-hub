@@ -443,10 +443,20 @@ export function DashboardAlerts({ trainerId }: Props) {
             <div className="space-y-2 max-h-[200px] overflow-auto">
               {birthdays.map((b, i) => (
                 <div key={i} className={`${itemClass} bg-secondary/50 border border-border`} onClick={() => goToStudent(b.student_id)}>
-                  <p className="text-sm font-sans text-foreground">{b.full_name}</p>
-                  <span className={`text-xs font-sans font-medium px-2 py-0.5 rounded ${b.daysUntil === 0 ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
-                    {b.daysUntil === 0 ? "🎉 Hoje!" : `em ${b.daysUntil}d`}
-                  </span>
+                  <p className="text-sm font-sans text-foreground flex-1 min-w-0 truncate">{b.full_name}</p>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-xs font-sans font-medium px-2 py-0.5 rounded ${b.daysUntil === 0 ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
+                      {b.daysUntil === 0 ? "🎉 Hoje!" : `em ${b.daysUntil}d`}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2 text-xs"
+                      onClick={(e) => { e.stopPropagation(); openBirthday(b); }}
+                    >
+                      <Send className="h-3 w-3 mr-1" />Parabéns
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
