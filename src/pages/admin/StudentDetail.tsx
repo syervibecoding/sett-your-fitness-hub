@@ -648,6 +648,10 @@ export default function StudentDetail() {
 
   const handleSaveAnamnesis = async () => {
     if (!id) return;
+    if (studentAnswered) {
+      toast({ title: "Edição bloqueada", description: "O aluno já respondeu a anamnese — não é possível sobrescrever manualmente.", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     const payload = {
       student_id: id,
