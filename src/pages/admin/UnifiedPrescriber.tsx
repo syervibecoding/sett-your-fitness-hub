@@ -323,7 +323,7 @@ export default function UnifiedPrescriber() {
   }, [companyId]);
 
   useEffect(() => {
-    if (!studentId) { setAnswered(null); return; }
+    if (!studentId) { setAnswered(null); setStudentAnswered(false); return; }
     setStep("anamnese");
     setResults({ musculacao: null, corrida: null, natacao: null, ciclismo: null, nutricao: null });
     setStatus({ musculacao: "idle", corrida: "idle", natacao: "idle", ciclismo: "idle", nutricao: "idle" });
