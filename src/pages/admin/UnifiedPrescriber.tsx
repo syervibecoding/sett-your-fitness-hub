@@ -289,6 +289,7 @@ export default function UnifiedPrescriber() {
   const [anamnese, setAnamnese]     = useState<Anamnese>(DEFAULT_ANAMNESE);
   const [anamneseId, setAnamneseId] = useState<string | null>(null);
   const [answered, setAnswered]     = useState<AnsweredSummary | null>(null);
+  const [studentAnswered, setStudentAnswered] = useState(false);
   const [assessmentExists, setAssessmentExists] = useState(false);
   const [modalities, setModalities] = useState<Set<Modality>>(new Set(["musculacao"]));
   const [nut, setNut]               = useState({ weight: "", height: "", sex: "masculino" as Sex, meals: "4" });
