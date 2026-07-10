@@ -151,12 +151,24 @@ function mapEquipment(raw?: string | null): string {
   if (t.includes("sem equip") || t.includes("ar livre") || t.includes("funcional")) return "funcional";
   return "";
 }
-function interestsToModalities(d: any): Modality[] {
-  const raw = d?.interesses ?? d?.interests;
-  const arr = Array.isArray(raw) ? raw : (typeof raw === "string" && raw ? [raw] : []);
+const INVALID_MOD_TOKENS = ["nenhum", "nenhuma", "n/a", "na", "-", "outro", "outra"];
+function parseModalityTokens(raw: any): string[] {
+  if (Array.isArray(raw)) return raw.map(String);
+  const s = String(raw ?? "").trim();
+  if (!s) return [];
+  // Legacy columns may store a JSON array string like '["Nenhum"]'.
+  if (s.startsWith("[")) { try { const p = JSON.parse(s); if (Array.isArray(p)) return p.map(String); } catch { /* ignore */ } }
+  return s.split(/[,;/|]/);
+}
+function interestsToModalities(d: any, legacy?: any): Modality[] {
+  const tokens = [
+    ...parseModalityTokens(d?.interesses ?? d?.interests),
+    ...parseModalityTokens(legacy),
+  ];
   const out = new Set<Modality>();
-  for (const x of arr) {
+  for (const x of tokens) {
     const t = norm(x);
+    if (!t || INVALID_MOD_TOKENS.includes(t.trim())) continue;
     if (t.includes("muscula")) out.add("musculacao");
     if (t.includes("corrid")) out.add("corrida");
     if (t.includes("nata")) out.add("natacao");
