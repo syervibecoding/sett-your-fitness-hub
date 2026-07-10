@@ -340,6 +340,10 @@ export default function UnifiedPrescriber() {
       const { mapped, interests, nut: nutMapped } = mapAnsweredAnamnesis(ans);
       const d = (ans?.data && typeof ans.data === "object" && !Array.isArray(ans.data))
         ? ans.data as Record<string, any> : {};
+      // O aluno respondeu o questionário quando o snapshot `data` está preenchido
+      // (só o formulário público grava `data`; edição manual grava só nas colunas).
+      const answeredByStudent = Object.keys(d).length > 0;
+      setStudentAnswered(answeredByStudent);
 
       // Resumo do que o aluno respondeu
       setAnswered(ans ? {
@@ -365,7 +369,10 @@ export default function UnifiedPrescriber() {
           ? ((sa as any).prescribed_modalities as string[]).filter((m): m is Modality =>
               ["musculacao", "corrida", "natacao", "ciclismo", "nutricao"].includes(m))
           : [];
-        const initialMods = savedMods.length ? savedMods : (interests.length ? interests : ["musculacao"]);
+        // Quando o aluno respondeu, os interesses dele vencem; senão, usa o salvo manual.
+        const initialMods = answeredByStudent && interests.length
+          ? interests
+          : (savedMods.length ? savedMods : (interests.length ? interests : ["musculacao"]));
         setModalities(new Set(initialMods as Modality[]));
         const base: Anamnese = {
           age: sa.age?.toString() ?? "",
