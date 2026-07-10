@@ -183,11 +183,16 @@ export function RenewalsAndCyclesPanel({ effectiveCompanyId, routePrefix, renewa
                         <p className="text-muted-foreground/70 text-[11px] font-sans">Treinador: {trainerMap[contract.trainer_id]}</p>
                       )}
                     </div>
-                    <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
-                      isOverdue ? "bg-destructive/20 text-destructive" : "bg-warning/20 text-warning"
-                    }`}>
-                      {isOverdue ? "Inadimplente" : "Renovar"}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
+                        isOverdue ? "bg-destructive/20 text-destructive" : "bg-warning/20 text-warning"
+                      }`}>
+                        {isOverdue ? "Inadimplente" : "Renovar"}
+                      </span>
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => openReminder(contract)}>
+                        <Send className="h-3 w-3 mr-1" />Lembrar
+                      </Button>
+                    </div>
                   </div>
                 );
               })}
