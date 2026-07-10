@@ -39,7 +39,7 @@ async function fetchAlerts(
   };
 
   const queries: any[] = [
-    addCompanyFilter(supabase.from("students").select("id, full_name, birth_date, assigned_trainer_id, status")
+    addCompanyFilter(supabase.from("students").select("id, full_name, birth_date, assigned_trainer_id, status, phone, email")
       .not("birth_date", "is", null).eq("status", "active")),
   ];
 
@@ -84,7 +84,7 @@ async function fetchAlerts(
       const nextYear = setYear(bd, today.getFullYear() + 1);
       diff = differenceInDays(nextYear, today);
     }
-    if (diff <= 30) birthdays.push({ full_name: s.full_name, birth_date: s.birth_date, daysUntil: diff, student_id: s.id });
+    if (diff <= 30) birthdays.push({ full_name: s.full_name, birth_date: s.birth_date, daysUntil: diff, student_id: s.id, phone: s.phone ?? null, email: s.email ?? null });
   });
   birthdays.sort((a, b) => a.daysUntil - b.daysUntil);
 
