@@ -301,16 +301,17 @@ export default function VideoAssessment({ studentId, companyId, studentName, con
     setSaving(true); setError("");
     try {
       const assessment_json = {
-        vistas: frames.map(f => ({
+        vistas: usable.map(f => ({
           vista: f.vista,
           time: Number(f.time.toFixed(2)),
           compensacoes: f.findings,
+          annotations: f.annotations,
         })),
         protocol_hint: protocol,
         expected_movements: PROTOCOLS[protocol].vistas,
         total_compensacoes: totalCompensacoes,
       };
-      const report_text = frames
+      const report_text = usable
         .map(f => {
           const comps = f.findings.length
             ? f.findings.map(c => `  • [${c.gravidade}] ${c.descricao || "—"}`).join("\n")
