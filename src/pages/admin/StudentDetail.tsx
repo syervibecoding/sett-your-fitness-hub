@@ -45,6 +45,7 @@ function safeFormatDate(value: string | null | undefined, fmt: string, opts?: Pa
 }
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 import { lookupCep, lookupCepByAddress } from "@/lib/cep";
+import { createPlansLink } from "@/lib/studentChat";
 // Heavy children loaded only when their tab is opened (chunk size win)
 const WorkoutAnalysis = lazy(() => import("@/components/trainer/WorkoutAnalysis").then(m => ({ default: m.WorkoutAnalysis })));
 const TrainerWeeklyBar = lazy(() => import("@/components/trainer/TrainerWeeklyBar").then(m => ({ default: m.TrainerWeeklyBar })));
@@ -1151,14 +1152,22 @@ export default function StudentDetail() {
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" onClick={async () => {
-                    const link = `${window.location.origin}/pagamento/${id}`;
-                    try { await navigator.clipboard.writeText(link); } catch {
-                      const ta = document.createElement("textarea");
-                      ta.value = link; ta.style.position = "fixed"; ta.style.left = "-9999px";
-                      document.body.appendChild(ta); ta.focus(); ta.select();
-                      document.execCommand("copy"); document.body.removeChild(ta);
+                    try {
+                      const link = await createPlansLink(id!);
+                      try { await navigator.clipboard.writeText(link); } catch {
+                        const ta = document.createElement("textarea");
+                        ta.value = link; ta.style.position = "fixed"; ta.style.left = "-9999px";
+                        document.body.appendChild(ta); ta.focus(); ta.select();
+                        document.execCommand("copy"); document.body.removeChild(ta);
+                      }
+                      toast({ title: "Link de pagamento copiado!", description: "O link é seguro e válido por 30 dias." });
+                    } catch (error) {
+                      toast({
+                        title: "Erro ao criar link de pagamento",
+                        description: error instanceof Error ? error.message : "Tente novamente.",
+                        variant: "destructive",
+                      });
                     }
-                    toast({ title: "Link de pagamento copiado!" });
                   }}>
                     <Copy className="h-4 w-4 mr-1" />Link de Pagamento
                   </Button>

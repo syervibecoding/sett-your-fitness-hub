@@ -14,14 +14,14 @@ import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-async function callAsaas(action: string, body: Record<string, any>) {
+async function callAsaas(checkoutToken: string, action: string, body: Record<string, any>) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/asaas-integration`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       apikey: SUPABASE_KEY,
     },
-    body: JSON.stringify({ action, ...body }),
+    body: JSON.stringify({ action, checkoutToken, ...body }),
   });
   const data = await res.json();
   if (!res.ok || data.error) throw new Error(data.error || "Erro na operação");
@@ -49,22 +49,23 @@ function formatBRL(value: number): string {
 }
 
 async function recordRecoveryEvent(
-  studentId: string | undefined,
+  token: string | undefined,
   eventType: "plan_selected" | "payment_started" | "payment_abandoned" | "payment_completed",
   metadata: Record<string, any> = {},
   planId?: string | null,
   paymentId?: string | null,
 ) {
-  if (!studentId) return;
+  if (!token) return;
   try {
-    await supabase.rpc("record_payment_recovery_event" as any, {
-      _student_id: studentId,
-      _event_type: eventType,
-      _plan_id: planId || null,
-      _payment_id: paymentId || null,
-      _enrollment_id: null,
-      _metadata: metadata,
-      _source: "public-payment",
+    await supabase.functions.invoke("public-payment-context", {
+      body: {
+        action: "record-event",
+        token,
+        eventType,
+        planId: planId || null,
+        paymentId: paymentId || null,
+        metadata,
+      },
     });
   } catch {
     // Recovery telemetry must never block checkout.
@@ -72,7 +73,7 @@ async function recordRecoveryEvent(
 }
 
 export default function PublicPayment() {
-  const { studentId } = useParams<{ studentId: string }>();
+  const { token } = useParams<{ token: string }>();
   const { toast } = useToast();
 
   const [student, setStudent] = useState<any>(null);
@@ -116,7 +117,7 @@ export default function PublicPayment() {
   const [installments, setInstallments] = useState(1);
   const abandonedRecordedRef = useRef(false);
   const recoveryStateRef = useRef({
-    studentId,
+    token,
     step,
     selectedPlanOptionId,
     planName,
@@ -126,20 +127,20 @@ export default function PublicPayment() {
 
   useEffect(() => {
     recoveryStateRef.current = {
-      studentId,
+      token,
       step,
       selectedPlanOptionId,
       planName,
       planValue,
       pixPaymentId,
     };
-  }, [studentId, step, selectedPlanOptionId, planName, planValue, pixPaymentId]);
+  }, [token, step, selectedPlanOptionId, planName, planValue, pixPaymentId]);
 
   const recordAbandoned = (reason: string) => {
     const state = recoveryStateRef.current;
     if (abandonedRecordedRef.current || state.step === "success" || !state.selectedPlanOptionId) return;
     abandonedRecordedRef.current = true;
-    void recordRecoveryEvent(state.studentId, "payment_abandoned", {
+    void recordRecoveryEvent(state.token, "payment_abandoned", {
       reason,
       step: state.step,
       plan_name: state.planName,
@@ -149,12 +150,12 @@ export default function PublicPayment() {
   };
 
   useEffect(() => {
-    if (!studentId) { setNotFound(true); return; }
+    if (!token) { setNotFound(true); return; }
 
     const loadAll = async () => {
       setLoadingPlans(true);
       const { data, error } = await supabase.functions.invoke("public-payment-context", {
-        body: { action: "context", studentId },
+        body: { action: "context", token },
       });
       if (error || !data?.student) { setNotFound(true); setLoadingPlans(false); return; }
       const s = data.student;
@@ -186,7 +187,7 @@ export default function PublicPayment() {
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
-  }, [studentId]);
+  }, [token]);
 
   useEffect(() => {
     const onVisibilityChange = () => {
@@ -205,22 +206,27 @@ export default function PublicPayment() {
   useEffect(() => () => recordAbandoned("page_unmounted"), []);
 
   const handleSelectPlan = async (plan: PlanOption) => {
-    setSelectedPlanOptionId(plan.id);
-    setPlanValue(plan.price);
-    setPlanName(plan.name);
-    setPlanDurationWeeks(plan.duration_weeks);
-    setInstallments(1);
-    setStep("choose");
-
-    if (studentId) {
-      await supabase.functions.invoke("public-payment-context", {
-        body: { action: "select-plan", studentId, planId: plan.id },
+    if (!token) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("public-payment-context", {
+        body: { action: "select-plan", token, planId: plan.id },
       });
-      await recordRecoveryEvent(studentId, "plan_selected", {
-        plan_name: plan.name,
-        amount: plan.price,
-        duration_weeks: plan.duration_weeks,
-      }, plan.id);
+      if (error || data?.error) throw new Error(data?.error || error?.message || "Não foi possível selecionar o plano.");
+      setSelectedPlanOptionId(plan.id);
+      setPlanValue(plan.price);
+      setPlanName(plan.name);
+      setPlanDurationWeeks(plan.duration_weeks);
+      setInstallments(1);
+      setStep("choose");
+    } catch (error) {
+      toast({
+        title: "Não foi possível selecionar o plano",
+        description: error instanceof Error ? error.message : "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -229,22 +235,21 @@ export default function PublicPayment() {
   const handlePix = async () => {
     setLoading(true);
     try {
-      const { paymentId } = await callAsaas("create-payment", {
-        studentId,
+      if (!token) throw new Error("Link de pagamento inválido.");
+      const { paymentId } = await callAsaas(token, "create-payment", {
         billingType: "PIX",
-        value: planValue,
         planId: selectedPlanOptionId,
       });
       setPixPaymentId(paymentId);
       abandonedRecordedRef.current = false;
-      await recordRecoveryEvent(studentId, "payment_started", {
+      await recordRecoveryEvent(token, "payment_started", {
         method: "PIX",
         plan_name: planName,
         amount: planValue,
         asaas_payment_id: paymentId,
       }, selectedPlanOptionId);
 
-      const { encodedImage, payload } = await callAsaas("get-pix-qrcode", { paymentId });
+      const { encodedImage, payload } = await callAsaas(token, "get-pix-qrcode", { paymentId });
       setPixImage(encodedImage);
       setPixPayload(payload);
       setStep("pix");
@@ -259,11 +264,11 @@ export default function PublicPayment() {
           return;
         }
         try {
-          const { status } = await callAsaas("get-payment-status", { paymentId });
+          const { status } = await callAsaas(token, "get-payment-status", { paymentId });
           if (status === "RECEIVED" || status === "CONFIRMED") {
             if (pollingRef.current) clearInterval(pollingRef.current);
             abandonedRecordedRef.current = true;
-            await recordRecoveryEvent(studentId, "payment_completed", {
+            await recordRecoveryEvent(token, "payment_completed", {
               method: "PIX",
               status,
               plan_name: planName,
@@ -319,25 +324,15 @@ export default function PublicPayment() {
 
     setLoading(true);
     try {
-      await recordRecoveryEvent(studentId, "payment_started", {
+      if (!token) throw new Error("Link de pagamento inválido.");
+      await recordRecoveryEvent(token, "payment_started", {
         method: "CARD",
         plan_name: planName,
         amount: planValue,
         installments,
       }, selectedPlanOptionId);
-      // Captura IP real do cliente (requerido por antifraude do Asaas)
-      let remoteIp = "";
-      try {
-        const ipRes = await fetch("https://api.ipify.org?format=json");
-        const ipData = await ipRes.json();
-        remoteIp = ipData.ip || "";
-      } catch {}
-
       const payload: Record<string, any> = {
-        studentId,
-        value: planValue,
         planId: selectedPlanOptionId,
-        remoteIp: remoteIp || undefined,
         creditCard: {
           holderName: cardForm.holderName.trim(),
           number: cardForm.number,
@@ -360,17 +355,17 @@ export default function PublicPayment() {
         payload.installmentCount = installments;
         payload.installmentValue = Number((planValue / installments).toFixed(2));
       }
-      const { status } = await callAsaas("create-card-payment", payload);
+      const { status, paymentId } = await callAsaas(token, "create-card-payment", payload);
 
       if (status === "CONFIRMED" || status === "RECEIVED") {
         abandonedRecordedRef.current = true;
-        await recordRecoveryEvent(studentId, "payment_completed", {
+        await recordRecoveryEvent(token, "payment_completed", {
           method: "CARD",
           status,
           plan_name: planName,
           amount: planValue,
           installments,
-        }, selectedPlanOptionId);
+        }, selectedPlanOptionId, paymentId);
         setStep("success");
       } else if (status === "PENDING" || status === "AWAITING_RISK_ANALYSIS") {
         toast({ title: "Pagamento em análise", description: "Você receberá a confirmação em breve." });
@@ -402,8 +397,8 @@ export default function PublicPayment() {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="max-w-md w-full bg-card border-border text-center">
           <CardContent className="pt-8 pb-8 space-y-4">
-            <h2 className="text-2xl text-primary">ALUNO NÃO ENCONTRADO</h2>
-            <p className="text-muted-foreground font-sans">O link de pagamento é inválido.</p>
+            <h2 className="text-2xl text-primary">LINK INDISPONÍVEL</h2>
+            <p className="text-muted-foreground font-sans">O link de pagamento é inválido ou expirou. Solicite um novo link ao seu treinador.</p>
           </CardContent>
         </Card>
       </div>

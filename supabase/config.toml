@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.public-payment-context]
 verify_jwt = false
 
+[functions.asaas-integration]
+verify_jwt = false
+
 [functions.ai-prescribe-workout]
 verify_jwt = false
 
@@ -43,6 +46,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.push-send]
+verify_jwt = false
+
+[functions.process-automation-sessions]
 verify_jwt = false
 
 [functions.whatsapp-webhook]

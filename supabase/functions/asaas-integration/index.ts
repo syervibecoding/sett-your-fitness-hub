@@ -45,35 +45,41 @@ async function asaasFetch(path: string, options: RequestInit = {}) {
 
 async function requireAdminTenant(req: Request, body: any) {
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) throw new Error("Unauthorized");
+  if (!authHeader?.startsWith("Bearer ")) throw new HttpError(401, "Unauthorized");
 
   const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     global: { headers: { Authorization: authHeader } },
   });
   const token = authHeader.replace("Bearer ", "");
   const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
-  if (claimsError || !claimsData?.claims?.sub) throw new Error("Unauthorized");
+  if (claimsError || !claimsData?.claims?.sub) throw new HttpError(401, "Unauthorized");
   const userId = claimsData.claims.sub as string;
 
-  const [{ data: hasMaster }, { data: hasAdmin }, { data: hasCoord }, { data: userCompanyId }] = await Promise.all([
+  const roleResults = await Promise.all([
     supabaseAdmin.rpc("has_role", { _user_id: userId, _role: "master" }),
     supabaseAdmin.rpc("has_role", { _user_id: userId, _role: "admin" }),
     supabaseAdmin.rpc("has_role", { _user_id: userId, _role: "coordinator" }),
     supabaseAdmin.rpc("get_user_company_id", { _user_id: userId }),
   ]);
-  if (!hasMaster && !hasAdmin && !hasCoord) throw new Error("Forbidden");
+  const failedCheck = roleResults.find((result) => result.error);
+  if (failedCheck?.error) {
+    throw new HttpError(503, `Falha ao validar permissões: ${failedCheck.error.message}`);
+  }
+  const [{ data: hasMaster }, { data: hasAdmin }, { data: hasCoord }, { data: userCompanyId }] = roleResults;
+  if (!hasMaster && !hasAdmin && !hasCoord) throw new HttpError(403, "Forbidden");
 
   let targetCompanyId = typeof body.companyId === "string" && body.companyId ? body.companyId : null;
-  if (targetCompanyId && !UUID_RE.test(targetCompanyId)) throw new Error("companyId inválido.");
+  if (targetCompanyId && !UUID_RE.test(targetCompanyId)) throw new HttpError(400, "companyId inválido.");
 
   if (body.studentId) {
+    if (!UUID_RE.test(body.studentId)) throw new HttpError(400, "studentId inválido.");
     const { data: student } = await supabaseAdmin
       .from("students")
       .select("company_id")
       .eq("id", body.studentId)
       .maybeSingle();
-    if (!student?.company_id) throw new Error("Aluno não encontrado.");
-    if (targetCompanyId && targetCompanyId !== student.company_id) throw new Error("Forbidden: student/company mismatch.");
+    if (!student?.company_id) throw new HttpError(404, "Aluno não encontrado.");
+    if (targetCompanyId && targetCompanyId !== student.company_id) throw new HttpError(403, "Forbidden: student/company mismatch.");
     targetCompanyId = student.company_id;
   }
 
@@ -83,14 +89,58 @@ async function requireAdminTenant(req: Request, body: any) {
       .select("company_id")
       .eq("asaas_payment_id", body.paymentId)
       .maybeSingle();
-    if (!payment?.company_id) throw new Error("Pagamento local não encontrado.");
-    if (targetCompanyId && targetCompanyId !== payment.company_id) throw new Error("Forbidden: payment/company mismatch.");
+    if (!payment?.company_id) throw new HttpError(404, "Pagamento local não encontrado.");
+    if (targetCompanyId && targetCompanyId !== payment.company_id) throw new HttpError(403, "Forbidden: payment/company mismatch.");
     targetCompanyId = payment.company_id;
   }
 
-  if (!targetCompanyId) throw new Error("Selecione uma empresa.");
-  if (!hasMaster && targetCompanyId !== userCompanyId) throw new Error("Forbidden: company mismatch.");
+  if (!targetCompanyId) throw new HttpError(400, "Selecione uma empresa.");
+  if (!hasMaster && targetCompanyId !== userCompanyId) throw new HttpError(403, "Forbidden: company mismatch.");
   return { companyId: targetCompanyId };
+}
+
+async function requireCheckoutToken(body: any, action: string) {
+  const token = typeof body.checkoutToken === "string" ? body.checkoutToken : "";
+  if (!UUID_RE.test(token)) throw new HttpError(401, "Link de pagamento inválido.");
+
+  const { data: link, error: linkError } = await supabaseAdmin
+    .from("public_payment_links")
+    .select("id, student_id, company_id, expires_at, revoked_at")
+    .eq("token", token)
+    .maybeSingle();
+  if (linkError) throw new HttpError(500, `Falha ao validar link de pagamento: ${linkError.message}`);
+  if (!link) throw new HttpError(401, "Link de pagamento inválido.");
+  if (link.revoked_at || new Date(link.expires_at).getTime() <= Date.now()) {
+    throw new HttpError(410, "Este link de pagamento expirou. Solicite um novo link ao seu treinador.");
+  }
+
+  if (body.studentId && body.studentId !== link.student_id) {
+    throw new HttpError(403, "Forbidden: student mismatch.");
+  }
+  body.studentId = link.student_id;
+  body.companyId = link.company_id;
+
+  if (action === "get-pix-qrcode" || action === "get-payment-status") {
+    if (typeof body.paymentId !== "string" || !body.paymentId) {
+      throw new HttpError(400, "paymentId é obrigatório.");
+    }
+    const { data: payment, error: paymentError } = await supabaseAdmin
+      .from("payments")
+      .select("id")
+      .eq("asaas_payment_id", body.paymentId)
+      .eq("student_id", link.student_id)
+      .eq("company_id", link.company_id)
+      .maybeSingle();
+    if (paymentError) throw new HttpError(500, `Falha ao validar pagamento: ${paymentError.message}`);
+    if (!payment) throw new HttpError(403, "Pagamento não pertence a este link.");
+  }
+
+  const { error: touchError } = await supabaseAdmin
+    .from("public_payment_links")
+    .update({ last_used_at: new Date().toISOString() })
+    .eq("id", link.id);
+  if (touchError) console.error("asaas-integration: failed to touch checkout link", touchError);
+  return { studentId: link.student_id, companyId: link.company_id };
 }
 
 async function createCustomer(body: any) {
@@ -243,7 +293,7 @@ async function createPayment(body: any) {
   });
 
   // Save to payments table
-  await supabaseAdmin.from("payments").insert({
+  const { error: insertError } = await supabaseAdmin.from("payments").insert({
     student_id: studentId,
     company_id: student.company_id || null,
     asaas_customer_id: student.asaas_customer_id,
@@ -255,6 +305,7 @@ async function createPayment(body: any) {
     invoice_url: payment.invoiceUrl || null,
     installment_count: 1,
   });
+  if (insertError) throw new HttpError(500, `Falha ao persistir pagamento: ${insertError.message}`);
 
   // Ativar aluno automaticamente se pagamento já confirmado
   if (["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"].includes(payment.status)) {
@@ -364,7 +415,7 @@ async function createCardPayment(body: any) {
     body: JSON.stringify(paymentPayload),
   });
 
-  await supabaseAdmin.from("payments").insert({
+  const { error: insertError } = await supabaseAdmin.from("payments").insert({
     student_id: studentId,
     company_id: student.company_id || null,
     asaas_customer_id: student.asaas_customer_id,
@@ -376,6 +427,7 @@ async function createCardPayment(body: any) {
     invoice_url: payment.invoiceUrl || null,
     installment_count: installmentCount && installmentCount > 1 ? installmentCount : 1,
   });
+  if (insertError) throw new HttpError(500, `Falha ao persistir pagamento: ${insertError.message}`);
 
   // Ativar aluno automaticamente se pagamento já confirmado
   if (["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"].includes(payment.status)) {
@@ -812,9 +864,20 @@ Deno.serve(async (req) => {
   try {
     const { action, ...body } = await req.json();
     const adminActions = new Set(["create-customer", "update-customer", "create-invoice", "sync-payments"]);
+    const checkoutActions = new Set(["create-payment", "get-pix-qrcode", "create-card-payment", "get-payment-status"]);
     if (adminActions.has(action)) {
       const tenant = await requireAdminTenant(req, body);
       body.companyId = body.companyId || tenant.companyId;
+    } else if (checkoutActions.has(action)) {
+      if (body.checkoutToken) {
+        await requireCheckoutToken(body, action);
+      } else {
+        const tenant = await requireAdminTenant(req, body);
+        body.companyId = body.companyId || tenant.companyId;
+      }
+      const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+      const connectingIp = req.headers.get("cf-connecting-ip")?.trim();
+      body.remoteIp = connectingIp || forwardedFor || body.remoteIp;
     }
 
     let result;

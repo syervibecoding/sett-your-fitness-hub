@@ -14,7 +14,7 @@ import { AtRiskStudents } from "@/components/admin/AtRiskStudents";
 import { useMaster } from "@/contexts/MasterContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { buildStudentChatMap, openStudentChat, renewalMessage } from "@/lib/studentChat";
+import { buildStudentChatMap, createPlansLink, openStudentChat, renewalMessage } from "@/lib/studentChat";
 
 const LazyChart = lazy(() => import("recharts").then(mod => ({
   default: ({ data, colors }: { data: { name: string; count: number }[]; colors: string[] }) => (
@@ -179,16 +179,21 @@ export default function AdminDashboard() {
     staleTime: 60_000,
   });
 
-  const handleRenew = (studentId: string, fullName?: string, planName?: string, daysLeft?: number) => {
-    const message = renewalMessage({ fullName, planName, daysLeft, studentId, overdue: typeof daysLeft === "number" && daysLeft <= 0 });
-    void openStudentChat({
-      navigate,
-      routePrefix: (routePrefix as string) || "admin",
-      chatId: studentChatMap?.[studentId],
-      studentId,
-      message,
-      onNoChat: (m) => { void navigator.clipboard?.writeText(m); toast.success("Aluno sem WhatsApp — mensagem de renovação copiada."); },
-    });
+  const handleRenew = async (studentId: string, fullName?: string, planName?: string, daysLeft?: number) => {
+    try {
+      const paymentLink = await createPlansLink(studentId);
+      const message = renewalMessage({ fullName, planName, daysLeft, paymentLink, overdue: typeof daysLeft === "number" && daysLeft <= 0 });
+      await openStudentChat({
+        navigate,
+        routePrefix: (routePrefix as string) || "admin",
+        chatId: studentChatMap?.[studentId],
+        studentId,
+        message,
+        onNoChat: (m) => { void navigator.clipboard?.writeText(m); toast.success("Aluno sem WhatsApp — mensagem de renovação copiada."); },
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível criar o link de renovação.");
+    }
   };
 
   const stats = data?.stats ?? { totalStudents: 0, pendingStudents: 0, awaitingRenewalStudents: 0, inactiveStudents: 0, trainers: 0 };

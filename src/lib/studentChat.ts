@@ -61,9 +61,16 @@ export async function openStudentChat(opts: {
 
 const firstName = (full?: string | null) => (full ?? "").trim().split(/\s+/)[0] || "";
 
-// Link público de planos/checkout do aluno (PublicPayment já detecta renovação automaticamente).
-export function plansLink(studentId: string): string {
-  return `${window.location.origin}/pagamento/${studentId}`;
+// Cria um link opaco e temporário. O UUID do aluno nunca funciona como credencial
+// pública de checkout.
+export async function createPlansLink(studentId: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke("public-payment-context", {
+    body: { action: "create-link", studentId },
+  });
+  if (error || !data?.token) {
+    throw new Error(data?.error || error?.message || "Não foi possível criar o link de pagamento.");
+  }
+  return `${window.location.origin}/pagamento/${data.token}`;
 }
 
 export function birthdayMessage(fullName?: string | null): string {
@@ -75,12 +82,12 @@ export function renewalMessage(opts: {
   fullName?: string | null;
   planName?: string | null;
   daysLeft?: number | null;
-  studentId: string;
+  paymentLink: string;
   overdue?: boolean;
 }): string {
   const nome = firstName(opts.fullName);
   const plano = opts.planName ? ` ${opts.planName}` : "";
-  const link = plansLink(opts.studentId);
+  const link = opts.paymentLink;
   if (opts.overdue) {
     return `Oi, ${nome}! Seu plano${plano} venceu e seu acesso aos treinos pode ser interrompido. Pra regularizar e continuar evoluindo, é só renovar por aqui: ${link}`;
   }
