@@ -425,6 +425,53 @@ export type Database = {
         }
         Relationships: []
       }
+      assessment_frames: {
+        Row: {
+          ai_findings: Json | null
+          assessment_id: string
+          company_id: string
+          created_at: string
+          edited: boolean
+          frame_index: number
+          id: string
+          image_url: string
+          trainer_findings: Json
+          vista: string
+        }
+        Insert: {
+          ai_findings?: Json | null
+          assessment_id: string
+          company_id: string
+          created_at?: string
+          edited?: boolean
+          frame_index: number
+          id?: string
+          image_url: string
+          trainer_findings?: Json
+          vista: string
+        }
+        Update: {
+          ai_findings?: Json | null
+          assessment_id?: string
+          company_id?: string
+          created_at?: string
+          edited?: boolean
+          frame_index?: number
+          id?: string
+          image_url?: string
+          trainer_findings?: Json
+          vista?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_frames_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "functional_assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_flow_edges: {
         Row: {
           created_at: string
@@ -685,6 +732,62 @@ export type Database = {
         }
         Relationships: []
       }
+      company_ai_config: {
+        Row: {
+          assistant_name: string
+          company_id: string
+          created_at: string
+          doctrine: string | null
+          enabled: boolean
+          ethical_limits: string | null
+          extra: Json
+          id: string
+          methodology: string | null
+          staff_assistant_enabled: boolean
+          student_assistant_enabled: boolean
+          tone: string | null
+          updated_at: string
+        }
+        Insert: {
+          assistant_name?: string
+          company_id: string
+          created_at?: string
+          doctrine?: string | null
+          enabled?: boolean
+          ethical_limits?: string | null
+          extra?: Json
+          id?: string
+          methodology?: string | null
+          staff_assistant_enabled?: boolean
+          student_assistant_enabled?: boolean
+          tone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assistant_name?: string
+          company_id?: string
+          created_at?: string
+          doctrine?: string | null
+          enabled?: boolean
+          ethical_limits?: string | null
+          extra?: Json
+          id?: string
+          methodology?: string | null
+          staff_assistant_enabled?: boolean
+          student_assistant_enabled?: boolean
+          tone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_ai_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_billing: {
         Row: {
           company_id: string
@@ -897,6 +1000,8 @@ export type Database = {
       }
       exercise_library: {
         Row: {
+          categories: string[]
+          category: string | null
           company_id: string | null
           created_at: string
           created_by: string | null
@@ -914,6 +1019,8 @@ export type Database = {
           video_url: string | null
         }
         Insert: {
+          categories?: string[]
+          category?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -931,6 +1038,8 @@ export type Database = {
           video_url?: string | null
         }
         Update: {
+          categories?: string[]
+          category?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -1169,6 +1278,7 @@ export type Database = {
           nivel: string | null
           queixa_principal: string | null
           report_text: string | null
+          source: string | null
           status: string | null
           student_id: string
           updated_at: string
@@ -1184,6 +1294,7 @@ export type Database = {
           nivel?: string | null
           queixa_principal?: string | null
           report_text?: string | null
+          source?: string | null
           status?: string | null
           student_id: string
           updated_at?: string
@@ -1199,6 +1310,7 @@ export type Database = {
           nivel?: string | null
           queixa_principal?: string | null
           report_text?: string | null
+          source?: string | null
           status?: string | null
           student_id?: string
           updated_at?: string
@@ -1277,6 +1389,78 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      nutrition_plans: {
+        Row: {
+          carbs_g: number | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          fat_g: number | null
+          id: string
+          meals: Json
+          notes: string | null
+          objective: string
+          protein_g: number | null
+          status: string
+          student_id: string
+          title: string
+          total_calories: number | null
+          updated_at: string
+          water_ml: number | null
+        }
+        Insert: {
+          carbs_g?: number | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          fat_g?: number | null
+          id?: string
+          meals?: Json
+          notes?: string | null
+          objective?: string
+          protein_g?: number | null
+          status?: string
+          student_id: string
+          title?: string
+          total_calories?: number | null
+          updated_at?: string
+          water_ml?: number | null
+        }
+        Update: {
+          carbs_g?: number | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          fat_g?: number | null
+          id?: string
+          meals?: Json
+          notes?: string | null
+          objective?: string
+          protein_g?: number | null
+          status?: string
+          student_id?: string
+          title?: string
+          total_calories?: number | null
+          updated_at?: string
+          water_ml?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nutrition_plans_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nutrition_plans_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payments: {
         Row: {
@@ -1747,6 +1931,7 @@ export type Database = {
           meals_per_day: number | null
           notes: string | null
           objective: string | null
+          prescribed_modalities: string[]
           session_duration_min: number | null
           sleep_quality: number | null
           sport: string | null
@@ -1778,6 +1963,7 @@ export type Database = {
           meals_per_day?: number | null
           notes?: string | null
           objective?: string | null
+          prescribed_modalities?: string[]
           session_duration_min?: number | null
           sleep_quality?: number | null
           sport?: string | null
@@ -1809,6 +1995,7 @@ export type Database = {
           meals_per_day?: number | null
           notes?: string | null
           objective?: string | null
+          prescribed_modalities?: string[]
           session_duration_min?: number | null
           sleep_quality?: number | null
           sport?: string | null
@@ -1822,6 +2009,53 @@ export type Database = {
             foreignKeyName: "student_anamneses_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: true
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_body_limitations: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          region: string
+          severity: string
+          student_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          region: string
+          severity?: string
+          student_id: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          region?: string
+          severity?: string
+          student_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_body_limitations_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
             referencedRelation: "students"
             referencedColumns: ["id"]
           },
@@ -1858,6 +2092,56 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_documents: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          file_name: string
+          file_path: string
+          id: string
+          mime_type: string | null
+          notes: string | null
+          size: number | null
+          student_id: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          file_name: string
+          file_path: string
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          size?: number | null
+          student_id: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          size?: number | null
+          student_id?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_documents_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
@@ -1927,6 +2211,56 @@ export type Database = {
           },
           {
             foreignKeyName: "student_evaluations_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_goals: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          status: string
+          student_id: string
+          target_date: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          student_id: string
+          target_date: string
+          title: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          student_id?: string
+          target_date?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_goals_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
@@ -2743,6 +3077,18 @@ export type Database = {
       recalculate_training_cycles: {
         Args: { p_enrollment_id: string; p_new_start_date: string }
         Returns: undefined
+      }
+      student_self_update_allowed: {
+        Args: {
+          _asaas_customer_id: string
+          _assigned_trainer_id: string
+          _category_id: string
+          _company_id: string
+          _id: string
+          _selected_plan_id: string
+          _status: string
+        }
+        Returns: boolean
       }
       unaccent_simple: { Args: { t: string }; Returns: string }
     }
