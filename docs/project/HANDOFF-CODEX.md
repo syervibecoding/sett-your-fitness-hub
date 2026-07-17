@@ -133,3 +133,40 @@ node scripts/prescription/test-curation-review-return-guard.mjs  # 12/12
 npx -y deno check supabase/functions/<edge>/index.ts             # sem erros (deno via npx; rm -f deno.lock depois)
 ```
 Pré-flight de deploy frontend: `grep -rl cxesecxyrndveookvlzz dist` (0), `grep -rl your-project-ref dist` (0), `grep -rl zshrcgbyhzxpnlccssyz dist/assets` (>0).
+
+---
+
+## 9. Estabilização Codex de 2026-07-17
+
+- O schema vivo foi reconciliado pelas migrations `20260717123000`, `20260717133000`,
+  `20260717143000` e `20260717150000`, todas aplicadas no Bn-app. Os tipos locais foram
+  regenerados a partir do banco vivo.
+- O Studio agora cria um `prescription_bundle` antes das modalidades, passa o mesmo
+  `bundle_id` para musculação/cardio/nutrição e registra os itens do pacote. A publicação
+  da musculação cria o próximo ciclo como `pending`, persiste todo o treino e só então o
+  ativa/encerra o ciclo anterior.
+- As edges de prescrição validam a posse exata do pacote por aluno+empresa. Toda gravação
+  relevante falha explicitamente quando o banco recusa o insert.
+- As 12 avaliações funcionais históricas foram normalizadas para o contrato determinístico
+  atual (7 chaves OHS + relatório estruturado) pelo script
+  `scripts/backfill-functional-assessments.ts`.
+- O dispatcher `process-automation-sessions` reivindica sessões de forma atômica, envia a
+  primeira mensagem dos fluxos e faz retry/defer. O cron usa `AUTOMATION_CRON_SECRET`.
+- O checkout público não usa mais `student_id` como credencial. A migration
+  `20260717150000_secure_public_payment_links.sql` cria tokens opacos com validade de 30 dias;
+  `public-payment-context` e `asaas-integration` derivam aluno/empresa do token. A antiga RPC
+  anônima de recovery foi revogada.
+- `youtube-exercise-video` valida, via RLS do usuário, se o exercício é visível antes de
+  gravar cache com service-role. Biblioteca viva: 917 exercícios; todos possuem metadata e
+  alvos musculares. Vídeos próprios existentes: 168; os demais têm fallback YouTube sob demanda.
+- Dependências atualizadas (`vite 6.4.3`, `jspdf 4.2.1`); `npm audit` = 0 vulnerabilidades.
+- Edges legadas sem consumidores e com schema obsoleto foram removidas do projeto remoto:
+  `ai-secretary-chat`, `process-scheduled-messages`, `ai-adaptive-training`,
+  `ai-body-composition`, `ai-injury-triage`, `ai-analyze-execution`.
+
+### Dependências externas ainda obrigatórias
+
+O código falha fechado e mostra estado de “não configurado”, mas pagamentos e WhatsApp só
+operam de ponta a ponta depois de cadastrar os secrets reais: `ASAAS_API_KEY`,
+`EVOLUTION_API_URL`, `EVOLUTION_API_KEY` e, se Stripe for usado,
+`STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`. Não inventar valores para esses secrets.

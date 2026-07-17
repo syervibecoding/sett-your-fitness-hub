@@ -25,25 +25,34 @@ export function AnnouncementsFeed({ studentId, companyId }: Props) {
   const [items, setItems] = useState<Announcement[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [openedIds, setOpenedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => { load(); }, [companyId, studentId]);
 
   const load = async () => {
     setLoading(true);
-    const { data: ann } = await supabase
+    setLoadError("");
+    const { data: ann, error: announcementsError } = await supabase
       .from("announcements")
       .select("*")
       .eq("company_id", companyId)
       .order("pinned", { ascending: false })
       .order("published_at", { ascending: false })
       .limit(50);
+    if (announcementsError) {
+      setItems([]);
+      setLoading(false);
+      setLoadError("Não foi possível carregar os avisos agora.");
+      return;
+    }
     setItems(ann || []);
 
-    const { data: reads } = await supabase
+    const { data: reads, error: readsError } = await supabase
       .from("announcement_reads")
       .select("announcement_id")
       .eq("student_id", studentId);
+    if (readsError) setLoadError("Os avisos abriram, mas o status de leitura não pôde ser atualizado.");
     setReadIds(new Set((reads || []).map(r => r.announcement_id)));
     setLoading(false);
   };
@@ -72,6 +81,17 @@ export function AnnouncementsFeed({ studentId, companyId }: Props) {
 
   if (loading) {
     return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>;
+  }
+
+  if (loadError && items.length === 0) {
+    return (
+      <Card className="bg-card border-destructive/30">
+        <CardContent className="p-6 text-center">
+          <Megaphone className="h-7 w-7 text-destructive/60 mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground font-sans">{loadError}</p>
+        </CardContent>
+      </Card>
+    );
   }
 
   if (items.length === 0) {

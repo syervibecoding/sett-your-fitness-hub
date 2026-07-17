@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
@@ -72,6 +72,8 @@ const MUSCLE_GROUP_NAMES_FALLBACK = [
   "Bíceps", "Tríceps", "Antebraço", "Abdominais", "Lombar / Eretores",
 ];
 
+const EXERCISES_PER_PAGE = 80;
+
 export default function ExerciseLibrary() {
   const { user, role, companyId } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
@@ -82,6 +84,7 @@ export default function ExerciseLibrary() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [search, setSearch] = useState("");
   const [filterGroup, setFilterGroup] = useState("all");
+  const [visibleCount, setVisibleCount] = useState(EXERCISES_PER_PAGE);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Exercise | null>(null);
   const [videoModal, setVideoModal] = useState<{ type: "path" | "url"; value: string } | null>(null);
@@ -385,13 +388,18 @@ export default function ExerciseLibrary() {
     }
   };
 
-  const filtered = exercises.filter((ex) => {
+  useEffect(() => {
+    setVisibleCount(EXERCISES_PER_PAGE);
+  }, [search, filterGroup, effectiveCompanyId]);
+
+  const filtered = useMemo(() => exercises.filter((ex) => {
     const matchSearch = ex.name.toLowerCase().includes(search.toLowerCase());
     const matchGroup = filterGroup === "all" || ex.muscle_group === filterGroup;
     return matchSearch && matchGroup;
-  });
+  }), [exercises, filterGroup, search]);
 
-  const grouped = filtered.reduce<Record<string, Exercise[]>>((acc, ex) => {
+  const visibleExercises = filtered.slice(0, visibleCount);
+  const grouped = visibleExercises.reduce<Record<string, Exercise[]>>((acc, ex) => {
     const g = ex.muscle_group;
     if (!acc[g]) acc[g] = [];
     acc[g].push(ex);
@@ -706,6 +714,10 @@ export default function ExerciseLibrary() {
           </Select>
         </div>
 
+        <p className="text-xs text-muted-foreground font-mono-data">
+          Exibindo {Math.min(visibleCount, filtered.length)} de {filtered.length} exercício(s)
+        </p>
+
         {/* Exercise grid grouped by muscle group */}
         {Object.keys(grouped).length === 0 && (
           <p className="text-center text-muted-foreground font-sans py-12">Nenhum exercício encontrado</p>
@@ -808,6 +820,13 @@ export default function ExerciseLibrary() {
             </div>
           </div>
         ))}
+        {visibleCount < filtered.length && (
+          <div className="flex justify-center pb-4">
+            <Button variant="outline" onClick={() => setVisibleCount((count) => count + EXERCISES_PER_PAGE)}>
+              Carregar mais exercícios
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Input escondido do upload rápido/inline de vídeo por exercício */}

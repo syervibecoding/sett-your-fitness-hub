@@ -16,6 +16,7 @@ interface WorkoutExercise {
   muscle_group: string;
   video_url: string | null;
   video_path: string | null;
+  youtube_video_id?: string | null;
   sets: string;
   reps: string;
   rest: string;
@@ -54,8 +55,9 @@ export default function StudentWorkout() {
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [selectedCycle, setSelectedCycle] = useState<Cycle | null>(null);
   const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(null);
-  const [videoModal, setVideoModal] = useState<{ type: "path" | "url"; value: string } | null>(null);
+  const [videoModal, setVideoModal] = useState<{ type: "path" | "url" | "loading"; value: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [expandedExercise, setExpandedExercise] = useState<number | null>(null);
 
   const selectedWorkout = selectedCycle?.workouts.find(w => w.id === selectedWorkoutId) || selectedCycle?.workouts[0] || null;
@@ -70,13 +72,17 @@ export default function StudentWorkout() {
   };
 
   const loadData = async () => {
-    const { data: studentData } = await supabase
+    setLoading(true);
+    setLoadError("");
+    try {
+    const { data: studentData, error: studentError } = await supabase
       .from("students")
       .select("full_name")
       .eq("id", studentId!)
       .single();
+    if (studentError) throw studentError;
 
-    const { data: enrollmentData } = await supabase
+    const { data: enrollmentData, error: enrollmentError } = await supabase
       .from("enrollments")
       .select("id, start_date, end_date, training_start_date, plan_id, plans(name)")
       .eq("student_id", studentId!)
@@ -84,6 +90,7 @@ export default function StudentWorkout() {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+    if (enrollmentError) throw enrollmentError;
 
     if (studentData) {
       setStudent({
@@ -100,17 +107,19 @@ export default function StudentWorkout() {
     }
 
     if (enrollmentData) {
-      const { data: cyclesData } = await supabase
+      const { data: cyclesData, error: cyclesError } = await supabase
         .from("training_cycles")
         .select("id, cycle_number, start_date, end_date, status")
         .eq("enrollment_id", enrollmentData.id)
         .order("cycle_number");
+      if (cyclesError) throw cyclesError;
 
       if (cyclesData && cyclesData.length > 0) {
-        const { data: workoutsData } = await supabase
+        const { data: workoutsData, error: workoutsError } = await supabase
           .from("workouts")
           .select("id, title, description, exercises, cycle_id")
           .in("cycle_id", cyclesData.map((c) => c.id));
+        if (workoutsError) throw workoutsError;
 
         // Collect exercise_ids for video enrichment
         const exerciseIds = new Set<string>();
@@ -120,15 +129,19 @@ export default function StudentWorkout() {
         });
 
         // Fetch video data from exercise library
-        const videoMap: Record<string, { video_url: string | null; video_path: string | null }> = {};
+        const videoMap: Record<string, { video_url: string | null; video_path: string | null; youtube_video_id: string | null }> = {};
         if (exerciseIds.size > 0) {
           const { data: libraryData } = await supabase
             .from("exercise_library")
-            .select("id, video_url, video_path")
+            .select("id, video_url, video_path, youtube_video_id")
             .in("id", Array.from(exerciseIds));
           if (libraryData) {
             libraryData.forEach(lib => {
-              videoMap[lib.id] = { video_url: lib.video_url, video_path: lib.video_path };
+              videoMap[lib.id] = {
+                video_url: lib.video_url,
+                video_path: lib.video_path,
+                youtube_video_id: lib.youtube_video_id,
+              };
             });
           }
         }
@@ -144,6 +157,7 @@ export default function StudentWorkout() {
                 ...ex,
                 video_url: (ex.video_url && ex.video_url.trim()) || videoMap[ex.exercise_id]?.video_url || null,
                 video_path: (ex.video_path && ex.video_path.trim()) || videoMap[ex.exercise_id]?.video_path || null,
+                youtube_video_id: ex.youtube_video_id || videoMap[ex.exercise_id]?.youtube_video_id || null,
               })),
             }));
           return { ...c, workouts: cycleWorkouts };
@@ -151,17 +165,30 @@ export default function StudentWorkout() {
         setCycles(enriched);
 
         const today = new Date();
-        const activeCycle = enriched.find((c) => {
+        const inRange = (cycle: Cycle) => {
           try {
-            return isWithinInterval(today, { start: parseISO(c.start_date), end: parseISO(c.end_date) });
+            return isWithinInterval(today, { start: parseISO(cycle.start_date), end: parseISO(cycle.end_date) });
           } catch { return false; }
-        });
-        const chosen = activeCycle || enriched[0];
+        };
+        const newest = [...enriched].sort((left, right) =>
+          (right.start_date || "").localeCompare(left.start_date || "") || right.cycle_number - left.cycle_number
+        );
+        const chosen =
+          newest.find((cycle) => cycle.status === "active" && cycle.workouts.length > 0) ||
+          newest.find((cycle) => cycle.status === "active") ||
+          newest.find((cycle) => cycle.status !== "completed" && inRange(cycle) && cycle.workouts.length > 0) ||
+          newest.find((cycle) => cycle.workouts.length > 0) ||
+          newest[0];
         setSelectedCycle(chosen);
         if (chosen.workouts.length > 0) setSelectedWorkoutId(chosen.workouts[0].id);
       }
     }
-    setLoading(false);
+    } catch (error) {
+      console.error("student workout load failed", error);
+      setLoadError("Não foi possível carregar os treinos. Atualize a página ou fale com seu treinador.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getEmbedUrl = (url: string) => {
@@ -180,12 +207,29 @@ export default function StudentWorkout() {
     return url;
   };
 
-  const openVideoForExercise = (ex: WorkoutExercise) => {
-    if (ex.video_path) setVideoModal({ type: "path", value: getStoragePublicUrl(ex.video_path) });
-    else if (ex.video_url) setVideoModal({ type: "url", value: ex.video_url });
+  const openVideoForExercise = async (ex: WorkoutExercise) => {
+    if (ex.video_path) { setVideoModal({ type: "path", value: getStoragePublicUrl(ex.video_path) }); return; }
+    if (ex.video_url) { setVideoModal({ type: "url", value: ex.video_url }); return; }
+    if (ex.youtube_video_id) {
+      setVideoModal({ type: "url", value: `https://www.youtube.com/watch?v=${ex.youtube_video_id}` });
+      return;
+    }
+    if (!ex.exercise_id) return;
+    setVideoModal({ type: "loading", value: ex.exercise_name });
+    try {
+      const { data, error } = await supabase.functions.invoke("youtube-exercise-video", {
+        body: { exercise_id: ex.exercise_id, name: ex.exercise_name },
+      });
+      const videoId = (data as { video_id?: string } | null)?.video_id;
+      if (error || !videoId) throw error || new Error("Vídeo não encontrado");
+      setVideoModal({ type: "url", value: `https://www.youtube.com/watch?v=${videoId}` });
+    } catch {
+      setVideoModal(null);
+      window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(`${ex.exercise_name} execução técnica`)}`, "_blank");
+    }
   };
 
-  const hasVideo = (ex: WorkoutExercise) => !!(ex.video_path || ex.video_url);
+  const hasVideo = (ex: WorkoutExercise) => !!(ex.video_path || ex.video_url || ex.youtube_video_id || ex.exercise_id);
 
   const getCycleProgress = (cycle: Cycle) => {
     const today = new Date();
@@ -223,7 +267,7 @@ export default function StudentWorkout() {
   if (!student) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <p className="text-muted-foreground font-sans">Aluno não encontrado.</p>
+        <p className="text-muted-foreground font-sans">{loadError || "Aluno não encontrado."}</p>
       </div>
     );
   }
@@ -265,7 +309,7 @@ export default function StudentWorkout() {
               const hasPrescription = cycle.workouts.length > 0;
               const isCurrent = (() => {
                 try {
-                  return isWithinInterval(new Date(), { start: parseISO(cycle.start_date), end: parseISO(cycle.end_date) });
+                  return cycle.status === "active" && isWithinInterval(new Date(), { start: parseISO(cycle.start_date), end: parseISO(cycle.end_date) });
                 } catch { return false; }
               })();
 
@@ -292,6 +336,16 @@ export default function StudentWorkout() {
                   {isCurrent && (
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/50 text-primary">
                       Atual
+                    </Badge>
+                  )}
+                  {!isCurrent && cycle.status === "completed" && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">
+                      Concluído
+                    </Badge>
+                  )}
+                  {!isCurrent && cycle.status === "pending" && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">
+                      Próximo
                     </Badge>
                   )}
                 </button>
@@ -466,7 +520,12 @@ export default function StudentWorkout() {
           </DialogHeader>
           {videoModal && (
             <div className="aspect-video w-full">
-              {videoModal.type === "path" ? (
+              {videoModal.type === "loading" ? (
+                <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                  <Loader2 className="h-7 w-7 animate-spin text-primary" />
+                  <p className="text-sm">Buscando demonstração de {videoModal.value}…</p>
+                </div>
+              ) : videoModal.type === "path" ? (
                 <video src={videoModal.value} controls className="w-full h-full rounded-md" />
               ) : (
                 <iframe

@@ -33,12 +33,18 @@ export function ExternalActivitiesList({ studentId, companyId }: Props) {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("external_activities")
       .select("*")
       .eq("student_id", studentId)
       .order("activity_date", { ascending: false })
       .limit(30);
+    if (error) {
+      setActivities([]);
+      setLoading(false);
+      toast({ title: "Não foi possível carregar as atividades", description: error.message, variant: "destructive" });
+      return;
+    }
     setActivities(data || []);
     setLoading(false);
   };

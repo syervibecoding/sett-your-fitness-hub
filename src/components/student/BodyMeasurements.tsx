@@ -64,6 +64,7 @@ export function BodyMeasurements({ studentId, companyId, gender, onGenderChange 
   const { toast } = useToast();
   const [history, setHistory] = useState<MeasurementRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [savingGender, setSavingGender] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
@@ -73,12 +74,19 @@ export function BodyMeasurements({ studentId, companyId, gender, onGenderChange 
   const [heightCm, setHeightCm] = useState<string>("");
 
   const loadHistory = async () => {
-    const { data } = await supabase
+    setLoadError("");
+    const { data, error } = await supabase
       .from("body_measurements")
       .select("*")
       .eq("student_id", studentId)
       .order("measured_at", { ascending: false })
       .order("created_at", { ascending: false });
+    if (error) {
+      setHistory([]);
+      setLoadError("Não foi possível carregar suas medidas agora.");
+      setLoading(false);
+      return;
+    }
     const rows = (data as MeasurementRow[]) || [];
     setHistory(rows);
     // Prefill form with the latest measurement for easy editing.
@@ -182,6 +190,18 @@ export function BodyMeasurements({ studentId, companyId, gender, onGenderChange 
       <div className="flex justify-center py-16">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <Card className="bg-card border-destructive/30">
+        <CardContent className="p-6 text-center">
+          <Ruler className="h-8 w-8 text-destructive/60 mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground font-sans">{loadError}</p>
+          <Button variant="outline" className="mt-4" onClick={loadHistory}>Tentar novamente</Button>
+        </CardContent>
+      </Card>
     );
   }
 

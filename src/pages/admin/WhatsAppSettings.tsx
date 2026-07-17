@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMaster } from "@/contexts/MasterContext";
 
-type ConnectionState = "disconnected" | "waiting_qr" | "connected" | "loading";
+type ConnectionState = "disconnected" | "waiting_qr" | "connected" | "loading" | "not_configured";
 type BotStatus = { loading: boolean; enabled: boolean; source: string; details?: string };
 
 export default function WhatsAppSettings() {
@@ -16,6 +16,7 @@ export default function WhatsAppSettings() {
   const [qrcode, setQrcode] = useState<string | null>(null);
   const [phone, setPhone] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [integrationError, setIntegrationError] = useState("");
   const [botStatus, setBotStatus] = useState<BotStatus>({ loading: true, enabled: false, source: "none" });
   const [disablingBot, setDisablingBot] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -53,7 +54,13 @@ export default function WhatsAppSettings() {
     try {
       const data = await invoke("check-status");
       if (!data) return;
+      setIntegrationError("");
       setState(data.status as ConnectionState);
+      if (data.status === "not_configured") {
+        setBotStatus({ loading: false, enabled: false, source: "none" });
+        stopPolling();
+        return;
+      }
       setPhone(data.phone || null);
       if (data.status === "connected") {
         setQrcode(null);
@@ -72,8 +79,9 @@ export default function WhatsAppSettings() {
           if (refreshed?.status) setState(refreshed.status as ConnectionState);
         } catch { /* silent */ }
       }
-    } catch {
-      // silent
+    } catch (error) {
+      setState("disconnected");
+      setIntegrationError(error instanceof Error ? error.message : "Não foi possível verificar a integração.");
     }
   }, [invoke]);
 
@@ -240,7 +248,18 @@ export default function WhatsAppSettings() {
                   <Wifi className="h-3 w-3" /> Conectado
                 </Badge>
               )}
+              {state === "not_configured" && (
+                <Badge variant="outline" className="gap-1 border-amber-300 text-amber-700">
+                  <ShieldAlert className="h-3 w-3" /> Provedor não configurado
+                </Badge>
+              )}
             </div>
+
+            {(state === "not_configured" || integrationError) && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                {integrationError || "A conexão está preparada no app, mas as credenciais do provedor WhatsApp ainda não foram configuradas no servidor."}
+              </div>
+            )}
 
             {/* Connected phone */}
             {state === "connected" && phone && (
@@ -303,7 +322,7 @@ export default function WhatsAppSettings() {
         )}
 
         {/* External Bot Card */}
-        {effectiveCompanyId && (
+        {effectiveCompanyId && state !== "not_configured" && (
         <Card className="max-w-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">

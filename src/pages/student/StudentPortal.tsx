@@ -111,11 +111,12 @@ export default function StudentPortal() {
   const [selectedCycle, setSelectedCycle] = useState<Cycle | null>(null);
   const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(null);
   const [videoModal, setVideoModal] = useState<{ type: "path" | "url" | "loading"; value: string } | null>(null);
-  // Feedback pós-treino ("como foi o treino?") — vai pro WhatsApp do treinador.
+  // Feedback pós-treino — persiste no painel; WhatsApp é um canal adicional.
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackRating, setFeedbackRating] = useState<string | null>(null);
   const [feedbackWorkoutTitle, setFeedbackWorkoutTitle] = useState("");
+  const [feedbackSessionId, setFeedbackSessionId] = useState<string | null>(null);
   const [sendingFeedback, setSendingFeedback] = useState(false);
   const [loading, setLoading] = useState(true);
   const [expandedExercise, setExpandedExercise] = useState<number | null>(null);
@@ -595,13 +596,14 @@ export default function StudentPortal() {
       previousBestWeights[`ex-${idx}`] = maxW;
     });
 
-    await session.finishSession(logs, selectedWorkout.exercises, previousBestWeights);
+    const finishedSession = await session.finishSession(logs, selectedWorkout.exercises, previousBestWeights);
     toast({ title: "Treino concluído! 🎉", description: "Mandou bem — orgulho do seu progresso. Bora pro próximo!" });
 
     // Abre o popup "Como foi o treino?" — a resposta vai pro WhatsApp do treinador.
     setFeedbackWorkoutTitle(selectedWorkout.title);
     setFeedbackText("");
     setFeedbackRating(null);
+    setFeedbackSessionId(finishedSession?.id ?? null);
     setFeedbackOpen(true);
   };
 
@@ -609,15 +611,34 @@ export default function StudentPortal() {
     if (!studentId) return;
     setSendingFeedback(true);
     try {
-      await supabase.functions.invoke("student-workout-feedback", {
-        body: { student_id: studentId, feedback: feedbackText, rating: feedbackRating, workout_title: feedbackWorkoutTitle },
+      const { data, error } = await supabase.functions.invoke("student-workout-feedback", {
+        body: {
+          student_id: studentId,
+          feedback: feedbackText,
+          rating: feedbackRating,
+          workout_title: feedbackWorkoutTitle,
+          workout_session_id: feedbackSessionId,
+        },
       });
-      toast({ title: "Valeu pelo feedback! 💪", description: "Seu treinador já recebeu." });
-    } catch {
-      toast({ title: "Feedback registrado", description: "Obrigado!" });
+      if (error || !data?.ok || !data?.persisted) {
+        throw new Error(error?.message || data?.error || "Não foi possível registrar o feedback.");
+      }
+      toast({
+        title: "Valeu pelo feedback! 💪",
+        description: data.delivered
+          ? "Registrado no app e enviado para a conversa da equipe."
+          : "Registrado no painel da equipe para o seu treinador.",
+      });
+      setFeedbackOpen(false);
+      setFeedbackSessionId(null);
+    } catch (error) {
+      toast({
+        title: "Não foi possível enviar o feedback",
+        description: error instanceof Error ? error.message : "Tente novamente em instantes.",
+        variant: "destructive",
+      });
     } finally {
       setSendingFeedback(false);
-      setFeedbackOpen(false);
     }
   };
 
@@ -1139,7 +1160,7 @@ export default function StudentPortal() {
             <DialogTitle className="text-primary">Como foi o treino?</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">Seu treinador recebe sua resposta no WhatsApp.</p>
+            <p className="text-xs text-muted-foreground">Sua resposta fica registrada no painel da equipe e também vai para a conversa quando o WhatsApp estiver conectado.</p>
             <div className="flex gap-2">
               {[{ e: "😮‍💨", l: "Difícil" }, { e: "👍", l: "Bom" }, { e: "🔥", l: "Ótimo" }].map((o) => (
                 <button
