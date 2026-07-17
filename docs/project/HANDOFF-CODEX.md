@@ -115,9 +115,18 @@ RPCs criadas: `cohort_feedback_summary(_company_id)`, `next_cycle_recommendation
 
 ---
 
-## 7. Domínio `settapp.com.br` (pendência de infra do Matheus)
+## 7. Domínio `settapp.com.br` (pendência de DNS na Hostinger)
 
-`www.settapp.com.br` (= `settapp.lovable.app`) serve o **build ANTIGO do Lovable apontando pro Supabase morto** — por isso parece "completamente diferente" do Netlify. O DNS aponta pros servidores do Lovable. Já adicionei `www.settapp.com.br` + `settapp.com.br` como domínios do site Netlify. Falta o Matheus: (opção recomendada) apontar o DNS pro Netlify (`A @ → 75.2.60.5`, `CNAME www → bn-performance-webapp-matheus.netlify.app`) para o domínio servir o build certo com backend certo; OU republicar no Lovable (frágil — reinjeta cxese).
+O domínio está cadastrado no site correto da Netlify, mas os nameservers continuam na
+Hostinger (`athena.dns-parking.com` / `apollo.dns-parking.com`) e os registros públicos ainda
+apontam para a hospedagem antiga (`www → 185.158.133.1`, `@ → 2.57.91.91`). Por isso
+`www.settapp.com.br` continua servindo o deployment antigo `df709c2a-...`, mesmo depois de um
+deploy de produção bem-sucedido na Netlify. Esse build antigo já usa o Supabase Bn-app, mas não
+contém o frontend mais recente.
+
+Correção recomendada no DNS da Hostinger: `A @ → 75.2.60.5` e
+`CNAME www → bn-performance-webapp-matheus.netlify.app`. Depois, remover os registros A antigos
+conflitantes e aguardar a propagação. Não republicar pelo Lovable.
 
 ---
 
@@ -170,3 +179,27 @@ O código falha fechado e mostra estado de “não configurado”, mas pagamento
 operam de ponta a ponta depois de cadastrar os secrets reais: `ASAAS_API_KEY`,
 `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` e, se Stripe for usado,
 `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`. Não inventar valores para esses secrets.
+
+## 10. QA de produção e guard canônico — 2026-07-17
+
+- QA autenticado no deploy direto da Netlify: painel master, 26 rotas de admin, biblioteca,
+  Studio, avaliação, prescrições, financeiro, evasão, Central de IA e as 5 telas de WhatsApp.
+  Nenhuma rota caiu no ErrorBoundary e o console terminou sem erros.
+- Portal autenticado como aluno de teste, sem redefinir senha: dashboard, treino, estatísticas,
+  calendário, histórico, nutrição, corrida, natação e ciclismo carregaram dados do Bn-app. O
+  vídeo de exercício abriu corretamente e `ai-student-bnito` na ação `brief` respondeu HTTP 200.
+- Checkout: o painel gera token opaco de 30 dias, o link válido carrega aluno/planos e um token
+  aleatório retorna `LINK INDISPONÍVEL`. IDs de aluno não são mais aceitos como credencial.
+- Smoke anônimo nas 26 edge functions: nenhuma respondeu HTTP 500. Rotas protegidas retornaram
+  401/400/404; webhooks sem credencial retornaram 503 explícito.
+- Catálogo vivo confirmado com 917 exercícios; a tela renderiza 80 por lote e a busca encontra
+  exercícios fora do primeiro lote. Todos continuam ligados ao catálogo consumido pelo motor.
+- A chave `sb_publishable_okM...` enviada na migração pertence a outro projeto e retorna
+  `Invalid API key` no Bn-app. `.env`, `.env.local` e as quatro variáveis da Netlify estão com as
+  chaves oficiais do projeto `zshrcgbyhzxpnlccssyz`.
+- `scripts/verify-canonical-backend.mjs` passou a bloquear build com projeto, URL ou publishable
+  key divergente. `prebuild` executa o guard automaticamente e o workflow
+  `.github/workflows/quality.yml` repete guard, testes, build e inspeção do bundle em todo push/PR.
+- QA automatizado final: TypeScript 0 erros, 17 arquivos/170 testes verdes, build de produção
+  verde e `npm audit` sem vulnerabilidades. O lint global ainda contém dívida histórica de
+  `no-explicit-any` (não é regressão desta rodada e não afeta o build).

@@ -434,6 +434,8 @@ export default function StudentWorkout() {
                                       variant="ghost"
                                       size="icon"
                                       className="h-8 w-8"
+                                      aria-label={`Ver demonstração de ${ex.exercise_name}`}
+                                      title={`Ver demonstração de ${ex.exercise_name}`}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         openVideoForExercise(ex);

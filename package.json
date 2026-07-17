@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "npm run verify:backend",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
@@ -12,7 +13,8 @@
     "replica:export": "node scripts/replica-export.mjs",
     "replica:import": "node scripts/replica-import.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "verify:backend": "node scripts/verify-canonical-backend.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
