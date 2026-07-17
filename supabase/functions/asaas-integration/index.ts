@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const ASAAS_API_KEY = Deno.env.get("ASAAS_API_KEY")!;
+const ASAAS_API_KEY = Deno.env.get("ASAAS_API_KEY") || "";
 const ASAAS_BASE_URL = "https://api.asaas.com/v3";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -15,7 +15,14 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+class HttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
 async function asaasFetch(path: string, options: RequestInit = {}) {
+  if (!ASAAS_API_KEY) throw new HttpError(503, "Integração Asaas não configurada no servidor.");
   const res = await fetch(`${ASAAS_BASE_URL}${path}`, {
     ...options,
     headers: {
@@ -849,7 +856,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ error: message }),
       {
-        status: 400,
+        status: error instanceof HttpError ? error.status : 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );

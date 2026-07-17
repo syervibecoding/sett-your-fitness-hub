@@ -28,7 +28,7 @@ serve(async (req) => {
   if (!sub) return json({ error: "Unauthorized" }, 401);
 
   try {
-    const { student_id, feedback, rating, workout_title } = await req.json();
+    const { student_id, feedback, rating, workout_title, workout_session_id } = await req.json();
     const text = typeof feedback === "string" ? feedback.trim().slice(0, 1000) : "";
     if (!student_id) return json({ error: "student_id obrigatório" }, 400);
 
@@ -43,6 +43,44 @@ serve(async (req) => {
     const titleLine = workout_title ? ` (${String(workout_title).slice(0, 60)})` : "";
     const content = `📋 Feedback de treino${titleLine} — ${firstName}\n${ratingLine}${text || "(sem comentário)"}`;
 
+    const ratingDifficulty: Record<string, number> = { "Difícil": 8, "Bom": 5, "Ótimo": 3 };
+    const painAreas = ["joelho", "lombar", "ombro", "quadril", "tornozelo", "punho", "cotovelo", "pescoço"]
+      .filter((area) => text.toLocaleLowerCase("pt-BR").includes(area));
+
+    // Persist first. WhatsApp is an optional delivery channel, never the source of truth.
+    const { data: savedFeedback, error: feedbackError } = await db.from("workout_feedback").insert({
+      student_id,
+      company_id: student.company_id,
+      workout_session_id: typeof workout_session_id === "string" ? workout_session_id : null,
+      difficulty: ratingDifficulty[String(rating || "")] ?? null,
+      pain_areas: painAreas,
+      notes: [rating ? `Percepção: ${String(rating).slice(0, 40)}` : null, text || null].filter(Boolean).join("\n") || null,
+    }).select("id").single();
+    if (feedbackError || !savedFeedback) {
+      throw new Error(`Falha ao registrar feedback: ${feedbackError?.message || "registro não retornado"}`);
+    }
+
+    const { data: enrollment } = await db.from("enrollments")
+      .select("id, trainer_id")
+      .eq("student_id", student_id)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    await db.from("admin_alerts").insert({
+      company_id: student.company_id,
+      type: painAreas.length ? "workout_feedback_pain" : "workout_feedback",
+      severity: painAreas.length ? "warning" : "info",
+      target_role: enrollment?.trainer_id ? "trainer" : "admin",
+      target_user_id: enrollment?.trainer_id ?? null,
+      student_id,
+      enrollment_id: null,
+      title: painAreas.length ? "Aluno relatou desconforto no treino" : "Novo feedback de treino",
+      message: content,
+      action_url: `/admin/students/${student_id}`,
+    });
+
     // Conversa do aluno; cria se não houver (precisa de instância + número).
     let { data: chat } = await db.from("whatsapp_chats").select("id, unread_count").eq("student_id", student_id).order("last_message_at", { ascending: false }).limit(1).maybeSingle();
 
@@ -52,7 +90,7 @@ serve(async (req) => {
       if (digits && (inst as any)?.id) {
         const remoteJid = `${digits.startsWith("55") ? digits : "55" + digits}@s.whatsapp.net`;
         const { data: created } = await db.from("whatsapp_chats").insert({
-          company_id: student.company_id, instance_id: (inst as any).id, remote_jid,
+          company_id: student.company_id, instance_id: (inst as any).id, remote_jid: remoteJid,
           student_id, contact_name: student.full_name,
         }).select("id, unread_count").maybeSingle();
         chat = created as any;
@@ -60,23 +98,24 @@ serve(async (req) => {
     }
 
     if (!chat) {
-      // Sem conversa/instância: não dá pra entregar no WhatsApp. Retorna soft (o app agradece mesmo assim).
-      return json({ ok: false, delivered: false });
+      return json({ ok: true, persisted: true, delivered: false, feedback_id: savedFeedback.id });
     }
 
     const nowIso = new Date().toISOString();
-    await db.from("whatsapp_messages").insert({
+    const { error: messageError } = await db.from("whatsapp_messages").insert({
       chat_id: (chat as any).id, company_id: student.company_id,
       content, type: "text", source: "incoming", is_from_me: false,
       status: "received", timestamp: nowIso, sender_id: student_id,
     });
-    await db.from("whatsapp_chats").update({
+    if (messageError) throw new Error(`Feedback salvo, mas falhou no WhatsApp: ${messageError.message}`);
+    const { error: chatError } = await db.from("whatsapp_chats").update({
       unread_count: (((chat as any).unread_count as number) || 0) + 1,
       last_message: content.slice(0, 120),
       last_message_at: nowIso,
     }).eq("id", (chat as any).id);
+    if (chatError) throw new Error(`Feedback salvo, mas falhou ao atualizar conversa: ${chatError.message}`);
 
-    return json({ ok: true, delivered: true });
+    return json({ ok: true, persisted: true, delivered: true, feedback_id: savedFeedback.id });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : "Erro inesperado" }, 500);
   }

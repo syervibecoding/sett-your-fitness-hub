@@ -44,3 +44,12 @@ verify_jwt = false
 
 [functions.push-send]
 verify_jwt = false
+
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+[functions.asaas-webhook]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false

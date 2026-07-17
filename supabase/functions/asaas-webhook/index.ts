@@ -12,8 +12,40 @@ const supabaseAdmin = createClient(
 );
 
 const ASAAS_WEBHOOK_TOKEN = Deno.env.get("ASAAS_WEBHOOK_TOKEN");
-const ASAAS_API_KEY = Deno.env.get("ASAAS_API_KEY")!;
+const ASAAS_API_KEY = Deno.env.get("ASAAS_API_KEY") || "";
 const ASAAS_BASE_URL = "https://api.asaas.com/v3";
+
+class HttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
+async function claimEvent(eventId: string, eventType: string) {
+  const { error } = await supabaseAdmin.from("integration_webhook_events").insert({
+    provider: "asaas",
+    event_id: eventId,
+    event_type: eventType,
+    status: "processing",
+  });
+  if (!error) return true;
+  if (error.code !== "23505") throw new Error(`Falha ao registrar evento Asaas: ${error.message}`);
+
+  const { data: existing } = await supabaseAdmin.from("integration_webhook_events")
+    .select("status")
+    .eq("provider", "asaas")
+    .eq("event_id", eventId)
+    .maybeSingle();
+  if (existing?.status !== "failed") return false;
+
+  await supabaseAdmin.from("integration_webhook_events").update({
+    status: "processing",
+    error: null,
+    received_at: new Date().toISOString(),
+    processed_at: null,
+  }).eq("provider", "asaas").eq("event_id", eventId);
+  return true;
+}
 
 async function createInvoice(asaasPaymentId: string) {
   try {
@@ -147,25 +179,28 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  let claimedEventId: string | null = null;
   try {
-    // Validate webhook token
-    if (ASAAS_WEBHOOK_TOKEN) {
-      const url = new URL(req.url);
-      const token =
-        url.searchParams.get("token") ||
-        req.headers.get("asaas-access-token");
-      if (token !== ASAAS_WEBHOOK_TOKEN) {
-        console.error("Invalid webhook token");
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    if (!ASAAS_WEBHOOK_TOKEN || !ASAAS_API_KEY) {
+      throw new HttpError(503, "Asaas webhook is not configured");
+    }
+
+    const token = req.headers.get("asaas-access-token");
+    if (token !== ASAAS_WEBHOOK_TOKEN) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const event = await req.json();
-    console.log("Asaas webhook event:", JSON.stringify(event));
-
     const { event: eventType, payment } = event;
 
     if (!payment?.id) {
@@ -176,7 +211,23 @@ Deno.serve(async (req) => {
     }
 
     const asaasPaymentId = payment.id;
-    const newStatus = payment.status;
+    const remotePaymentResponse = await fetch(`${ASAAS_BASE_URL}/payments/${encodeURIComponent(asaasPaymentId)}`, {
+      headers: { access_token: ASAAS_API_KEY },
+    });
+    if (!remotePaymentResponse.ok) {
+      throw new HttpError(502, `Falha ao confirmar pagamento no Asaas (HTTP ${remotePaymentResponse.status})`);
+    }
+    const remotePayment = await remotePaymentResponse.json();
+    if (remotePayment?.id !== asaasPaymentId) throw new HttpError(400, "Pagamento Asaas divergente");
+    const newStatus = remotePayment.status;
+    const eventId = String(event.id || `${eventType}:${asaasPaymentId}:${newStatus}`);
+    claimedEventId = eventId;
+    if (!(await claimEvent(eventId, String(eventType || "payment")))) {
+      return new Response(JSON.stringify({ received: true, duplicate: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    console.log("Asaas webhook", JSON.stringify({ eventType, asaasPaymentId, newStatus }));
 
     // Update payment status in our database
     const { data: localPayment, error: paymentError } = await supabaseAdmin
@@ -188,6 +239,10 @@ Deno.serve(async (req) => {
 
     if (paymentError) {
       console.error("Error updating payment:", paymentError);
+      await supabaseAdmin.from("integration_webhook_events").update({
+        status: "completed",
+        processed_at: new Date().toISOString(),
+      }).eq("provider", "asaas").eq("event_id", eventId);
       return new Response(
         JSON.stringify({ received: true, error: "Payment not found locally" }),
         {
@@ -255,14 +310,26 @@ Deno.serve(async (req) => {
       console.log(`Student ${studentId} deactivated after refund/delete`);
     }
 
+    await supabaseAdmin.from("integration_webhook_events").update({
+      status: "completed",
+      processed_at: new Date().toISOString(),
+    }).eq("provider", "asaas").eq("event_id", eventId);
+
     return new Response(JSON.stringify({ received: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("Webhook error:", error);
     const message = error instanceof Error ? error.message : "Erro interno";
+    if (claimedEventId) {
+      await supabaseAdmin.from("integration_webhook_events").update({
+        status: "failed",
+        error: message.slice(0, 1000),
+        processed_at: new Date().toISOString(),
+      }).eq("provider", "asaas").eq("event_id", claimedEventId);
+    }
     return new Response(JSON.stringify({ error: message }), {
-      status: 500,
+      status: error instanceof HttpError ? error.status : 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

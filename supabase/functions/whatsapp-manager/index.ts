@@ -58,8 +58,19 @@ Deno.serve(async (req) => {
       return json({ error: "Forbidden" }, 403);
     }
 
-    const evoUrl = Deno.env.get("EVOLUTION_API_URL")!;
+    const evoUrl = Deno.env.get("EVOLUTION_API_URL") || "";
     const evoKey = Deno.env.get("EVOLUTION_API_KEY") || "";
+    const webhookSecret = Deno.env.get("WHATSAPP_WEBHOOK_SECRET") || "";
+
+    if (!evoUrl || !evoKey || !webhookSecret) {
+      if (action === "check-status") {
+        return json({ status: "not_configured", configured: false });
+      }
+      return json({
+        error: "Integração WhatsApp ainda não configurada no servidor.",
+        code: "whatsapp_not_configured",
+      }, 503);
+    }
 
     const evoHeaders: Record<string, string> = {
       "Content-Type": "application/json",
@@ -105,7 +116,8 @@ Deno.serve(async (req) => {
     // ─── Helper: create fresh instance ───
     const createFreshInstance = async () => {
       console.log("[createFreshInstance] Creating instance:", instanceName);
-      const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/whatsapp-webhook`;
+      const webhookUrl = new URL(`${Deno.env.get("SUPABASE_URL")}/functions/v1/whatsapp-webhook`);
+      webhookUrl.searchParams.set("token", webhookSecret);
       const createRes = await fetch(`${evoUrl}/instance/create`, {
         method: "POST",
         headers: evoHeaders,
@@ -114,7 +126,8 @@ Deno.serve(async (req) => {
           integration: "WHATSAPP-BAILEYS",
           qrcode: true,
           webhook: {
-            url: webhookUrl,
+            url: webhookUrl.toString(),
+            headers: { "x-webhook-secret": webhookSecret },
             byEvents: false,
             base64: false,
             events: ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],

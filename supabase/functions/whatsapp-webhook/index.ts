@@ -6,6 +6,15 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+function safeEqual(left: string, right: string) {
+  if (!left || !right || left.length !== right.length) return false;
+  let diff = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    diff |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return diff === 0;
+}
+
 // ─── VARIABLE REPLACEMENT ───
 function replaceVariables(text: string, context: Record<string, any>): string {
   // Get first name helper
@@ -319,6 +328,29 @@ async function resumeFlowSession(
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const expectedSecret = Deno.env.get("WHATSAPP_WEBHOOK_SECRET") || "";
+  if (!expectedSecret) {
+    console.error("[webhook] WHATSAPP_WEBHOOK_SECRET missing");
+    return new Response(JSON.stringify({ error: "Webhook not configured" }), {
+      status: 503,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const suppliedSecret = req.headers.get("x-webhook-secret") || new URL(req.url).searchParams.get("token") || "";
+  if (!safeEqual(suppliedSecret, expectedSecret)) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   try {
     const body = await req.json();

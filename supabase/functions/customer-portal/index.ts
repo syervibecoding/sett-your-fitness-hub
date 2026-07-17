@@ -12,6 +12,20 @@ const logStep = (step: string, details?: any) => {
   console.log(`[CUSTOMER-PORTAL] ${step}${detailsStr}`);
 };
 
+class HttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ALLOWED_ORIGINS = new Set([
+  "https://www.settapp.com.br",
+  "https://settapp.com.br",
+  "https://bn-performance-webapp-matheus.netlify.app",
+  "http://localhost:8080",
+]);
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -26,21 +40,26 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
-
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No authorization header provided");
+    if (!authHeader) throw new HttpError(401, "No authorization header provided");
 
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError) throw new Error(`Authentication error: ${userError.message}`);
+    if (userError) throw new HttpError(401, `Authentication error: ${userError.message}`);
     const user = userData.user;
-    if (!user) throw new Error("User not authenticated");
+    if (!user) throw new HttpError(401, "User not authenticated");
     logStep("User authenticated", { userId: user.id });
 
+    const { data: isMaster, error: roleError } = await supabaseClient.rpc("has_role", { _user_id: user.id, _role: "master" });
+    if (roleError) throw new HttpError(503, "Unable to verify user role");
+    if (!isMaster) throw new HttpError(403, "Only master users can open the billing portal");
+
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeKey) throw new HttpError(503, "Stripe is not configured");
+
     const { companyId } = await req.json();
-    if (!companyId) throw new Error("companyId is required");
+    if (!companyId) throw new HttpError(400, "companyId is required");
+    if (!UUID_RE.test(companyId)) throw new HttpError(400, "Invalid companyId");
 
     // Get Stripe customer id from restricted billing table
     const { data: billing, error: billingError } = await supabaseClient
@@ -54,7 +73,8 @@ serve(async (req) => {
     }
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-    const origin = req.headers.get("origin") || "https://bnperformancetraining.lovable.app";
+    const requestOrigin = req.headers.get("origin") || "";
+    const origin = ALLOWED_ORIGINS.has(requestOrigin) ? requestOrigin : "https://www.settapp.com.br";
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: billing.stripe_customer_id,
@@ -72,7 +92,7 @@ serve(async (req) => {
     logStep("ERROR", { message: errorMessage });
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: error instanceof HttpError ? error.status : 500,
     });
   }
 });

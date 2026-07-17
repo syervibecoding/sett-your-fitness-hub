@@ -270,6 +270,31 @@ function validatePrescription(args: {
     else warnings.push(warning);
   };
 
+  const planRecord = isRecord(args.plan) ? args.plan : null;
+  const workouts = planRecord && Array.isArray(planRecord.workouts) ? planRecord.workouts : [];
+  if (!planRecord || workouts.length === 0) {
+    add({
+      severity: "blocker",
+      code: "empty_training_plan",
+      message: "O plano não contém nenhum treino.",
+      recommendation: "Inclua ao menos um treino com exercícios válidos da biblioteca antes de salvar.",
+      source: "metodologia_bn",
+    });
+  }
+
+  workouts.forEach((workout, workoutIndex) => {
+    const exercises = isRecord(workout) && Array.isArray(workout.exercises) ? workout.exercises : [];
+    if (exercises.length === 0) {
+      add({
+        severity: "blocker",
+        code: `empty_workout_${workoutIndex + 1}`,
+        message: `O treino ${workoutIndex + 1} não contém exercícios.`,
+        recommendation: "Remova o treino vazio ou inclua exercícios válidos da biblioteca.",
+        source: "metodologia_bn",
+      });
+    }
+  });
+
   const library = validateLibraryUsage(args.plan, new Set(args.catalog.map((exercise) => exercise.id)));
   if (!library.valid) {
     add({
@@ -331,7 +356,7 @@ function validatePrescription(args: {
   }
 
   const volume_review = buildVolumeSummary(args.plan, args.catalog).map((item) => {
-    const highLimit = levelText.includes("inic") ? 16 : objectiveText.includes("forca") ? 14 : 20;
+    const highLimit = levelText.includes("inic") ? 12 : 16;
     const lowLimit = objectiveText.includes("hipertrof") ? 8 : 6;
     return {
       ...item,
@@ -350,7 +375,7 @@ function validatePrescription(args: {
         severity: "warning",
         code: `high_volume_${normalizeText(item.muscle_group).replace(/\s+/g, "_")}`,
         message: `${item.muscle_group}: ${item.weekly_sets} series/semana estimadas.`,
-        recommendation: levelText.includes("inic") ? "Reduzir para <=16 series/semana." : "Manter apenas com justificativa e boa recuperacao.",
+        recommendation: levelText.includes("inic") ? "Reduzir para <=12 series/semana." : "Reduzir para <=16 series/semana na versao atual da metodologia.",
         source: "volume",
       });
     }

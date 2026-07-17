@@ -18,9 +18,50 @@ const logStep = (step: string, details?: any) => {
   console.log(`[STRIPE-WEBHOOK] ${step}${detailsStr}`);
 };
 
+class HttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+async function claimEvent(client: any, event: Stripe.Event) {
+  const { error } = await client.from("integration_webhook_events").insert({
+    provider: "stripe",
+    event_id: event.id,
+    event_type: event.type,
+    status: "processing",
+  });
+  if (!error) return true;
+  if (error.code !== "23505") throw new Error(`Falha ao registrar evento Stripe: ${error.message}`);
+
+  const { data: existing } = await client.from("integration_webhook_events")
+    .select("status")
+    .eq("provider", "stripe")
+    .eq("event_id", event.id)
+    .maybeSingle();
+  if (existing?.status !== "failed") return false;
+
+  await client.from("integration_webhook_events").update({
+    status: "processing",
+    error: null,
+    received_at: new Date().toISOString(),
+    processed_at: null,
+  }).eq("provider", "stripe").eq("event_id", event.id);
+  return true;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   const supabaseClient = createClient(
@@ -29,21 +70,32 @@ serve(async (req) => {
     { auth: { persistSession: false } }
   );
 
+  let eventId: string | null = null;
   try {
     logStep("Webhook received");
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
+    const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+    if (!stripeKey || !webhookSecret) throw new HttpError(503, "Stripe webhook is not configured");
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     const body = await req.text();
-    
-    // For production, verify webhook signature
-    // const sig = req.headers.get("stripe-signature");
-    // const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
-    // const event = stripe.webhooks.constructEvent(body, sig!, webhookSecret!);
-    
-    const event = JSON.parse(body) as Stripe.Event;
+    const signature = req.headers.get("stripe-signature");
+    if (!signature) throw new HttpError(401, "Missing Stripe signature");
+
+    let event: Stripe.Event;
+    try {
+      event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
+    } catch {
+      throw new HttpError(400, "Invalid Stripe signature");
+    }
+    eventId = event.id;
+    if (!(await claimEvent(supabaseClient, event))) {
+      return new Response(JSON.stringify({ received: true, duplicate: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
     logStep("Event parsed", { type: event.type });
 
     switch (event.type) {
@@ -53,7 +105,7 @@ serve(async (req) => {
         const tier = session.metadata?.tier;
         const subscriptionId = session.subscription as string;
 
-        if (companyId && subscriptionId) {
+        if (companyId && subscriptionId && UUID_RE.test(companyId)) {
           logStep("Processing checkout completion", { companyId, tier, subscriptionId });
 
           await supabaseClient
@@ -80,7 +132,7 @@ serve(async (req) => {
         const subscription = event.data.object as Stripe.Subscription;
         const companyId = subscription.metadata?.company_id;
 
-        if (companyId) {
+        if (companyId && UUID_RE.test(companyId)) {
           const productId = subscription.items.data[0]?.price?.product as string;
           const tier = PRODUCT_TO_TIER[productId] || "basic";
 
@@ -103,7 +155,7 @@ serve(async (req) => {
         const subscription = event.data.object as Stripe.Subscription;
         const companyId = subscription.metadata?.company_id;
 
-        if (companyId) {
+        if (companyId && UUID_RE.test(companyId)) {
           logStep("Processing subscription cancellation", { companyId });
 
           await supabaseClient
@@ -145,6 +197,11 @@ serve(async (req) => {
         logStep("Unhandled event type", { type: event.type });
     }
 
+    await supabaseClient.from("integration_webhook_events").update({
+      status: "completed",
+      processed_at: new Date().toISOString(),
+    }).eq("provider", "stripe").eq("event_id", event.id);
+
     return new Response(JSON.stringify({ received: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
@@ -152,9 +209,16 @@ serve(async (req) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: errorMessage });
+    if (eventId) {
+      await supabaseClient.from("integration_webhook_events").update({
+        status: "failed",
+        error: errorMessage.slice(0, 1000),
+        processed_at: new Date().toISOString(),
+      }).eq("provider", "stripe").eq("event_id", eventId);
+    }
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: error instanceof HttpError ? error.status : 500,
     });
   }
 });
