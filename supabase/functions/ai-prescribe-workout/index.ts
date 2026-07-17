@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { assertTenantAccess, HttpError } from "../_shared/tenant-auth.ts";
+import { assertBundleAccess, assertTenantAccess, HttpError } from "../_shared/tenant-auth.ts";
 import { planAdvancedMethods } from "../_shared/prescription/advancedMethods.ts";
 import { buildPrescriptionInputFromEdgePayload } from "../_shared/prescription/adapters/inputAdapter.ts";
 import { adaptTrainingProgramForAiStrengthPlan } from "../_shared/prescription/adapters/outputAdapter.ts";
@@ -1385,6 +1385,7 @@ serve(async (req) => {
 
     const authz = await assertTenantAccess(supabase, claims, { companyId: company_id, studentId: student_id });
     const authorizedCompanyId = authz.companyId;
+    const authorizedBundleId = await assertBundleAccess(supabase, bundle_id, authorizedCompanyId, student_id);
     const aiConfig = await loadCompanyAiConfig(supabase, authorizedCompanyId);
     const exerciseCatalog = await loadExerciseCatalog(supabase, authorizedCompanyId);
     const exerciseCatalogText = formatExerciseCatalog(exerciseCatalog);
@@ -1699,8 +1700,8 @@ INSTRUÇÕES:
       biomechanical_notes: planJson.biomechanical_notes,
       plan: planJson,
       anamnese_id: anamnese_id ?? null,
-      bundle_id: bundle_id ?? null,
-    });
+      bundle_id: authorizedBundleId,
+    }).throwOnError();
 
     return new Response(
       JSON.stringify({ id: planId, plan: planJson }),

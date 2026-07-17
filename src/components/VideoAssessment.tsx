@@ -414,6 +414,9 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.88));
     if (!blob) return;
     const preview = canvas.toDataURL("image/jpeg", 0.88);
+    setAiAnalysis(null);
+    setAiReportText("");
+    setAiFrameFindings([]);
     setFrames(prev => prev.map(fr => fr.id === previewFrame.id
       ? { ...fr, preview, blob, aiAnalyzed: false }
       : fr));
@@ -514,6 +517,9 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
       ? await captureUsableFrame(video, time + 0.5, video.duration)
       : { ...shot, time };
 
+    setAiAnalysis(null);
+    setAiReportText("");
+    setAiFrameFindings([]);
     setFrames(prev => prev.map(fr => fr.id === frameId
       ? { ...fr, time: usableShot.time, preview: usableShot.preview, blob: usableShot.blob, aiAnalyzed: false }
       : fr));
@@ -591,6 +597,9 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
     if (!video) return;
     await waitForPaintedVideoFrame(video);
     const { preview, blob } = await captureFrame(video);
+    setAiAnalysis(null);
+    setAiReportText("");
+    setAiFrameFindings([]);
     setFrames(prev => [...prev, {
       id: crypto.randomUUID(), time: video.currentTime, preview, blob,
       vista: "Extra", findings: [], aiAnalyzed: false,
@@ -598,14 +607,19 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
   }
 
   // ── Análise IA de todos os frames ────────────────────────────────────────
-  async function analyzeAI() {
-    if (frames.length === 0) return;
+  async function analyzeAI(): Promise<AiFunctionalAssessmentResponse | null> {
+    if (frames.length === 0) return null;
     setAnalyzing(true); setError("");
     try {
       // Converte frames para base64
       const images = await Promise.all(frames.map(async (fr) => {
         const b64 = await blobToBase64(fr.blob);
-        return { vista: fr.vista, data: b64, frameId: fr.id };
+        return {
+          vista: fr.vista,
+          data: b64,
+          frameId: fr.id,
+          findings: fr.findings.filter((finding) => finding.descricao.trim()).map(toSerializableFinding),
+        };
       }));
 
       const { data, error: e } = await supabase.functions.invoke<AiFunctionalAssessmentResponse>("ai-functional-assessment", {
@@ -617,6 +631,11 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
           assessment_source: "video_full_assessment",
           protocol_hint: activeProtocol.hint,
           expected_movements: activeProtocol.vistas,
+          frame_findings: frames.map((frame) => ({
+            frameId: frame.id,
+            vista: frame.vista,
+            findings: frame.findings.filter((finding) => finding.descricao.trim()).map(toSerializableFinding),
+          })),
           ...assessmentContext,
         },
       });
@@ -639,15 +658,27 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
         findings: byFrame[fr.id]?.map(normalizeAIFinding) || fr.findings,
         aiAnalyzed: true,
       })));
-    } catch (e: unknown) { setError(errorMessage(e)); }
-    setAnalyzing(false);
+      return response;
+    } catch (e: unknown) {
+      setError(errorMessage(e));
+      return null;
+    } finally {
+      setAnalyzing(false);
+    }
   }
 
   // ── Edição manual dos achados ────────────────────────────────────────────
+  function invalidateStructuredAnalysis() {
+    setAiAnalysis(null);
+    setAiReportText("");
+    setAiFrameFindings([]);
+  }
   function updateFrame(id: string, changes: Partial<Frame>) {
+    invalidateStructuredAnalysis();
     setFrames(prev => prev.map(fr => fr.id === id ? { ...fr, ...changes } : fr));
   }
   function swapFrameCaptureWithNext(id: string) {
+    invalidateStructuredAnalysis();
     setFrames(prev => {
       const idx = prev.findIndex(fr => fr.id === id);
       if (idx < 0 || idx >= prev.length - 1) return prev;
@@ -673,11 +704,13 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
     setPreviewFrame(prev => prev?.id === id ? null : prev);
   }
   function addFinding(id: string) {
+    invalidateStructuredAnalysis();
     setFrames(prev => prev.map(fr => fr.id === id
       ? { ...fr, findings: [...fr.findings, { gravidade: "Moderada", descricao: "" }] }
       : fr));
   }
   function updateFinding(frameId: string, idx: number, key: keyof Finding, val: string) {
+    invalidateStructuredAnalysis();
     setFrames(prev => prev.map(fr => {
       if (fr.id !== frameId) return fr;
       const findings = [...fr.findings];
@@ -686,11 +719,13 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
     }));
   }
   function removeFinding(frameId: string, idx: number) {
+    invalidateStructuredAnalysis();
     setFrames(prev => prev.map(fr => fr.id === frameId
       ? { ...fr, findings: fr.findings.filter((_, i) => i !== idx) }
       : fr));
   }
   function removeFrame(id: string) {
+    invalidateStructuredAnalysis();
     setFrames(prev => prev.filter(fr => fr.id !== id));
   }
 
@@ -698,18 +733,42 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
   async function save() {
     setSaving(true); setError("");
     try {
+      let resolvedAnalysis = aiAnalysis;
+      let resolvedReportText = aiReportText;
+      let resolvedFrameFindings = aiFrameFindings;
+      let framesToSave = frames;
+
+      // The structured deterministic report is mandatory for every saved assessment.
+      // The explicit Analyze button remains useful for review, but Save can no longer
+      // persist a legacy frame-only assessment by accident.
+      if (!resolvedAnalysis) {
+        const analyzed = await analyzeAI();
+        if (!analyzed?.assessment_json) {
+          throw new Error("Não foi possível estruturar a avaliação. Revise os cortes e tente novamente.");
+        }
+        resolvedAnalysis = analyzed.assessment_json;
+        resolvedReportText = analyzed.report_text || "";
+        resolvedFrameFindings = analyzed.frame_findings || [];
+        const findingsByFrame = new Map((resolvedFrameFindings || []).map((item) => [item.frameId, item.findings || []]));
+        framesToSave = frames.map((frame) => ({
+          ...frame,
+          findings: (findingsByFrame.get(frame.id) || frame.findings).map(normalizeAIFinding),
+          aiAnalyzed: true,
+        }));
+      }
+
       // 1. Cria a avaliação — junta o laudo estruturado da IA + os achados editados pelo treinador
       const assessmentJson = {
-        ...(aiAnalysis || {}),
-        vistas: frames.map(fr => ({
+        ...(resolvedAnalysis || {}),
+        vistas: framesToSave.map(fr => ({
           vista: fr.vista, time: fr.time,
           compensacoes: fr.findings.filter(x => x.descricao.trim()).map(toSerializableFinding),
         })),
         protocol_hint: activeProtocol.hint,
         expected_movements: [...activeProtocol.vistas],
-        total_compensacoes: frames.reduce((s, fr) => s + fr.findings.filter(x => x.descricao.trim()).length, 0),
+        total_compensacoes: framesToSave.reduce((s, fr) => s + fr.findings.filter(x => x.descricao.trim()).length, 0),
       } as unknown as JsonObject;
-      const fallbackReport = typeof aiAnalysis?.relatorio_para_aluno === "string" ? aiAnalysis.relatorio_para_aluno : "";
+      const fallbackReport = typeof resolvedAnalysis?.relatorio_para_aluno === "string" ? resolvedAnalysis.relatorio_para_aluno : "";
       const { data: assessment, error: e1 } = await videoDb
         .from("functional_assessments")
         .insert({
@@ -718,7 +777,7 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
           historico_lesoes: assessmentContext?.historico_lesoes || null,
           modalidade: assessmentContext?.modalidade || null,
           nivel: assessmentContext?.nivel || null,
-          report_text: aiReportText || fallbackReport,
+          report_text: resolvedReportText || fallbackReport,
           assessment_json: assessmentJson,
           status: "completed",
           source: "video",
@@ -727,8 +786,8 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
       if (!assessment) throw new Error("A avaliação foi salva sem retornar ID.");
 
       // 2. Upload dos frames para storage + grava assessment_frames
-      for (let i = 0; i < frames.length; i++) {
-        const fr = frames[i];
+      for (let i = 0; i < framesToSave.length; i++) {
+        const fr = framesToSave[i];
         const path = `${companyId}/${assessment.id}/frame_${i}.jpg`;
         const { error: uploadError } = await videoDb.storage.from("assessment-frames").upload(path, fr.blob, { upsert: true });
         if (uploadError) throw uploadError;
@@ -744,9 +803,9 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
       }
       onComplete?.(assessment.id, {
         id: assessment.id,
-        report_text: aiReportText || fallbackReport,
+        report_text: resolvedReportText || fallbackReport,
         assessment_json: assessmentJson,
-        frame_findings: aiFrameFindings,
+        frame_findings: resolvedFrameFindings,
       });
 
       // 3. Gera o PDF entregável do laudo → salva na PASTA do aluno + abre o popup de envio.
@@ -754,11 +813,11 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
         const { data: st } = await supabase.from("students").select("full_name").eq("id", studentId).maybeSingle();
         const name = (st as { full_name?: string } | null)?.full_name || "Aluno";
         const imgs: string[] = [];
-        for (const fr of frames) {
+        for (const fr of framesToSave) {
           try { imgs.push(await new Promise<string>((res) => { const r = new FileReader(); r.onloadend = () => res(r.result as string); r.readAsDataURL(fr.blob); })); } catch { imgs.push(""); }
         }
         const pdf = generateAssessmentPDF(
-          { report_text: aiReportText || fallbackReport, assessment_json: assessmentJson },
+          { report_text: resolvedReportText || fallbackReport, assessment_json: assessmentJson },
           { studentName: name, date: new Date().toLocaleDateString("pt-BR") },
           imgs,
         );
@@ -874,8 +933,8 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
       {frames.length > 0 && !extracting && (
         <div className="flex gap-2">
           <Button onClick={analyzeAI} disabled={analyzing} className="flex-1 bg-[#1B2B4A] hover:bg-[#1B2B4A]/90">
-            {analyzing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analisando com IA…</>
-              : <><Sparkles className="mr-2 h-4 w-4" /> Analisar {frames.length} cortes com IA</>}
+            {analyzing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analisando cortes…</>
+              : <><Sparkles className="mr-2 h-4 w-4" /> Analisar {frames.length} cortes</>}
           </Button>
         </div>
       )}
@@ -971,7 +1030,7 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
 
           {error && <p className="text-sm text-red-500">{error}</p>}
 
-          <Button onClick={save} disabled={saving} className="w-full bg-[#8B7355] hover:bg-[#8B7355]/90">
+          <Button onClick={save} disabled={saving || analyzing} className="w-full bg-[#8B7355] hover:bg-[#8B7355]/90">
             {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando avaliação…</>
               : <><Save className="mr-2 h-4 w-4" /> Salvar avaliação funcional</>}
           </Button>

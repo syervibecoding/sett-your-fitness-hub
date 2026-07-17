@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { assertTenantAccess, HttpError } from "../_shared/tenant-auth.ts";
+import { assertBundleAccess, assertTenantAccess, HttpError } from "../_shared/tenant-auth.ts";
 import { buildCardioProgram, assertCardioPlanComplete } from "../_shared/prescription/cardio/cardioEngine.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
@@ -370,6 +370,7 @@ serve(async (req) => {
 
     const authz = await assertTenantAccess(supabase, claims, { companyId: company_id, studentId: student_id });
     const authorizedCompanyId = authz.companyId;
+    const authorizedBundleId = await assertBundleAccess(supabase, bundle_id, authorizedCompanyId, student_id);
     const aiConfig = await loadCompanyAiConfig(supabase, authorizedCompanyId);
 
     // Monta contexto do atleta
@@ -486,7 +487,7 @@ INSTRUÇÕES:
       duration_weeks: planJson.duration_weeks,
       model: planJson.model,
       anamnese_id: anamnese_id ?? null,
-      bundle_id: bundle_id ?? null,
+      bundle_id: authorizedBundleId,
     }).throwOnError();
 
     return new Response(

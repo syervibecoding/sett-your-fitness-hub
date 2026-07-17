@@ -17,12 +17,12 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
-async function hasValidUser(req: Request): Promise<boolean> {
+async function authenticatedClient(req: Request): Promise<any | null> {
   const auth = req.headers.get("Authorization");
-  if (!auth?.startsWith("Bearer ")) return false;
+  if (!auth?.startsWith("Bearer ")) return null;
   const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { headers: { Authorization: auth } } });
   const { data, error } = await supa.auth.getClaims(auth.replace("Bearer ", ""));
-  return !error && !!data?.claims?.sub;
+  return !error && data?.claims?.sub ? supa : null;
 }
 
 // Robusto: YouTube Data API (precisa de YOUTUBE_API_KEY como secret). Retorna null se sem chave/erro.
@@ -56,7 +56,8 @@ async function resolveYoutubeId(query: string): Promise<string | null> {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (!(await hasValidUser(req))) return json({ error: "Unauthorized" }, 401);
+  const userClient = await authenticatedClient(req);
+  if (!userClient) return json({ error: "Unauthorized" }, 401);
 
   try {
     const { exercise_id, name } = await req.json();
@@ -66,9 +67,15 @@ serve(async (req) => {
     const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
     let resolvedName = exerciseName;
-    // Cache + nome canônico via exercise_id.
+    // Read through the user's RLS context. The service role is only used to cache
+    // a result after ownership/visibility has already been established.
     if (exercise_id) {
-      const { data: ex } = await db.from("exercise_library").select("name, youtube_video_id").eq("id", exercise_id).maybeSingle();
+      const { data: ex, error: exerciseError } = await userClient.from("exercise_library")
+        .select("name, youtube_video_id")
+        .eq("id", exercise_id)
+        .maybeSingle();
+      if (exerciseError) return json({ error: "Falha ao validar exercício." }, 400);
+      if (!ex) return json({ error: "Exercício não encontrado ou sem acesso." }, 404);
       if ((ex as any)?.youtube_video_id) return json({ video_id: (ex as any).youtube_video_id, cached: true });
       if (!resolvedName && (ex as any)?.name) resolvedName = (ex as any).name;
     }
@@ -87,7 +94,10 @@ serve(async (req) => {
     }
 
     if (videoId && exercise_id) {
-      await db.from("exercise_library").update({ youtube_video_id: videoId }).eq("id", exercise_id);
+      const { error: cacheError } = await db.from("exercise_library")
+        .update({ youtube_video_id: videoId })
+        .eq("id", exercise_id);
+      if (cacheError) console.error("youtube video cache failed", cacheError.message);
     }
 
     return json({ video_id: videoId, cached: false });

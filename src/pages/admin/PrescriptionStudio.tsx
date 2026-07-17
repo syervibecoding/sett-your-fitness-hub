@@ -124,6 +124,7 @@ export default function PrescriptionStudio() {
   // Publicação do treino de força para o app do aluno.
   const [publishing, setPublishing]   = useState(false);
   const [published, setPublished]     = useState<{ workoutsCreated: number; createdEnrollment: boolean } | null>(null);
+  const [activeBundleId, setActiveBundleId] = useState<string | null>(null);
   // Vídeo vindo do WhatsApp (handshake do chat → Studio) para a Avaliação Funcional.
   const [pendingVideoUrl, setPendingVideoUrl] = useState<string | null>(null);
   const location = useLocation();
@@ -325,10 +326,13 @@ export default function PrescriptionStudio() {
     modalities.forEach(m => st[m] = "idle");
     setStatus(st);
     setResults({}); setPublished(null);
+    setActiveBundleId(null);
 
     const newResults: Record<string, any> = {};
     let strengthPlan: any = null;
     const cardioPlans: Record<string, any> = {};
+    let bundleId: string | null = null;
+    let firstRunningPlanId: string | null = null;
 
     try {
       // Avaliação funcional como contexto
@@ -337,6 +341,42 @@ export default function PrescriptionStudio() {
       const integrationCtx = prescriptionIntegration;
       const orchestrationCtx = buildBnitoOrchestrationPlan(integrationCtx);
       const a = anamnese || {};
+
+      bundleId = crypto.randomUUID();
+      const { error: bundleCreateError } = await db.from("prescription_bundles").insert({
+        id: bundleId,
+        company_id: companyId,
+        student_id: studentId,
+        anamnese_id: a.id || null,
+        assessment_id: assessmentId,
+        modalities: Array.from(modalities),
+        has_strength: modalities.has("musculacao"),
+        has_cardio: modalities.has("corrida"),
+        has_swimming: modalities.has("natacao"),
+        has_cycling: modalities.has("ciclismo"),
+        has_nutrition: modalities.has("nutricao"),
+        notes: [
+          formatPrescriptionIntegrationSummary(integrationCtx),
+          `BNITO: periodizacao de ${orchestrationCtx.duration_weeks} semanas em blocos de ${orchestrationCtx.block_length_weeks} semanas.`,
+        ].join("\n"),
+        status: "generating",
+      });
+      if (bundleCreateError) throw new Error(`Falha ao iniciar pacote integrado: ${bundleCreateError.message}`);
+      setActiveBundleId(bundleId);
+
+      const linkBundleItem = async (modality: Modality | "avaliacao", entityType: string, entityId: string) => {
+        const { error: itemError } = await db.from("prescription_bundle_items").insert({
+          bundle_id: bundleId,
+          company_id: companyId,
+          student_id: studentId,
+          modality,
+          entity_type: entityType,
+          entity_id: entityId,
+        });
+        if (itemError) throw new Error(`Falha ao vincular ${modality} ao pacote: ${itemError.message}`);
+      };
+
+      if (assessmentId) await linkBundleItem("avaliacao", "functional_assessment", assessmentId);
 
       // ── 1. MUSCULAÇÃO ──────────────────────────────────────────────
       if (modalities.has("musculacao")) {
@@ -356,9 +396,16 @@ export default function PrescriptionStudio() {
             anamnese_context: a,
             prescription_integration: integrationCtx,
             bnito_orchestration: orchestrationCtx,
+            bundle_id: bundleId,
           },
         });
         if (e || data?.error) throw new Error((await readEdgeError(e, data)) || "Falha na geração.");
+        if (!data?.id) throw new Error("A musculação foi gerada sem ID persistido.");
+        await linkBundleItem("musculacao", "ai_strength_plan", data.id);
+        const { error: strengthLinkError } = await db.from("prescription_bundles")
+          .update({ strength_plan_id: data.id })
+          .eq("id", bundleId);
+        if (strengthLinkError) throw new Error(`Falha ao ligar musculação: ${strengthLinkError.message}`);
         strengthPlan = data?.plan; newResults.musculacao = data?.plan;
         setResults({ ...newResults }); setStatus(s => ({ ...s, musculacao: "done" }));
       }
@@ -391,9 +438,19 @@ export default function PrescriptionStudio() {
             anamnese_context: a,
             prescription_integration: integrationCtx,
             bnito_orchestration: orchestrationCtx,
+            bundle_id: bundleId,
           },
         });
         if (e || data?.error) throw new Error((await readEdgeError(e, data)) || "Falha na geração.");
+        if (!data?.id) throw new Error(`A prescrição de ${mod} foi gerada sem ID persistido.`);
+        await linkBundleItem(mod, "running_plan", data.id);
+        if (!firstRunningPlanId) {
+          firstRunningPlanId = data.id;
+          const { error: cardioLinkError } = await db.from("prescription_bundles")
+            .update({ running_plan_id: data.id })
+            .eq("id", bundleId);
+          if (cardioLinkError) throw new Error(`Falha ao ligar cardio: ${cardioLinkError.message}`);
+        }
         cardioPlans[mod] = data?.plan; newResults[mod] = data?.plan;
         setResults({ ...newResults }); setStatus(s => ({ ...s, [mod]: "done" }));
       }
@@ -436,36 +493,35 @@ export default function PrescriptionStudio() {
             anamnese_context: a,
             prescription_integration: integrationCtx,
             bnito_orchestration: orchestrationCtx,
+            bundle_id: bundleId,
           },
         });
         if (e || data?.error) throw new Error((await readEdgeError(e, data)) || "Falha na geração.");
+        if (!data?.id) throw new Error("A nutrição foi gerada sem ID persistido.");
+        await linkBundleItem("nutricao", "nutrition_plan", data.id);
+        const { error: nutritionLinkError } = await db.from("prescription_bundles")
+          .update({ nutrition_plan_id: data.id })
+          .eq("id", bundleId);
+        if (nutritionLinkError) throw new Error(`Falha ao ligar nutrição: ${nutritionLinkError.message}`);
         newResults.nutricao = data?.plan;
         setResults({ ...newResults }); setStatus(s => ({ ...s, nutricao: "done" }));
       }
 
-      // ── Salva bundle ───────────────────────────────────────────────
-      // prescription_bundles VIVO não tem coluna assessment_id (divergência schema) → não inserir.
-      const { error: bundleErr } = await db.from("prescription_bundles").insert({
-        id: crypto.randomUUID(), company_id: companyId, student_id: studentId,
-        anamnese_id: a.id,
-        modalities: Array.from(modalities),
-        has_strength: modalities.has("musculacao"),
-        has_cardio: modalities.has("corrida"),
-        has_swimming: modalities.has("natacao"),
-        has_cycling: modalities.has("ciclismo"),
-        has_nutrition: modalities.has("nutricao"),
-        notes: [
-          formatPrescriptionIntegrationSummary(integrationCtx),
-          `BNITO: periodizacao de ${orchestrationCtx.duration_weeks} semanas em blocos de ${orchestrationCtx.block_length_weeks} semanas.`,
-        ].join("\n"),
-        status: "active",
-      });
-      if (bundleErr) console.warn("prescription_bundles insert falhou (nao bloqueia):", bundleErr.message);
+      const { error: bundleFinalizeError } = await db.from("prescription_bundles")
+        .update({ status: "active", generation_error: null })
+        .eq("id", bundleId);
+      if (bundleFinalizeError) throw new Error(`Falha ao finalizar pacote integrado: ${bundleFinalizeError.message}`);
 
       // Sem auto-publicação: o professor revisa/edita o treino e clica em "Publicar treino no app do aluno".
 
     } catch (e: any) {
       setError(e.message);
+      if (bundleId) {
+        await db.from("prescription_bundles").update({
+          status: "failed",
+          generation_error: String(e?.message || "Falha na geração").slice(0, 1000),
+        }).eq("id", bundleId);
+      }
     }
     setGenerating(false);
   }
@@ -489,6 +545,7 @@ export default function PrescriptionStudio() {
       const r = await publishStrengthPlanToStudent({
         plan: editPlan || results.musculacao, studentId, companyId, createdBy: user?.id ?? null,
         aiOriginal: results.musculacao, // P9/P15 — versiona + resume edições do professor.
+        bundleId: activeBundleId,
       });
       setPublished({ workoutsCreated: r.workoutsCreated, createdEnrollment: r.createdEnrollment });
       // #5 Push — avisa o aluno no celular que a prescrição chegou (best-effort, não bloqueia).

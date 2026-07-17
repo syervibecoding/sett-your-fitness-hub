@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { assertTenantAccess, HttpError } from "../_shared/tenant-auth.ts";
+import { assertBundleAccess, assertTenantAccess, HttpError } from "../_shared/tenant-auth.ts";
 import { buildNutritionProgram, assertNutritionPlanComplete } from "../_shared/nutrition/nutritionEngine.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
@@ -473,6 +473,7 @@ serve(async (req) => {
 
     const authz = await assertTenantAccess(supabase, claims, { companyId: company_id, studentId: student_id });
     const authorizedCompanyId = authz.companyId;
+    const authorizedBundleId = await assertBundleAccess(supabase, bundle_id, authorizedCompanyId, student_id);
     const aiConfig = await loadCompanyAiConfig(supabase, authorizedCompanyId);
 
     const athleteContext = `
@@ -584,8 +585,8 @@ INSTRUÇÕES:
       ai_rationale: textValue(planJson.general_notes),
       observations: textValue(planJson.general_notes),
       anamnese_id,
-      bundle_id,
-    });
+      bundle_id: authorizedBundleId,
+    }).throwOnError();
 
     return new Response(
       JSON.stringify({ id: planId, plan: planJson }),

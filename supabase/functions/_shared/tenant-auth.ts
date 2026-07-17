@@ -13,6 +13,28 @@ export function isUuid(value: unknown): value is string {
   return typeof value === "string" && UUID_RE.test(value);
 }
 
+export async function assertBundleAccess(
+  adminClient: any,
+  bundleId: unknown,
+  companyId: string,
+  studentId: unknown,
+): Promise<string | null> {
+  if (bundleId == null || bundleId === "") return null;
+  if (!isUuid(bundleId)) throw new HttpError(400, "bundle_id inválido.");
+  if (!isUuid(studentId)) throw new HttpError(400, "student_id inválido.");
+
+  const { data: bundle, error } = await adminClient
+    .from("prescription_bundles")
+    .select("id")
+    .eq("id", bundleId)
+    .eq("company_id", companyId)
+    .eq("student_id", studentId)
+    .maybeSingle();
+  if (error) throw new HttpError(500, `Falha ao validar pacote integrado: ${error.message}`);
+  if (!bundle) throw new HttpError(403, "Forbidden: bundle mismatch.");
+  return bundleId;
+}
+
 export async function assertTenantAccess(
   adminClient: any,
   claims: any,
