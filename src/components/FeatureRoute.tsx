@@ -2,6 +2,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanyFeatures, CompanyFeatures } from "@/hooks/useCompanyFeatures";
 import { useRolePermissions, type PermissionModule } from "@/hooks/useRolePermissions";
+import { useMaster } from "@/contexts/MasterContext";
 
 type FeatureKey = keyof Omit<CompanyFeatures, "tier" | "loading">;
 
@@ -16,9 +17,10 @@ export function FeatureRoute({ children, allowedRoles, requiredFeature, required
   const { user, role, loading: authLoading } = useAuth();
   const features = useCompanyFeatures();
   const { canAccess, loading: permLoading } = useRolePermissions();
+  const { viewingCompany, contextLoading, contextError } = useMaster();
   const location = useLocation();
 
-  if (authLoading || features.loading || permLoading) {
+  if (authLoading || contextLoading || features.loading || permLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -31,7 +33,7 @@ export function FeatureRoute({ children, allowedRoles, requiredFeature, required
   }
 
   const isMaster = role === "master";
-  const isViewingCompany = isMaster && !!localStorage.getItem("master_viewing_company");
+  const isViewingCompany = isMaster && !!viewingCompany;
   const isAdminRoute = location.pathname.startsWith("/admin");
   const isCoordinatorRoute = location.pathname.startsWith("/coordinator");
   const isTrainerRoute = location.pathname.startsWith("/trainer");
@@ -46,9 +48,11 @@ export function FeatureRoute({ children, allowedRoles, requiredFeature, required
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-6">
         <div className="text-center space-y-4 max-w-md">
-          <h2 className="text-2xl text-primary">Nenhuma empresa selecionada</h2>
+          <h2 className="text-2xl text-primary">
+            {contextError ? "Não foi possível validar a empresa" : "Nenhuma empresa selecionada"}
+          </h2>
           <p className="text-muted-foreground font-sans">
-            Como master, você precisa entrar no contexto de uma empresa para acessar esta área. Volte ao painel master e selecione uma empresa para visualizar.
+            {contextError || "Como master, você precisa entrar no contexto de uma empresa para acessar esta área. Volte ao painel master e selecione uma empresa para visualizar."}
           </p>
           <button
             onClick={() => (window.location.href = "/master")}

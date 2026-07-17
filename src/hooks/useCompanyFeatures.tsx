@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useMaster } from "@/contexts/MasterContext";
 
 export type CompanyTier = "basic" | "intermediate" | "advanced";
 
@@ -72,6 +73,7 @@ const TIER_FEATURES: Record<CompanyTier, Omit<CompanyFeatures, "tier" | "loading
 
 export function useCompanyFeatures(): CompanyFeatures {
   const { user, role } = useAuth();
+  const { viewingCompany, contextLoading } = useMaster();
   const [tier, setTier] = useState<CompanyTier>("basic");
   const [loading, setLoading] = useState(true);
 
@@ -81,20 +83,10 @@ export function useCompanyFeatures(): CompanyFeatures {
       return;
     }
 
-    // Master viewing a company - get tier from localStorage
     if (role === "master") {
-      const stored = localStorage.getItem("master_viewing_company");
-      if (stored) {
-        try {
-          const viewingCompany = JSON.parse(stored);
-          setTier((viewingCompany.tier as CompanyTier) || "advanced");
-        } catch {
-          setTier("advanced");
-        }
-      } else {
-        // Master not viewing any company - full access
-        setTier("advanced");
-      }
+      if (contextLoading) return;
+      const companyTier = viewingCompany?.tier as CompanyTier | undefined;
+      setTier(companyTier && companyTier in TIER_FEATURES ? companyTier : "advanced");
       setLoading(false);
       return;
     }
@@ -115,7 +107,7 @@ export function useCompanyFeatures(): CompanyFeatures {
     };
 
     fetchTier();
-  }, [user, role]);
+  }, [contextLoading, role, user, viewingCompany]);
 
   return {
     tier,
