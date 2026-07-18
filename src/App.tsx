@@ -52,6 +52,7 @@ const CoordinatorDashboard = lazy(() => import("./pages/coordinator/CoordinatorD
 const TrainerDashboard = lazy(() => import("./pages/trainer/TrainerDashboard"));
 const MasterDashboard = lazy(() => import("./pages/master/MasterDashboard"));
 const CompaniesManager = lazy(() => import("./pages/master/CompaniesManager"));
+const MasterAccount = lazy(() => import("./pages/master/MasterAccount"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PublicRegistration = lazy(() => import("./pages/PublicRegistration"));
 const PublicAnamnesis = lazy(() => import("./pages/PublicAnamnesis"));
