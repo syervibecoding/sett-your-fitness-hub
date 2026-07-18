@@ -22,6 +22,7 @@ import {
   Sparkles,
   Activity,
   BrainCircuit,
+  KeyRound,
 
 
 } from "lucide-react";
