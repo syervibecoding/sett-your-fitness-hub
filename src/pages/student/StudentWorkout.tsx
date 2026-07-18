@@ -82,15 +82,17 @@ export default function StudentWorkout() {
       .single();
     if (studentError) throw studentError;
 
-    const { data: enrollmentData, error: enrollmentError } = await supabase
+    const { data: enrollmentRows, error: enrollmentError } = await supabase
       .from("enrollments")
-      .select("id, start_date, end_date, training_start_date, plan_id, plans(name)")
+      .select("id, start_date, end_date, training_start_date, plan_id, status, plans(name)")
       .eq("student_id", studentId!)
-      .eq("status", "active")
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(20);
     if (enrollmentError) throw enrollmentError;
+    const enrollmentData =
+      enrollmentRows?.find((enrollment) => enrollment.status === "active") ||
+      enrollmentRows?.[0] ||
+      null;
 
     if (studentData) {
       setStudent({
