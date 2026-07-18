@@ -133,14 +133,14 @@ export default function StudentWorkout() {
         if (exerciseIds.size > 0) {
           const { data: libraryData } = await supabase
             .from("exercise_library")
-            .select("id, video_url, video_path, youtube_video_id")
+            .select("id, video_url, video_path")
             .in("id", Array.from(exerciseIds));
           if (libraryData) {
             libraryData.forEach(lib => {
               videoMap[lib.id] = {
                 video_url: lib.video_url,
                 video_path: lib.video_path,
-                youtube_video_id: lib.youtube_video_id,
+                youtube_video_id: null,
               };
             });
           }

@@ -16,6 +16,21 @@ interface PlatformSettings {
   company_id: string | null;
 }
 
+function normalizePlatformSettings(data: Partial<PlatformSettings> | null): PlatformSettings | null {
+  if (!data?.id) return null;
+  return {
+    id: data.id,
+    primary_color: data.primary_color || DEFAULTS.primary_color,
+    background_color: data.background_color || DEFAULTS.background_color,
+    card_color: data.card_color || DEFAULTS.card_color,
+    text_color: data.text_color || DEFAULTS.text_color,
+    platform_title: data.platform_title || DEFAULTS.platform_title,
+    logo_url: data.logo_url ?? null,
+    layout_style: data.layout_style || DEFAULTS.layout_style,
+    company_id: data.company_id ?? null,
+  };
+}
+
 const DEFAULTS: Omit<PlatformSettings, "id" | "company_id"> = {
   primary_color: "#1D2D5C",
   background_color: "#FAFAF7",
@@ -187,7 +202,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
       const { data, error } = await query.limit(1).maybeSingle();
       if (error) throw error;
-      return data as PlatformSettings | null;
+      return normalizePlatformSettings(data);
     },
     staleTime: 1000 * 60 * 5,
   });
