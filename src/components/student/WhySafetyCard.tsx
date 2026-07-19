@@ -4,11 +4,15 @@ import { useMemo, useState } from "react";
 import { differenceInWeeks, parseISO } from "date-fns";
 import { HelpCircle, ShieldAlert, ChevronDown, ChevronUp, MessageCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Props {
   objective?: string | null;
   startDate?: string | null;
-  whatsappUrl?: string | null; // wa.me da empresa (sem texto)
+  studentId: string;
+  companyId: string | null;
   studentName?: string | null;
 }
 
@@ -25,8 +29,9 @@ function blockLabel(week: number): { fase: string; foco: string } {
   return { fase: "Semanas 5–6 · Intensificação", foco: "consolidar a progressão mantendo a técnica" };
 }
 
-export function WhySafetyCard({ objective, startDate, whatsappUrl, studentName }: Props) {
+export function WhySafetyCard({ objective, startDate, studentId, companyId, studentName }: Props) {
   const [open, setOpen] = useState(false);
+  const [reportingPain, setReportingPain] = useState(false);
 
   const { fase, foco, why } = useMemo(() => {
     let week = 1;
@@ -37,9 +42,28 @@ export function WhySafetyCard({ objective, startDate, whatsappUrl, studentName }
     return { ...b, why: matched ? OBJ_WHY[matched] : "seguir a progressão que seu treinador planejou pra você" };
   }, [objective, startDate]);
 
-  const painMsg = encodeURIComponent(
-    `Oi! Sou ${studentName || "aluno(a)"} e senti dor durante o treino de hoje. Pode me orientar?`,
-  );
+  const reportPain = async () => {
+    setReportingPain(true);
+    const { data, error } = await supabase.functions.invoke("ai-student-bnito", {
+      body: {
+        action: "report_pain",
+        question: `Sou ${studentName || "aluno(a)"} e senti dor durante o treino de hoje. Preciso de orientação da equipe.`,
+        history: [],
+        page_context: {
+          pathname: "/student",
+          page_label: "Segurança do treino",
+          student_id: studentId,
+          company_id: companyId,
+        },
+      },
+    });
+    setReportingPain(false);
+    if (error || !data?.team_alert_created) {
+      toast.error(data?.error || error?.message || "Não foi possível avisar a equipe agora.");
+      return;
+    }
+    toast.success("Seu treinador foi avisado dentro do app.");
+  };
 
   return (
     <Card className="bg-card border-border">
@@ -70,16 +94,10 @@ export function WhySafetyCard({ objective, startDate, whatsappUrl, studentName }
                 <li>🟡 <span className="font-medium">Média (4–5/10):</span> pare ESTE exercício e pule para o próximo.</li>
                 <li>🔴 <span className="font-medium">Forte (acima de 5/10):</span> pare o treino e avise seu treinador.</li>
               </ul>
-              {whatsappUrl && (
-                <a
-                  href={`${whatsappUrl}?text=${painMsg}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-[11px] font-medium text-primary mt-1"
-                >
-                  <MessageCircle className="h-3 w-3" /> Avisar meu treinador agora
-                </a>
-              )}
+              <Button type="button" variant="link" size="sm" onClick={reportPain} disabled={reportingPain} className="mt-1 h-auto px-0 text-[11px]">
+                <MessageCircle className="mr-1.5 h-3 w-3" />
+                {reportingPain ? "Avisando a equipe..." : "Avisar meu treinador agora"}
+              </Button>
             </div>
           </div>
         )}

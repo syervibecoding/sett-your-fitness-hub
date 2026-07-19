@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { UserPlus, Copy, Check, MessageCircle, Link2, Pencil, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import FormFieldEditor from "@/components/FormFieldEditor";
+import { useNavigate } from "react-router-dom";
+import { openStudentChat } from "@/lib/studentChat";
 
 interface Student { id: string; full_name: string; phone: string | null; whatsapp: string | null; }
 
@@ -25,6 +27,8 @@ export default function RegistrationManager() {
   const { companyId, role } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
   const effectiveCompanyId = role === "master" ? (isViewingCompany ? viewingCompany?.id ?? null : null) : companyId ?? null;
+  const navigate = useNavigate();
+  const chatRoutePrefix = role === "master" ? "admin" : role || "admin";
 
   const [link, setLink] = useState(`${window.location.origin}/cadastro`);
   const [students, setStudents] = useState<Student[]>([]);
@@ -50,11 +54,19 @@ export default function RegistrationManager() {
     if (s) setPhone(s.whatsapp || s.phone || "");
   }, [studentId, students]);
 
-  const sendWhatsApp = () => {
+  const sendWhatsApp = async () => {
     const digits = waDigits(phone);
     if (!digits) { toast.error("Digite o WhatsApp do interessado (ou selecione um aluno)."); return; }
     const msg = `Olá! Faça seu cadastro por aqui (leva 1 minutinho): ${link}`;
-    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
+    const selectedStudent = students.find((student) => student.id === studentId);
+    await openStudentChat({
+      navigate,
+      routePrefix: chatRoutePrefix,
+      studentId: selectedStudent?.id || null,
+      phone: digits,
+      message: msg,
+      onNoChat: () => toast.error("Informe um telefone válido para abrir a conversa interna."),
+    });
   };
 
   const copyLink = () => {
@@ -87,7 +99,7 @@ export default function RegistrationManager() {
         <div>
           <h1 className="flex items-center gap-2 text-3xl text-primary"><UserPlus className="h-7 w-7" /> CADASTRO</h1>
           <p className="mt-1 font-sans text-sm text-muted-foreground">
-            Envie o link do cadastro direto no WhatsApp do interessado.
+            Abra uma conversa interna com o link de cadastro já preenchido.
           </p>
         </div>
         <Button variant="outline" onClick={() => setEditing(true)}>

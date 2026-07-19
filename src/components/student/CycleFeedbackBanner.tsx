@@ -13,17 +13,14 @@ interface Props {
   enrollmentId: string | null;
   enrollmentEndDate: string | null;
   cycleId?: string | null;
-  whatsappUrl?: string | null;
 }
 
-const WHATSAPP_FEEDBACK_FALLBACK = "https://wa.me/message/GZWXMSEEKWGII1";
 const DISMISS_KEY = (id: string) => `cycle_feedback_dismissed_${id}`;
 const DONE_KEY = (id: string) => `cycle_feedback_done_${id}`;
 
 // Banner de fim de ciclo → anamnese RÁPIDA + NPS (item 3). Grava em cycle_feedback;
 // o professor vê na hora de liberar a próxima prescrição (liberação manual).
-export function CycleFeedbackBanner({ studentId, companyId, enrollmentId, enrollmentEndDate, cycleId, whatsappUrl }: Props) {
-  const feedbackUrl = whatsappUrl || WHATSAPP_FEEDBACK_FALLBACK;
+export function CycleFeedbackBanner({ studentId, companyId, enrollmentId, enrollmentEndDate, cycleId }: Props) {
   const [dismissed, setDismissed] = useState(false);
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -94,9 +91,6 @@ export function CycleFeedbackBanner({ studentId, companyId, enrollmentId, enroll
             {!open ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button size="sm" className="h-8" onClick={() => setOpen(true)}>Responder (1 min)</Button>
-                <Button size="sm" variant="outline" className="h-8" onClick={() => window.open(feedbackUrl, "_blank")}>
-                  Falar no WhatsApp
-                </Button>
               </div>
             ) : (
               <div className="mt-3 space-y-3">

@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     if (!student_id) return json(400, { error: "student_id required" });
 
     // Autorização por empresa (master ou staff da mesma empresa do aluno)
-    await assertTenantAccess(adminClient, claimsData.claims, { studentId: student_id });
+    await assertTenantAccess(adminClient, claimsData.claims, { studentId: student_id, requireStaff: true });
     const { data: callerRoles } = await adminClient.from("user_roles").select("role").eq("user_id", callerId);
     const roles = (callerRoles || []).map((r: any) => r.role);
     if (!roles.some((r: string) => ["admin", "master", "coordinator", "trainer"].includes(r))) {

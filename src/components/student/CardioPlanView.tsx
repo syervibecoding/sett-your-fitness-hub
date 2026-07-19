@@ -23,6 +23,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { businessDateYmd } from "@/lib/businessDate";
 
 type Sport = "corrida" | "natacao" | "ciclismo";
 
@@ -128,16 +129,27 @@ export function CardioPlanView({
     let active = true;
     const load = async () => {
       setLoading(true);
+      const today = businessDateYmd();
       const { data } = await supabase
         .from("running_plans")
         .select("*")
         .eq("student_id", studentId)
         .eq("sport", sport)
+        .lte("start_date", today)
+        .or(`end_date.is.null,end_date.gte.${today}`)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+      let visible = data;
+      // Compatibilidade com prescrições legadas, que não tinham vigência.
+      if (!visible) {
+        const { data: legacy } = await supabase.from("running_plans").select("*")
+          .eq("student_id", studentId).eq("sport", sport).is("start_date", null)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle();
+        visible = legacy;
+      }
       if (!active) return;
-      setPlan((data as CardioPlan) || null);
+      setPlan((visible as CardioPlan) || null);
       setLoading(false);
     };
     load();

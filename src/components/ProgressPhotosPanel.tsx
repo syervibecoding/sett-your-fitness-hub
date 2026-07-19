@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { businessDateYmd } from "@/lib/businessDate";
 
 type ProgressPhoto = {
   id: string;
@@ -37,7 +38,7 @@ export function ProgressPhotosPanel({
   const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [takenAt, setTakenAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [takenAt, setTakenAt] = useState(() => businessDateYmd());
   const [notes, setNotes] = useState("");
 
   const canUpload = role === "student";

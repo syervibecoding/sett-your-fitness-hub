@@ -3,8 +3,9 @@
 // Preserva os exercícios VERBATIM (group_id, method, vídeo, set_types) — diferente do
 // publishStrengthPlan que remapeia do formato da IA.
 import { supabase } from "@/integrations/supabase/client";
+import { businessDateYmd } from "@/lib/businessDate";
 
-const ymd = (d: Date) => d.toISOString().slice(0, 10);
+const ymd = businessDateYmd;
 
 export interface TemplateForSend {
   name: string;

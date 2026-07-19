@@ -1041,7 +1041,11 @@ serve(async (req) => {
     } = await req.json();
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-    const authz = await assertTenantAccess(supabaseAdmin, claims, { companyId: company_id, studentId: student_id });
+    const authz = await assertTenantAccess(supabaseAdmin, claims, {
+      companyId: company_id,
+      studentId: student_id,
+      requireStaff: true,
+    });
     const authorizedCompanyId = authz.companyId;
 
     // Monta o conteúdo de imagens, rotulando cada uma com vista + frameId

@@ -19,6 +19,15 @@ export interface EdgePrescriptionPayload {
   restrictions?: unknown;
   injuries?: unknown;
   block_number?: unknown;
+  previous_plan_context?: unknown;
+  previous_performance_context?: unknown;
+  program_sequence?: {
+    sequence_number?: unknown;
+    total_cycles?: unknown;
+    start_date?: unknown;
+    end_date?: unknown;
+    phase?: unknown;
+  } | null;
   is_endurance_athlete?: unknown;
   assessment_context?: unknown;
   anamnese_context?: unknown;

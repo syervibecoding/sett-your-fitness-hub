@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Save, Trash2, Ruler, TrendingUp } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { businessDateYmd } from "@/lib/businessDate";
 import {
   LineChart,
   Line,
@@ -58,7 +59,7 @@ interface MeasurementRow extends BodyMeasurementValues {
   notes: string | null;
 }
 
-const todayStr = () => new Date().toISOString().split("T")[0];
+const todayStr = () => businessDateYmd();
 
 export function BodyMeasurements({ studentId, companyId, gender, onGenderChange }: BodyMeasurementsProps) {
   const { toast } = useToast();

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { assertBundleAccess, assertTenantAccess, HttpError } from "../_shared/tenant-auth.ts";
+import { assertBundleAccess, assertTenantAccess, HttpError, isUuid } from "../_shared/tenant-auth.ts";
 import { planAdvancedMethods } from "../_shared/prescription/advancedMethods.ts";
 import { buildPrescriptionInputFromEdgePayload } from "../_shared/prescription/adapters/inputAdapter.ts";
 import { adaptTrainingProgramForAiStrengthPlan } from "../_shared/prescription/adapters/outputAdapter.ts";
@@ -1380,12 +1380,57 @@ serve(async (req) => {
       running_days_context, // { days_per_week, sport } — anti-interferência
       anamnese_id,
       bundle_id,
+      training_cycle_id,
+      previous_plan_id,
+      previous_plan_context,
+      previous_performance_context,
+      program_sequence,
       notes,
     } = await req.json();
 
-    const authz = await assertTenantAccess(supabase, claims, { companyId: company_id, studentId: student_id });
+    const authz = await assertTenantAccess(supabase, claims, {
+      companyId: company_id,
+      studentId: student_id,
+      requireStaff: true,
+    });
     const authorizedCompanyId = authz.companyId;
     const authorizedBundleId = await assertBundleAccess(supabase, bundle_id, authorizedCompanyId, student_id);
+    let cycleContext: any = null;
+    if (training_cycle_id != null && training_cycle_id !== "") {
+      if (!isUuid(training_cycle_id)) throw new HttpError(400, "training_cycle_id inválido.");
+      const { data: cycle, error: cycleError } = await supabase
+        .from("training_cycles")
+        .select("id, student_id, company_id, cycle_number, start_date, end_date")
+        .eq("id", training_cycle_id)
+        .maybeSingle();
+      if (cycleError) throw new HttpError(500, `Falha ao validar ciclo: ${cycleError.message}`);
+      if (!cycle || cycle.student_id !== student_id || cycle.company_id !== authorizedCompanyId) {
+        throw new HttpError(403, "Forbidden: training cycle mismatch.");
+      }
+      cycleContext = cycle;
+    }
+    let effectivePreviousPlan = previous_plan_context ?? null;
+    let authorizedPreviousPlanId: string | null = null;
+    if (previous_plan_id != null && previous_plan_id !== "") {
+      if (!isUuid(previous_plan_id)) throw new HttpError(400, "previous_plan_id inválido.");
+      const { data: previous, error: previousError } = await supabase
+        .from("ai_strength_plans")
+        .select("id, plan")
+        .eq("id", previous_plan_id)
+        .eq("student_id", student_id)
+        .eq("company_id", authorizedCompanyId)
+        .maybeSingle();
+      if (previousError) throw new HttpError(500, `Falha ao carregar plano anterior: ${previousError.message}`);
+      if (!previous) throw new HttpError(403, "Forbidden: previous plan mismatch.");
+      authorizedPreviousPlanId = previous.id;
+      effectivePreviousPlan = previous.plan;
+    }
+    const effectiveProgramSequence = {
+      ...(program_sequence && typeof program_sequence === "object" ? program_sequence : {}),
+      sequence_number: cycleContext?.cycle_number ?? program_sequence?.sequence_number ?? block_number ?? 1,
+      start_date: cycleContext?.start_date ?? program_sequence?.start_date ?? null,
+      end_date: cycleContext?.end_date ?? program_sequence?.end_date ?? null,
+    };
     const aiConfig = await loadCompanyAiConfig(supabase, authorizedCompanyId);
     const exerciseCatalog = await loadExerciseCatalog(supabase, authorizedCompanyId);
     const exerciseCatalogText = formatExerciseCatalog(exerciseCatalog);
@@ -1494,6 +1539,9 @@ INSTRUÇÕES:
           anamnese_context,
           prescription_integration,
           running_days_context,
+          previous_plan_context: effectivePreviousPlan,
+          previous_performance_context,
+          program_sequence: effectiveProgramSequence,
           notes,
         },
         catalog: exerciseCatalog.exercises as any,
@@ -1604,7 +1652,8 @@ INSTRUÇÕES:
             student_name, objective, fitness_level, days_per_week, duration_weeks,
             equipment, restrictions, block_number, is_endurance_athlete,
             assessment_context, anamnese_context, prescription_integration,
-            running_days_context, notes,
+            running_days_context, previous_plan_context: effectivePreviousPlan,
+            previous_performance_context, program_sequence: effectiveProgramSequence, notes,
           },
           catalog: exerciseCatalog.exercises as any,
         });
@@ -1690,8 +1739,11 @@ INSTRUÇÕES:
     }
 
     // Salva o plano de força gerado pela IA (JSON, desacoplado da execução)
-    const planId = crypto.randomUUID();
-    await supabase.from("ai_strength_plans").insert({
+    const { data: existingCyclePlan } = cycleContext
+      ? await supabase.from("ai_strength_plans").select("id").eq("training_cycle_id", cycleContext.id).maybeSingle()
+      : { data: null };
+    const planId = existingCyclePlan?.id || crypto.randomUUID();
+    const persistencePayload = {
       id: planId,
       company_id: authorizedCompanyId, student_id,
       cycle_name: planJson.cycle_name,
@@ -1701,7 +1753,16 @@ INSTRUÇÕES:
       plan: planJson,
       anamnese_id: anamnese_id ?? null,
       bundle_id: authorizedBundleId,
-    }).throwOnError();
+      training_cycle_id: cycleContext?.id ?? null,
+      previous_plan_id: authorizedPreviousPlanId,
+      sequence_number: Number(effectiveProgramSequence.sequence_number) || 1,
+      sequence_phase: planJson.program_sequence?.phase ?? null,
+    };
+    if (existingCyclePlan?.id) {
+      await supabase.from("ai_strength_plans").update(persistencePayload).eq("id", existingCyclePlan.id).throwOnError();
+    } else {
+      await supabase.from("ai_strength_plans").insert(persistencePayload).throwOnError();
+    }
 
     return new Response(
       JSON.stringify({ id: planId, plan: planJson }),

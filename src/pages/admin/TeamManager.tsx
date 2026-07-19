@@ -18,6 +18,7 @@ import { useManageRolePermissions, type PermissionModule } from "@/hooks/useRole
 import { format, subMonths, startOfMonth, endOfMonth, parse, addMonths, isAfter, isBefore } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Textarea } from "@/components/ui/textarea";
+import { businessDateYmd } from "@/lib/businessDate";
 
 interface TeamMember {
   user_id: string;
@@ -465,7 +466,7 @@ export default function TeamManager() {
 
   const saveHistoryRow = async (row: { id: string; trainer_id: string | null; assigned_at: string; unassigned_at: string | null }) => {
     // P17 — validação de datas: início não pode ser no futuro; fim não pode anteceder o início.
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessDateYmd();
     if (row.assigned_at && row.assigned_at.slice(0, 10) > today) {
       toast({ title: "Data inválida", description: "O início da atribuição não pode ser no futuro.", variant: "destructive" }); return;
     }

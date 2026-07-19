@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { businessDateYmd } from "../_shared/business-date.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -286,7 +287,7 @@ async function createPayment(body: any) {
       customer: student.asaas_customer_id,
       billingType,
       value: Number(value),
-      dueDate: dueDate || new Date().toISOString().split("T")[0],
+      dueDate: dueDate || businessDateYmd(),
       description: description || "Plano BN Performance Training",
       externalReference: studentId,
     }),
@@ -381,7 +382,7 @@ async function createCardPayment(body: any) {
     customer: student.asaas_customer_id,
     billingType: "CREDIT_CARD",
     value: Number(value),
-    dueDate: dueDate || new Date().toISOString().split("T")[0],
+    dueDate: dueDate || businessDateYmd(),
     description: description || "Plano BN Performance Training",
     externalReference: studentId,
     creditCard: {
@@ -487,7 +488,7 @@ async function createInvoice(body: any) {
       payment: paymentId,
       serviceDescription: "Consultoria em educação física",
       observations: "Nota fiscal referente ao plano BN Performance Training",
-      effectiveDate: new Date().toISOString().split("T")[0],
+      effectiveDate: businessDateYmd(),
       municipalServiceId: "8446",
       municipalServiceCode: "8599-6/04",
       municipalServiceName: "8.02 - TREINAMENTO EM DESENVOLVIMENTO PROFISSIONAL E GERENCIAL",
@@ -550,14 +551,13 @@ async function ensureEnrollmentExists(studentId: string, planId?: string) {
 
   // --- RENEWAL: active enrollment exists → extend it ---
   if (existing) {
-    const currentEnd = existing.end_date ? new Date(existing.end_date) : new Date();
-    const today = new Date();
-    // Start extension from whichever is later: today or current end_date
-    const extensionStart = currentEnd > today ? currentEnd : today;
+    const todayYmd = businessDateYmd();
+    const extensionStartYmd = existing.end_date && existing.end_date > todayYmd ? existing.end_date : todayYmd;
+    const extensionStart = new Date(`${extensionStartYmd}T12:00:00Z`);
     const newEnd = new Date(extensionStart);
-    newEnd.setDate(newEnd.getDate() + planDays);
+    newEnd.setUTCDate(newEnd.getUTCDate() + planDays);
 
-    const newEndStr = newEnd.toISOString().split("T")[0];
+    const newEndStr = businessDateYmd(newEnd);
 
     console.log(`[RENEWAL] Extending enrollment ${existing.id} from ${existing.end_date} to ${newEndStr} (+${planDays} days)`);
 
@@ -585,28 +585,29 @@ async function ensureEnrollmentExists(studentId: string, planId?: string) {
     let cycleNum = (lastCycle?.cycle_number || 0) + 1;
     // New cycles start after the last cycle ends (or from extensionStart+1 if no cycles)
     let cycleStart = lastCycle?.end_date
-      ? new Date(new Date(lastCycle.end_date).getTime() + 86400000)
-      : new Date(extensionStart.getTime() + 86400000);
+      ? new Date(`${lastCycle.end_date}T12:00:00Z`)
+      : new Date(extensionStart);
+    cycleStart.setUTCDate(cycleStart.getUTCDate() + 1);
 
     while (cycleStart <= newEnd) {
       let cycleEnd = new Date(cycleStart);
-      cycleEnd.setDate(cycleEnd.getDate() + cycleDays - 1);
+      cycleEnd.setUTCDate(cycleEnd.getUTCDate() + cycleDays - 1);
       if (cycleEnd > newEnd) cycleEnd = newEnd;
 
       await supabaseAdmin.from("training_cycles").insert({
         enrollment_id: existing.id,
         cycle_number: cycleNum,
-        start_date: cycleStart.toISOString().split("T")[0],
-        end_date: cycleEnd.toISOString().split("T")[0],
+        start_date: businessDateYmd(cycleStart),
+        end_date: businessDateYmd(cycleEnd),
         status: "pending",
         company_id: companyId,
       });
 
-      console.log(`[RENEWAL] Created cycle ${cycleNum}: ${cycleStart.toISOString().split("T")[0]} → ${cycleEnd.toISOString().split("T")[0]}`);
+      console.log(`[RENEWAL] Created cycle ${cycleNum}: ${businessDateYmd(cycleStart)} → ${businessDateYmd(cycleEnd)}`);
 
       cycleNum++;
       cycleStart = new Date(cycleEnd);
-      cycleStart.setDate(cycleStart.getDate() + 1);
+      cycleStart.setUTCDate(cycleStart.getUTCDate() + 1);
     }
 
     return existing.id;
@@ -614,9 +615,9 @@ async function ensureEnrollmentExists(studentId: string, planId?: string) {
 
   // --- FIRST ENROLLMENT: create new ---
 
-  const today = new Date();
+  const today = new Date(`${businessDateYmd()}T12:00:00Z`);
   const endDate = new Date(today);
-  endDate.setDate(endDate.getDate() + planDays - 1);
+  endDate.setUTCDate(endDate.getUTCDate() + planDays - 1);
 
   const { data: enrollment, error } = await supabaseAdmin
     .from("enrollments")
@@ -624,10 +625,10 @@ async function ensureEnrollmentExists(studentId: string, planId?: string) {
       student_id: studentId,
       plan_id: effectivePlanId,
       trainer_id: student?.assigned_trainer_id || null,
-      start_date: today.toISOString().split("T")[0],
-      end_date: endDate.toISOString().split("T")[0],
+      start_date: businessDateYmd(today),
+      end_date: businessDateYmd(endDate),
       payment_status: "paid",
-      payment_date: today.toISOString().split("T")[0],
+      payment_date: businessDateYmd(today),
       status: "active",
       company_id: companyId,
     })
@@ -667,7 +668,7 @@ async function applyPaymentStatusEffects(studentId: string, paymentStatus: strin
       .from("enrollments")
       .update({
         payment_status: "paid",
-        payment_date: new Date().toISOString().split("T")[0],
+        payment_date: businessDateYmd(),
       })
       .eq("student_id", studentId)
       .eq("status", "active");
@@ -776,7 +777,7 @@ async function syncPayments(body: any) {
   // Calculate 6 months ago date for syncAll
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-  const dateFilter = syncAll ? `&dateCreated[ge]=${sixMonthsAgo.toISOString().split("T")[0]}` : "";
+  const dateFilter = syncAll ? `&dateCreated[ge]=${businessDateYmd(sixMonthsAgo)}` : "";
 
   for (const student of students) {
     try {

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BarChart3, AlertTriangle, CheckCircle, TrendingUp, Activity } from "lucide-react";
 import { MuscleRadar } from "@/components/student/MuscleRadar";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
+import { businessDateYmd } from "@/lib/businessDate";
 
 interface Props {
   studentId: string;
@@ -42,7 +43,7 @@ export function WorkoutAnalysis({ studentId }: Props) {
 
     const daysAgo = new Date();
     daysAgo.setDate(daysAgo.getDate() - parseInt(period));
-    const sinceDate = daysAgo.toISOString().split("T")[0]; // YYYY-MM-DD for session_date comparison
+    const sinceDate = businessDateYmd(daysAgo);
 
     // Load sessions (if any)
     const { data: sessions } = await supabase

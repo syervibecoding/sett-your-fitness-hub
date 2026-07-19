@@ -82,6 +82,20 @@ type LabelItem = {
   color: string;
 };
 
+type ChatNavigationState = {
+  chatId?: string | null;
+  studentId?: string | null;
+  phone?: string | null;
+  contactName?: string | null;
+  prefillMessage?: string | null;
+};
+
+type DraftRecipient = {
+  remoteJid: string;
+  studentId: string | null;
+  contactName: string;
+};
+
 export default function WhatsAppChat() {
   const { user, role: userRole, companyId } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
@@ -92,10 +106,16 @@ export default function WhatsAppChat() {
   // Prefixo de rota para mandar o vídeo da avaliação pro Studio (master visualizando = admin).
   const studioRoutePrefix = userRole === "master" && isViewingCompany ? "admin" : (userRole || "admin");
   // Chat alvo vindo do CRM/dashboard (navigate("/admin/whatsapp-chat", { state: { chatId, prefillMessage } }))
-  const pendingChatIdRef = useRef<string | null>((location.state as { chatId?: string } | null)?.chatId ?? null);
+  const navigationState = (location.state as ChatNavigationState | null) ?? null;
+  const pendingChatIdRef = useRef<string | null>(navigationState?.chatId ?? null);
+  const pendingStudentIdRef = useRef<string | null>(navigationState?.studentId ?? null);
+  const pendingPhoneRef = useRef<string | null>(navigationState?.phone ?? null);
+  const pendingContactNameRef = useRef<string | null>(navigationState?.contactName ?? null);
   // Mensagem pronta (rascunho) vinda de aniversário/renovação/anamnese — pré-preenche a caixa de texto, NÃO envia sozinha.
-  const pendingPrefillRef = useRef<string | null>((location.state as { prefillMessage?: string } | null)?.prefillMessage ?? null);
+  const pendingPrefillRef = useRef<string | null>(navigationState?.prefillMessage ?? null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [draftRecipient, setDraftRecipient] = useState<DraftRecipient | null>(null);
+  const [chatsLoaded, setChatsLoaded] = useState(false);
   const selectedChatIdRef = useRef<string | null>(null);
   useEffect(() => { selectedChatIdRef.current = selectedChatId; }, [selectedChatId]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -178,6 +198,7 @@ export default function WhatsAppChat() {
       }));
       setChats(chatsWithPreview);
     }
+    setChatsLoaded(true);
   }, [effectiveCompanyId]);
 
   const loadSenderNames = useCallback(async () => {
@@ -433,18 +454,41 @@ export default function WhatsAppChat() {
   // Load contacts from Evolution API separately to avoid overwhelming edge function workers
   useEffect(() => { const t = setTimeout(() => loadContacts(), 2000); return () => clearTimeout(t); }, [loadContacts]);
   useEffect(() => { if (chats.length > 0) { loadStudentData(chats); loadChatLabels(chats.map(c => c.id)); } }, [chats, loadStudentData, loadChatLabels]);
-  // Pré-seleciona a conversa vinda do CRM assim que ela aparece na lista carregada (aplica uma única vez).
+  // Pré-seleciona uma conversa existente ou prepara uma nova conversa interna.
   useEffect(() => {
-    if (pendingChatIdRef.current && chats.some((c) => c.id === pendingChatIdRef.current)) {
-      setSelectedChatId(pendingChatIdRef.current);
-      pendingChatIdRef.current = null;
-      // Aplica o rascunho pronto (aniversário/renovação/etc.) uma única vez, sem enviar.
-      if (pendingPrefillRef.current) {
-        setNewMessage(pendingPrefillRef.current);
-        pendingPrefillRef.current = null;
-      }
+    if (!chatsLoaded) return;
+
+    const requestedChat = pendingChatIdRef.current
+      ? chats.find((chat) => chat.id === pendingChatIdRef.current)
+      : null;
+    const studentChat = !requestedChat && pendingStudentIdRef.current
+      ? chats.find((chat) => chat.student_id === pendingStudentIdRef.current)
+      : null;
+    const digits = (pendingPhoneRef.current || "").replace(/\D/g, "");
+    const phoneChat = !requestedChat && !studentChat && digits
+      ? chats.find((chat) => chat.remote_jid.replace(/\D/g, "").endsWith(digits))
+      : null;
+    const matchedChat = requestedChat || studentChat || phoneChat || null;
+
+    if (matchedChat) {
+      setSelectedChatId(matchedChat.id);
+      setDraftRecipient(null);
+    } else if (digits) {
+      setSelectedChatId(null);
+      setDraftRecipient({
+        remoteJid: digits,
+        studentId: pendingStudentIdRef.current,
+        contactName: pendingContactNameRef.current || "Nova conversa",
+      });
     }
-  }, [chats]);
+
+    if (pendingPrefillRef.current) setNewMessage(pendingPrefillRef.current);
+    pendingChatIdRef.current = null;
+    pendingStudentIdRef.current = null;
+    pendingPhoneRef.current = null;
+    pendingContactNameRef.current = null;
+    pendingPrefillRef.current = null;
+  }, [chats, chatsLoaded]);
   useEffect(() => { if (selectedChatId) loadMessages(selectedChatId); }, [selectedChatId, loadMessages]);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -481,9 +525,9 @@ export default function WhatsAppChat() {
   }, [effectiveCompanyId, loadChats]);
 
   const handleSend = async () => {
-    if (!newMessage.trim() || !selectedChatId) return;
+    if (!newMessage.trim()) return;
     const chat = chats.find((c) => c.id === selectedChatId);
-    if (!chat) return;
+    if (!chat && !draftRecipient) return;
     setSending(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -494,15 +538,23 @@ export default function WhatsAppChat() {
         body: JSON.stringify({
           action: "send-message",
           companyId: effectiveCompanyId,
-          remoteJid: chat.remote_jid,
+          remoteJid: chat?.remote_jid || draftRecipient?.remoteJid,
           content: newMessage.trim(),
-          chatId: selectedChatId,
+          chatId: selectedChatId || undefined,
+          studentId: chat?.student_id || draftRecipient?.studentId || undefined,
+          contactName: chat ? getContactName(chat) : draftRecipient?.contactName,
           ...(replyingTo?.message_id_external ? { quotedMessageId: replyingTo.message_id_external } : {}),
         }),
       });
-      if (!res.ok) throw new Error("Erro ao enviar");
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || "Erro ao enviar");
       setNewMessage("");
       setReplyingTo(null);
+      if (!selectedChatId && payload?.chatId) {
+        setDraftRecipient(null);
+        await loadChats();
+        setSelectedChatId(payload.chatId);
+      }
     } catch (err: any) {
       toast.error(err.message || "Erro ao enviar mensagem");
     } finally { setSending(false); }
@@ -757,8 +809,19 @@ export default function WhatsAppChat() {
                   const lastSenderName = chat.last_sender_id ? senderNames[chat.last_sender_id] : null;
                   return (
                     <div key={chat.id} className="relative group">
-                      <button
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Abrir conversa com ${getContactName(chat)}`}
                         onClick={() => { setSelectedChatId(chat.id); setEditingName(false); }}
+                        onKeyDown={(event) => {
+                          if (event.currentTarget !== event.target) return;
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            setSelectedChatId(chat.id);
+                            setEditingName(false);
+                          }
+                        }}
                         className={cn("w-full text-left p-3 border-b border-border hover:bg-muted/50 transition-colors flex items-start gap-3", selectedChatId === chat.id && "bg-primary/10")}
                       >
                         <div className="h-10 w-10 shrink-0 rounded-full bg-muted flex items-center justify-center">
@@ -800,7 +863,7 @@ export default function WhatsAppChat() {
                             </div>
                           </div>
                         </div>
-                      </button>
+                      </div>
                     </div>
                   );
                 })
@@ -810,11 +873,49 @@ export default function WhatsAppChat() {
 
           {/* Messages */}
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            {!selectedChat ? (
+            {!selectedChat && !draftRecipient ? (
               <div className="flex-1 flex items-center justify-center text-muted-foreground">
                 <div className="text-center space-y-2">
                   <MessageSquare className="h-12 w-12 mx-auto opacity-30" />
                   <p className="text-sm">Selecione uma conversa para começar</p>
+                </div>
+              </div>
+            ) : draftRecipient ? (
+              <div className="flex h-full flex-col">
+                <div className="flex items-center gap-3 border-b border-border bg-muted/30 p-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
+                    <UserPlus className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground">{draftRecipient.contactName}</p>
+                    <p className="font-mono-data text-xs text-muted-foreground">+{draftRecipient.remoteJid}</p>
+                  </div>
+                </div>
+                <div className="flex flex-1 items-center justify-center p-6 text-center text-muted-foreground">
+                  <div className="max-w-sm space-y-2">
+                    <MessageSquare className="mx-auto h-10 w-10 opacity-30" />
+                    <p className="text-sm font-medium text-foreground">Nova conversa interna</p>
+                    <p className="text-xs">A mensagem só será enviada quando você confirmar abaixo.</p>
+                  </div>
+                </div>
+                <div className="border-t border-border p-3 pr-20">
+                  <div className="flex items-end gap-2">
+                    <Textarea
+                      value={newMessage}
+                      onChange={(event) => setNewMessage(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                          event.preventDefault();
+                          void handleSend();
+                        }
+                      }}
+                      placeholder="Digite a mensagem..."
+                      className="min-h-[44px] max-h-32 resize-none"
+                    />
+                    <Button onClick={handleSend} disabled={sending || !newMessage.trim()} size="icon" title="Enviar mensagem">
+                      {sending ? <Clock className="h-4 w-4 animate-pulse" /> : <Send className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -997,7 +1098,7 @@ export default function WhatsAppChat() {
                     </div>
                   </div>
                 )}
-                <div className="p-3 border-t border-border flex gap-2 items-center">
+                <div className="p-3 pr-20 border-t border-border flex gap-2 items-center">
                   <input
                     ref={fileInputRef}
                     type="file"

@@ -4,9 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Trophy, Clock, Dumbbell, TrendingUp, CheckCircle2, Share2, MessageCircle } from "lucide-react";
 import type { ExerciseSummaryItem } from "@/hooks/useWorkoutSession";
 
-// Fallback BN — usado só quando a empresa do aluno não tem WhatsApp configurado (white-label).
-const WHATSAPP_FEEDBACK_FALLBACK = "https://wa.me/message/GZWXMSEEKWGII1";
-
 interface WorkoutSummaryProps {
   open: boolean;
   onClose: () => void;
@@ -16,13 +13,12 @@ interface WorkoutSummaryProps {
   totalSetsPrescribed: number;
   exercises: ExerciseSummaryItem[];
   formatTime: (s: number) => string;
-  whatsappUrl?: string | null;
+  onFeedback?: () => void;
 }
 
 export function WorkoutSummary({
-  open, onClose, durationSeconds, totalVolume, totalSetsCompleted, totalSetsPrescribed, exercises, formatTime, whatsappUrl
+  open, onClose, durationSeconds, totalVolume, totalSetsCompleted, totalSetsPrescribed, exercises, formatTime, onFeedback
 }: WorkoutSummaryProps) {
-  const feedbackUrl = whatsappUrl || WHATSAPP_FEEDBACK_FALLBACK;
   const prs = exercises.filter(e => e.isPR);
 
   const shareText = () => {
@@ -114,11 +110,11 @@ export function WorkoutSummary({
             Compartilhar
           </Button>
           <Button
-            onClick={() => window.open(feedbackUrl, "_blank")}
-            className="w-full font-sans gap-2 bg-[#25D366] hover:bg-[#20bd5a] text-white"
+            onClick={() => { onClose(); onFeedback?.(); }}
+            className="w-full font-sans gap-2"
           >
             <MessageCircle className="h-4 w-4" />
-            Enviar Feedback no WhatsApp
+            Registrar feedback no app
           </Button>
           <Button onClick={onClose} className="w-full font-sans">
             Fechar

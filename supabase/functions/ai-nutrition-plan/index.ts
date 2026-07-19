@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { assertBundleAccess, assertTenantAccess, HttpError } from "../_shared/tenant-auth.ts";
+import { assertBundleAccess, assertTenantAccess, HttpError, isUuid } from "../_shared/tenant-auth.ts";
 import { buildNutritionProgram, assertNutritionPlanComplete } from "../_shared/nutrition/nutritionEngine.ts";
+import { businessDateYmd } from "../_shared/business-date.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -469,11 +470,51 @@ serve(async (req) => {
       bnito_orchestration, // contrato do BNITO para sincronizar agentes
       anamnese_id,
       bundle_id,
+      training_cycle_id,
+      previous_plan_id,
+      previous_plan_context,
+      program_sequence,
     } = input;
 
-    const authz = await assertTenantAccess(supabase, claims, { companyId: company_id, studentId: student_id });
+    const authz = await assertTenantAccess(supabase, claims, {
+      companyId: company_id,
+      studentId: student_id,
+      requireStaff: true,
+    });
     const authorizedCompanyId = authz.companyId;
     const authorizedBundleId = await assertBundleAccess(supabase, bundle_id, authorizedCompanyId, student_id);
+    let cycleContext: any = null;
+    if (training_cycle_id != null && training_cycle_id !== "") {
+      if (!isUuid(training_cycle_id)) throw new HttpError(400, "training_cycle_id inválido.");
+      const { data: cycle, error: cycleError } = await supabase.from("training_cycles")
+        .select("id, student_id, company_id, cycle_number, start_date, end_date")
+        .eq("id", training_cycle_id).maybeSingle();
+      if (cycleError) throw new HttpError(500, `Falha ao validar ciclo: ${cycleError.message}`);
+      if (!cycle || cycle.student_id !== student_id || cycle.company_id !== authorizedCompanyId) {
+        throw new HttpError(403, "Forbidden: training cycle mismatch.");
+      }
+      cycleContext = cycle;
+    }
+    let authorizedPreviousPlanId: string | null = null;
+    let effectivePreviousPlan = previous_plan_context ?? null;
+    if (previous_plan_id != null && previous_plan_id !== "") {
+      if (!isUuid(previous_plan_id)) throw new HttpError(400, "previous_plan_id inválido.");
+      const { data: previous, error: previousError } = await supabase.from("nutrition_plans")
+        .select("id, plan_name, goal, target_calories, target_protein_g, target_carbs_g, target_fat_g, meals")
+        .eq("id", previous_plan_id).eq("student_id", student_id).eq("company_id", authorizedCompanyId).maybeSingle();
+      if (previousError) throw new HttpError(500, `Falha ao carregar plano anterior: ${previousError.message}`);
+      if (!previous) throw new HttpError(403, "Forbidden: previous plan mismatch.");
+      authorizedPreviousPlanId = previous.id;
+      effectivePreviousPlan = previous;
+    }
+    input.previous_plan_context = effectivePreviousPlan;
+    input.block_number = cycleContext?.cycle_number ?? input.block_number ?? 1;
+    input.program_sequence = {
+      ...(program_sequence && typeof program_sequence === "object" ? program_sequence : {}),
+      sequence_number: cycleContext?.cycle_number ?? program_sequence?.sequence_number ?? input.block_number,
+      start_date: cycleContext?.start_date ?? program_sequence?.start_date ?? null,
+      end_date: cycleContext?.end_date ?? program_sequence?.end_date ?? null,
+    };
     const aiConfig = await loadCompanyAiConfig(supabase, authorizedCompanyId);
 
     const athleteContext = `
@@ -560,9 +601,12 @@ INSTRUÇÕES:
     assertNutritionPlanComplete(planJson);
 
     // Salva no banco
-    const planId = crypto.randomUUID();
+    const { data: existingCyclePlan } = cycleContext
+      ? await supabase.from("nutrition_plans").select("id").eq("training_cycle_id", cycleContext.id).maybeSingle()
+      : { data: null };
+    const planId = existingCyclePlan?.id || crypto.randomUUID();
     // Schema LIVE de nutrition_plans (studio): name(NOT NULL)/goal/target_*/total_*/meals.
-    await supabase.from("nutrition_plans").insert({
+    const persistencePayload = {
       id: planId,
       company_id: authorizedCompanyId, student_id,
       name: planJson.plan_name,
@@ -586,7 +630,19 @@ INSTRUÇÕES:
       observations: textValue(planJson.general_notes),
       anamnese_id,
       bundle_id: authorizedBundleId,
-    }).throwOnError();
+      training_cycle_id: cycleContext?.id ?? null,
+      previous_plan_id: authorizedPreviousPlanId,
+      sequence_number: planJson.program_sequence?.sequence_number ?? 1,
+      sequence_phase: planJson.program_sequence?.phase ?? null,
+      start_date: cycleContext?.start_date ?? businessDateYmd(),
+      end_date: cycleContext?.end_date ?? null,
+      status: cycleContext && cycleContext.start_date > businessDateYmd() ? "scheduled" : "active",
+    };
+    if (existingCyclePlan?.id) {
+      await supabase.from("nutrition_plans").update(persistencePayload).eq("id", existingCyclePlan.id).throwOnError();
+    } else {
+      await supabase.from("nutrition_plans").insert(persistencePayload).throwOnError();
+    }
 
     return new Response(
       JSON.stringify({ id: planId, plan: planJson }),

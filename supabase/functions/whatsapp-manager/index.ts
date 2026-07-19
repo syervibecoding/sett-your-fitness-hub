@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
     // Look up instance_name from whatsapp_instances table
     const { data: instanceRow } = await adminClient
       .from("whatsapp_instances")
-      .select("instance_name")
+      .select("id, instance_name")
       .eq("company_id", resolvedCompanyId)
       .limit(1)
       .maybeSingle();
@@ -360,7 +360,7 @@ Deno.serve(async (req) => {
 
     // ─── SEND MESSAGE ───
     if (action === "send-message") {
-      const { remoteJid, content, chatId, quotedMessageId } = body;
+      const { remoteJid, content, chatId, quotedMessageId, studentId, contactName } = body;
       if (!remoteJid || !content) return json({ error: "remoteJid and content required" }, 400);
 
       const sendBody: Record<string, unknown> = {
@@ -391,9 +391,36 @@ Deno.serve(async (req) => {
 
       const sendData = await sendRes.json();
 
-      if (chatId) {
+      let persistedChatId = chatId || null;
+      if (!persistedChatId) {
+        const digits = String(remoteJid).replace(/\D/g, "");
+        const databaseRemoteJid = String(remoteJid).includes("@")
+          ? String(remoteJid)
+          : `${digits}@s.whatsapp.net`;
+        const { data: createdChat, error: chatError } = await adminClient
+          .from("whatsapp_chats")
+          .upsert({
+            company_id: resolvedCompanyId,
+            instance_id: instanceRow?.id || null,
+            remote_jid: databaseRemoteJid,
+            contact_name: contactName || null,
+            student_id: studentId || null,
+            last_message: content,
+            last_message_at: new Date().toISOString(),
+            unread_count: 0,
+          }, { onConflict: "instance_id,remote_jid" })
+          .select("id")
+          .single();
+        if (chatError) {
+          console.error("Failed to persist new WhatsApp chat:", chatError.message);
+        } else {
+          persistedChatId = createdChat.id;
+        }
+      }
+
+      if (persistedChatId) {
         await adminClient.from("whatsapp_messages").insert({
-          chat_id: chatId,
+          chat_id: persistedChatId,
           company_id: resolvedCompanyId,
           content,
           source: "outgoing",
@@ -407,13 +434,14 @@ Deno.serve(async (req) => {
 
         // Update last_message_at and last_sender_id
         await adminClient.from("whatsapp_chats").update({
+          last_message: content,
           last_message_at: new Date().toISOString(),
           unread_count: 0,
           last_sender_id: userId,
-        }).eq("id", chatId);
+        }).eq("id", persistedChatId);
       }
 
-      return json({ success: true, messageId: sendData?.key?.id || null });
+      return json({ success: true, messageId: sendData?.key?.id || null, chatId: persistedChatId });
     }
 
     // ─── SEND MEDIA ───

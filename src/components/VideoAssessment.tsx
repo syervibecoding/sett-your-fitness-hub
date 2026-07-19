@@ -50,7 +50,6 @@ interface VideoDbClient {
   storage: {
     from(bucket: string): {
       upload(path: string, file: Blob, options?: { upsert?: boolean }): Promise<{ error: SupabaseErrorLike | null }>;
-      getPublicUrl(path: string): { data: { publicUrl: string } };
     };
   };
   from(table: "functional_assessments"): {
@@ -791,10 +790,9 @@ export default function VideoAssessment({ studentId, companyId, assessmentContex
         const path = `${companyId}/${assessment.id}/frame_${i}.jpg`;
         const { error: uploadError } = await videoDb.storage.from("assessment-frames").upload(path, fr.blob, { upsert: true });
         if (uploadError) throw uploadError;
-        const { data: urlData } = videoDb.storage.from("assessment-frames").getPublicUrl(path);
         const { error: frameError } = await videoDb.from("assessment_frames").insert({
           assessment_id: assessment.id, company_id: companyId,
-          frame_index: i, vista: fr.vista, image_url: urlData.publicUrl,
+          frame_index: i, vista: fr.vista, image_url: path,
           ai_findings: fr.aiAnalyzed ? fr.findings.map(toSerializableFinding) : null,
           trainer_findings: fr.findings.map(toSerializableFinding),
           edited: !fr.aiAnalyzed || true,

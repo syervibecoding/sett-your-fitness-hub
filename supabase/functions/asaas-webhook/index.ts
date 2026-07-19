@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { businessDateYmd } from "../_shared/business-date.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,7 +50,7 @@ async function claimEvent(eventId: string, eventType: string) {
 
 async function createInvoice(asaasPaymentId: string) {
   try {
-    const today = new Date().toISOString().split("T")[0];
+    const today = businessDateYmd();
     const res = await fetch(`${ASAAS_BASE_URL}/invoices`, {
       method: "POST",
       headers: {
@@ -145,9 +146,9 @@ async function ensureEnrollmentExists(studentId: string) {
     return null;
   }
 
-  const today = new Date();
+  const today = new Date(`${businessDateYmd()}T12:00:00Z`);
   const endDate = new Date(today);
-  endDate.setDate(endDate.getDate() + plan.duration_weeks * 7);
+  endDate.setUTCDate(endDate.getUTCDate() + plan.duration_weeks * 7 - 1);
 
   const { data: enrollment, error } = await supabaseAdmin
     .from("enrollments")
@@ -155,10 +156,10 @@ async function ensureEnrollmentExists(studentId: string) {
       student_id: studentId,
       plan_id: student.selected_plan_id,
       trainer_id: student.assigned_trainer_id || null,
-      start_date: today.toISOString().split("T")[0],
-      end_date: endDate.toISOString().split("T")[0],
+      start_date: businessDateYmd(today),
+      end_date: businessDateYmd(endDate),
       payment_status: "paid",
-      payment_date: today.toISOString().split("T")[0],
+      payment_date: businessDateYmd(today),
       status: "active",
       company_id: studentCompanyId || null,
     })
@@ -272,7 +273,7 @@ Deno.serve(async (req) => {
         .from("enrollments")
         .update({
           payment_status: "paid",
-          payment_date: new Date().toISOString().split("T")[0],
+          payment_date: businessDateYmd(),
         })
         .eq("student_id", studentId)
         .eq("status", "active");

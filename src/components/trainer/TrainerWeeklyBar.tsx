@@ -5,6 +5,7 @@ import { CalendarDays, CheckCircle2, Circle, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
+import { businessDateYmd } from "@/lib/businessDate";
 
 const DAYS = [
   { label: "Seg", dayOfWeek: 1 },
@@ -74,10 +75,10 @@ export function TrainerWeeklyBar({ studentId }: Props) {
     const mondayOffset = jsDow === 0 ? -6 : 1 - jsDow;
     const weekStart = new Date(now);
     weekStart.setDate(now.getDate() + mondayOffset);
-    const weekStartStr = weekStart.toISOString().split("T")[0];
+    const weekStartStr = businessDateYmd(weekStart);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
-    const weekEndStr = weekEnd.toISOString().split("T")[0];
+    const weekEndStr = businessDateYmd(weekEnd);
 
     const workoutIds = Array.from(scheduled.values());
     const { data: logs } = await supabase

@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { businessDateYmd } from "../_shared/business-date.ts";
 
 type ChatRole = "user" | "assistant";
-type StudentBnitoAction = "ask" | "brief" | "weekly_contact" | "contextual";
+type StudentBnitoAction = "ask" | "brief" | "weekly_contact" | "contextual" | "report_pain";
 
 interface AuthContext {
   authHeader: string;
@@ -342,18 +343,16 @@ function safeExercises(workout: any) {
   }));
 }
 
-function isDateInside(date: Date, start?: string | null, end?: string | null) {
+function isDateInside(dateIso: string, start?: string | null, end?: string | null) {
   if (!start || !end) return false;
-  const startTime = new Date(start).getTime();
-  const endTime = new Date(end).getTime();
-  const now = date.getTime();
-  return Number.isFinite(startTime) && Number.isFinite(endTime) && now >= startTime && now <= endTime;
+  return dateIso >= start.slice(0, 10) && dateIso <= end.slice(0, 10);
 }
 
 function fallbackStudentContext(auth: AuthContext, pageContext?: Record<string, unknown>) {
   const today = new Date();
+  const todayIso = businessDateYmd(today);
   return {
-    today: { iso: today.toISOString().slice(0, 10), day_of_week: today.getDay() },
+    today: { iso: todayIso, day_of_week: new Date(`${todayIso}T12:00:00Z`).getUTCDay() },
     student: null,
     company: null,
     available_plans: [],
@@ -407,8 +406,8 @@ async function resolveStudentForAuth(supabase: any, auth: AuthContext) {
 async function loadStudentContext(auth: AuthContext, opts: { allowMissingStudent?: boolean; pageContext?: Record<string, unknown> } = {}) {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   const today = new Date();
-  const todayIso = today.toISOString().slice(0, 10);
-  const todayDow = today.getDay();
+  const todayIso = businessDateYmd(today);
+  const todayDow = new Date(`${todayIso}T12:00:00Z`).getUTCDay();
 
   const student = await resolveStudentForAuth(supabase, auth);
   if (!student) {
@@ -528,7 +527,7 @@ async function loadStudentContext(auth: AuthContext, opts: { allowMissingStudent
 
   const activeCycle =
     cycles.find((cycle) => cycle.status === "active") ||
-    cycles.find((cycle) => isDateInside(today, cycle.start_date, cycle.end_date)) ||
+    cycles.find((cycle) => isDateInside(todayIso, cycle.start_date, cycle.end_date)) ||
     cycles[0] ||
     null;
 
@@ -656,7 +655,6 @@ function localActionFallback(action: StudentBnitoAction, studentContext: any, pa
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
-  if (!ANTHROPIC_API_KEY) return jsonResponse({ error: "ANTHROPIC_API_KEY not configured" }, 500);
 
   const auth = await requireUser(req);
   if (!auth) return jsonResponse({ error: "Unauthorized" }, 401);
@@ -664,7 +662,7 @@ serve(async (req) => {
   try {
     const body = (await req.json()) as StudentBnitoRequest;
     const action: StudentBnitoAction =
-      body.action === "brief" || body.action === "weekly_contact" || body.action === "contextual"
+      body.action === "brief" || body.action === "weekly_contact" || body.action === "contextual" || body.action === "report_pain"
         ? body.action
         : "ask";
     const question = cleanText(
@@ -694,6 +692,53 @@ serve(async (req) => {
       allowMissingStudent: action === "brief" || action === "contextual",
       pageContext: body.page_context,
     });
+    if (action === "report_pain") {
+      const result = {
+        answer: "Entendi. Pegue mais leve ou pare o padrão doloroso agora. A equipe vai receber seu relato para orientar o próximo passo.",
+        topic: "dor",
+        urgency: "cautela",
+        student_action: "Não force o movimento doloroso e aguarde a orientação do treinador.",
+        handoff_to_team: true,
+        team_alert: {
+          should_alert: true,
+          title: "BNITO: aluno relatou dor no treino",
+          message: `Relato do aluno: ${cleanText(question, 600)}`,
+          severity: "warning",
+        },
+        follow_up_question: null,
+      };
+      const alertRecord = await createPainAlert(studentContext, question, result);
+      if (!alertRecord?.id) {
+        return jsonResponse({
+          error: "Falha ao registrar alerta para a equipe.",
+          result,
+          team_alert_created: false,
+          team_alert_error: alertRecord?.error || "alert_not_created",
+          model_tier: "deterministic",
+          generated_at: new Date().toISOString(),
+        }, 502);
+      }
+      return jsonResponse({
+        result: { ...result, team_alert_created: true },
+        team_alert_created: true,
+        team_alert: alertRecord,
+        model_tier: "deterministic",
+        generated_at: new Date().toISOString(),
+      });
+    }
+    if (!ANTHROPIC_API_KEY) {
+      if (action === "brief" || action === "contextual" || action === "weekly_contact") {
+        return jsonResponse({
+          result: localActionFallback(action, studentContext, body.page_context),
+          team_alert_created: false,
+          team_alert: null,
+          model_tier: "local_fallback",
+          fallback_reason: "ANTHROPIC_API_KEY not configured",
+          generated_at: new Date().toISOString(),
+        });
+      }
+      return jsonResponse({ error: "Assistente textual indisponível no momento." }, 503);
+    }
     const picked = pickModel(action, question);
     const aiConfig = await loadCompanyAiConfig(studentContext.student?.company_id as string | undefined);
 

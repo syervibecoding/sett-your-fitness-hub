@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { Dumbbell, Play, Clock, RotateCcw, ChevronDown, ChevronUp, Timer, CheckCircle2, Circle, Loader2 } from "lucide-react";
+import { Dumbbell, Play, Clock, RotateCcw, ChevronDown, ChevronUp, Timer, CheckCircle2, Circle, ExternalLink, Loader2 } from "lucide-react";
 import { format, parseISO, differenceInDays, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -523,21 +523,32 @@ export default function StudentWorkout() {
             <DialogTitle className="text-primary text-sm">DEMONSTRAÇÃO</DialogTitle>
           </DialogHeader>
           {videoModal && (
-            <div className="aspect-video w-full">
-              {videoModal.type === "loading" ? (
-                <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground">
-                  <Loader2 className="h-7 w-7 animate-spin text-primary" />
-                  <p className="text-sm">Buscando demonstração de {videoModal.value}…</p>
-                </div>
-              ) : videoModal.type === "path" ? (
-                <video src={videoModal.value} controls className="w-full h-full rounded-md" />
-              ) : (
-                <iframe
-                  src={getEmbedUrl(videoModal.value)}
-                  className="w-full h-full rounded-md"
-                  allowFullScreen
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                />
+            <div className="space-y-3">
+              <div className="aspect-video w-full">
+                {videoModal.type === "loading" ? (
+                  <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                    <Loader2 className="h-7 w-7 animate-spin text-primary" />
+                    <p className="text-sm">Buscando demonstração de {videoModal.value}…</p>
+                  </div>
+                ) : videoModal.type === "path" ? (
+                  <video src={videoModal.value} controls className="w-full h-full rounded-md" />
+                ) : (
+                  <iframe
+                    src={getEmbedUrl(videoModal.value)}
+                    title="Demonstração do exercício"
+                    className="w-full h-full rounded-md"
+                    allowFullScreen
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  />
+                )}
+              </div>
+              {videoModal.type === "url" && (
+                <Button variant="outline" size="sm" className="w-full" asChild>
+                  <a href={videoModal.value} target="_blank" rel="noreferrer">
+                    Abrir vídeo original
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </a>
+                </Button>
               )}
             </div>
           )}

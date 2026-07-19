@@ -424,6 +424,7 @@ async function resolveValidationCompanyId(supabase: any, claims: any, body: any)
     const authz = await assertTenantAccess(supabase, claims, {
       companyId: body.company_id,
       studentId: body.student_id,
+      requireStaff: true,
     });
     return authz.companyId;
   }
@@ -438,7 +439,13 @@ async function resolveValidationCompanyId(supabase: any, claims: any, body: any)
 
   if (masterError) throw new HttpError(503, `Falha ao validar permissões do usuário: ${masterError.message}`);
   if (companyError) throw new HttpError(503, `Falha ao resolver empresa do usuário: ${companyError.message}`);
-  if (userCompanyId) return userCompanyId as string;
+  if (userCompanyId) {
+    const authz = await assertTenantAccess(supabase, claims, {
+      companyId: userCompanyId,
+      requireStaff: true,
+    });
+    return authz.companyId;
+  }
   if (isMaster) return null;
 
   throw new HttpError(400, "Empresa não informada para validar a prescrição.");

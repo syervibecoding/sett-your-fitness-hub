@@ -45,7 +45,7 @@ function safeFormatDate(value: string | null | undefined, fmt: string, opts?: Pa
 }
 import { formatCPF, formatCEP, formatPhone } from "@/lib/masks";
 import { lookupCep, lookupCepByAddress } from "@/lib/cep";
-import { createPlansLink } from "@/lib/studentChat";
+import { createPlansLink, openStudentChat } from "@/lib/studentChat";
 // Heavy children loaded only when their tab is opened (chunk size win)
 const WorkoutAnalysis = lazy(() => import("@/components/trainer/WorkoutAnalysis").then(m => ({ default: m.WorkoutAnalysis })));
 const TrainerWeeklyBar = lazy(() => import("@/components/trainer/TrainerWeeklyBar").then(m => ({ default: m.TrainerWeeklyBar })));
@@ -395,14 +395,23 @@ export default function StudentDetail() {
   };
 
   const sendStudentLoginWhatsApp = async () => {
-    const digits = waDigits(student?.whatsapp || student?.phone);
-    if (!digits) {
+    if (!waDigits(student?.whatsapp || student?.phone)) {
       toast({ title: "Sem WhatsApp", description: "Cadastre o WhatsApp do aluno para enviar.", variant: "destructive" });
       return;
     }
     const creds = await fetchLoginCreds();
     if (!creds) return;
-    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(buildLoginMessage(creds))}`, "_blank", "noopener");
+    await openStudentChat({
+      navigate,
+      routePrefix: role === "master" ? "admin" : role || "admin",
+      studentId: student?.id,
+      phone: student?.whatsapp || student?.phone,
+      message: buildLoginMessage(creds),
+      onNoChat: (message) => {
+        void navigator.clipboard?.writeText(message);
+        toast({ title: "Mensagem copiada", description: "O aluno não possui telefone válido cadastrado." });
+      },
+    });
   };
 
   // CEP ↔ endereço automático no editar aluno
@@ -1004,7 +1013,7 @@ export default function StudentDetail() {
             {/* Acesso do app: copiar login (email+senha+link) ou enviar no WhatsApp */}
             <CollapsibleCard title="ACESSO DO APP" icon={<KeyRound className="h-4 w-4" />} className="mb-4" contentClassName="space-y-3">
                 <p className="text-xs text-muted-foreground font-sans">
-                  Envie o login do aluno no WhatsApp ou copie pra colar no chat. Ao gerar, uma senha nova é definida.
+                  Abra a conversa interna com o login pronto ou copie a mensagem. Ao gerar, uma senha nova é definida.
                 </p>
                 {loginCreds && (
                   <div className="rounded-lg border border-border bg-secondary/40 p-3 space-y-1.5 text-sm font-mono-data break-all">
@@ -1021,7 +1030,7 @@ export default function StudentDetail() {
                     className="bg-[#25D366] text-white hover:bg-[#25D366]/90"
                   >
                     <MessageCircle className="h-4 w-4 mr-1.5" />
-                    {loadingLogin ? "Gerando..." : "Enviar no WhatsApp"}
+                    {loadingLogin ? "Gerando..." : "Abrir conversa"}
                   </Button>
                   <Button size="sm" variant="outline" onClick={copyStudentLogin} disabled={loadingLogin}>
                     {copiedLogin ? <Check className="h-4 w-4 mr-1.5 text-green-600" /> : <Copy className="h-4 w-4 mr-1.5" />}

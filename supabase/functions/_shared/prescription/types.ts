@@ -50,6 +50,15 @@ export interface PrescriptionInput {
   runningDaysContext?: { days_per_week?: number | string | null; sport?: string | null; schedule?: unknown; sessions?: unknown[] } | null;
   enduranceAgenda?: unknown;
   blockNumber?: number | string | null;
+  previousPlanContext?: unknown;
+  previousPerformanceContext?: unknown;
+  programSequence?: {
+    sequence_number?: number | string | null;
+    total_cycles?: number | string | null;
+    start_date?: string | null;
+    end_date?: string | null;
+    phase?: string | null;
+  } | null;
   notes?: unknown;
   painEva?: number | string | null;
   techniqueBreakdown?: boolean;
@@ -168,11 +177,23 @@ export interface TrainingProgram {
     structured_days: number;
     split: string;
     library_only: true;
+    sequence_number?: number;
+    total_cycles?: number | null;
+    sequence_phase?: string;
+    previous_plan_used?: boolean;
   };
   cycle_name: string;
   objective: string;
   duration_weeks: number;
   block: string;
+  program_sequence?: {
+    sequence_number: number;
+    total_cycles: number | null;
+    phase: string;
+    start_date: string | null;
+    end_date: string | null;
+    previous_plan_used: boolean;
+  };
   methodology_preset: {
     key: string;
     label: string;

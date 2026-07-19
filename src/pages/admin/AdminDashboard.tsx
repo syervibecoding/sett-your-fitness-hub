@@ -3,8 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, TrendingUp, RefreshCw, Clock, UserX, Timer, RotateCcw, MessageCircle } from "lucide-react";
-import { format, addDays } from "date-fns";
+import { Users, TrendingUp, RefreshCw, Clock, UserX, Timer, RotateCcw, MessageCircle, CalendarRange } from "lucide-react";
+import { format, addDays, differenceInCalendarDays, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
 import { MonthlyPrescriptionsCard } from "@/components/admin/MonthlyPrescriptionsCard";
@@ -15,6 +15,7 @@ import { useMaster } from "@/contexts/MasterContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { buildStudentChatMap, createPlansLink, openStudentChat, renewalMessage } from "@/lib/studentChat";
+import { businessDateYmd } from "@/lib/businessDate";
 
 const LazyChart = lazy(() => import("recharts").then(mod => ({
   default: ({ data, colors }: { data: { name: string; count: number }[]; colors: string[] }) => (
@@ -42,9 +43,11 @@ interface DashboardData {
 }
 
 async function fetchDashboardData(effectiveCompanyId: string | null | undefined): Promise<DashboardData> {
-  // Run enrollment lifecycle (advance cycles, renewals, auto-overdue) before loading dashboard data
-  await supabase.rpc("process_enrollment_lifecycle" as any);
-  const thirtyDaysFromNow = format(addDays(new Date(), 30), "yyyy-MM-dd");
+  // O ciclo diário é processado por cron com service_role. O painel usa datas
+  // diretamente e não chama a RPC administrativa com um JWT de usuário.
+  const today = businessDateYmd();
+  const businessToday = parseISO(today);
+  const sevenDaysFromNow = format(addDays(businessToday, 7), "yyyy-MM-dd");
 
   let studentQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "active");
   let pendingQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "pending");
@@ -52,8 +55,8 @@ async function fetchDashboardData(effectiveCompanyId: string | null | undefined)
   let inactiveQuery = supabase.from("students").select("*", { count: "exact", head: true }).eq("status", "inactive");
   let enrollQuery = supabase.from("enrollments").select("plan_id, plans(name)");
   let expiringQuery = supabase.from("enrollments").select("*, trainer_id, students(full_name, status), plans(name)")
-    .eq("status", "active").lte("end_date", thirtyDaysFromNow)
-    .order("end_date", { ascending: true });
+    .in("status", ["active", "awaiting_renewal"]).lte("end_date", sevenDaysFromNow)
+    .order("end_date", { ascending: false });
 
   if (effectiveCompanyId) {
     studentQuery = studentQuery.eq("company_id", effectiveCompanyId);
@@ -93,6 +96,20 @@ async function fetchDashboardData(effectiveCompanyId: string | null | undefined)
     trainerCountPromise,
   ]);
 
+  const failedQuery = [
+    ["alunos ativos", studentRes],
+    ["alunos pendentes", pendingRes],
+    ["renovações", awaitingRenewalRes],
+    ["alunos inativos", inactiveRes],
+    ["matrículas", enrollRes],
+    ["contratos a vencer", expiringRes],
+    ["ciclos por matrícula", activeEnrollsRes],
+  ].find(([, result]) => (result as any)?.error);
+  if (failedQuery) {
+    const [label, result] = failedQuery;
+    throw new Error(`Falha ao carregar ${label}: ${(result as any).error.message}`);
+  }
+
   const stats = {
     totalStudents: studentRes.count || 0,
     pendingStudents: pendingRes.count || 0,
@@ -111,7 +128,7 @@ async function fetchDashboardData(effectiveCompanyId: string | null | undefined)
 
   const expiringContracts = (expiringRes.data || []).filter((e: any) => {
     const s = e.students?.status;
-    return s === "active" || s === "pending";
+    return s === "active" || s === "pending" || s === "awaiting_renewal";
   });
 
   // Cycle countdowns
@@ -128,10 +145,34 @@ async function fetchDashboardData(effectiveCompanyId: string | null | undefined)
         student_id: e.student_id,
       };
     });
-    const { data: activeCycles } = await supabase.from("training_cycles").select("*").in("enrollment_id", enrollIds).eq("status", "active");
-    (activeCycles || []).forEach((c: any) => {
+    const { data: cycleRows, error: cycleRowsError } = await supabase.from("training_cycles")
+      .select("id, enrollment_id, cycle_number, start_date, end_date, status")
+      .in("enrollment_id", enrollIds)
+      .order("cycle_number");
+    if (cycleRowsError) throw new Error(`Falha ao carregar trocas de treino: ${cycleRowsError.message}`);
+    const allCycles = cycleRows || [];
+    const activeCycles = allCycles.filter((cycle: any) => cycle.start_date <= today && cycle.end_date >= today);
+    const nextCycles = activeCycles.map((cycle: any) => allCycles.find((candidate: any) =>
+      candidate.enrollment_id === cycle.enrollment_id && candidate.cycle_number === cycle.cycle_number + 1,
+    )).filter(Boolean);
+    const nextCycleIds = nextCycles.map((cycle: any) => cycle.id);
+    const [{ data: nextWorkouts, error: nextWorkoutsError }, { data: nextBundles, error: nextBundlesError }] = nextCycleIds.length > 0
+      ? await Promise.all([
+          supabase.from("workouts").select("cycle_id").in("cycle_id", nextCycleIds),
+          (supabase as any).from("prescription_bundles").select("training_cycle_id").in("training_cycle_id", nextCycleIds).neq("status", "failed"),
+        ])
+      : [{ data: [] as any[], error: null }, { data: [] as any[], error: null }];
+    if (nextWorkoutsError) throw new Error(`Falha ao conferir treinos futuros: ${nextWorkoutsError.message}`);
+    if (nextBundlesError) throw new Error(`Falha ao conferir prescrições futuras: ${nextBundlesError.message}`);
+    const preparedNextCycles = new Set([
+      ...(nextWorkouts || []).map((row: any) => row.cycle_id),
+      ...(nextBundles || []).map((row: any) => row.training_cycle_id),
+    ]);
+    activeCycles.forEach((c: any) => {
       const info = enrollInfoMap[c.enrollment_id];
-      const daysLeft = Math.ceil((new Date(c.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      const daysLeft = differenceInCalendarDays(parseISO(c.end_date), businessToday);
+      if (daysLeft < 0 || daysLeft > 7) return;
+      const nextCycle = nextCycles.find((candidate: any) => candidate.enrollment_id === c.enrollment_id);
       countdowns.push({
         student_name: info?.name || "—",
         student_id: info?.student_id,
@@ -139,6 +180,10 @@ async function fetchDashboardData(effectiveCompanyId: string | null | undefined)
         end_date: c.end_date,
         days_left: daysLeft,
         trainer_id: info?.trainer_id,
+        next_cycle_id: nextCycle?.id || null,
+        next_cycle_number: nextCycle?.cycle_number || null,
+        next_start_date: nextCycle?.start_date || null,
+        next_ready: Boolean(nextCycle && preparedNextCycles.has(nextCycle.id)),
       });
     });
   }
@@ -166,7 +211,7 @@ export default function AdminDashboard() {
   const routePrefix = role === "master" && isViewingCompany ? "admin" : role;
   const effectiveCompanyId = role === "master" ? (isViewingCompany ? viewingCompany?.id : null) : companyId;
 
-  const { data } = useQuery({
+  const { data, error: dashboardError, isLoading: dashboardLoading } = useQuery({
     queryKey: ["admin-dashboard", effectiveCompanyId ?? "all"],
     queryFn: () => fetchDashboardData(effectiveCompanyId),
     staleTime: 60_000,
@@ -196,11 +241,26 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleCycleNotice = async (cycle: any) => {
+    const firstName = String(cycle.student_name || "").trim().split(/\s+/)[0];
+    const startLabel = cycle.next_start_date ? format(parseISO(cycle.next_start_date), "dd/MM") : "na próxima troca";
+    const message = `Oi, ${firstName}! Seu próximo ciclo de treino já está programado e entra no app em ${startLabel}. Quando ele liberar, me conta como se sentiu no bloco anterior para eu acompanhar sua evolução.`;
+    await openStudentChat({
+      navigate,
+      routePrefix: (routePrefix as string) || "admin",
+      chatId: studentChatMap?.[cycle.student_id],
+      studentId: cycle.student_id,
+      message,
+      onNoChat: (draft) => { void navigator.clipboard?.writeText(draft); toast.success("Aluno sem conversa interna — mensagem copiada."); },
+    });
+  };
+
   const stats = data?.stats ?? { totalStudents: 0, pendingStudents: 0, awaitingRenewalStudents: 0, inactiveStudents: 0, trainers: 0 };
   const planChart = data?.planChart ?? [];
   const expiringContracts = data?.expiringContracts ?? [];
   const cycleCountdowns = data?.cycleCountdowns ?? [];
   const trainerMap = data?.trainerMap ?? {};
+  const businessToday = parseISO(businessDateYmd());
 
   return (
     <>
@@ -212,12 +272,21 @@ export default function AdminDashboard() {
           </p>
         </div>
 
+        {dashboardError && (
+          <Card className="border-destructive/40 bg-destructive/5">
+            <CardContent className="pt-6">
+              <p className="text-sm font-medium text-destructive">Não foi possível carregar os indicadores do painel.</p>
+              <p className="mt-1 text-xs text-muted-foreground">{dashboardError instanceof Error ? dashboardError.message : "Atualize a página e tente novamente."}</p>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <Card className="bg-card border-border cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate(`/${routePrefix}/students?status=active`)}>
             <CardContent className="flex items-center gap-4 pt-6">
               <div className="p-3 rounded-lg bg-primary/10"><Users className="h-6 w-6 text-primary" /></div>
               <div>
-                <p className="text-2xl font-bold text-foreground font-sans">{stats.totalStudents}</p>
+                <p className="text-2xl font-bold text-foreground font-sans">{dashboardLoading ? "—" : stats.totalStudents}</p>
                 <p className="text-sm text-muted-foreground font-sans">Alunos Ativos</p>
               </div>
             </CardContent>
@@ -226,7 +295,7 @@ export default function AdminDashboard() {
             <CardContent className="flex items-center gap-4 pt-6">
               <div className="p-3 rounded-lg bg-warning/10"><Clock className="h-6 w-6 text-warning" /></div>
               <div>
-                <p className="text-2xl font-bold text-foreground font-sans">{stats.pendingStudents}</p>
+                <p className="text-2xl font-bold text-foreground font-sans">{dashboardLoading ? "—" : stats.pendingStudents}</p>
                 <p className="text-sm text-muted-foreground font-sans">Alunos Pendentes</p>
               </div>
             </CardContent>
@@ -235,7 +304,7 @@ export default function AdminDashboard() {
             <CardContent className="flex items-center gap-4 pt-6">
               <div className="p-3 rounded-lg bg-warning/10"><RotateCcw className="h-6 w-6 text-warning" /></div>
               <div>
-                <p className="text-2xl font-bold text-foreground font-sans">{stats.awaitingRenewalStudents}</p>
+                <p className="text-2xl font-bold text-foreground font-sans">{dashboardLoading ? "—" : stats.awaitingRenewalStudents}</p>
                 <p className="text-sm text-muted-foreground font-sans">Aguardando Renovação</p>
               </div>
             </CardContent>
@@ -244,7 +313,7 @@ export default function AdminDashboard() {
             <CardContent className="flex items-center gap-4 pt-6">
               <div className="p-3 rounded-lg bg-muted"><UserX className="h-6 w-6 text-muted-foreground" /></div>
               <div>
-                <p className="text-2xl font-bold text-foreground font-sans">{stats.inactiveStudents}</p>
+                <p className="text-2xl font-bold text-foreground font-sans">{dashboardLoading ? "—" : stats.inactiveStudents}</p>
                 <p className="text-sm text-muted-foreground font-sans">Alunos Inativos</p>
               </div>
             </CardContent>
@@ -253,7 +322,7 @@ export default function AdminDashboard() {
             <CardContent className="flex items-center gap-4 pt-6">
               <div className="p-3 rounded-lg bg-primary/10"><TrendingUp className="h-6 w-6 text-primary" /></div>
               <div>
-                <p className="text-2xl font-bold text-foreground font-sans">{stats.trainers}</p>
+                <p className="text-2xl font-bold text-foreground font-sans">{dashboardLoading ? "—" : stats.trainers}</p>
                 <p className="text-sm text-muted-foreground font-sans">Treinadores</p>
               </div>
             </CardContent>
@@ -284,7 +353,7 @@ export default function AdminDashboard() {
               {expiringContracts.length > 0 ? (
                 <div className="space-y-3 max-h-[250px] overflow-auto">
                   {expiringContracts.map((contract: any) => {
-                    const daysLeft = Math.ceil((new Date(contract.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                    const daysLeft = differenceInCalendarDays(parseISO(contract.end_date), businessToday);
                     return (
                       <div key={contract.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border cursor-pointer hover:brightness-110 transition-all" onClick={() => navigate(`/${routePrefix}/students/${contract.student_id}`)}>
                         <div>
@@ -295,11 +364,8 @@ export default function AdminDashboard() {
                           )}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
-                            daysLeft <= 7 ? "bg-destructive/20 text-destructive" :
-                            daysLeft <= 15 ? "bg-warning/20 text-warning" : "bg-primary/20 text-primary"
-                          }`}>
-                            {daysLeft}d restantes
+                          <span className="rounded bg-destructive/20 px-2 py-1 text-xs font-medium text-destructive font-mono-data">
+                            {daysLeft < 0 ? `${Math.abs(daysLeft)}d em atraso` : daysLeft === 0 ? "Vence hoje" : `${daysLeft}d restantes`}
                           </span>
                           <Button
                             size="sm"
@@ -334,25 +400,40 @@ export default function AdminDashboard() {
             {cycleCountdowns.length > 0 ? (
               <div className="space-y-3 max-h-[300px] overflow-auto">
                 {cycleCountdowns.map((m: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border cursor-pointer hover:brightness-110 transition-all" onClick={() => m.student_id && navigate(`/${routePrefix}/students/${m.student_id}`)}>
+                  <div key={i} className="flex flex-col gap-3 rounded-lg border border-border bg-secondary/50 p-3 sm:flex-row sm:items-center sm:justify-between" onClick={() => m.student_id && navigate(`/${routePrefix}/students/${m.student_id}`)}>
                     <div>
                       <p className="text-foreground font-sans font-medium text-sm">{m.student_name}</p>
-                      <p className="text-muted-foreground text-xs font-sans">Ciclo {m.cycle_number} · vence {format(new Date(m.end_date), "dd/MM")}</p>
+                      <p className="text-muted-foreground text-xs font-sans">Ciclo {m.cycle_number} · vence {format(parseISO(m.end_date), "dd/MM")}</p>
+                      <p className={`mt-1 text-xs font-medium ${m.next_ready ? "text-emerald-700" : "text-amber-700"}`}>
+                        {m.next_ready ? `Próximo ciclo ${m.next_cycle_number} pronto` : "Próxima prescrição pendente"}
+                      </p>
                       {m.trainer_id && trainerMap[m.trainer_id] && (
                         <p className="text-muted-foreground/70 text-[11px] font-sans">Treinador: {trainerMap[m.trainer_id]}</p>
                       )}
                     </div>
-                    <span className={`text-xs font-sans font-medium px-2 py-1 rounded ${
-                      m.days_left <= 0 ? "bg-destructive/20 text-destructive" :
-                      m.days_left <= 7 ? "bg-warning/20 text-warning" : "bg-primary/20 text-primary"
-                    }`}>
-                      {m.days_left <= 0 ? "Vencido!" : `${m.days_left}d para troca`}
-                    </span>
+                    <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+                      <span className={`rounded px-2 py-1 text-xs font-medium font-mono-data ${m.days_left <= 0 ? "bg-destructive/20 text-destructive" : "bg-warning/20 text-warning"}`}>
+                        {m.days_left <= 0 ? "Hoje" : `${m.days_left}d para troca`}
+                      </span>
+                      {m.next_ready ? (
+                        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleCycleNotice(m)}>
+                          <MessageCircle className="mr-1.5 h-3.5 w-3.5" /> Avisar aluno
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={() => navigate(`/${routePrefix}/studio`, { state: { studentId: m.student_id, tab: "prescricao" } })}
+                        >
+                          <CalendarRange className="mr-1.5 h-3.5 w-3.5" /> Prescrever
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground font-sans text-center py-8">Nenhum ciclo ativo no momento</p>
+              <p className="text-muted-foreground font-sans text-center py-8">Nenhuma troca prevista para os próximos 7 dias</p>
             )}
           </CardContent>
         </Card>

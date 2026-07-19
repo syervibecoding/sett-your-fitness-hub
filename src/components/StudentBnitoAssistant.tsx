@@ -16,6 +16,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { businessDateYmd } from "@/lib/businessDate";
 
 type StudentBnitoMessage = {
   id: string;
@@ -211,7 +212,7 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
   const shouldShow = role === "student";
   const pageLabel = useMemo(() => getStudentPageLabel(location.pathname), [location.pathname]);
   const missionCacheKey = useMemo(
-    () => `student-bnito-mission:${new Date().toISOString().slice(0, 10)}:${location.pathname}`,
+    () => `student-bnito-mission:${businessDateYmd()}:${location.pathname}`,
     [location.pathname],
   );
 
@@ -311,7 +312,17 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
   };
 
   // BNITO arrastável: o aluno pode mover o botão pra não atrapalhar finalizar a série.
-  const dragRef = useRef({ sx: 0, sy: 0, ox: 0, oy: 0, moved: false });
+  const dragRef = useRef({
+    sx: 0,
+    sy: 0,
+    ox: 0,
+    oy: 0,
+    minX: 0,
+    maxX: 0,
+    minY: 0,
+    maxY: 0,
+    moved: false,
+  });
   const [bnitoDrag, setBnitoDrag] = useState({ x: 0, y: 0 });
 
   return (
@@ -325,9 +336,45 @@ export function StudentBnitoAssistantProvider({ children }: { children: ReactNod
                 type="button"
                 aria-label={`Abrir ${name}`}
                 style={{ transform: `translate(${bnitoDrag.x}px, ${bnitoDrag.y}px)`, touchAction: "none" }}
-                onPointerDown={(e) => { dragRef.current = { sx: e.clientX, sy: e.clientY, ox: bnitoDrag.x, oy: bnitoDrag.y, moved: false }; (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); }}
-                onPointerMove={(e) => { const dx = e.clientX - dragRef.current.sx; const dy = e.clientY - dragRef.current.sy; if (Math.abs(dx) > 5 || Math.abs(dy) > 5) dragRef.current.moved = true; if (dragRef.current.moved) setBnitoDrag({ x: dragRef.current.ox + dx, y: dragRef.current.oy + dy }); }}
+                onPointerDown={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const baseLeft = rect.left - bnitoDrag.x;
+                  const baseTop = rect.top - bnitoDrag.y;
+                  const minX = 8 - baseLeft;
+                  const maxX = window.innerWidth - 8 - baseLeft - rect.width;
+                  const minY = 8 - baseTop;
+                  const maxY = window.innerHeight - 8 - baseTop - rect.height;
+                  const ox = Math.min(maxX, Math.max(minX, bnitoDrag.x));
+                  const oy = Math.min(maxY, Math.max(minY, bnitoDrag.y));
+
+                  if (ox !== bnitoDrag.x || oy !== bnitoDrag.y) setBnitoDrag({ x: ox, y: oy });
+                  dragRef.current = {
+                    sx: e.clientX,
+                    sy: e.clientY,
+                    ox,
+                    oy,
+                    minX,
+                    maxX,
+                    minY,
+                    maxY,
+                    moved: false,
+                  };
+                  e.currentTarget.setPointerCapture?.(e.pointerId);
+                }}
+                onPointerMove={(e) => {
+                  const drag = dragRef.current;
+                  const dx = e.clientX - drag.sx;
+                  const dy = e.clientY - drag.sy;
+                  if (Math.abs(dx) > 5 || Math.abs(dy) > 5) drag.moved = true;
+                  if (drag.moved) {
+                    setBnitoDrag({
+                      x: Math.min(drag.maxX, Math.max(drag.minX, drag.ox + dx)),
+                      y: Math.min(drag.maxY, Math.max(drag.minY, drag.oy + dy)),
+                    });
+                  }
+                }}
                 onPointerUp={(e) => { (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId); if (!dragRef.current.moved) setOpen(true); }}
+                onPointerCancel={(e) => e.currentTarget.releasePointerCapture?.(e.pointerId)}
                 className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] right-[calc(1.25rem+env(safe-area-inset-right,0px))] z-40 flex h-16 w-16 items-center justify-center rounded-full border border-white/70 bg-navy text-primary-foreground shadow-[0_18px_45px_rgba(29,45,92,0.32)] ring-8 ring-navy/10 transition-colors duration-200 hover:bg-navy/95 focus:outline-none focus:ring-4 focus:ring-ring focus:ring-offset-2 md:bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] md:right-6 cursor-grab active:cursor-grabbing"
               >
                 <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/45 bg-white/10">

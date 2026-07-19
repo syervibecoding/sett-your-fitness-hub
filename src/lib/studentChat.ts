@@ -1,7 +1,7 @@
 // Primitivo compartilhado: "abrir o chat do aluno com uma mensagem pronta (rascunho)".
 // Usado pelos botões de Aniversário, Renovação e Envio de anamnese. NÃO envia sozinho — só pré-preenche
-// a caixa de texto do WhatsAppChat (que lê location.state.prefillMessage). Se o aluno não tiver conversa
-// vinculada (whatsapp_chats), cai no fallback (copiar a mensagem pro clipboard).
+// a caixa de texto do WhatsAppChat (que lê location.state.prefillMessage). Nenhum fluxo abre
+// WhatsApp externo: sem conversa vinculada, a tela interna abre um novo rascunho pelo telefone.
 import type { NavigateFunction } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -25,10 +25,8 @@ function waDigits(phone?: string | null): string | null {
   return d;
 }
 
-// Abre o chat do aluno com a mensagem pronta. Ordem do fallback:
-// 1) conversa interna vinculada (chatId) → abre o WhatsAppChat com prefill;
-// 2) sem conversa → abre o WhatsApp DIRETO pelo número (igual ao cadastro);
-// 3) sem telefone → onNoChat (copia pro clipboard).
+// Abre o chat interno do aluno com a mensagem pronta. Sem conversa vinculada, a tela
+// interna recebe o telefone e prepara uma nova conversa. Sem telefone, usa onNoChat.
 export async function openStudentChat(opts: {
   navigate: NavigateFunction;
   routePrefix: string;
@@ -38,25 +36,51 @@ export async function openStudentChat(opts: {
   message: string;
   onNoChat?: (message: string) => void;
 }): Promise<void> {
-  const { navigate, routePrefix, chatId, studentId, phone, message, onNoChat } = opts;
-  if (chatId) {
-    navigate(`/${routePrefix}/whatsapp-chat`, { state: { chatId, prefillMessage: message } });
+  const { navigate, routePrefix, studentId, message, onNoChat } = opts;
+  let resolvedChatId = opts.chatId ?? null;
+  let resolvedPhone = opts.phone ?? null;
+  let contactName: string | null = null;
+
+  if (!resolvedChatId && studentId) {
+    const { data: linkedChat } = await supabase
+      .from("whatsapp_chats")
+      .select("id")
+      .eq("student_id", studentId)
+      .order("last_message_at", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+    resolvedChatId = linkedChat?.id ?? null;
+  }
+
+  if ((!resolvedPhone || !contactName) && studentId) {
+    const { data } = await supabase
+      .from("students")
+      .select("full_name, whatsapp, phone")
+      .eq("id", studentId)
+      .maybeSingle();
+    resolvedPhone = resolvedPhone || (data as any)?.whatsapp || (data as any)?.phone || null;
+    contactName = (data as any)?.full_name || null;
+  }
+
+  const digits = waDigits(resolvedPhone);
+  if (!resolvedChatId && !digits) {
+    if (onNoChat) {
+      onNoChat(message);
+      return;
+    }
+    void navigator.clipboard?.writeText(message);
     return;
   }
-  let digits = waDigits(phone);
-  if (!digits && studentId) {
-    const { data } = await supabase.from("students").select("whatsapp, phone").eq("id", studentId).maybeSingle();
-    digits = waDigits((data as any)?.whatsapp || (data as any)?.phone);
-  }
-  if (digits) {
-    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(message)}`, "_blank", "noopener");
-    return;
-  }
-  if (onNoChat) {
-    onNoChat(message);
-    return;
-  }
-  void navigator.clipboard?.writeText(message);
+
+  navigate(`/${routePrefix}/whatsapp-chat`, {
+    state: {
+      chatId: resolvedChatId,
+      studentId: studentId ?? null,
+      phone: digits,
+      contactName,
+      prefillMessage: message,
+    },
+  });
 }
 
 const firstName = (full?: string | null) => (full ?? "").trim().split(/\s+/)[0] || "";

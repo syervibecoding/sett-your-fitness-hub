@@ -10,6 +10,7 @@ import {
 import {
   buildExerciseMeta, volumeLoadByWeek, volumeByMuscleGroup, type CycleLike,
 } from "@/lib/volumeStats";
+import { businessDateYmd } from "@/lib/businessDate";
 
 interface VolumeInsightsProps {
   allLogs: any[];
@@ -30,7 +31,7 @@ export function VolumeInsights({ allLogs, cycles, className }: VolumeInsightsPro
     const days = range === "4w" ? 28 : 56;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
-    const cut = cutoff.toISOString().slice(0, 10);
+    const cut = businessDateYmd(cutoff);
     return (allLogs || []).filter((l: any) => (l?.session_date || "") >= cut);
   }, [allLogs, range]);
   const meta = useMemo(() => buildExerciseMeta(cycles), [cycles]);

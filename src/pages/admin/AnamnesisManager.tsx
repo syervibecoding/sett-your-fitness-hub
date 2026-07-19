@@ -11,6 +11,8 @@ import { ClipboardCheck, Copy, Check, Link2, Loader2, MessageCircle, Pencil, Arr
 import { toast } from "sonner";
 import { BnitoContextButton } from "@/components/BnitoFloatingAssistant";
 import FormFieldEditor from "@/components/FormFieldEditor";
+import { useNavigate } from "react-router-dom";
+import { openStudentChat } from "@/lib/studentChat";
 
 // Anamnese ÚNICA (estúdio integrado). A aba Anamnese seleciona o aluno, gera o link da
 // anamnese estruturada e envia direto no WhatsApp dele (ou copia o link).
@@ -34,6 +36,8 @@ export default function AnamnesisManager() {
   const { user, companyId: authCompanyId, role } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
   const effectiveCompanyId = role === "master" ? (isViewingCompany ? viewingCompany?.id ?? null : null) : authCompanyId ?? null;
+  const navigate = useNavigate();
+  const chatRoutePrefix = role === "master" ? "admin" : role || "admin";
 
   const [students, setStudents] = useState<Student[]>([]);
   const [studentId, setStudentId] = useState("");
@@ -79,13 +83,17 @@ export default function AnamnesisManager() {
     if (!url) return;
     const nome = (student?.full_name || "").trim().split(/\s+/)[0] || "";
     const msg = `Oi, ${nome}! Pra eu montar seu plano do jeito certo, responde essa anamnese rapidinha (leva uns minutos): ${url}`;
-    const digits = waDigits(student?.whatsapp || student?.phone);
-    if (digits) {
-      window.open(`https://wa.me/${digits}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
-    } else {
-      await navigator.clipboard?.writeText(url).catch(() => {});
-      toast.success("Aluno sem telefone cadastrado — link copiado pra você enviar.");
-    }
+    await openStudentChat({
+      navigate,
+      routePrefix: chatRoutePrefix,
+      studentId,
+      phone: student?.whatsapp || student?.phone,
+      message: msg,
+      onNoChat: () => {
+        void navigator.clipboard?.writeText(url);
+        toast.success("Aluno sem telefone cadastrado — link copiado.");
+      },
+    });
   }
 
   async function copyLink() {
@@ -120,7 +128,7 @@ export default function AnamnesisManager() {
         <div>
           <h1 className="flex items-center gap-2 text-3xl text-primary"><ClipboardCheck className="h-7 w-7" /> ANAMNESE</h1>
           <p className="mt-1 font-sans text-sm text-muted-foreground">
-            Anamnese única do estúdio — gere o link e envie direto no WhatsApp do aluno.
+            Anamnese única do estúdio — gere o link e abra a conversa dentro do app.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -155,7 +163,7 @@ export default function AnamnesisManager() {
           <div className="flex flex-wrap gap-2">
             <Button onClick={sendWhatsApp} disabled={!studentId || creating} className="bg-[#25D366] text-white hover:bg-[#25D366]/90">
               {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageCircle className="mr-2 h-4 w-4" />}
-              Gerar link e enviar no WhatsApp
+              Gerar link e abrir conversa
             </Button>
             <Button variant="outline" onClick={copyLink} disabled={!studentId || creating}>
               {copied ? <Check className="mr-2 h-4 w-4 text-green-600" /> : <Copy className="mr-2 h-4 w-4" />}

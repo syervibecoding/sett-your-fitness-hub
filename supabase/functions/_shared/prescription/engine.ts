@@ -2,6 +2,7 @@ import { pickCatalogExercise } from "./exerciseScoring.ts";
 import { correctionsToExplanations, deloadExplanation, enduranceExplanation, explanationsFromRestrictions, frequencyDowngradeExplanation, progressionExplanation } from "./explanations.ts";
 import { normalizeText, objectiveModifier, resolveSplit, selectMethodologyPreset } from "./presets.ts";
 import { buildPeriodizationBlocks, deloadAdjustSets, hasPainContext, progressionProtocol, resolveDurationWeeks } from "./progressionRules.ts";
+import { applyLongitudinalProgression, previousExerciseIds, resolveSequenceNumber } from "./longitudinalRules.ts";
 import { applyRestrictionRules, deriveRestrictionRules } from "./restrictionRules.ts";
 import { validateTrainingProgram } from "./validator.ts";
 import type {
@@ -109,6 +110,7 @@ function selectExercises(input: PrescriptionInput, specs: ExerciseSpec[], usedId
       fitnessLevel: input.fitnessLevel,
       preferredMuscleGroup: spec.preferredMuscleGroup,
       preferredPattern: spec.preferredPattern,
+      preferredExerciseIds: previousExerciseIds(input, spec.phase, spec.preferredMuscleGroup),
     });
     if (!exercise) {
       gaps.push(`${spec.required === false ? "WARNING" : "BLOCKER"}:safe_alternative_unavailable:${spec.phase}:${spec.keywords.join("/")}`);
@@ -232,6 +234,7 @@ export function generateTrainingProgram(input: PrescriptionInput): TrainingProgr
   const restrictions = deriveRestrictionRules(normalizedInput);
   const durationWeeks = resolveDurationWeeks(normalizedInput);
   const { workouts, gaps } = buildWorkouts(normalizedInput);
+  const longitudinal = applyLongitudinalProgression(workouts, normalizedInput);
   const periodization = buildPeriodizationBlocks(normalizedInput);
   const split = resolveSplit(normalizedInput);
   const advancedAllowed = !hasPainContext(normalizedInput) && !normalizeText(normalizedInput.fitnessLevel).includes("inic");
@@ -241,6 +244,7 @@ export function generateTrainingProgram(input: PrescriptionInput): TrainingProgr
     ...frequencyDowngradeExplanation(split.downgraded, split.requestedDays, split.structuredDays),
     ...deloadExplanation(Boolean(normalizedInput.deload)),
     progressionExplanation(advancedAllowed),
+    longitudinal.explanation,
   ];
 
   const program: TrainingProgram = {
@@ -252,11 +256,23 @@ export function generateTrainingProgram(input: PrescriptionInput): TrainingProgr
       structured_days: split.structuredDays,
       split: split.label,
       library_only: true,
+      sequence_number: longitudinal.sequenceNumber,
+      total_cycles: normalizedInput.programSequence?.total_cycles ? Number(normalizedInput.programSequence.total_cycles) : null,
+      sequence_phase: longitudinal.phase,
+      previous_plan_used: Boolean(normalizedInput.previousPlanContext),
     },
-    cycle_name: `Plano BN Engine - ${clean(normalizedInput.studentName || "Aluno")}`,
+    cycle_name: `Plano BN Engine - ${clean(normalizedInput.studentName || "Aluno")} - Ciclo ${longitudinal.sequenceNumber}`,
     objective: clean(normalizedInput.objective || "base tecnica e consistencia"),
     duration_weeks: durationWeeks,
-    block: "1",
+    block: String(resolveSequenceNumber(normalizedInput)),
+    program_sequence: {
+      sequence_number: longitudinal.sequenceNumber,
+      total_cycles: normalizedInput.programSequence?.total_cycles ? Number(normalizedInput.programSequence.total_cycles) : null,
+      phase: longitudinal.phase,
+      start_date: normalizedInput.programSequence?.start_date || null,
+      end_date: normalizedInput.programSequence?.end_date || null,
+      previous_plan_used: Boolean(normalizedInput.previousPlanContext),
+    },
     methodology_preset: {
       key: preset.key,
       label: preset.label,
@@ -275,7 +291,7 @@ export function generateTrainingProgram(input: PrescriptionInput): TrainingProgr
     },
     periodization_blocks: periodization,
     weekly_structure: `${workouts.length} sessões/semana (${split.label}) distribuídas em dias alternados quando possível.`,
-    progression_protocol: progressionProtocol(normalizedInput),
+    progression_protocol: `${progressionProtocol(normalizedInput)} Continuidade entre ciclos: ${longitudinal.phase}; o próximo bloco deve partir deste resultado e do feedback real do aluno.`,
     warnings: gaps.length ? ["Biblioteca incompleta para alguns padrões; nenhum exercício foi inventado."] : [],
     validator: {
       pre_save: {

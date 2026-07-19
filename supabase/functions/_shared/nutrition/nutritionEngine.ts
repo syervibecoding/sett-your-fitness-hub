@@ -19,6 +19,15 @@ export interface NutritionInput {
   stress_score?: number | string | null;
   sleep_quality?: number | string | null;
   nutrition_context?: string | null;
+  block_number?: number | string | null;
+  previous_plan_context?: NutritionPlan | null;
+  program_sequence?: {
+    sequence_number?: number | string | null;
+    total_cycles?: number | string | null;
+    start_date?: string | null;
+    end_date?: string | null;
+    phase?: string | null;
+  } | null;
   [k: string]: unknown;
 }
 
@@ -71,6 +80,14 @@ export interface NutritionPlan {
   meals: any[];
   pre_race_gi_protocol: string; intra_workout_protocol: string; rest_day_adjustments: string;
   general_notes: string; warnings: string[];
+  program_sequence?: {
+    sequence_number: number;
+    total_cycles: number | null;
+    phase: string;
+    start_date: string | null;
+    end_date: string | null;
+    previous_plan_used: boolean;
+  };
   generated_by: string;
 }
 
@@ -110,7 +127,27 @@ function buildSupplements(objective: string, endurance: boolean, stress: number)
   return out.slice(0, 4);
 }
 
+function sequenceMeta(input: NutritionInput) {
+  const sequenceNumber = Math.max(1, Math.round(num(input.program_sequence?.sequence_number ?? input.block_number)) || 1);
+  const position = ((sequenceNumber - 1) % 4) + 1;
+  const inferred = position === 1 ? "base" : position === 2 ? "acumulacao" : position === 3 ? "intensificacao" : "consolidacao";
+  const requested = String(input.program_sequence?.phase || "").toLowerCase();
+  const phase = /acumul/.test(requested) ? "acumulacao"
+    : /intens/.test(requested) ? "intensificacao"
+      : /(consol|deload|regener)/.test(requested) ? "consolidacao"
+        : /base/.test(requested) ? "base" : inferred;
+  return {
+    sequence_number: sequenceNumber,
+    total_cycles: Number(input.program_sequence?.total_cycles) || null,
+    phase,
+    start_date: input.program_sequence?.start_date || null,
+    end_date: input.program_sequence?.end_date || null,
+    previous_plan_used: Boolean(input.previous_plan_context),
+  };
+}
+
 export function buildNutritionProgram(input: NutritionInput): NutritionPlan {
+  const sequence = sequenceMeta(input);
   const kg = num(input.weight_kg) || 75;
   const cm = num(input.height_cm) || 172;
   const age = num(input.age) || 30;
@@ -175,6 +212,16 @@ export function buildNutritionProgram(input: NutritionInput): NutritionPlan {
     rest_day_kcal: r0(target * 0.9), rest_day_carbs_g: r0(carbsTotal * 0.7),
     note: "Mais carboidrato nos dias de treino pesado/longo; menos no descanso/deload, mantendo a proteína alta.",
   };
+  if (sequence.phase === "acumulacao") {
+    carb_cycling.high_day_carbs_g = r0(carb_cycling.high_day_carbs_g * 1.05);
+    carb_cycling.note += " No bloco de acúmulo, concentre o acréscimo nos dias de maior volume.";
+  } else if (sequence.phase === "intensificacao") {
+    carb_cycling.high_day_carbs_g = r0(carb_cycling.high_day_carbs_g * 1.1);
+    carb_cycling.note += " No bloco de intensificação, priorize carboidrato antes e depois das sessões-chave.";
+  } else if (sequence.phase === "consolidacao") {
+    carb_cycling.high_day_carbs_g = r0(carb_cycling.high_day_carbs_g * 0.9);
+    carb_cycling.note += " Na consolidação, reduza carboidrato junto da carga, mantendo proteína e hidratação.";
+  }
 
   const nutrition_tips = [
     { title: "Pré-treino", timing: "60 a 120 min antes", goal: "Energia sem pesar o estômago.", how_much: "Porção moderada de carboidrato + pouca proteína; pouca gordura/fibra se o treino for intenso.", examples: ["banana com iogurte", "pão/tapioca com ovos", "arroz/batata com frango em porção leve"], avoid: ["muita gordura", "muita fibra"] },
@@ -219,7 +266,8 @@ export function buildNutritionProgram(input: NutritionInput): NutritionPlan {
     pre_race_gi_protocol: "Nas 2–4 h antes de prova/corrida intensa: priorize carboidrato de fácil digestão (banana, pão branco, arroz branco, whey/malto). Evite FODMAPs (feijão, brócolis, couve, leite) e fibra insolúvel.",
     intra_workout_protocol: endurance ? "Sessões > 75 min: 30–60 g de carboidrato/h; > 90 min: 60–90 g/h (2:1 malto:frutose). Hidratação com eletrólitos." : "Treinos de força: foque na hidratação; carboidrato intra só em sessões muito longas.",
     rest_day_adjustments: `Reduza o carboidrato para ~${carb_cycling.rest_day_carbs_g} g, mantenha a proteína (${proteinTotal} g) e a gordura pode subir um pouco para saúde hormonal.`,
-    general_notes: "Orientações por momento (sem cardápio fechado nem gramas exatas no prato). Ajuste porções ao apetite e à rotina. Consistência > perfeição.",
+    general_notes: `Orientações por momento (sem cardápio fechado nem gramas exatas no prato). Ajuste porções ao apetite e à rotina. Continuidade longitudinal: ciclo ${sequence.sequence_number}, fase ${sequence.phase}; proteína permanece estável e carboidrato acompanha a carga. Consistência > perfeição.`,
+    program_sequence: sequence,
     warnings,
     generated_by: "bn_nutrition_engine_v1",
   };

@@ -10,6 +10,7 @@ export interface ExercisePickRequest {
   fitnessLevel?: unknown;
   preferredMuscleGroup?: string;
   preferredPattern?: string;
+  preferredExerciseIds?: Set<string>;
 }
 
 function exerciseText(exercise: ExerciseCatalogEntry) {
@@ -51,6 +52,7 @@ export function scoreExercise(exercise: ExerciseCatalogEntry, request: ExerciseP
   if (equipment && text.includes(equipment)) score += 2;
   if (level.includes("inic") && /avanc|complex|olimp|snatch|clean|salto/.test(text)) score -= 5;
   if (request.usedIds?.has(exercise.id)) score -= 4;
+  if (request.preferredExerciseIds?.has(exercise.id)) score += 12;
 
   for (const rule of request.restrictions || []) {
     if (!rule.active) continue;

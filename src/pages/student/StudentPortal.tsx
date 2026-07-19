@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
-import { Dumbbell, Play, Clock, CheckCircle2, Circle, Loader2, LogOut, Save, CalendarDays, History, BarChart3, ArrowLeft, Flame } from "lucide-react";
+import { Dumbbell, Play, Clock, CheckCircle2, Circle, Loader2, LogOut, Save, CalendarDays, History, BarChart3, ArrowLeft, ExternalLink, Flame } from "lucide-react";
 import { format, parseISO, differenceInDays, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +30,7 @@ import { useWakeLock } from "@/hooks/useWakeLock";
 import { WeeklyBar } from "@/components/student/WeeklyBar";
 import { AnnouncementsBell } from "@/components/student/AnnouncementsBell";
 import { StudentHome } from "@/components/student/StudentHome";
+import { businessDateYmd } from "@/lib/businessDate";
 import { NutritionPlanView } from "@/components/student/NutritionPlanView";
 import { CardioPlanView } from "@/components/student/CardioPlanView";
 import { StudentCalendar } from "@/components/student/StudentCalendar";
@@ -128,7 +129,6 @@ export default function StudentPortal() {
   const [allLogs, setAllLogs] = useState<any[]>([]);
   const [studentGoals, setStudentGoals] = useState<any[]>([]);
   const [extraSets, setExtraSets] = useState<Record<number, number>>({});
-  const [companyWhatsapp, setCompanyWhatsapp] = useState<string | null>(null);
   const [workoutSessions, setWorkoutSessions] = useState<any[]>([]);
   const [weeklyGoal, setWeeklyGoal] = useState<number>(3);
   const [activeEnrollmentId, setActiveEnrollmentId] = useState<string | null>(null);
@@ -138,7 +138,7 @@ export default function StudentPortal() {
   
 
   const selectedWorkout = selectedCycle?.workouts.find(w => w.id === selectedWorkoutId) || selectedCycle?.workouts[0] || null;
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = businessDateYmd();
 
   const session = useWorkoutSession(studentId, companyId);
 
@@ -180,29 +180,17 @@ export default function StudentPortal() {
     // Detecta quais prescrições existem para mostrar as abas condicionais (nutrição/corrida/natação/ciclismo).
     // RLS já permite o aluno ler nutrition_plans e running_plans próprios.
     {
-      const [{ count: nutriCount }, { data: runs }] = await Promise.all([
-        (supabase as any).from("nutrition_plans").select("id", { count: "exact", head: true }).eq("student_id", student.id),
-        supabase.from("running_plans").select("sport").eq("student_id", student.id),
+      const [{ data: nutritionRows }, { data: runs }] = await Promise.all([
+        (supabase as any).from("nutrition_plans").select("id, start_date, end_date").eq("student_id", student.id),
+        (supabase as any).from("running_plans").select("sport, start_date, end_date").eq("student_id", student.id),
       ]);
-      setHasNutrition((nutriCount ?? 0) > 0);
+      const isVisibleToday = (row: any) => (!row.start_date || row.start_date <= todayStr) && (!row.end_date || row.end_date >= todayStr);
+      setHasNutrition((nutritionRows ?? []).some(isVisibleToday));
       const sports = new Set<string>();
-      (runs ?? []).forEach((r: any) => { if (r.sport) sports.add(String(r.sport).toLowerCase()); });
+      (runs ?? []).filter(isVisibleToday).forEach((r: any) => { if (r.sport) sports.add(String(r.sport).toLowerCase()); });
       setRunningSports(sports);
     }
 
-
-    if (student.company_id) {
-      const { data: waInstance } = await supabase
-        .from("whatsapp_instances")
-        .select("phone_number")
-        .eq("company_id", student.company_id)
-        .eq("status", "connected")
-        .limit(1)
-        .maybeSingle();
-      if (waInstance?.phone_number) {
-        setCompanyWhatsapp(waInstance.phone_number.replace(/\D/g, ""));
-      }
-    }
 
     const { data: enrollment } = await supabase
       .from("enrollments")
@@ -294,25 +282,27 @@ export default function StudentPortal() {
         // Vários ciclos podem ter períodos sobrepostos (re-publicações). Prioriza: ciclo ATIVO com treinos
         // > ativo > no período com treinos > no período > com treinos > mais recente (maior cycle_number).
         const byNewest = [...enriched].sort((a, b) => (b.cycle_number || 0) - (a.cycle_number || 0));
+        // Prescrição futura nunca vaza antes da data. O status ajuda, mas a
+        // vigência é a fonte de verdade para o que o aluno enxerga hoje.
         const chosen =
-          byNewest.find(c => c.status === "active" && c.workouts.length > 0) ||
-          byNewest.find(c => c.status === "active") ||
           byNewest.find(c => inRange(c) && c.workouts.length > 0) ||
           byNewest.find(c => inRange(c)) ||
-          byNewest.find(c => c.workouts.length > 0) ||
-          byNewest[0] ||
-          enriched[0];
+          byNewest.find(c => c.status === "active" && c.workouts.length > 0 && (!c.start_date || !c.end_date)) ||
+          byNewest.find(c => c.status === "active" && (!c.start_date || !c.end_date)) ||
+          null;
         setSelectedCycle(chosen);
         // P6 — marca a prescrição como vista assim que o aluno abre o ciclo escolhido.
         if (chosen?.id && (chosen as any).delivery_status !== "viewed") {
-          void (supabase as any).from("training_cycles").update({ delivery_status: "viewed" }).eq("id", chosen.id);
+          void (supabase as any).rpc("mark_training_cycle_viewed", { _cycle_id: chosen.id });
         }
         const todayDow = new Date().getDay();
-        const todaysWorkout = chosen.workouts.find(w => w.day_of_week === todayDow);
+        const todaysWorkout = chosen?.workouts.find(w => w.day_of_week === todayDow);
         if (todaysWorkout) {
           setSelectedWorkoutId(todaysWorkout.id);
-        } else if (chosen.workouts.length > 0) {
+        } else if (chosen?.workouts.length) {
           setSelectedWorkoutId(chosen.workouts[0].id);
+        } else {
+          setSelectedWorkoutId(null);
         }
 
         const workoutIds = workoutsData?.map(w => w.id) || [];
@@ -781,7 +771,14 @@ export default function StudentPortal() {
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-3">
               {activeView !== "home" && (
-                <Button variant="ghost" size="icon" onClick={() => setActiveView("home")} className="mr-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setActiveView("home")}
+                  className="mr-1"
+                  aria-label="Voltar ao início"
+                  title="Voltar ao início"
+                >
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
               )}
@@ -792,7 +789,7 @@ export default function StudentPortal() {
             </div>
             <div className="flex items-center gap-1">
               {studentId && companyId && <AnnouncementsBell studentId={studentId} companyId={companyId} />}
-              <Button variant="ghost" size="icon" onClick={signOut}>
+              <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sair" title="Sair">
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>
@@ -813,7 +810,6 @@ export default function StudentPortal() {
               enrollmentId={activeEnrollmentId}
               enrollmentEndDate={enrollmentInfo.end_date}
               cycleId={selectedCycle?.id ?? null}
-              whatsappUrl={companyWhatsapp ? `https://wa.me/${companyWhatsapp}` : null}
             />
           </div>
         )}
@@ -906,7 +902,8 @@ export default function StudentPortal() {
                 <WhySafetyCard
                   objective={selectedCycle.objective}
                   startDate={selectedCycle.start_date}
-                  whatsappUrl={companyWhatsapp ? `https://wa.me/${companyWhatsapp}` : null}
+                  studentId={studentId}
+                  companyId={companyId}
                   studentName={studentName}
                 />
 
@@ -1197,16 +1194,26 @@ export default function StudentPortal() {
             <DialogTitle className="text-primary text-sm">DEMONSTRAÇÃO</DialogTitle>
           </DialogHeader>
           {videoModal && (
-            <div className="aspect-video w-full">
-              {videoModal.type === "loading" ? (
-                <div className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-md bg-muted/40">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  <p className="text-xs text-muted-foreground">Buscando demonstração no YouTube…</p>
-                </div>
-              ) : videoModal.type === "path" ? (
-                <video src={videoModal.value} controls className="w-full h-full rounded-md" />
-              ) : (
-                <iframe src={getEmbedUrl(videoModal.value)} className="w-full h-full rounded-md" allowFullScreen />
+            <div className="space-y-3">
+              <div className="aspect-video w-full">
+                {videoModal.type === "loading" ? (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-md bg-muted/40">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <p className="text-xs text-muted-foreground">Buscando demonstração no YouTube…</p>
+                  </div>
+                ) : videoModal.type === "path" ? (
+                  <video src={videoModal.value} controls className="w-full h-full rounded-md" />
+                ) : (
+                  <iframe src={getEmbedUrl(videoModal.value)} title="Demonstração do exercício" className="w-full h-full rounded-md" allowFullScreen />
+                )}
+              </div>
+              {videoModal.type === "url" && (
+                <Button variant="outline" size="sm" className="w-full" asChild>
+                  <a href={videoModal.value} target="_blank" rel="noreferrer">
+                    Abrir vídeo original
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </a>
+                </Button>
               )}
             </div>
           )}
@@ -1224,7 +1231,7 @@ export default function StudentPortal() {
           totalSetsPrescribed={session.summary.totalSetsPrescribed}
           exercises={session.summary.exercisesSummary}
           formatTime={session.formatTime}
-          whatsappUrl={companyWhatsapp ? `https://wa.me/${companyWhatsapp}` : null}
+          onFeedback={() => setFeedbackOpen(true)}
         />
       )}
 

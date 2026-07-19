@@ -38,8 +38,15 @@ export async function assertBundleAccess(
 export async function assertTenantAccess(
   adminClient: any,
   claims: any,
-  opts: { companyId?: unknown; studentId?: unknown; requireCompany?: boolean } = {},
-): Promise<{ userId: string; companyId: string; isMaster: boolean; userCompanyId: string | null }> {
+  opts: { companyId?: unknown; studentId?: unknown; requireCompany?: boolean; requireStaff?: boolean } = {},
+): Promise<{
+  userId: string;
+  companyId: string;
+  isMaster: boolean;
+  isStaff: boolean;
+  userCompanyId: string | null;
+  actorStudentId: string | null;
+}> {
   const userId = typeof claims?.sub === "string" ? claims.sub : null;
   if (!userId) throw new HttpError(401, "Unauthorized");
 
@@ -53,9 +60,16 @@ export async function assertTenantAccess(
     throw new HttpError(400, "student_id inválido.");
   }
 
-  const [masterResult, userCompanyResult] = await Promise.all([
+  const [masterResult, userCompanyResult, actorStudentResult] = await Promise.all([
     adminClient.rpc("has_role", { _user_id: userId, _role: "master" }),
     adminClient.rpc("get_user_company_id", { _user_id: userId }),
+    adminClient
+      .from("students")
+      .select("id, company_id")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
   if (masterResult.error) {
     console.error("tenant-auth: has_role(master) RPC failed", {
@@ -75,9 +89,20 @@ export async function assertTenantAccess(
     });
     throw new HttpError(503, `Falha ao resolver empresa do usuário: ${userCompanyResult.error.message}`);
   }
+  if (actorStudentResult.error) {
+    console.error("tenant-auth: student ownership lookup failed", {
+      userId,
+      message: actorStudentResult.error.message,
+      code: actorStudentResult.error.code,
+      details: actorStudentResult.error.details,
+    });
+    throw new HttpError(503, `Falha ao validar vínculo do aluno: ${actorStudentResult.error.message}`);
+  }
 
   const isMaster = !!masterResult.data;
   const userCompanyId = userCompanyResult.data ?? null;
+  const actorStudentId = actorStudentResult.data?.id ?? null;
+  const actorStudentCompanyId = actorStudentResult.data?.company_id ?? null;
 
   let studentCompanyId: string | null = null;
   if (requestedStudentId) {
@@ -102,15 +127,46 @@ export async function assertTenantAccess(
     throw new HttpError(403, "Forbidden: aluno não pertence à empresa informada.");
   }
 
-  if (!isMaster) {
-    if (!userCompanyId || !targetCompanyId || userCompanyId !== targetCompanyId) {
+  if (!targetCompanyId) throw new HttpError(400, "Empresa não informada.");
+
+  const staffResult = await adminClient.rpc("is_company_staff", {
+    _user_id: userId,
+    _company_id: targetCompanyId,
+  });
+  if (staffResult.error) {
+    console.error("tenant-auth: is_company_staff RPC failed", {
+      userId,
+      targetCompanyId,
+      message: staffResult.error.message,
+      code: staffResult.error.code,
+      details: staffResult.error.details,
+    });
+    throw new HttpError(503, `Falha ao validar acesso da equipe: ${staffResult.error.message}`);
+  }
+  const isStaff = !!staffResult.data;
+
+  if (opts.requireStaff && !isStaff) {
+    throw new HttpError(403, "Forbidden: staff access required.");
+  }
+
+  if (!isStaff) {
+    if (!actorStudentId || !actorStudentCompanyId) {
+      throw new HttpError(403, "Forbidden: company staff or student ownership required.");
+    }
+    if (actorStudentCompanyId !== targetCompanyId) {
       throw new HttpError(403, "Forbidden: company mismatch.");
     }
-    if (studentCompanyId && studentCompanyId !== userCompanyId) {
+    if (requestedStudentId && requestedStudentId !== actorStudentId) {
       throw new HttpError(403, "Forbidden: student mismatch.");
     }
   }
 
-  if (!targetCompanyId) throw new HttpError(400, "Empresa não informada.");
-  return { userId, companyId: targetCompanyId, isMaster: !!isMaster, userCompanyId: userCompanyId ?? null };
+  return {
+    userId,
+    companyId: targetCompanyId,
+    isMaster,
+    isStaff,
+    userCompanyId: userCompanyId ?? null,
+    actorStudentId,
+  };
 }

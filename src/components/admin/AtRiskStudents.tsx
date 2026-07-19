@@ -1,10 +1,10 @@
 // Central de Atenção ("semáforo BNITO"): unifica os sinais de atenção por aluno usando a máquina
 // de status única (studentStatus) + dor relatada na anamnese, com PRÓXIMA MELHOR AÇÃO:
-// mensagem pronta copiável por situação + atalho pra conversa. Componente standalone do dashboard.
+// mensagem pronta + atalho para a conversa interna. Componente standalone do dashboard.
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, AlertTriangle, MessageSquare, Copy, Check } from "lucide-react";
+import { Loader2, AlertTriangle, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,6 +12,7 @@ import { useMaster } from "@/contexts/MasterContext";
 import { deriveStudentStatus, riskReasons, STUDENT_STATUS_LABELS, STUDENT_STATUS_COLORS, type StudentStatus } from "@/lib/studentStatus";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { openStudentChat } from "@/lib/studentChat";
 
 interface RiskRow {
   id: string;
@@ -25,7 +26,7 @@ interface RiskRow {
 }
 const PAID = ["CONFIRMED", "RECEIVED", "RECEIVED_IN_CASH"];
 
-// Mensagem pronta por situação (tom humano, 1 clique → copiar → colar no WhatsApp).
+// Mensagem pronta por situação (tom humano, aberta como rascunho no chat interno).
 function buildMessage(name: string, status: StudentStatus, reasons: string[], pain?: string | null): string {
   const first = (name || "").split(" ")[0] || "tudo bem";
   if (pain) {
@@ -51,7 +52,6 @@ export function AtRiskStudents() {
   const effectiveCompanyId = role === "master" ? (isViewingCompany ? viewingCompany?.id : null) : companyId;
   const [rows, setRows] = useState<RiskRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     // Sem empresa efetiva (master fora do company-view), não lista global de todas as empresas.
@@ -126,15 +126,16 @@ export function AtRiskStudents() {
 
   useEffect(() => { load(); }, [load]);
 
-  const copyMessage = async (r: RiskRow) => {
-    try {
-      await navigator.clipboard.writeText(r.message);
-      setCopiedId(r.id);
-      toast.success("Mensagem copiada — cole no WhatsApp do aluno");
-      setTimeout(() => setCopiedId(null), 2000);
-    } catch {
-      toast.error("Não consegui copiar — selecione manualmente");
-    }
+  const openConversation = async (row: RiskRow) => {
+    const routePrefix = role === "master" && isViewingCompany ? "admin" : (role || "admin");
+    await openStudentChat({
+      navigate,
+      routePrefix,
+      chatId: row.chatId,
+      studentId: row.id,
+      message: row.message,
+      onNoChat: () => toast.error("Esse aluno ainda não tem telefone ou conversa cadastrada."),
+    });
   };
 
   return (
@@ -160,16 +161,14 @@ export function AtRiskStudents() {
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{r.reasons.join(" · ")}</p>
                   </div>
-                  <button onClick={() => copyMessage(r)}
-                    className="text-muted-foreground hover:text-primary hover:bg-muted/60 rounded p-1.5 transition-colors" title="Copiar mensagem pronta">
-                    {copiedId === r.id ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                  <button
+                    onClick={() => void openConversation(r)}
+                    className="rounded p-1.5 text-primary transition-colors hover:bg-muted/60"
+                    title="Abrir conversa interna"
+                    aria-label={`Abrir conversa interna com ${r.name}`}
+                  >
+                    <MessageSquare className="h-4 w-4" />
                   </button>
-                  {r.chatId && (
-                    <button onClick={() => navigate("/admin/whatsapp-chat", { state: { chatId: r.chatId } })}
-                      className="text-primary hover:bg-muted/60 rounded p-1.5 transition-colors" title="Abrir conversa">
-                      <MessageSquare className="h-4 w-4" />
-                    </button>
-                  )}
                 </div>
               </div>
             ))}

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { businessDateYmd } from "@/lib/businessDate";
 
 export const ACTIVITY_TYPES = [
   { value: "corrida", label: "Corrida", hasDistance: true },
@@ -42,7 +43,7 @@ export function ExternalActivityForm({ open, onClose, studentId, companyId, exis
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [activityType, setActivityType] = useState("corrida");
-  const [activityDate, setActivityDate] = useState(new Date().toISOString().split("T")[0]);
+  const [activityDate, setActivityDate] = useState(businessDateYmd());
   const [duration, setDuration] = useState<string>("");
   const [distance, setDistance] = useState<string>("");
   const [intensity, setIntensity] = useState<number>(3);
@@ -58,7 +59,7 @@ export function ExternalActivityForm({ open, onClose, studentId, companyId, exis
       setNotes(existing.notes || "");
     } else {
       setActivityType("corrida");
-      setActivityDate(new Date().toISOString().split("T")[0]);
+      setActivityDate(businessDateYmd());
       setDuration("");
       setDistance("");
       setIntensity(3);

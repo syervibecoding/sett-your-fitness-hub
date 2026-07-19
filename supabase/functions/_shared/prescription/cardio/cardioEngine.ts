@@ -11,6 +11,15 @@ export interface CardioInput {
   days_per_week?: number | string;
   session_duration?: number | string; // min
   current_volume?: number | string;
+  block_number?: number | string | null;
+  previous_plan_context?: CardioPlan | null;
+  program_sequence?: {
+    sequence_number?: number | string | null;
+    total_cycles?: number | string | null;
+    start_date?: string | null;
+    end_date?: string | null;
+    phase?: string | null;
+  } | null;
   fcmax?: number | string | null;
   fcrep?: number | string | null;
   age?: number | string | null;
@@ -52,6 +61,14 @@ export interface CardioPlan {
   complementary_strength: string[];
   nutrition_alert: string; general_tips: string; warnings: string[];
   coach_notes?: string[];
+  program_sequence?: {
+    sequence_number: number;
+    total_cycles: number | null;
+    phase: string;
+    start_date: string | null;
+    end_date: string | null;
+    previous_plan_used: boolean;
+  };
   generated_by: string;
 }
 
@@ -61,6 +78,33 @@ const num = (v: unknown): number => {
 };
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const round1 = (n: number) => Math.round(n * 10) / 10;
+
+function sequenceMeta(input: CardioInput) {
+  const sequenceNumber = Math.max(1, Math.round(num(input.program_sequence?.sequence_number ?? input.block_number)) || 1);
+  const position = ((sequenceNumber - 1) % 4) + 1;
+  const inferred = position === 1 ? "base" : position === 2 ? "acumulacao" : position === 3 ? "intensificacao" : "consolidacao";
+  const requested = String(input.program_sequence?.phase || "").toLowerCase();
+  const phase = /acumul/.test(requested) ? "acumulacao"
+    : /intens/.test(requested) ? "intensificacao"
+      : /(consol|deload|regener)/.test(requested) ? "consolidacao"
+        : /base/.test(requested) ? "base" : inferred;
+  return {
+    sequence_number: sequenceNumber,
+    total_cycles: Number(input.program_sequence?.total_cycles) || null,
+    phase,
+    start_date: input.program_sequence?.start_date || null,
+    end_date: input.program_sequence?.end_date || null,
+    previous_plan_used: Boolean(input.previous_plan_context),
+  };
+}
+
+function previousVolume(input: CardioInput, sport: string): number {
+  const weeks = Array.isArray(input.previous_plan_context?.weeks) ? input.previous_plan_context!.weeks : [];
+  const usable = weeks.filter((week) => week?.type !== "deload").slice(-2);
+  if (!usable.length) return NaN;
+  if (sport === "natacao") return Math.max(...usable.map((week) => num(week.volume_hours)).filter(Number.isFinite));
+  return Math.max(...usable.map((week) => num(week.volume_km)).filter(Number.isFinite));
+}
 
 const DAYS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const ZONE_LABEL: Record<ZoneKey, string> = { z1: "Z1", z2: "Z2", z3: "Z3", z4: "Z4", z5: "Z5" };
@@ -264,13 +308,16 @@ function complementaryStrength(sport: string): string[] {
 // ── Motor principal ──────────────────────────────────────────────────────────
 export function buildCardioProgram(input: CardioInput): CardioPlan {
   const sport = normSport(input.sport);
+  const sequence = sequenceMeta(input);
   const N = clamp(Math.round(num(input.duration_weeks)) || 6, 1, 16);
   let sessionMin = clamp(Math.round(num(input.session_duration)) || 60, 20, 180);
   const { level, assumed } = resolveLevel(input);
 
   // ── Calibração pelo volume ATUAL da anamnese (regra dos ~10%: semana 1 nunca muito acima do que já faz) ──
   // current_volume: km/semana (corrida/pedal). Estima a semana 1 e escala a duração-base das sessões.
-  const currentVol = num(input.current_volume);
+  const reportedVolume = num(input.current_volume);
+  const inheritedVolume = previousVolume(input, sport);
+  const currentVol = Number.isFinite(reportedVolume) && reportedVolume > 0 ? reportedVolume : inheritedVolume;
   let volCalibrated = false;
   if (!isNaN(currentVol) && currentVol > 0 && sport !== "natacao") {
     const d0 = clamp(Math.round(num(input.days_per_week)) || 3, 1, 6);
@@ -281,6 +328,14 @@ export function buildCardioProgram(input: CardioInput): CardioPlan {
       if (Math.abs(scale - 1) > 0.07) { sessionMin = clamp(Math.round(sessionMin * scale), 20, 180); volCalibrated = true; }
     }
   }
+  if (sport === "natacao" && Number.isFinite(currentVol) && currentVol > 0) {
+    const d0 = clamp(Math.round(num(input.days_per_week)) || 3, 1, 6);
+    sessionMin = clamp(Math.round((currentVol * 60 / d0) * 1.05), 20, 180);
+    volCalibrated = true;
+  }
+  if (sequence.phase === "acumulacao") sessionMin = clamp(Math.round(sessionMin * 1.05), 20, 180);
+  if (sequence.phase === "intensificacao") sessionMin = clamp(Math.round(sessionMin * 1.08), 20, 180);
+  if (sequence.phase === "consolidacao") sessionMin = clamp(Math.round(sessionMin * 0.85), 20, 180);
   const zones = computeFcZones(input);
   const tsbNum = num(input.tsb);
   const safety = resolveSafety(input, level);
@@ -362,6 +417,7 @@ export function buildCardioProgram(input: CardioInput): CardioPlan {
   if (assumed) coach_notes.push("Nível de experiência não informado — assumido conservador (iniciante). Ajuste se o atleta tiver mais base.");
   if (input.strength_plan_context) coach_notes.push("Sincronizado com a musculação: evite Z4/Z5 no dia e na véspera de MMII pesado; corrida fácil só após a força, ≥6h de intervalo.");
   if (volCalibrated) coach_notes.push(`Volume inicial calibrado pelo volume atual da anamnese (~${round1(currentVol)} km/sem): semana 1 parte de perto do que o atleta já faz (+~10%).`);
+  if (input.previous_plan_context) coach_notes.push(`Continuidade longitudinal aplicada a partir do ciclo anterior; fase atual: ${sequence.phase}.`);
   if (perf) coach_notes.push("Última semana em taper (fator 0,5) para chegar descansado na prova.");
   coach_notes.push("Plano base gerado pela metodologia BN (determinístico). Revise antes de prescrever ao aluno.");
 
@@ -381,6 +437,7 @@ export function buildCardioProgram(input: CardioInput): CardioPlan {
     general_tips: tips,
     warnings,
     coach_notes,
+    program_sequence: sequence,
     generated_by: "bn_cardio_engine_v2",
   };
 }

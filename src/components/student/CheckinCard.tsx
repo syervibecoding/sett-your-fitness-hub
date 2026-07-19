@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, HeartPulse } from "lucide-react";
+import { businessDateYmd } from "@/lib/businessDate";
 
 interface Props { studentId: string; companyId: string | null; }
 
@@ -12,7 +13,7 @@ const STRESS = [["😌", 1], ["🙂", 2], ["😐", 3], ["😖", 4], ["🤯", 5]]
 const PAIN = [0, 2, 4, 6, 8] as const;
 
 export function CheckinCard({ studentId, companyId }: Props) {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = businessDateYmd();
   const [done, setDone] = useState<boolean | null>(null);
   const [sleep, setSleep] = useState<number | null>(null);
   const [stress, setStress] = useState<number | null>(null);

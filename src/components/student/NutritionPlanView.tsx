@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Apple, Utensils, Droplets, Flame, Beef, Wheat, Leaf, Loader2, Coffee, Dumbbell, Moon, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { businessDateYmd } from "@/lib/businessDate";
 
 // Espelha o schema VIVO de nutrition_plans (Supabase zshrcgbyhzxpnlccssyz): macros em target_*,
 // objetivo em goal, restrições em context_dietary_restrictions, e o PLANO DE REFEIÇÕES prático em
@@ -33,6 +34,8 @@ interface NutritionRow {
   fat_g?: number | null;
   context_dietary_restrictions?: string | null;
   meals?: MealItem[] | null;
+  start_date?: string | null;
+  end_date?: string | null;
 }
 
 const GOAL_LABEL: Record<string, string> = {
@@ -90,7 +93,7 @@ export function NutritionPlanView({ studentId }: { studentId: string }) {
   const [generatingMeals, setGeneratingMeals] = useState(false);
 
   // Rastreador de hidratação (interativo) — persiste por aluno + dia no localStorage.
-  const dayKey = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const dayKey = useMemo(() => businessDateYmd(), []);
   const waterStoreKey = `nutri-water:${studentId}:${dayKey}`;
   const [glasses, setGlasses] = useState(0);
   useEffect(() => {
@@ -107,19 +110,29 @@ export function NutritionPlanView({ studentId }: { studentId: string }) {
     (async () => {
       setLoading(true);
       try {
+        const today = businessDateYmd();
         const { data } = await (supabase as any)
           .from("nutrition_plans")
           .select("*")
           .eq("student_id", studentId)
+          .lte("start_date", today)
+          .or(`end_date.is.null,end_date.gte.${today}`)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
+        let visible = data;
+        if (!visible) {
+          const { data: legacy } = await (supabase as any).from("nutrition_plans").select("*")
+            .eq("student_id", studentId).is("start_date", null)
+            .order("created_at", { ascending: false }).limit(1).maybeSingle();
+          visible = legacy;
+        }
         if (!active) return;
-        setRow((data as NutritionRow) ?? null);
+        setRow((visible as NutritionRow) ?? null);
         setLoading(false);
         // Gera o plano de refeições sob demanda se ainda não existe (preenche nutrition_plans.meals).
-        const existing = Array.isArray((data as any)?.meals) ? (data as any).meals : [];
-        if (data && existing.length === 0) {
+        const existing = Array.isArray((visible as any)?.meals) ? (visible as any).meals : [];
+        if (visible && existing.length === 0) {
           setGeneratingMeals(true);
           try {
             const { data: gen } = await supabase.functions.invoke("ai-nutrition-meals", { body: { student_id: studentId } });
