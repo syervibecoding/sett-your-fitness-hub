@@ -31,7 +31,7 @@ interface Exercise {
   category: string | null;
   categories: string[] | null;
   body_regions: string[] | null;
-  youtube_video_id: string | null;
+  youtube_video_id?: string | null;
   video_url: string | null;
   video_path: string | null;
   description: string | null;
@@ -324,10 +324,14 @@ export default function WorkoutBuilder() {
   const loadLibrary = async () => {
     const { data } = await supabase
       .from("exercise_library")
-      .select("id, name, muscle_group, category, categories, body_regions, youtube_video_id, video_url, video_path, description")
+      .select("id, name, muscle_group, category, categories, video_url, video_path, description")
       .order("muscle_group")
       .order("name");
-    setLibraryExercises((data as Exercise[]) || []);
+    setLibraryExercises(((data || []) as unknown as Exercise[]).map((exercise) => ({
+      ...exercise,
+      body_regions: exercise.body_regions ?? null,
+      youtube_video_id: exercise.youtube_video_id ?? null,
+    })));
   };
 
   const loadMuscleTargets = async () => {

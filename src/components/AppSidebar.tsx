@@ -22,6 +22,7 @@ import {
   Sparkles,
   Activity,
   BrainCircuit,
+  KeyRound,
 
 
 } from "lucide-react";
@@ -74,6 +75,7 @@ const masterItems = [
   { title: "Dashboard", url: "/master", icon: LayoutDashboard },
   { title: "Empresas", url: "/master/companies", icon: Building2 },
   { title: "Biblioteca", url: "/master/biblioteca", icon: Dumbbell },
+  { title: "Minha Conta", url: "/master/account", icon: KeyRound },
 ];
 
 const baseAdminItems: typeof managementItems = [];

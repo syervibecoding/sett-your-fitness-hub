@@ -22,7 +22,7 @@ interface Exercise {
   description: string | null;
   muscle_group: string;
   category: string | null;
-  youtube_video_id: string | null;
+  youtube_video_id?: string | null;
   video_url: string | null;
   video_path: string | null;
   thumbnail_url: string | null;
@@ -124,7 +124,10 @@ export default function ExerciseLibrary() {
       .order("muscle_group")
       .order("name");
     if (error) console.error(error);
-    const list = (data as Exercise[]) || [];
+    const list = ((data || []) as unknown as Exercise[]).map((exercise) => ({
+      ...exercise,
+      youtube_video_id: exercise.youtube_video_id ?? null,
+    }));
     setExercises(list);
 
     // Load muscle targets for all exercises in one query

@@ -301,7 +301,7 @@ export default function StudentDetail() {
     { id: "avaliacoes", label: "Avaliações", tabs: [["anamnesis", "Anamnese"], ["evaluations", "Avaliações"], ["progress", "Progresso"]] },
     { id: "visao360", label: "Visão 360", tabs: [["overview", "Visão Geral"], ["financial", "Financeiro"], ["hub", "Acompanhamento"]] },
   ] as const;
-  const activeGroup = TAB_GROUPS.find((g) => g.tabs.some(([v]) => v === activeTab)) || TAB_GROUPS[0];
+  const activeGroup = TAB_GROUPS.find((g) => g.tabs.some(([v]: readonly [string, string]) => v === activeTab)) || TAB_GROUPS[0];
 
   const handleActivateStudentAccess = async () => {
     if (!student?.email) {
