@@ -613,6 +613,34 @@ export default function StudentDetail() {
     ? addDays(startDate, (selectedPlan.duration_days || (selectedPlan.duration_weeks ?? 4) * 7) - 1)
     : null;
 
+  // Atribuir/trocar treinador direto do perfil (grava na MATRÍCULA e sincroniza o aluno).
+  const handleAssignTrainerInline = async (enrollmentId: string, trainerId: string) => {
+    if (!trainerId || !id) return;
+    const { error } = await supabase.from("enrollments").update({ trainer_id: trainerId }).eq("id", enrollmentId);
+    if (error) {
+      toast({ title: "Erro ao atribuir treinador", description: error.message, variant: "destructive" });
+      return;
+    }
+    await supabase.from("students").update({ assigned_trainer_id: trainerId }).eq("id", id);
+    toast({ title: "Treinador atribuído!" });
+    loadData(id);
+  };
+
+  // Seletor inline de treinador — substitui o "Treinador desconhecido" estático.
+  const TrainerInlineSelect = ({ enrollmentId, trainerId, trainerName }: { enrollmentId: string; trainerId: string | null; trainerName?: string }) => (
+    <Select value={trainerId || ""} onValueChange={(v) => handleAssignTrainerInline(enrollmentId, v)}>
+      <SelectTrigger className="h-6 w-auto min-w-[150px] border-dashed px-2 py-0 text-xs gap-1 [&>svg]:h-3 [&>svg]:w-3">
+        <Dumbbell className="h-3 w-3 shrink-0" />
+        <SelectValue placeholder="Selecionar treinador">
+          {trainerId && trainerName && trainerName !== "Treinador desconhecido" ? trainerName : "Selecionar treinador"}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {trainers.map((t) => <SelectItem key={t.user_id} value={t.user_id}>{t.full_name}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+
   const handleCreateEnrollment = async () => {
     if (!selectedPlanId || !selectedTrainerId || !id || !session?.user?.id || !computedEndDate) return;
     setSaving(true);
@@ -1065,8 +1093,8 @@ export default function StudentDetail() {
                             {statusLabels[active.status] || active.status}
                           </Badge>
                         </div>
-                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                          <span><Dumbbell className="h-3 w-3 inline mr-1" />{active.trainer_name}</span>
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                          <TrainerInlineSelect enrollmentId={active.id} trainerId={active.trainer_id} trainerName={active.trainer_name} />
                           <span><CalendarDays className="h-3 w-3 inline mr-1" />{safeFormatDate(active.start_date, "dd/MM/yyyy")} → {safeFormatDate(active.end_date, "dd/MM/yyyy")}</span>
                         </div>
                         {cycles.filter(c => c.enrollment_id === active.id).length > 0 && (
@@ -1196,8 +1224,8 @@ export default function StudentDetail() {
                             {statusLabels[e.status] || e.status}
                           </Badge>
                         </div>
-                        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground font-sans">
-                          <span><Dumbbell className="h-3 w-3 inline mr-1" />{e.trainer_name}</span>
+                        <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground font-sans">
+                          <TrainerInlineSelect enrollmentId={e.id} trainerId={e.trainer_id} trainerName={e.trainer_name} />
                           <span><CalendarDays className="h-3 w-3 inline mr-1" />{safeFormatDate(e.start_date, "dd/MM/yyyy")} → {safeFormatDate(e.end_date, "dd/MM/yyyy")}</span>
                           {e.plan_duration && <span>{e.plan_duration} semanas</span>}
                         </div>
