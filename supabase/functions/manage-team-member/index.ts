@@ -215,6 +215,17 @@ Deno.serve(async (req) => {
         });
       }
 
+      const { data: targetAccount, error: targetAccountError } = await adminClient.auth.admin.getUserById(user_id);
+      if (targetAccountError || !targetAccount?.user) {
+        return new Response(JSON.stringify({
+          error: "Este registro é histórico e ainda não possui uma conta de acesso neste ambiente.",
+          code: "AUTH_ACCOUNT_MISSING",
+        }), {
+          status: 409,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const { error: updateError } = await adminClient.auth.admin.updateUserById(user_id, {
         password: new_password,
       });
@@ -243,6 +254,18 @@ Deno.serve(async (req) => {
       if (!(await assertSameCompany(user_id))) {
         return new Response(JSON.stringify({ error: "Forbidden: target user is not in your company" }), {
           status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+
+      const { data: targetAccount, error: targetAccountError } = await adminClient.auth.admin.getUserById(user_id);
+      if (targetAccountError || !targetAccount?.user) {
+        return new Response(JSON.stringify({
+          error: "Este registro é histórico e ainda não possui uma conta de acesso neste ambiente.",
+          code: "AUTH_ACCOUNT_MISSING",
+        }), {
+          status: 409,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -287,14 +310,35 @@ Deno.serve(async (req) => {
       }
 
       const results: { user_id: string; email: string }[] = [];
+      const accounts: Array<{
+        user_id: string;
+        auth_exists: boolean;
+        email: string | null;
+        email_confirmed: boolean;
+        banned: boolean;
+        last_sign_in_at: string | null;
+      }> = [];
       for (const uid of allowedUids) {
         const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(uid);
-        if (!userError && userData?.user?.email) {
-          results.push({ user_id: uid, email: userData.user.email });
+        const authUser = !userError ? userData?.user : null;
+        if (authUser?.email) {
+          results.push({ user_id: uid, email: authUser.email });
         }
+        accounts.push({
+          user_id: uid,
+          auth_exists: !!authUser,
+          email: authUser?.email ?? null,
+          email_confirmed: !!authUser?.email_confirmed_at,
+          banned: !!authUser?.banned_until && new Date(authUser.banned_until).getTime() > Date.now(),
+          last_sign_in_at: authUser?.last_sign_in_at ?? null,
+        });
       }
 
-      return new Response(JSON.stringify({ emails: results }), {
+      return new Response(JSON.stringify({
+        emails: results,
+        accounts,
+        missing_user_ids: accounts.filter((account) => !account.auth_exists).map((account) => account.user_id),
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

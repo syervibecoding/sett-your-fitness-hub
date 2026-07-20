@@ -24,6 +24,10 @@ interface TeamMember {
   user_id: string;
   full_name: string | null;
   email?: string;
+  auth_exists?: boolean;
+  email_confirmed?: boolean;
+  banned?: boolean;
+  last_sign_in_at?: string | null;
   roles: string[];
 }
 
@@ -89,6 +93,7 @@ export default function TeamManager() {
   const [editUserId, setEditUserId] = useState("");
   const [editUserName, setEditUserName] = useState("");
   const [editUserEmail, setEditUserEmail] = useState("");
+  const [editAuthExists, setEditAuthExists] = useState<boolean | undefined>(undefined);
   const [editRoles, setEditRoles] = useState<string[]>([]);
 
   // Performance tab
@@ -191,12 +196,33 @@ export default function TeamManager() {
         const { data: emailData } = await supabase.functions.invoke("manage-team-member", {
           body: { action: "list-emails", user_ids: membersList.map((m) => m.user_id) },
         });
-        if (emailData?.emails) {
-          const emailMap = new Map(emailData.emails.map((e: any) => [e.user_id, e.email]));
-          membersList.forEach((m) => {
-            m.email = (emailMap.get(m.user_id) as string) || undefined;
-          });
-        }
+        const emailMap = new Map<string, string>(
+          (emailData?.emails ?? []).map((entry: { user_id: string; email: string }) => [entry.user_id, entry.email]),
+        );
+        const accountMap = new Map<string, {
+          auth_exists: boolean;
+          email: string | null;
+          email_confirmed: boolean;
+          banned: boolean;
+          last_sign_in_at: string | null;
+        }>(
+          (emailData?.accounts ?? []).map((account: {
+            user_id: string;
+            auth_exists: boolean;
+            email: string | null;
+            email_confirmed: boolean;
+            banned: boolean;
+            last_sign_in_at: string | null;
+          }) => [account.user_id, account]),
+        );
+        membersList.forEach((member) => {
+          const account = accountMap.get(member.user_id);
+          member.email = account?.email ?? emailMap.get(member.user_id) ?? undefined;
+          member.auth_exists = account?.auth_exists ?? (emailMap.has(member.user_id) ? true : undefined);
+          member.email_confirmed = account?.email_confirmed;
+          member.banned = account?.banned;
+          member.last_sign_in_at = account?.last_sign_in_at;
+        });
       } catch (e) {
         console.error("Failed to fetch emails", e);
       }
@@ -592,6 +618,7 @@ export default function TeamManager() {
     setEditUserId(member.user_id);
     setEditUserName(member.full_name || "");
     setEditUserEmail(member.email || "");
+    setEditAuthExists(member.auth_exists);
     setEditRoles([...member.roles]);
     setEditDialogOpen(true);
   };
@@ -608,7 +635,7 @@ export default function TeamManager() {
     await supabase.from("profiles").update({ full_name: editUserName }).eq("user_id", editUserId);
 
     // Update email via edge function (skip if user not found in auth)
-    if (editUserEmail) {
+    if (editUserEmail && editAuthExists !== false) {
       const { data: emailData } = await supabase.functions.invoke("manage-team-member", {
         body: { action: "update-email", user_id: editUserId, email: editUserEmail },
       });
@@ -809,7 +836,19 @@ export default function TeamManager() {
                     </div>
                     <div className="space-y-2">
                       <Label className="font-sans">Email</Label>
-                      <Input type="email" value={editUserEmail} onChange={(e) => setEditUserEmail(e.target.value)} placeholder="email@exemplo.com" className="bg-secondary border-border" />
+                      <Input
+                        type="email"
+                        value={editUserEmail}
+                        onChange={(e) => setEditUserEmail(e.target.value)}
+                        placeholder={editAuthExists === false ? "Sem conta de acesso" : "email@exemplo.com"}
+                        className="bg-secondary border-border"
+                        disabled={editAuthExists === false}
+                      />
+                      {editAuthExists === false && (
+                        <p className="text-xs text-muted-foreground font-sans">
+                          Registro histórico preservado. Crie um novo membro para conceder acesso ao app.
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label className="font-sans">Papéis</Label>
@@ -845,9 +884,18 @@ export default function TeamManager() {
                         <p className="text-foreground font-sans font-medium">{m.full_name}</p>
                           {m.email && <p className="text-muted-foreground text-xs font-sans">{m.email}</p>}
                           {!m.email && <p className="text-muted-foreground text-xs font-sans">{m.user_id.slice(0, 8)}...</p>}
+                          {m.auth_exists === false && (
+                            <p className="text-warning text-xs font-sans">Registro histórico, sem login</p>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        {m.auth_exists === true && (
+                          <Badge variant="outline" className="text-success border-success/40">Acesso ativo</Badge>
+                        )}
+                        {m.auth_exists === false && (
+                          <Badge variant="outline" className="text-warning border-warning/40">Sem acesso</Badge>
+                        )}
                         {m.roles.map((role) => (
                           <span key={role} className={`text-xs font-sans font-medium px-2 py-1 rounded capitalize ${roleColors[role] || ""}`}>
                             {roleLabels[role] || role}
@@ -856,7 +904,14 @@ export default function TeamManager() {
                         <Button variant="ghost" size="icon" onClick={() => openEditDialog(m)} className="text-muted-foreground hover:text-foreground">
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openPasswordDialog(m.user_id, m.full_name)} className="text-muted-foreground hover:text-foreground">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openPasswordDialog(m.user_id, m.full_name)}
+                          className="text-muted-foreground hover:text-foreground"
+                          disabled={m.auth_exists === false}
+                          title={m.auth_exists === false ? "Registro histórico sem conta de login" : "Alterar senha"}
+                        >
                           <KeyRound className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleRemoveRole(m.user_id)} className="text-destructive hover:text-destructive">
