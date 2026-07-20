@@ -44,6 +44,14 @@ async function asaasFetch(path: string, options: RequestInit = {}) {
   return data;
 }
 
+async function checkConnection() {
+  const account = await asaasFetch("/myAccount/accountNumber");
+  return {
+    connected: Boolean(account?.accountNumber),
+    environment: "production",
+  };
+}
+
 async function requireAdminTenant(req: Request, body: any) {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) throw new HttpError(401, "Unauthorized");
@@ -864,7 +872,13 @@ Deno.serve(async (req) => {
 
   try {
     const { action, ...body } = await req.json();
-    const adminActions = new Set(["create-customer", "update-customer", "create-invoice", "sync-payments"]);
+    const adminActions = new Set([
+      "check-connection",
+      "create-customer",
+      "update-customer",
+      "create-invoice",
+      "sync-payments",
+    ]);
     const checkoutActions = new Set(["create-payment", "get-pix-qrcode", "create-card-payment", "get-payment-status"]);
     if (adminActions.has(action)) {
       const tenant = await requireAdminTenant(req, body);
@@ -883,6 +897,9 @@ Deno.serve(async (req) => {
 
     let result;
     switch (action) {
+      case "check-connection":
+        result = await checkConnection();
+        break;
       case "create-customer":
         result = await createCustomer(body);
         break;
