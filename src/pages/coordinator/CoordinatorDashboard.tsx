@@ -19,6 +19,8 @@ interface Student {
   id: string;
   full_name: string;
   email: string | null;
+  phone: string | null;
+  whatsapp: string | null;
   status: string;
 }
 
@@ -67,6 +69,21 @@ export default function CoordinatorDashboard() {
 
   const handleAddStudent = async () => {
     if (!form.full_name) return;
+    const email = form.email.trim().toLowerCase();
+    const phone = form.phone.replace(/\D/g, "");
+    const duplicate = students.find((student) => {
+      const studentEmail = (student.email || "").trim().toLowerCase();
+      const studentPhone = (student.whatsapp || student.phone || "").replace(/\D/g, "");
+      return (email && studentEmail === email) || (!email && phone && studentPhone === phone);
+    });
+    if (duplicate) {
+      toast({
+        title: "Aluno já cadastrado",
+        description: `${duplicate.full_name} já existe na empresa. Abra o perfil existente para seguir.`,
+        variant: "destructive",
+      });
+      return;
+    }
     const { error } = await supabase.from("students").insert({
       full_name: form.full_name,
       email: form.email || null,

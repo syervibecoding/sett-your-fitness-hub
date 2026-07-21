@@ -28,6 +28,7 @@ interface AlertsData {
 
 interface Props {
   trainerId?: string;
+  compact?: boolean;
 }
 
 async function fetchAlerts(
@@ -207,7 +208,7 @@ async function fetchAlerts(
   return { birthdays, missingWorkouts, awaitingTrainer, awaitingTrainingDate, missingEnrollment, incompleteBilling };
 }
 
-export function DashboardAlerts({ trainerId }: Props) {
+export function DashboardAlerts({ trainerId, compact = false }: Props) {
   const { role, companyId, user } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
   const navigate = useNavigate();
@@ -272,6 +273,145 @@ export function DashboardAlerts({ trainerId }: Props) {
   if (!hasContent) return null;
 
   const itemClass = "flex items-center justify-between p-2 rounded-lg cursor-pointer hover:brightness-110 transition-all";
+
+  if (compact) {
+    const attentionItems = [
+      ...pendingActions.map((a: any) => ({
+        key: `alert-${a.id}`,
+        tone: a.severity === "error" ? "danger" : a.severity === "warning" ? "warning" : "info",
+        label: "Ação",
+        title: a.title,
+        subtitle: a.message || "Pendência administrativa ou técnica.",
+        action: () => a.action_url ? navigate(a.action_url) : a.student_id && goToStudent(a.student_id),
+        resolveId: a.id,
+      })),
+      ...awaitingTrainer.map((a, i) => ({
+        key: `trainer-${a.student_id}-${i}`,
+        tone: "warning",
+        label: "Treinador",
+        title: a.student_name,
+        subtitle: "Aguardando definição de treinador.",
+        action: () => goToStudent(a.student_id),
+      })),
+      ...awaitingTrainingDate.map((a, i) => ({
+        key: `date-${a.enrollment_id}-${i}`,
+        tone: "warning",
+        label: "Data",
+        title: a.student_name,
+        subtitle: a.trainer_name ? `Sem data de treino · ${a.trainer_name}` : "Sem data de início do treino.",
+        action: () => goToStudent(a.student_id),
+      })),
+      ...missingEnrollment.map((a, i) => ({
+        key: `enrollment-${a.student_id}-${i}`,
+        tone: "danger",
+        label: "Matrícula",
+        title: a.student_name,
+        subtitle: "Aluno ativo sem matrícula ativa.",
+        action: () => goToStudent(a.student_id),
+      })),
+      ...incompleteBilling.map((a, i) => ({
+        key: `billing-${a.student_id}-${i}`,
+        tone: "danger",
+        label: "Cobrança",
+        title: a.student_name,
+        subtitle: `Falta: ${a.missing.join(", ")}`,
+        action: () => goToStudent(a.student_id),
+      })),
+      ...missingWorkouts.map((a, i) => ({
+        key: `workout-${a.cycle_id}-${i}`,
+        tone: "danger",
+        label: "Treino",
+        title: a.student_name,
+        subtitle: `Ciclo ${a.cycle_number} sem treino prescrito.`,
+        action: () => goToStudent(a.student_id),
+      })),
+      ...birthdays.map((a, i) => ({
+        key: `birthday-${a.student_id}-${i}`,
+        tone: a.isToday ? "info" : "neutral",
+        label: "Aniversário",
+        title: a.full_name,
+        subtitle: a.isToday ? "Hoje" : `Dia ${a.day}`,
+        action: () => goToStudent(a.student_id),
+        birthday: a,
+      })),
+    ];
+
+    const visibleItems = attentionItems.slice(0, 6);
+    const hiddenCount = Math.max(attentionItems.length - visibleItems.length, 0);
+    const countPills = [
+      { label: "Ações", value: pendingActions.length },
+      { label: "Treinador", value: awaitingTrainer.length },
+      { label: "Matrícula", value: missingEnrollment.length },
+      { label: "Cobrança", value: incompleteBilling.length },
+      { label: "Treino", value: missingWorkouts.length },
+      { label: "Aniversários", value: birthdays.length },
+    ].filter((item) => item.value > 0);
+
+    const toneClass: Record<string, string> = {
+      danger: "border-destructive/20 bg-destructive/5 text-destructive",
+      warning: "border-warning/20 bg-warning/5 text-warning",
+      info: "border-primary/20 bg-primary/5 text-primary",
+      neutral: "border-border bg-secondary/40 text-muted-foreground",
+    };
+
+    return (
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-primary text-xl flex flex-wrap items-center gap-2">
+            <Bell className="h-5 w-5" />CENTRAL DE ATENÇÃO
+            <BnitoContextButton
+              label="central de atencao"
+              context={`Dashboard com ${attentionItems.length} pendencias consolidadas por prioridade operacional.`}
+              question="Qual destas pendencias eu devo resolver primeiro hoje?"
+              className="ml-auto"
+            />
+          </CardTitle>
+          <div className="flex flex-wrap gap-2">
+            {countPills.map((pill) => (
+              <span key={pill.label} className="rounded border border-border bg-secondary/40 px-2 py-1 text-xs font-sans text-muted-foreground">
+                {pill.label}: <strong className="text-foreground font-mono-data">{pill.value}</strong>
+              </span>
+            ))}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {visibleItems.map((item) => (
+              <div key={item.key} className={`flex items-center justify-between gap-3 rounded-lg border p-2 ${toneClass[item.tone] || toneClass.neutral}`}>
+                <button type="button" className="min-w-0 flex-1 text-left" onClick={item.action}>
+                  <div className="flex items-center gap-2">
+                    <span className="shrink-0 rounded bg-background/70 px-1.5 py-0.5 text-[11px] font-sans">{item.label}</span>
+                    <p className="truncate text-sm font-medium text-foreground font-sans">{item.title}</p>
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground font-sans">{item.subtitle}</p>
+                </button>
+                {item.resolveId && (
+                  <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => resolveAlert(item.resolveId)}>
+                    <Check className="h-4 w-4" />
+                  </Button>
+                )}
+                {item.birthday && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs shrink-0 border-primary/40 text-primary hover:bg-primary/5"
+                    onClick={() => sendBirthday(item.birthday.student_id, item.birthday.full_name)}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+          {hiddenCount > 0 && (
+            <p className="mt-3 text-xs text-muted-foreground font-sans">
+              +{hiddenCount} itens adicionais. Use as telas específicas para limpar a fila completa.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

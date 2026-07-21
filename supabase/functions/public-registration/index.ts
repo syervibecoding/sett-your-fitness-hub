@@ -33,6 +33,41 @@ async function resolveCompany(slug: string | null) {
   return data;
 }
 
+const normalizeEmail = (value: unknown) =>
+  typeof value === "string" ? value.trim().toLowerCase() : "";
+
+const onlyDigits = (value: unknown) =>
+  typeof value === "string" ? value.replace(/\D/g, "") : "";
+
+const escapeLikePattern = (value: string) => value.replace(/[\\%_]/g, "\\$&");
+
+async function findExistingStudent(companyId: string, student: Record<string, unknown>) {
+  const email = normalizeEmail(student.email);
+  const cpf = onlyDigits(student.cpf);
+
+  if (email) {
+    const { data } = await supabase
+      .from("students")
+      .select("id")
+      .eq("company_id", companyId)
+      .ilike("email", escapeLikePattern(email))
+      .maybeSingle();
+    if (data?.id) return data;
+  }
+
+  if (cpf) {
+    const { data } = await supabase
+      .from("students")
+      .select("id")
+      .eq("company_id", companyId)
+      .eq("cpf", cpf)
+      .maybeSingle();
+    if (data?.id) return data;
+  }
+
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -100,11 +135,19 @@ Deno.serve(async (req) => {
       const insertPayload: Record<string, any> = { company_id: companyId, status: "pending" };
       for (const k of allowed) if (student[k] !== undefined) insertPayload[k] = student[k];
 
+      const existingStudent = await findExistingStudent(companyId, insertPayload);
+      if (existingStudent?.id) {
+        return new Response(JSON.stringify({ studentId: existingStudent.id, existing: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const { data, error } = await supabase
         .from("students").insert(insertPayload).select("id").single();
       if (error) {
+        const duplicate = String(error.code || "") === "23505";
         return new Response(JSON.stringify({ error: error.message }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: duplicate ? 409 : 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       return new Response(JSON.stringify({ studentId: data.id }), {

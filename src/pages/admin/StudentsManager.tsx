@@ -62,6 +62,23 @@ const statusColors: Record<string, string> = {
 
 const emptyForm = { full_name: "", email: "", phone: "", status: "pending", notes: "", birth_date: "", cpf: "", cep: "", address: "", address_number: "", neighborhood: "", city: "", state: "", whatsapp: "" };
 
+const normalizeEmail = (value: string | null | undefined) => (value || "").trim().toLowerCase();
+const onlyDigits = (value: string | null | undefined) => (value || "").replace(/\D/g, "");
+
+function findDuplicateStudent(students: Student[], payload: { email: string | null; cpf: string | null; phone: string | null; whatsapp: string | null }, currentId?: string) {
+  const email = normalizeEmail(payload.email);
+  const cpf = onlyDigits(payload.cpf);
+  const phone = onlyDigits(payload.whatsapp || payload.phone);
+
+  return students.find((student) => {
+    if (student.id === currentId) return false;
+    if (email && normalizeEmail(student.email) === email) return true;
+    if (cpf && onlyDigits(student.cpf) === cpf) return true;
+    if (!email && !cpf && phone && onlyDigits(student.whatsapp || student.phone) === phone) return true;
+    return false;
+  });
+}
+
 export default function StudentsManager() {
   const [students, setStudents] = useState<Student[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -215,6 +232,17 @@ export default function StudentsManager() {
       city: form.city.trim() || null, state: form.state.trim() || null,
       whatsapp: form.whatsapp.replace(/\D/g, "") || null,
     };
+
+    const duplicate = findDuplicateStudent(students, payload, editing?.id);
+    if (duplicate) {
+      toast({
+        title: "Aluno já cadastrado",
+        description: `${duplicate.full_name} já usa este e-mail/CPF. Abra o perfil existente em vez de criar outro.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (editing) {
       const { error } = await supabase.from("students").update(payload).eq("id", editing.id);
       if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }

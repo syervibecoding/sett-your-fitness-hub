@@ -1,9 +1,9 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, TrendingUp, RefreshCw, Clock, UserX, Timer, RotateCcw, MessageCircle, CalendarRange } from "lucide-react";
+import { Users, TrendingUp, RefreshCw, Clock, UserX, Timer, RotateCcw, MessageCircle, CalendarRange, BarChart3, ChevronDown } from "lucide-react";
 import { format, addDays, differenceInCalendarDays, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { buildStudentChatMap, createPlansLink, openStudentChat, renewalMessage } from "@/lib/studentChat";
 import { businessDateYmd } from "@/lib/businessDate";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const LazyChart = lazy(() => import("recharts").then(mod => ({
   default: ({ data, colors }: { data: { name: string; count: number }[]; colors: string[] }) => (
@@ -208,6 +209,7 @@ export default function AdminDashboard() {
   const { role, companyId } = useAuth();
   const { viewingCompany, isViewingCompany } = useMaster();
   const navigate = useNavigate();
+  const [insightsOpen, setInsightsOpen] = useState(false);
   const routePrefix = role === "master" && isViewingCompany ? "admin" : role;
   const effectiveCompanyId = role === "master" ? (isViewingCompany ? viewingCompany?.id : null) : companyId;
 
@@ -329,20 +331,9 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="bg-card border-border">
-            <CardHeader><CardTitle className="text-primary text-xl">PLANOS MAIS VENDIDOS</CardTitle></CardHeader>
-            <CardContent>
-              {planChart.length > 0 ? (
-                <Suspense fallback={<div className="h-[250px] flex items-center justify-center"><div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>}>
-                  <LazyChart data={planChart} colors={chartColors} />
-                </Suspense>
-              ) : (
-                <p className="text-muted-foreground font-sans text-center py-8">Nenhuma matrícula registrada</p>
-              )}
-            </CardContent>
-          </Card>
+        <DashboardAlerts compact />
 
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="bg-card border-border">
             <CardHeader>
               <CardTitle className="text-primary text-xl flex items-center gap-2">
@@ -385,64 +376,95 @@ export default function AdminDashboard() {
               )}
             </CardContent>
           </Card>
+
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="text-primary text-xl flex items-center gap-2">
+                <Timer className="h-5 w-5" />TROCA DE TREINO
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {cycleCountdowns.length > 0 ? (
+                <div className="space-y-3 max-h-[300px] overflow-auto">
+                  {cycleCountdowns.map((m: any, i: number) => (
+                    <div key={i} className="flex flex-col gap-3 rounded-lg border border-border bg-secondary/50 p-3 sm:flex-row sm:items-center sm:justify-between" onClick={() => m.student_id && navigate(`/${routePrefix}/students/${m.student_id}`)}>
+                      <div>
+                        <p className="text-foreground font-sans font-medium text-sm">{m.student_name}</p>
+                        <p className="text-muted-foreground text-xs font-sans">Ciclo {m.cycle_number} · vence {format(parseISO(m.end_date), "dd/MM")}</p>
+                        <p className={`mt-1 text-xs font-medium ${m.next_ready ? "text-emerald-700" : "text-amber-700"}`}>
+                          {m.next_ready ? `Próximo ciclo ${m.next_cycle_number} pronto` : "Próxima prescrição pendente"}
+                        </p>
+                        {m.trainer_id && trainerMap[m.trainer_id] && (
+                          <p className="text-muted-foreground/70 text-[11px] font-sans">Treinador: {trainerMap[m.trainer_id]}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+                        <span className={`rounded px-2 py-1 text-xs font-medium font-mono-data ${m.days_left <= 0 ? "bg-destructive/20 text-destructive" : "bg-warning/20 text-warning"}`}>
+                          {m.days_left <= 0 ? "Hoje" : `${m.days_left}d para troca`}
+                        </span>
+                        {m.next_ready ? (
+                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleCycleNotice(m)}>
+                            <MessageCircle className="mr-1.5 h-3.5 w-3.5" /> Avisar aluno
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={() => navigate(`/${routePrefix}/studio`, { state: { studentId: m.student_id, tab: "prescricao" } })}
+                          >
+                            <CalendarRange className="mr-1.5 h-3.5 w-3.5" /> Prescrever
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground font-sans text-center py-8">Nenhuma troca prevista para os próximos 7 dias</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
-        {/* EVASÃO embutida na dashboard (antes era a rota separada /admin/evasao). */}
-        <AtRiskStudents />
-
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-primary text-xl flex items-center gap-2">
-              <Timer className="h-5 w-5" />TROCA DE TREINO
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {cycleCountdowns.length > 0 ? (
-              <div className="space-y-3 max-h-[300px] overflow-auto">
-                {cycleCountdowns.map((m: any, i: number) => (
-                  <div key={i} className="flex flex-col gap-3 rounded-lg border border-border bg-secondary/50 p-3 sm:flex-row sm:items-center sm:justify-between" onClick={() => m.student_id && navigate(`/${routePrefix}/students/${m.student_id}`)}>
-                    <div>
-                      <p className="text-foreground font-sans font-medium text-sm">{m.student_name}</p>
-                      <p className="text-muted-foreground text-xs font-sans">Ciclo {m.cycle_number} · vence {format(parseISO(m.end_date), "dd/MM")}</p>
-                      <p className={`mt-1 text-xs font-medium ${m.next_ready ? "text-emerald-700" : "text-amber-700"}`}>
-                        {m.next_ready ? `Próximo ciclo ${m.next_cycle_number} pronto` : "Próxima prescrição pendente"}
-                      </p>
-                      {m.trainer_id && trainerMap[m.trainer_id] && (
-                        <p className="text-muted-foreground/70 text-[11px] font-sans">Treinador: {trainerMap[m.trainer_id]}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
-                      <span className={`rounded px-2 py-1 text-xs font-medium font-mono-data ${m.days_left <= 0 ? "bg-destructive/20 text-destructive" : "bg-warning/20 text-warning"}`}>
-                        {m.days_left <= 0 ? "Hoje" : `${m.days_left}d para troca`}
-                      </span>
-                      {m.next_ready ? (
-                        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleCycleNotice(m)}>
-                          <MessageCircle className="mr-1.5 h-3.5 w-3.5" /> Avisar aluno
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          className="h-8 text-xs"
-                          onClick={() => navigate(`/${routePrefix}/studio`, { state: { studentId: m.student_id, tab: "prescricao" } })}
-                        >
-                          <CalendarRange className="mr-1.5 h-3.5 w-3.5" /> Prescrever
-                        </Button>
-                      )}
-                    </div>
+        <Collapsible open={insightsOpen} onOpenChange={setInsightsOpen}>
+          <Card className="bg-card border-border">
+            <CollapsibleTrigger asChild>
+              <button type="button" className="flex w-full items-center justify-between gap-4 p-6 text-left">
+                <div>
+                  <CardTitle className="text-primary text-xl flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />ANÁLISES E ACOMPANHAMENTO
+                  </CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground font-sans">
+                    Coorte, evasão, feedbacks e distribuição por plano quando precisar investigar com mais calma.
+                  </p>
+                </div>
+                <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${insightsOpen ? "rotate-180" : ""}`} />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-6 pt-0">
+                <section className="rounded-lg border border-border bg-secondary/20 p-4">
+                  <h2 className="text-primary text-xl">PLANOS MAIS VENDIDOS</h2>
+                  <div className="mt-4">
+                    {planChart.length > 0 ? (
+                      <Suspense fallback={<div className="h-[250px] flex items-center justify-center"><div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>}>
+                        <LazyChart data={planChart} colors={chartColors} />
+                      </Suspense>
+                    ) : (
+                      <p className="text-muted-foreground font-sans text-center py-8">Nenhuma matrícula registrada</p>
+                    )}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground font-sans text-center py-8">Nenhuma troca prevista para os próximos 7 dias</p>
-            )}
-          </CardContent>
-        </Card>
+                </section>
 
-        <DashboardAlerts />
-
-        <MonthlyPrescriptionsCard companyId={effectiveCompanyId} routePrefix={(routePrefix as string) || "admin"} />
-        <PendingFeedbackCard companyId={effectiveCompanyId} routePrefix={(routePrefix as string) || "admin"} />
-        <CohortInsightsCard companyId={effectiveCompanyId} />
+                {/* EVASÃO embutida na dashboard (antes era a rota separada /admin/evasao). */}
+                <AtRiskStudents />
+                <MonthlyPrescriptionsCard companyId={effectiveCompanyId} routePrefix={(routePrefix as string) || "admin"} />
+                <PendingFeedbackCard companyId={effectiveCompanyId} routePrefix={(routePrefix as string) || "admin"} />
+                <CohortInsightsCard companyId={effectiveCompanyId} />
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
       </div>
     </>
   );
