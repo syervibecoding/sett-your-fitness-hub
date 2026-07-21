@@ -47,8 +47,8 @@ async function fetchAlerts(
   ];
 
   if (!trainerId) {
-    queries.push(addCompanyFilter(supabase.from("students").select("id, full_name, assigned_trainer_id")
-      .in("status", ["active", "pending"]).is("assigned_trainer_id", null)));
+    queries.push(addCompanyFilter(supabase.from("enrollments").select("id, student_id, trainer_id, students(full_name)")
+      .in("status", ["active", "awaiting_training", "awaiting_renewal"]).is("trainer_id", null)));
     queries.push(addCompanyFilter(supabase.from("enrollments").select("id, student_id, trainer_id, created_at, students(full_name)")
       .in("status", ["active", "awaiting_training"]).is("training_start_date", null)));
     queries.push(addCompanyFilter(supabase.from("students").select("id, full_name").eq("status", "active")));
@@ -94,13 +94,8 @@ async function fetchAlerts(
   let nextIdx: number;
 
   if (!trainerId) {
-    // Alunos que já têm treinador na matrícula (ativa/aguardando) — não devem aparecer como "sem treinador"
-    const studentsWithEnrollmentTrainer = new Set(
-      (results[4].data || []).filter((e: any) => e.trainer_id).map((e: any) => e.student_id)
-    );
     awaitingTrainer = (results[1].data || [])
-      .filter((s: any) => !studentsWithEnrollmentTrainer.has(s.id))
-      .map((s: any) => ({ student_name: s.full_name, student_id: s.id }));
+      .map((e: any) => ({ student_name: e.students?.full_name || "—", student_id: e.student_id }));
     // Alunos que já têm alguma matrícula (ativa/aguardando) com data de treino definida — não devem aparecer como "sem data"
     const studentsWithTrainingDate = new Set(
       (results[4].data || []).filter((e: any) => e.training_start_date).map((e: any) => e.student_id)
